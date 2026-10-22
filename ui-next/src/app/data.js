@@ -64,6 +64,19 @@ export const SCOPE_SEG = Object.freeze({ workspace: "workspace", project: "proje
 export const workspace = async (wid) => api(`/v2/workspaces/${enc(wid)}`); // { workspace, projects[] with assessment_count / response_count }
 export const grantsAt = async (scope) => api(`/v2/${SCOPE_SEG[scope.type]}/${enc(scope.id)}/grants`); // { grants, pending_invitations }; member+ only
 export const myInvitations = async () => (await api("/v2/me/invitations")).invitations ?? [];
+// Invitations are a danger twin (cap.grant.invite, write.effect): the dry run is previewed and the person confirms the recipient, role and
+// scope before execute — the current design's two steps (ui/assess/permissions.js preview → Confirm; workspace-permissions TICKET DoD 2).
+export const previewInvite = (scope, { email, role }) => api(`/v2/${SCOPE_SEG[scope.type]}/${enc(scope.id)}/invitations`, { method: "POST", body: { email, role, mode: "dry_run" } });
+export const executeInvite = (scope, { email, role }, confirm_token) => api(`/v2/${SCOPE_SEG[scope.type]}/${enc(scope.id)}/invitations`, { method: "POST", body: { email, role, mode: "execute", confirm_token } });
+/** The two steps as one call for the shell: preview, then `ask(sentence)` (the person's explicit Confirm; false = cancel, nothing is sent),
+ *  then execute with the preview's token. Returns { sent: false } on cancel; throws on a hold or an unreadable preview. */
+export async function inviteWithConfirm(scope, { email, role }, ask, sentence = `${email} will be able to open this ${scope?.type ?? "item"} as ${role} once they accept. An email is sent when you confirm.`) {
+  const p = await previewInvite(scope, { email, role });
+  if (p?.suppressed === true || p?.status === "held") throw new Error("the server held the invitation");
+  if (typeof p?.confirm_token !== "string" || !p.confirm_token) throw new Error("the preview could not be read");
+  if (!(await ask(`${sentence}${p.impact?.irreversible ? " This cannot be undone from here." : ""}`))) return { sent: false };
+  return { sent: true, result: await executeInvite(scope, { email, role }, p.confirm_token) };
+}
 export const invite = (scope, { email, role }) => confirmed(`/v2/${SCOPE_SEG[scope.type]}/${enc(scope.id)}/invitations`, { email, role });
 export const previewRole = async (scope, gid, role) => api(`/v2/${SCOPE_SEG[scope.type]}/${enc(scope.id)}/grants/${enc(gid)}`, { method: "PATCH", body: { role, mode: "dry_run" } });
 export const executeRole = async (scope, gid, role, confirm_token) => api(`/v2/${SCOPE_SEG[scope.type]}/${enc(scope.id)}/grants/${enc(gid)}`, { method: "PATCH", body: { role, mode: "execute", confirm_token } });

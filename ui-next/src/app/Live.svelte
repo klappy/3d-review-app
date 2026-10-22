@@ -19,6 +19,7 @@
   import * as D from "./data.js";
   import * as P from "./participant.js";
   import * as SU from "./setup.js";
+  import { sheetSentence } from "../../../ui/assess/permissions.js";
   import { classify } from "./api.js";
   import { REGISTRY } from "../screens/registry.js";
   import About from "../screens/About.svelte";
@@ -265,7 +266,14 @@
   // People actions (app/data.js: the same routes the current UI's permissions page calls); each lands on a fresh read, or the shell's error.
   const peopleScope = () => page.data?.data?.scope;
   const act = async (label, fn) => { try { await fn(); load(); } catch (e) { page = { status: "error", key: route.name, data: null, error: { kind: classify(e), message: `${label}: ${e?.message || "the request could not be completed"}` } }; } };
-  const sendInvite = ({ email, role }) => act("Invitation not sent", async () => { const out = await D.invite(peopleScope(), { email, role }); if (out.held) throw new Error("the server held the invitation"); }); // an empty or malformed address is the server's INVALID_PARAMS, shown as is
+  // Send invitation = preview (dry run) → the person confirms recipient, role and scope in the current design's sentence
+  // (ui/assess/permissions.js sheetSentence) → execute with the preview's token. Cancel sends nothing. An empty or malformed address is
+  // the server's INVALID_PARAMS, shown as is.
+  const sendInvite = ({ email, role }) => act("Invitation not sent", async () => {
+    const scope = peopleScope();
+    const out = await D.inviteWithConfirm(scope, { email, role }, (text) => !!globalThis.confirm?.(text), sheetSentence({ kind: "invite", params: { email, role } }, scope?.type));
+    if (!out.sent) throw new Error("not confirmed; no invitation was sent");
+  });
   const rowAction = (name, row) => act(name === "Withdraw" ? "Invitation not withdrawn" : "Access not removed", () => (row.pending ? D.revokeInvitation(row.key) : D.revokeGrant(peopleScope(), row.key)));
   // A role change is a danger twin: the dry run's impact is shown and the person confirms before execute (an owner elevation cannot be
   // undone here; a downgrade can revoke the person's outstanding invitations). Codex P1 on 26a86937.
