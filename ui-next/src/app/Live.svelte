@@ -63,6 +63,12 @@
     if (PARTICIPANT.has(name)) return participant(r);
     if (name === "home") { const me = await S.me(); if (!me) return { screen: "landing" }; const home = await D.homeModel(me); return { screen: "home", home, state: home.empty ? "first" : "reviews" }; }
     if (name === "external") { globalThis.location.assign(params.href); return { screen: null }; } // the sample review in the current design
+    // The sample review is a closed world (captain 2026-10-22 10:36 ET: a clickable journey across every screen, nothing live): any
+    // route carrying the sample id — review, project, setup ?review=, people ?review= — renders its approved fixture with the
+    // "Sample data" line and never calls the API. The results lane keeps its fixture report; everything else draws its own fixture.
+    const inSample = params.aid === SAMPLE_AID || params.pid === SAMPLE_AID || params.wid === SAMPLE_AID || route.query.get("review") === SAMPLE_AID;
+    if (inSample) setLiveContext({ ...liveContext(), aid: SAMPLE_AID, pid: SAMPLE_AID, wid: SAMPLE_AID }); // every link from a sample screen stays in the sample
+    if (inSample && !SAMPLE.has(name)) { if (name === "review") return { redirect: to("setup5", {}, { review: SAMPLE_AID }) }; if (name === "setup") return { redirect: to("setup1", {}, { review: SAMPLE_AID }) }; return { screen: name, sample: true, fixture: true }; }
     if (params.aid === SAMPLE_AID) { if (!SAMPLE.has(name)) return { redirect: to("results", { aid: SAMPLE_AID }) }; const m = sampleModel(); return name === "next-step" || name === "action-plan" ? { screen: name, results: m, plan: D.nextStepModel(m), sample: true } : name === "results-answers" ? { screen: name, results: m, answers: { suppressed: true, reason: "sample data has no answer rows" }, sample: true } : { screen: name, results: m, sample: true }; }
     if (name === "landing" || name === "about" || name === "help") return { screen: name };
     // Feedback posts the existing contract (ui/assess/feedback.js: POST /v2/feedback with require_authenticated); the sample tour and the
@@ -319,6 +325,10 @@
   <Status {phone} {theme} kind="loading" />
 {:else if page.status === "error"}
   <Status {phone} {theme} kind={page.error.kind} message={page.error.message} onretry={load} />
+{:else if page.data.fixture}
+  {@const C = REGISTRY[page.data.screen]}
+  <Status {phone} {theme} kind="preview" inline message="Sample data: a made-up review that shows the design. Nothing here is saved." back={to("home")} backLabel="Home" />
+  <C {phone} {theme} state={route.query.get("state") ?? undefined} />
 {:else if page.data.screen === "landing"}
   <Landing {phone} {theme} />
 {:else if page.data.screen === "about"}

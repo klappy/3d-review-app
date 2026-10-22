@@ -232,11 +232,11 @@ if ((await f.textContent("body")).includes("design preview")) fail("setup1: stil
 const renamed = `${a.name} ✎`;
 await f.fill("#name", renamed);
 if (!(await f.inputValue("#close"))) await f.fill("#close", new Date(Date.now() + 30 * 86400e3).toISOString().slice(0, 10)); // the wizard's rule: an active-until date is required
-await f.click(".btn-primary"); await f.waitForURL(/setup\/2\?review=/); await loaded(f, "setup2");
+await f.click(".btn-primary"); await f.waitForURL(/\/review\/[^/]+\/collect$/); await loaded(f, "collect"); // a launched review edits details only, then returns to its page (steps 2–4 could archive a live survey)
 const s1row = await api(`/v2/assessments/${a.id}`);
 if (s1row?.assessment?.name !== renamed) fail(`setup1: Continue did not save the name (server has ${JSON.stringify(s1row?.assessment?.name)})`);
 await api(`/v2/assessments/${a.id}`, { name: a.name }, "PATCH"); // put the name back for the rest of the run
-ok(`prepare: Setup 5 shows ${a.name} read-only (primary "Go to Collect"); Setup 1 is live: renaming it and pressing Continue wrote the server row (PATCH), then restored`);
+ok(`prepare: Setup 5 shows ${a.name} read-only (primary "Go to Collect"); Setup 1 is live: renaming it and pressing Continue wrote the server row (PATCH) and returned to the review page (launched: steps 2–4 closed), then restored`);
 // Print QR pages: "Print N page(s)" opens the print document in its own tab (app/print.js, the current UI's sheets) and that
 // document calls print() itself — verified by stubbing print() in the new tab, not by the modal rendering.
 await f.goto(`${BASE}/next/#/review/${a.id}/collect/print`); await f.waitForSelector(".qr", { timeout: 30000 }); await loaded(f, "print-qr");
