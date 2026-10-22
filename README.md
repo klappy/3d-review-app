@@ -10,7 +10,7 @@ The governing target is `main` â†’ existing **3d-review-dev** and `production` â
 ## Run locally
 ```
 npm i
-npm run migrate:local && npx wrangler d1 execute 3d-review --local --file=migrations/0002_platform_ext.sql && npm run seed:local
+for f in migrations/*.sql; do npx wrangler d1 execute 3d-review-dev --local --file=$f; done && npm run seed:local   # every migration in order (0002_platform_ext.sql never existed); reset with rm -rf .wrangler/state; see scripts/ui-next-acceptance/README.md
 npm run dev            # http://localhost:8787
 curl localhost:8787/v2/health
 curl localhost:8787/mcp -H 'content-type: application/json' -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}'

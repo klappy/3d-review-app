@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 // UI Next (v4) participant lane screens + their /next/ routes (status: provisional).
 // Screens fanout, participant lane (3d-review-cookbook work/active/2026-10-21-ui-next-screens-fanout/TICKET.md). Boards: cookbook
-// design/2026-10-15-glass-redesign/canvas PWelcome, PCode, PCodeError, PPassage, PAbout, PQuestion, PReview, PReceipt, PProblem, PProblemBusy (390x844).
+// design/2026-10-15-glass-redesign/canvas PWelcome, PCode, PCodeError, PPassage, PAbout, PQuestion, PReview, PReceipt, PProblem (390x844; PProblemBusy retired, cookbook PR 198).
 import { describe, expect, it } from "vitest";
 import { readFileSync, readdirSync } from "node:fs";
 import { resolve } from "node:path";
@@ -49,7 +49,6 @@ const BOARDS: [string, string, string | undefined, C, string[], string | null][]
   ["PReview", "p-review", undefined, PReview, ["Check your answers", "You can change any answer before you send.", "Most of it is easy, but some parts are hard", "Some words are unfamiliar or strange", "We use it occasionally", "Show all 13 answers"], "Send my answers"],
   ["PReceipt", "p-receipt", undefined, PReceipt, ["Thank you", "Your answers were received. Your perspective helps the translation grow.", "Receipt", "R-2048-731", "Keep this in case the person who invited you asks for it.", "You can close this page.", "Interview another person"], null],
   ["PProblem", "p-problem", undefined, PProblem, ["We couldn't confirm your answers were received", "sending twice won't count twice.", "Other things that can happen", "This survey has closed", "Collection ended on 31 Oct.", "This link doesn't work", "You already answered", "your receipt was R-2048-731"], "Try sending again"],
-  ["PProblemBusy", "p-problem", "busy", PProblem, ["A lot of people are opening this at once", "If you are in a room with many people on the same Wi-Fi, this is normal.", "Retrying in 12 s · attempt 2 of 5", "If it keeps happening", "Switch to mobile data", "Ask for a paper copy", "Show this screen to the facilitator", "RL_HTTP_ANON · 429 · 22:41:07"], "Try now"],
 ];
 
 describe("participant screens render as the boards draw them", () => {
@@ -196,18 +195,17 @@ describe("participant screens: fields, states and data wiring", () => {
     expect(btns[0].classList.contains("btn-lg")).toBe(true);
     expect(btns[0].classList.contains("btn-block")).toBe(true);
   });
-  it("PProblem: the fixture's error picks the board through ui/rate-limit.js; busy carries the retry line and the diagnostic", () => {
+  it("PProblem: one problem board; the former busy (rate-limited, automatic retry) state is retired (cookbook PR 198; RULING-2026-10-16-scrap-app-ratelimit)", () => {
     expect(problem(undefined).busy).toBe(false);
-    expect(problem(undefined, { ...DATA, problem: { ...DATA.problem, error: { status: 429, code: "RATE_LIMITED" } } }).busy).toBe(true);
-    expect(problem("busy").retry).toBe("Retrying in 12 s · attempt 2 of 5");
+    expect(problem("busy").busy).toBe(false);
+    expect(problem(undefined, { ...DATA, problem: { ...DATA.problem, error: { status: 429, code: "RATE_LIMITED" } } }).busy).toBe(false);
     const a = mount(PProblem, { phone: true, state: "busy" });
-    expect(a.querySelector("[role=progressbar]")).toBeNull(); // no "40 of 100": the bar is decorative
-    const bar = a.querySelector("svg.bar") as Element;
-    expect(bar.getAttribute("aria-hidden")).toBe("true");
-    expect(bar.querySelector("rect")!.getAttribute("width")).toBe("40%"); // attempt 2 of 5
-    expect(text(a.querySelector("[role=status]")!)).toBe("Retrying in 12 s · attempt 2 of 5");
-    expect(a.querySelectorAll(".l-card[data-pad=hero]").length).toBe(2);
-    expect(a.querySelectorAll(".l-row[data-align=start] > .icn[data-size='32']").length).toBe(3);
+    expect(a.textContent).toContain("We couldn't confirm your answers were received");
+    expect(a.textContent).not.toMatch(/A lot of people are opening this at once|Retrying in|RL_HTTP_ANON|mobile data|Wi-Fi/);
+    expect(a.querySelectorAll(".btn-primary").length).toBe(1);
+    // live: a server-asked wait (an upstream 429 passed through) is stated, never auto-retried
+    const live = { ...DATA, live: true, notice: "", receipt: "", rateLimited: true, retryAfter: 30 };
+    expect(problem(undefined, live)).toMatchObject({ busy: false, retryAfter: 30 });
   });
   it("chips: the PIN's .icn[data-size] rows; fact and list chips wear the survey's lens (Community), the problem head and the code page are neutral", () => {
     expect(surveyLens()).toBe("community");

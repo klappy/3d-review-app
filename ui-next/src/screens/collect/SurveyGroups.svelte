@@ -27,8 +27,8 @@
     {#each groups as g (g.lens)}{#each g.surveys as s (s.code)}
       <div class="l-row" data-gap="2">
         <span class="lensdot" data-lens={g.lens} aria-hidden="true"></span>
-        <div class="l-stack" data-gap="1" data-grow><span class="h3">{s.name}</span><Bar value={s.answered} max={s.expected} lens={g.lens} /></div>
-        <span class="small tab-n">{s.answered}/{s.expected}</span>
+        <div class="l-stack" data-gap="1" data-grow><span class="h3">{s.name}</span><Bar value={s.answered} max={s.expected ?? "—"} lens={g.lens} /></div>
+        <span class="small tab-n">{s.answered}/{s.expected ?? "—"}</span>
         <Row gap={2}>
           <Button icon={copy} ariaLabel={`Copy link for ${s.name}`} variant="quiet" href={href("share")} />
           <Button icon={qr} ariaLabel={`QR for ${s.name}`} variant="quiet" href={href("qr-room", { state: String(s.n) })} />
@@ -41,13 +41,13 @@
     <Card gap={1}>
       <Row split gap={3}>
         <Row gap={3}><span class="icn icn-lens" data-lens={g.lens}><Glyph name="people" /></span><span class="h3">{g.label}</span><span class="small">· {g.surveys.length} {g.surveys.length === 1 ? "survey" : "surveys"}</span></Row>
-        <span class="small tab-n">{g.answered} of {g.expected} expected</span>
+        <span class="small tab-n">{g.answered} of {g.expected ?? "—"} expected</span>
       </Row>
       {#each g.surveys as s (s.code)}
         <div class="l-grid" data-gap="3" data-tpl="survey-row">
           <div class="l-stack" data-gap="1"><span class="h3">{s.name}</span><span class="micro kbd">{s.link}</span></div>
-          <Bar value={s.answered} max={s.expected} lens={g.lens} />
-          <span class="num tab-n" data-size="20">{s.answered} <span class="small">of {s.expected}</span></span>
+          <Bar value={s.answered} max={s.expected ?? "—"} lens={g.lens} />
+          <span class="num tab-n" data-size="20">{s.answered} <span class="small">of {s.expected ?? "—"}</span></span>
           <Row gap={1}>
             <Button icon={copy} ariaLabel={`Copy link for ${s.name}`} variant="quiet" href={href("share")} />
             <Button icon={qr} ariaLabel={`QR code for ${s.name}`} variant="quiet" href={href("qr-room", { state: String(s.n) })} />

@@ -99,7 +99,8 @@ export async function collectModel(aid, origin = globalThis.location?.origin ?? 
     const key = lensKeyOf(s.perspective) ?? "team";
     const c = counts[i];
     const answered = Number(c?.counts?.responses ?? 0);
-    const expected = Number(c?.expected_count ?? c?.survey?.expected_count ?? s.expected_count ?? 0) || Math.max(answered, 1);
+    const raw = c?.expected_count ?? c?.survey?.expected_count ?? s.expected_count;
+    const expected = Number.isFinite(Number(raw)) && Number(raw) > 0 ? Number(raw) : null; // null = no expected count set (model.js draws no bar)
     const row = { id: s.id, name: s.template_name || s.template_id, room: s.template_name || s.template_id, code: "", answered, expected, open: s.collection_status === "open", qr: null, link: null };
     if (!byLens.has(key)) byLens.set(key, []);
     row.fullLink = null;
@@ -112,7 +113,8 @@ export async function collectModel(aid, origin = globalThis.location?.origin ?? 
     user: { first: "", initials: "" }, workspace: "",
     project: { name: p.name, href: to("project", { pid: a.project_id }) },
     review: { id: a.id, title: a.name, stage, language: a.language_name || "", modality: a.format ? a.format[0].toUpperCase() + a.format.slice(1) : "", updated: ago(a.created_at), passage: "", opens: shortDate(a.created_at), closes: "", daysLeft: null, serverStage: a.stage },
-    room: { opened: counts.reduce((n, c) => n + Number(c?.counts?.respondents ?? 0), 0), refused: 0 },
+    // No room telemetry: the room-health counter is retired (cookbook PR 198; RULING-2026-10-16-scrap-app-ratelimit) and no capability
+    // reports opens per minute or refusals, so nothing is invented here (root plan @6cd4cd8 step 4).
     groups, linkHost: `${origin}/next/#survey=`,
     // PrintQR's choices (every survey ticked, the three layouts the board draws) and QRRoomPhone's default survey.
     printQr: { checked: live.map((s) => s.id), layouts: [{ title: "One page per survey", help: "A full-page code to pin up or hold up.", per: "survey" }, { title: "Hand-out cards", help: "Six cards per page, cut along the lines, one survey per sheet.", per: "sheet", cards: 6 }, { title: "All on one page", help: "Every selected code on one sheet, for the table.", per: "one" }], languages: [a.language_name || "English"], papers: ["A4", "Letter"], pageLanguages: a.language_name || "English" },

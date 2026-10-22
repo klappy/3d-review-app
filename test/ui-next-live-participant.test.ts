@@ -28,12 +28,12 @@ describe("model(state)", () => {
 });
 
 describe("screenFor(state)", () => {
-  it("lands each phase on its screen; a rate limit is the busy problem", () => {
+  it("lands each phase on its screen; a server-asked wait lands on the one problem board (busy state retired, cookbook PR 198)", () => {
     expect(screenFor({ phase: "form" })).toEqual(["p-welcome", {}]);
     expect(screenFor({ phase: "review" })).toEqual(["p-review", {}]);
     expect(screenFor({ phase: "receipt" })).toEqual(["p-receipt", {}]);
     expect(screenFor({ phase: "unavailable" })).toEqual(["p-problem", {}]);
-    expect(screenFor({ phase: "unavailable", rateLimited: true })).toEqual(["p-problem", { state: "busy" }]);
+    expect(screenFor({ phase: "unavailable", rateLimited: true })).toEqual(["p-problem", {}]);
     expect(screenFor({ phase: "opening" })).toEqual([null, {}]);
     expect(screenFor(null)).toEqual(["p-code", {}]);
   });

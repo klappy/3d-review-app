@@ -6,6 +6,32 @@ import { parse, to, linkFor, ROUTES, needs } from "../ui-next/src/app/router.js"
 import { href, setLiveContext } from "../ui-next/src/screens/href.js";
 // @ts-expect-error -- plain .js module, no type declarations
 import { REGISTRY } from "../ui-next/src/screens/registry.js";
+// @ts-expect-error -- plain .js module, no type declarations
+import { liveEntry, FLAG } from "../ui-next/src/route.js";
+
+describe("entry contract (route.js liveEntry; glass-v4 ASK option 1)", () => {
+  const mem = () => { const m = new Map(); return { getItem: (k: string) => m.get(k) ?? null, setItem: (k: string, v: string) => m.set(k, v), removeItem: (k: string) => m.delete(k) }; };
+  it("flag off by default: bare /next/ is the gallery; ?ui_next=on stores the opt-in and mounts the live app; ?ui_next=off clears it", () => {
+    const s = mem();
+    expect(liveEntry(new URLSearchParams(""), s)).toBe(false);
+    expect(liveEntry(new URLSearchParams("ui_next=on"), s)).toBe(true);
+    expect(s.getItem(FLAG)).toBe("on");
+    expect(liveEntry(new URLSearchParams(""), s)).toBe(true);
+    expect(liveEntry(new URLSearchParams("ui_next=off"), s)).toBe(false);
+    expect(s.getItem(FLAG)).toBeNull();
+    expect(liveEntry(new URLSearchParams(""), s)).toBe(false);
+  });
+  it("explicit fixture selection wins over the flag: ?screen= is a board, ?page= the gallery", () => {
+    const s = mem(); s.setItem(FLAG, "on");
+    expect(liveEntry(new URLSearchParams("screen=qr-room"), s)).toBe(false);
+    expect(liveEntry(new URLSearchParams("page=components"), s)).toBe(false);
+    expect(liveEntry(new URLSearchParams("theme=dark"), s)).toBe(true);
+  });
+  it("works without storage (private mode): only an explicit ?ui_next=on this navigation", () => {
+    expect(liveEntry(new URLSearchParams("ui_next=on"), undefined)).toBe(true);
+    expect(liveEntry(new URLSearchParams(""), undefined)).toBe(false);
+  });
+});
 
 describe("router", () => {
   it("every registered lane screen has a route of the same name", () => {

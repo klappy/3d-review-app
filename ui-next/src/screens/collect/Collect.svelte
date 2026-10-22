@@ -38,7 +38,7 @@
   {:else}
     <div class="l-grid" data-gap="5" data-tpl="aside">
       <div class="l-stack" data-gap="3">
-        <div class="l-row" data-gap="3" data-align="baseline"><h2 class="h2">Responses</h2><span class="num" data-size="40">{m.answered}</span><span class="small">of {m.expected} expected · updated {r.updated}</span></div>
+        <div class="l-row" data-gap="3" data-align="baseline"><h2 class="h2">Responses</h2><span class="num" data-size="40">{m.answered}</span><span class="small">of {m.expected ?? "—"} expected · updated {r.updated}</span></div>
         <SurveyGroups groups={m.groups} />
       </div>
       <aside class="l-stack" data-gap="4">

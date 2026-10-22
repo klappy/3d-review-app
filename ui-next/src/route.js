@@ -2,6 +2,11 @@
 // Flag (glass-v4 ASK option 1): off by default, core team only. On when localStorage.ui_next === "on", or when the URL carries
 // ?ui_next=on (which stores it); ?ui_next=off clears it. Client-only: no server change. Gallery pages stay at ?page=components|layouts|home.
 export const FLAG = "ui_next";
+// Entry contract for /next/ (main.js): the live app mounts only with the flag on (stored opt-in or ?ui_next=on this navigation) and no
+// explicit fixture selection (?screen= board, ?page= gallery); ?ui_next=off clears the opt-in and shows the gallery. Client-only.
+export function liveEntry(params, storage) {
+  return flagOn(params, storage) && !params.has("page") && !params.has("screen");
+}
 export function flagOn(params, storage) {
   const q = params.get(FLAG);
   // An explicit query controls this navigation even when persistence is absent,

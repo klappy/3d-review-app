@@ -18,15 +18,17 @@ export function stageTabs(current = "collect", hrefs = {}) {
   return STAGES.map((s, i) => ({ id: s.id, label: s.label, n: i + 1, done: i < at, current: i === at, href: hrefs[s.id] }));
 }
 
-const sum = (xs, k) => xs.reduce((n, x) => n + x[k], 0);
+// A null expected count (no capability set it) stays explicit: sums skip it and the screens draw "—", never a different number.
+const sum = (xs, k) => xs.reduce((n, x) => n + (x[k] ?? 0), 0);
+const sumOrNull = (xs, k) => (xs.some((x) => x[k] != null) ? sum(xs, k) : null);
 // Board bars use int(a / b * 100) (boards_fac.py group_rows): floor, so 2 of 3 draws 66 %.
 export const pct = (a, b) => (b > 0 ? Math.floor((a / b) * 100) : 0);
 
 export function collectModel(fx) {
   const groups = fx.groups.map((g) => {
     if (!Object.hasOwn(LENSES, g.lens)) throw new TypeError(`collectModel: unknown lens "${String(g.lens)}"`);
-    const surveys = g.surveys.map((s) => ({ ...s, lens: g.lens, pct: pct(s.answered, s.expected), link: s.link ?? fx.linkHost + s.code }));
-    return { lens: g.lens, label: LENSES[g.lens], surveys, answered: sum(surveys, "answered"), expected: sum(surveys, "expected") };
+    const surveys = g.surveys.map((s) => ({ ...s, lens: g.lens, pct: pct(s.answered, s.expected ?? 0), link: s.link ?? fx.linkHost + s.code }));
+    return { lens: g.lens, label: LENSES[g.lens], surveys, answered: sum(surveys, "answered"), expected: sumOrNull(surveys, "expected") };
   });
   const surveys = groups.flatMap((g) => g.surveys);
   surveys.forEach((s, i) => { s.n = i + 1; }); // 1-based survey number: QRRoomPhone's ?state=<n>
@@ -36,7 +38,7 @@ export function collectModel(fx) {
     groups,
     surveys,
     answered: sum(groups, "answered"),
-    expected: sum(groups, "expected"),
+    expected: sumOrNull(groups, "expected"),
     meta: `${fx.project.name} · ${r.language} · ${r.modality}`,
     // CloseCollection's per-perspective line: "Translation team 6 · Community 8 · Church 4".
     byLens: groups.map((g) => `${g.label} ${g.answered}`).join(" · "),

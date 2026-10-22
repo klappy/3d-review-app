@@ -10,7 +10,6 @@ import { UI_EN, SURVEYOR_EN, passageNames } from "../../../../ui/participate/i18
 import { fill } from "../../../../ui/shared-link.js";
 import { reviewAnswer } from "../../../../ui/present.js";
 import { aboutFields } from "../../../../ui/participant-view.js";
-import { isRateLimited, retryAfterSeconds } from "../../../../ui/rate-limit.js";
 import { LENSES } from "../../../../ui/lens-surveys.js";
 
 export const DATA = fixture;
@@ -104,18 +103,12 @@ export function review(all = false, d = DATA) {
   return { rows: ids.map((id) => ({ id, n: n(id), q: itemById(id, d).text, a: reviewAnswer(asShown(itemById(id, d), d), d.answers[id], d.answers._other?.[id]) })), total: d.form.items.length, all };
 }
 
-// PProblem vs PProblemBusy: the app's own rate-limit test picks the state from the fixture's error; ?state=busy forces it; any other
-// ?state= is ignored. The busy bar is the retry attempts (attempt of attempts): decorative, the retry line is the live text.
+// PProblem: the one problem board (send not confirmed; closed / link gone / already answered as the other cases). The former
+// PProblemBusy state (refused by the app rate limiter, automatic retry) is RETIRED: the app carries no participant/IP limiter
+// (cookbook RULING-2026-10-16-scrap-app-ratelimit; PR 198), so that state cannot occur. ?state= is ignored. Live (d.live): the
+// journey's own notice (ui/participate/controller.js copy) is the headline's explanation; a wait the server asked for (an upstream
+// 429 passed through) is said plainly, never retried by the page on its own.
 export function problem(state, d = DATA) {
-  const s = pickState(state, ["busy"]);
-  // Live: the journey's own unavailable state (ui/participate/controller.js): rateLimited -> busy with its wait; else the notice it chose.
-  if (d.live) {
-    const busy = s === "busy" || d.rateLimited;
-    return busy ? { busy: true, attempt: 1, attempts: 3, retry: d.retryAfter ? `You can try again in ${d.retryAfter} s` : "You can try again in a moment", diag: d.notice || "", closedOn: "", receipt: d.receipt } : { busy: false, closedOn: "", receipt: d.receipt, notice: d.notice || "" };
-  }
-  const busy = s === "busy" || (s === undefined && isRateLimited(d.problem.error.status, d.problem.error.code));
-  if (!busy) return { busy: false, closedOn: d.problem.closedOn, receipt: d.receipt };
-  const b = d.busy;
-  if (!isRateLimited(b.error.status, b.error.code)) throw new TypeError("participant fixture: the busy state needs a rate-limit refusal");
-  return { busy: true, attempt: b.attempt, attempts: b.attempts, retry: `Retrying in ${retryAfterSeconds(b.error.retryAfter)} s · attempt ${b.attempt} of ${b.attempts}`, diag: `${b.error.code} · ${b.error.status} · ${b.at}` };
+  if (d.live) return { busy: false, closedOn: "", receipt: d.receipt, notice: d.notice || "", retryAfter: d.rateLimited ? d.retryAfter : undefined };
+  return { busy: false, closedOn: d.problem.closedOn, receipt: d.receipt };
 }

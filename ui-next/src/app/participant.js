@@ -71,7 +71,7 @@ export function screenFor(state) {
     case "form": return ["p-welcome", {}];
     case "review": return ["p-review", {}];
     case "receipt": return ["p-receipt", {}];
-    case "unavailable": return ["p-problem", state.rateLimited ? { state: "busy" } : {}];
+    case "unavailable": return ["p-problem", {}]; // a server-asked wait (upstream 429) is said on the one problem board; no busy state
     default: return [null, {}];
   }
 }

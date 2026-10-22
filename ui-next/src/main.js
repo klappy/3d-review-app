@@ -24,7 +24,7 @@ import Home from "./screens/Home.svelte";
 import About from "./screens/About.svelte";
 import Landing from "./screens/Landing.svelte";
 import { REGISTRY } from "./screens/registry.js";
-import { route, wOverride, PHONE_QUERY } from "./route.js";
+import { route, wOverride, PHONE_QUERY, liveEntry } from "./route.js";
 import Live from "./app/Live.svelte";
 
 let storage;
@@ -32,9 +32,12 @@ try { storage = window.localStorage; } catch { storage = undefined; }
 const VIEWS = { ...REGISTRY, home: Home, about: About, landing: Landing, components: App, layouts: Layouts, "home-parts": HomeParts };
 const params = new URLSearchParams(location.search);
 const target = document.getElementById("next");
-// The live app (app/Live.svelte) is the normal entry: /next/ with no ?page= or ?screen= (or with a #/route or #survey= hash). The fixture
-// harness (gallery, ?screen= boards for the pixel diff and tests) stays on the query form.
-const live = !params.has("page") && !params.has("screen") && !params.has("ui_next");
+// Entry contract (route.js, glass-v4 ASK option 1): the flag is off by default and client-only; ?ui_next=on stores the opt-in and
+// ?ui_next=off clears it (flagOn). With the flag on, /next/ (and any #/route or #survey= hash) mounts the live app (app/Live.svelte).
+// Explicit fixture selection stays on the query form: ?screen=<name> is a fixture board (the pixel harness and tests), ?page= the
+// gallery. With the flag off and no explicit selection, the gallery shows, as before. The current UI's account menu links here with
+// ?ui_next=on ("Try the new design", playbook stage 5).
+const live = liveEntry(params, storage);
 if (live) {
   mount(Live, { target });
 } else {

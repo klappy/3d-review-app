@@ -127,7 +127,7 @@
     const r = await P.redeem(code);
     busy = false;
     if (r.ok) { await P.start(); land(); return; }
-    if (r.busy) { go(to("p-problem", {}, { state: "busy" })); return; }
+    if (r.busy) { codeError = `${r.error} Try again in about ${r.retryAfter} s.`; return; }
     codeError = r.error;
   }
   let gaps = $state([]);

@@ -138,7 +138,7 @@ describe("links: the shared href(), registered names, carried ?w= and ?theme=", 
 });
 
 describe("Collect (Collect, CollectPhone, CollectMenu, CollectMenuPhone, CollectDark)", () => {
-  it("desktop: crumb, title, stage pill, tabs with Now on Collect, 18 of 30, room health with the instruction, five survey rows", () => {
+  it("desktop: crumb, title, stage pill, tabs with Now on Collect, 18 of 30, no room-health line (retired), five survey rows", () => {
     const a = shot(Collect);
     expect(all(a, "nav.crumb li")).toEqual(["Hindi New Testament", "Mark 1–4 draft"]);
     expect(text(a.querySelector("h1.title-page"))).toBe("Mark 1–4 draft");
@@ -151,10 +151,10 @@ describe("Collect (Collect, CollectPhone, CollectMenu, CollectMenuPhone, Collect
     expect(all(a, "h2.h2")).toEqual(["Responses"]);
     expect(all(a, ".num[data-size='40']")).toEqual(["18"]);
     expect(text(a.querySelector(".num[data-size='40'] + .small"))).toBe("of 30 expected · updated just now");
-    expect(all(a.querySelector("[role=status]")!, ":scope > *")).toEqual(["38 surveys opened in the last minute", "6 opens turned away"]);
-    expect(a.querySelector("[role=status]")!.getAttribute("aria-live")).toBe("polite");
-    expect(a.querySelector(".tag[data-kind=warn]")).not.toBeNull();
-    expect(a.textContent).toContain("Ask people on shared Wi-Fi to switch to mobile data, or hand out paper surveys.");
+    // Retired (cookbook PR 198; RULING-2026-10-16-scrap-app-ratelimit): no room-health counter, refusal tag or Wi-Fi advice.
+    expect(a.querySelector("[role=status]")).toBeNull();
+    expect(a.querySelector(".tag[data-kind=warn]")).toBeNull();
+    expect(a.textContent).not.toMatch(/turned away|opened in the last minute|Wi-Fi|mobile data/);
     expect(all(a, ".glass .l-row > .h3")).toEqual(["Translation team", "Community", "Church"]);
     expect(all(a, "[data-tpl=survey-row] .h3")).toEqual(["Translators", "Team leaders & mentors", "Community", "Pastor involved in the work", "Denominational leader"]);
     expect(all(a, "[data-tpl=survey-row] .num")).toEqual(["4 of 5", "2 of 3", "8 of 15", "3 of 5", "1 of 2"]);
@@ -195,7 +195,8 @@ describe("Collect (Collect, CollectPhone, CollectMenu, CollectMenuPhone, Collect
     expect(text(a.querySelector("h1.title-phone"))).toBe("Mark 1–4 draft");
     expect(all(a, "nav.tabs .tab")).toEqual(["Prepare", "Collect", "Understand", "Improve"]);
     expect(all(a.querySelector(".l-card[data-pad=hero] .l-row")!, ":scope > *")).toEqual(["18", "of 30 · 5 surveys"]);
-    expect(all(a.querySelector("[role=status]")!, ":scope > *")).toEqual(["38 surveys opened in the last minute", "6 opens turned away"]);
+    expect(a.querySelector("[role=status]")).toBeNull(); // room-health counter retired (cookbook PR 198)
+    expect(a.textContent).not.toMatch(/turned away|opened in the last minute|Wi-Fi|mobile data/);
     expect(all(a, ".l-card .small.tab-n")).toEqual(["4/5", "2/3", "8/15", "3/5", "1/2"]);
     expect([...a.querySelectorAll(".l-card .l-row > .l-row")].map((r) => r.querySelectorAll(".btn-icon").length)).toEqual([2, 2, 2, 2, 2]);
     expect(all(a, "#offline .btn")).toEqual(["Print surveys", "Print QR pages", "Enter paper answers"]);
@@ -304,18 +305,17 @@ describe("CloseCollection (CloseCollection, CloseCollectionPhone)", () => {
       cleanup();
     }
   });
-  it("counts of one read singular: 1 response is in, 1 survey opened, 1 open turned away", () => {
+  it("counts of one read singular: 1 response is in; no room-health counter is drawn for any count (retired, cookbook PR 198)", () => {
     const one = structuredClone(fixture);
     one.groups = [one.groups[0]];
     one.groups[0].surveys = [{ ...one.groups[0].surveys[0], answered: 1 }];
-    one.room = { opened: 1, refused: 1 };
     const a = shot(CloseCollection, { data: one });
     expect(text(a.querySelector("dialog p.small"))).toContain("1 response is in.");
     expect(a.textContent).not.toMatch(/\b1 (responses|surveys|opens)\b/);
     cleanup();
     const c = shot(Collect, { data: one });
-    expect(c.textContent).toContain("1 survey opened in the last minute");
-    expect(all(c, ".tag[data-kind=warn]")).toEqual(["1 open turned away"]);
+    expect(c.textContent).not.toMatch(/opened in the last minute|turned away/);
+    expect(all(c, ".tag[data-kind=warn]")).toEqual([]);
     expect(c.textContent).not.toMatch(/\b1 (responses|surveys|opens)\b/);
     cleanup();
     const p = shot(Collect, { phone: true, data: one });
@@ -323,8 +323,8 @@ describe("CloseCollection (CloseCollection, CloseCollectionPhone)", () => {
     expect(p.textContent).not.toMatch(/\b1 (responses|surveys|opens)\b/);
     cleanup();
     const q = shot(QRRoom, { data: one });
-    expect(q.textContent).toContain("1 survey opened in the last minute");
-    expect(all(q, ".tag[data-kind=warn]")).toEqual(["1 open turned away"]);
+    expect(q.textContent).not.toMatch(/opened in the last minute|turned away/);
+    expect(all(q, ".tag[data-kind=warn]")).toEqual([]);
     expect([plural(1, "page", "pages"), plural(0, "page", "pages"), plural(18, "response is", "responses are")]).toEqual(["1 page", "0 pages", "18 responses are"]);
   });
   it("phone: the sheet holds the primary; Close in its title row; the phone bar's Share goes secondary; Keep collecting takes focus", () => {
@@ -341,13 +341,13 @@ describe("CloseCollection (CloseCollection, CloseCollectionPhone)", () => {
 });
 
 describe("QRRoom (QRRoom, QRRoomPhone)", () => {
-  it("projector: room top bar (no menus, no help), heading, five tiles across, each survey's own code and link, the room instruction", () => {
+  it("projector: room top bar (no menus, no help), heading, five tiles across, each survey's own code and link, no retired room instruction", () => {
     const a = shot(QRRoom);
     const top = a.querySelector("header.top[data-variant=room]")!;
     expect(top.querySelector("details, [aria-label=Help]")).toBeNull();
     expect(text(top.querySelector(".crumb [aria-current=page]"))).toBe("Mark 1–4 draft");
-    expect(all(top.querySelector("[role=status]")!, ":scope > *")).toEqual(["38 surveys opened in the last minute", "6 opens turned away"]);
-    expect(top.textContent).not.toContain("Ask people on shared Wi-Fi");
+    expect(top.querySelector("[role=status]")).toBeNull(); // room-health counter retired (cookbook PR 198)
+    expect(top.textContent).not.toMatch(/turned away|opened in the last minute|Wi-Fi/);
     expect(all(top, ".tag:not([data-kind])")).toEqual(["18 answered"]);
     expect(all(top, ".btn")).toEqual(["Meeting offline? Print and paper", "Exit room view"]);
     expect(text(a.querySelector("h1.display"))).toBe("Scan the code for your role");
@@ -359,7 +359,7 @@ describe("QRRoom (QRRoom, QRRoomPhone)", () => {
     const surveys = fixture.groups.flatMap((g) => g.surveys);
     expect(cards.map((c) => [...c.querySelectorAll(".qr i")].map((i) => (i.classList.contains("o") ? "0" : "1")).join(""))).toEqual(surveys.map((s) => s.qr));
     expect(a.querySelector(".btn-primary")).toBeNull();
-    expect(a.textContent).toContain("Survey not opening? Switch from the shared Wi-Fi to mobile data, or ask for a paper survey.");
+    expect(a.textContent).not.toMatch(/Survey not opening|Wi-Fi|mobile data/); // retired instruction (cookbook PR 198)
   });
   it("phone: nested header, the survey name is the h1, survey 3 of 5 (Community) with its own code and link, the one room, Previous / Next", () => {
     const a = shot(QRRoom, { phone: true });
@@ -369,8 +369,8 @@ describe("QRRoom (QRRoom, QRRoomPhone)", () => {
     expect(text(a.querySelector("main .l-card p.small"))).toBe("Scan to open the Hindi survey3dreview.app/s/P8L2W4");
     const community = fixture.groups[1].surveys[0];
     expect([...a.querySelectorAll(".qr[data-size=phone] i")].map((i) => (i.classList.contains("o") ? "0" : "1")).join("")).toBe(community.qr);
-    expect(all(a.querySelector("[role=status]")!, ":scope > *")).toEqual(["38 surveys opened in the last minute", "6 opens turned away"]);
-    expect(a.textContent).toContain("Ask people on shared Wi-Fi to switch to mobile data, or hand out paper surveys.");
+    expect(a.querySelector("[role=status]")).toBeNull(); // room-health counter retired (cookbook PR 198)
+    expect(a.textContent).not.toMatch(/turned away|opened in the last minute|Wi-Fi|mobile data/);
     expect(all(a, ".phone-bar .btn")).toEqual(["Previous", "Next survey"]);
     cleanup();
     const first = shot(QRRoom, { phone: true, state: "1" });
@@ -614,8 +614,8 @@ describe("collect view model and data wiring", () => {
     expect(m.surveys.map((s: { n: number }) => s.n)).toEqual([1, 2, 3, 4, 5]);
     expect([pct(2, 3), pct(8, 15), pct(1, 0)]).toEqual([66, 53, 0]);
   });
-  it("one source per value: one room, one link and code per survey", () => {
-    expect(Object.keys(fixture.room)).toEqual(["opened", "refused"]);
+  it("one source per value: one link and code per survey; no room telemetry in the fixture (retired, cookbook PR 198)", () => {
+    expect(fixture).not.toHaveProperty("room");
     expect(Object.keys(fixture.qrRoomPhone)).toEqual(["survey"]);
     expect(fixture.printQr).not.toHaveProperty("qr");
     // Ticks name surveys by code; the provenance lives in model.js, so the /next/ bundle carries none of it.

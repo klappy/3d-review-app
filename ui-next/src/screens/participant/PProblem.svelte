@@ -1,16 +1,15 @@
-<!-- UI Next (v4) participant problem states. Status: provisional (playbook rule 12). Boards: PProblem.dc.html (send not confirmed),
-     PProblemBusy.dc.html (?state=busy: refused by the rate limiter, automatic retry). Without ?state= (or with any other value) the fixture's
-     error picks the board through the app's own ui/rate-limit.js isRateLimited. Two hero cards: what happened, then the other cases; one
-     .btn-primary retry in the phone-bar. Rows: the PIN's §9 participant rows (56px neutral head chip, .lead-16, 32px list chips in the
-     survey's lens beside a two-line block, .l-row[data-align=start]). Busy: the bar is decorative (attempt of attempts) and the retry line is
-     the live text (role=status). The diagnostic line (RL_HTTP_ANON · 429 · time) is drawn as the board draws it; whether it stays is an open design question. -->
+<!-- UI Next (v4) participant problem state. Status: provisional (playbook rule 12). Board: PProblem.dc.html (send not confirmed; the other
+     cases listed under it). The former PProblemBusy board (?state=busy, refused by the app rate limiter, automatic retry) is RETIRED
+     (cookbook PR 198; RULING-2026-10-16-scrap-app-ratelimit): no such state exists in the product, so ?state= is ignored. Two hero cards:
+     what happened, then the other cases; one .btn-primary retry in the phone-bar. Rows: the PIN's §9 participant rows (56px neutral head
+     chip, .lead-16, 32px list chips in the survey's lens beside a two-line block, .l-row[data-align=start]). Live: the journey's own
+     notice explains the headline; a server-asked wait is stated, never auto-retried. -->
 <script module>
-  export const STATES = Object.freeze(["busy"]);
+  export const STATES = Object.freeze([]);
 </script>
 <script>
   import ParticipantShell from "./ParticipantShell.svelte";
   import ParticipantActions from "./ParticipantActions.svelte";
-  import ProgressBar from "./ProgressBar.svelte";
   import Chip from "./Chip.svelte";
   import Card from "../../Card.svelte";
   import { href } from "../href.js";
@@ -23,32 +22,20 @@
     ["link", "This link doesn't work", "Check for missing characters, or ask for the code and enter it on the home page."],
     ["check", "You already answered", `Thank you — your receipt was ${p.receipt}. Interviewing someone else? Start a new one.`],
   ]);
-  const KEEPS = [
-    ["print", "Ask for a paper copy", "The facilitator can enter it later; nothing is lost."],
-    ["people", "Show this screen to the facilitator", "The code at the bottom tells them what happened."],
-  ];
 </script>
 
-{#snippet actions()}<ParticipantActions {phone} label={p.busy ? "Try now" : "Try sending again"} href={href("p-receipt")} lead="refresh" onaction={onretry} />{/snippet}
+{#snippet actions()}<ParticipantActions {phone} label="Try sending again" href={href("p-receipt")} lead="refresh" onaction={onretry} />{/snippet}
 
 <ParticipantShell {phone} {theme} {actions}>
   <Card hi pad="hero" gap={4}>
-    <Chip icon={p.busy ? "clock" : "warn"} size={56} lens={null} />
-    {#if p.busy}
-      <h1 class="title-phone">A lot of people are opening this at once</h1>
-      <p class="lead-16">Your answers are safe on this phone. We will try again by ourselves in a moment — you do not need to do anything. If you are in a room with many people on the same Wi-Fi, this is normal.</p>
-      <ProgressBar value={p.attempt} max={p.attempts} decorative />
-      <p class="small" role="status">{p.retry}</p>
-    {:else}
-      <h1 class="title-phone">We couldn't confirm your answers were received</h1>
-      <p class="lead-16">{p.notice || "Your answers are still here on this phone. Check your connection and try again — nothing is lost, and sending twice won't count twice."}</p>
-    {/if}
+    <Chip icon="warn" size={56} lens={null} />
+    <h1 class="title-phone">We couldn't confirm your answers were received</h1>
+    <p class="lead-16">{p.notice || "Your answers are still here on this phone. Check your connection and try again — nothing is lost, and sending twice won't count twice."}{#if p.retryAfter} The server asked for a wait of about {p.retryAfter} s before the next try.{/if}</p>
   </Card>
   <Card hi pad="hero" gap={3}>
-    <span class="micro">{p.busy ? "If it keeps happening" : "Other things that can happen"}</span>
+    <span class="micro">Other things that can happen</span>
     <div class="l-stack" data-gap="3">
-      {#each p.busy ? KEEPS : OTHER as [icon, t, d] (t)}<div class="l-row" data-gap="3" data-align="start"><Chip {icon} size={32} {lens} /><div><div class="h3 t-15">{t}</div><p class="small">{d}</p></div></div>{/each}
+      {#each OTHER as [icon, t, d] (t)}<div class="l-row" data-gap="3" data-align="start"><Chip {icon} size={32} {lens} /><div><div class="h3 t-15">{t}</div><p class="small">{d}</p></div></div>{/each}
     </div>
-    {#if p.busy}<p class="micro kbd">{p.diag}</p>{/if}
   </Card>
 </ParticipantShell>
