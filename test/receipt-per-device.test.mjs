@@ -4,7 +4,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createParticipantJourney } from '../ui/participate/controller.js';
-import { deviceStorage, digestNamespace, DEVICE_MEMORY_MS, CURRENT_KEY } from '../ui/shared-link.js';
+import { createSharedLinkClient, deviceStorage, digestNamespace, scopedStorage, DEVICE_MEMORY_MS, CURRENT_KEY } from '../ui/shared-link.js';
 
 const form = { assessment: 'A', language: 'L', template: { id: 't', version: '1', perspective: 'Leaders' }, items: [{ id: 'q', type: 'text' }] };
 const response = result => ({ ok: true, status: 200, json: async () => ({ ok: true, result }) });
@@ -49,7 +49,7 @@ test('deviceStorage: writes stay in the tab; remember copies to the device until
   clock = 1020; store.remember('k'); store.remember('k', NaN); assert.equal(JSON.parse(device.getItem('k')).exp, 1030, 'no server end: nothing copied, nothing extended');
   const bare = memory(); deviceStorage({ device: bare, tab: memory({ x: 'y' }), now: () => clock }).remember('x'); assert.equal(bare.data.size, 0, 'unknown expiry never reaches the device');
   store.remember('k', 5000); assert.equal(JSON.parse(device.getItem('k')).exp, 1070, 'capped at ttlMs');
-  store.setItem('k', 'w'); assert.equal(device.getItem('k'), null, 'a different value in the tab drops the device copy');
+  store.setItem('k', 'w'); assert.equal(JSON.parse(device.getItem('k')).v, 'v', 'an ordinary tab write never touches the device copy');
   store.setItem('k', 'v'); store.remember('k', 1030); clock = 1030; assert.equal(other.getItem('k'), null, 'expired'); assert.equal(device.getItem('k'), null, 'expired entry is dropped');
   clock = 1000; store.remember('k', 1030); store.removeItem('k'); assert.equal(first.getItem('k'), null); assert.equal(device.getItem('k'), null);
   device.setItem('bad', 'not json'); assert.equal(other.getItem('bad'), null);
@@ -172,4 +172,24 @@ test('receipt promotion refuses malformed or elapsed stored expiry without break
     assert.equal(reloaded.journey.state.phase, 'receipt');
     assert.equal(device.data.size, 0, `invalid expiry ${invalid} must not reach the device`);
   }
+});
+
+test('the remembered end is the server\'s absolute expires_at, else expires_in counted from before the request (Codex 4343346811)', async t => {
+  const realNow = Date.now; let clock = 1_000_000; Date.now = () => clock; t.after(() => { Date.now = realNow; });
+  const slow = reply => async () => { clock += 60_000; return response(reply); }; // the reply lands a minute after the request
+  const at = memory(), withAt = createSharedLinkClient({ store: scopedStorage(at, 'shared:t:'), fetchImpl: slow({ participant_token: 'p', expires_at: new Date(5_000_000).toISOString(), expires_in: 4000 }) });
+  await withAt.open('link'); assert.equal(at.getItem('shared:t:expiresAt'), '5000000', 'expires_at wins');
+  const inOnly = memory(), withIn = createSharedLinkClient({ store: scopedStorage(inOnly, 'shared:t:'), fetchImpl: slow({ participant_token: 'p', expires_in: 4000 }) });
+  const sent = clock; await withIn.open('link'); assert.equal(inOnly.getItem('shared:t:expiresAt'), String(sent + 4_000_000), 'anchored before the request, not after the await');
+  const none = memory({ 'shared:t:expiresAt': '9' }), without = createSharedLinkClient({ store: scopedStorage(none, 'shared:t:'), fetchImpl: slow({ participant_token: 'p' }) });
+  await without.open('link'); assert.equal(none.getItem('shared:t:expiresAt'), null, 'no server end: nothing stored');
+});
+test('another tab\'s unsubmitted session does not erase a submitted device copy (Codex 4343346801)', async () => {
+  const device = memory(), srv = server(), ns = await digestNamespace('link-secret');
+  const b = tab({ device, srv }); await b.journey.start(); // B opens first and does not submit
+  const a = tab({ device, srv }); await submitIn(a);
+  const remembered = JSON.parse(device.getItem(ns + 'bearer')).v; assert.equal(remembered, 'pt-2');
+  const bAgain = tab({ device, srv, session: b.session }); await bAgain.journey.start(); // B reopens the link and rewrites its own bearer
+  assert.equal(bAgain.journey.state.phase, 'form'); assert.equal(JSON.parse(device.getItem(ns + 'bearer')).v, remembered, 'A\'s device copy stays');
+  const c = tab({ device, srv }); await c.journey.start(); assert.equal(c.journey.state.phase, 'receipt', 'a new tab still shows A\'s receipt');
 });

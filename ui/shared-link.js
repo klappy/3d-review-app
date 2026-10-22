@@ -105,10 +105,10 @@ export function scopedStorage(storage, namespace) {
 // Per-device participant memory (captain ruling 2026-10-21, cookbook work/active/2026-09-29-3d-gate-0230-participant-fixes/RULING.md):
 // once a participant has submitted, the link's session is remembered on this device, so any tab that reopens the link
 // resumes it and shows the same receipt instead of a fresh start. Only submitted sessions reach the device: setItem
-// writes the tab only (drafts, submit keys and unsubmitted sessions stay per tab), and the journey calls remember() at
+// writes the tab only and never touches the device copy (drafts, submit keys and unsubmitted sessions stay per tab), and the journey calls remember() at
 // the receipt. Reads use the tab first, so a code session handed over in this tab (ui/assess/scope.js) keeps its own
 // link, then the device copy while unexpired. removeItem clears both, so "Interview another person" forgets it too.
-// The device copy expires when the server session does (remember's `until`, from the open's expires_in), capped at
+// The device copy expires when the server session does (remember's `until`, from the open's expires_at), capped at
 // DEVICE_MEMORY_MS (the server's own 12-hour bound, src/handlers/shared-link.ts openSharedLink); it never slides.
 export const DEVICE_MEMORY_MS = 43_200_000;
 export function deviceStorage({ device, tab, ttlMs = DEVICE_MEMORY_MS, now = Date.now } = {}) {
@@ -123,10 +123,9 @@ export function deviceStorage({ device, tab, ttlMs = DEVICE_MEMORY_MS, now = Dat
   const dropDevice = key => { try { device?.removeItem(key); } catch { /* ignore */ } };
   return {
     getItem: key => { let own = null; try { own = tab?.getItem(key) ?? null; } catch { /* fall back to the device */ } return own !== null ? own : entryOf(key)?.v ?? null; },
-    setItem: (key, value) => {
-      try { tab?.setItem(key, value); } catch { /* ignore */ }
-      const kept = entryOf(key); if (kept && kept.v !== String(value)) dropDevice(key); // the device never contradicts this tab
-    },
+    // An ordinary write never touches the device copy (Codex 4343346801): another tab's unsubmitted session must not
+    // erase a submitted one. Only remember() writes it and only removeItem (Interview another) clears it.
+    setItem: (key, value) => { try { tab?.setItem(key, value); } catch { /* ignore */ } },
     removeItem: key => { dropDevice(key); try { tab?.removeItem(key); } catch { /* ignore */ } },
     // Copy this tab's value to the device until `until` (ms, the server session's end), capped at ttlMs. With no known
     // server end nothing is copied: an unknown expiry could outlive the server session (Codex review 4343213007).
@@ -268,10 +267,14 @@ export function createSharedLinkClient({ fetchImpl = globalThis.fetch, store, on
     async open(token) {
       const body = { token };
       if (bearer) body.resume_token = bearer;
+      const sent = Date.now(); // anchor before the request, so a slow reply can only shorten the remembered life
       const result = await call('/v2/participate/link', { method: 'POST', body, auth: false });
       bearer = result.participant_token; store.set('bearer', bearer);
-      // The server session's end, so a remembered copy never outlives it (deviceStorage.remember).
-      if (Number.isFinite(result.expires_in)) store.set('expiresAt', String(Date.now() + result.expires_in * 1000)); else store.remove('expiresAt');
+      // The server session's end, so a remembered copy never outlives it (deviceStorage.remember): the server's absolute
+      // expires_at, else expires_in counted from before the request (Codex 4343346811).
+      const end = typeof result.expires_at === 'string' ? Date.parse(result.expires_at) : NaN;
+      const until = Number.isFinite(end) ? end : Number.isFinite(result.expires_in) ? sent + result.expires_in * 1000 : NaN;
+      if (Number.isFinite(until)) store.set('expiresAt', String(until)); else store.remove('expiresAt');
       return result;
     },
     form: () => call('/v2/participate/form'),
