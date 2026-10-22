@@ -33,7 +33,7 @@
           <Bar pct={pct(s)} lens={s.lens} />
           <span class="num tab-n" data-size="20">{s.n} <span class="small">of {s.of}</span></span>
           <Row gap={1}>
-            <CopyButton icon text={`${host}${s.code}`} name={s.name} />
+            {#if `${host}${s.code}`.trim()}<CopyButton icon text={`${host}${s.code}`} name={s.name} />{:else}<span class="small" aria-label={`${s.name}: no link yet`}>No link yet</span>{/if}
             <Button icon={qr} ariaLabel={`QR code for ${s.name}`} variant="quiet" href={href("qr-room", at)} />
             <Button icon={print} ariaLabel={`Print ${s.name} survey`} variant="quiet" href={href("print", at)} />
           </Row>

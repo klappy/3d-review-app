@@ -657,8 +657,8 @@ describe("/next/ routes for the results lane", () => {
       expect(REGISTRY[r.view]).toBe(C);
     });
   }
-  it("flag off: the gallery, never a lane screen", () => {
-    expect(route(p("?screen=results"), undefined, Object.keys(REGISTRY)).view).toBe("components");
+  it("opted out: the gallery, never a lane screen", () => {
+    expect(route(p("?screen=results&ui_next=off"), undefined, Object.keys(REGISTRY)).view).toBe("components");
   });
 });
 

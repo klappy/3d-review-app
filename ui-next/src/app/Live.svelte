@@ -7,7 +7,8 @@
   import { tick } from "svelte";
   import { openQrPrint, preparePapers, openPapersPrint, paperPreview, printReadyLine, printAllowed } from "./print.js";
   import { loadBlankPrint } from "../../../ui/stage-screens.js";
-  import { SAMPLE_HREF } from "./router.js";
+  import { SAMPLE_HREF, SAMPLE_AID } from "./router.js";
+  import { REPORT as SAMPLE_REPORT } from "../screens/results/data.js";
   import { api, token } from "./api.js";
   import { onMount } from "svelte";
   import { parse, to } from "./router.js";
@@ -51,7 +52,10 @@
   });
 
   const PARTICIPANT = new Set(["p-entry", "p-code", "p-welcome", "p-passage", "p-about", "p-question", "p-review", "p-receipt", "p-problem"]);
-  const PUBLIC = new Set(["landing", "about", "sign-in", "sign-in-check", "help", "feedback", "external"]);
+  const PUBLIC = new Set(["landing", "about", "sign-in", "sign-in-check", "help", "feedback", "external", "sample"]);
+  const SAMPLE = new Set(["results", "results-gaps", "results-answers", "report", "report-detailed", "next-step", "action-plan"]);
+  // The sample review (fixture report.json, the boards' data): the results lane renders it read-only with a "Sample data" line; no API.
+  const sampleModel = () => { const f = SAMPLE_REPORT.desktop; return { aid: SAMPLE_AID, review: { ...f.review }, counts: f.counts, payload: f.payload, reportId: null, held: null, results: null, serverStage: "understand", canBuild: false, canReadResponses: false, canReopen: false, sample: true }; };
   const SETUP = new Set(["setup", "setup1", "setup2", "setup3", "setup4", "setup5"]);
   // Which route needs which data. Every loader resolves to the props its screen takes.
   async function loader(r) {
@@ -59,6 +63,7 @@
     if (PARTICIPANT.has(name)) return participant(r);
     if (name === "home") { const me = await S.me(); if (!me) return { screen: "landing" }; const home = await D.homeModel(me); return { screen: "home", home, state: home.empty ? "first" : "reviews" }; }
     if (name === "external") { globalThis.location.assign(params.href); return { screen: null }; } // the sample review in the current design
+    if (params.aid === SAMPLE_AID) { if (!SAMPLE.has(name)) return { redirect: to("results", { aid: SAMPLE_AID }) }; const m = sampleModel(); return name === "next-step" || name === "action-plan" ? { screen: name, results: m, plan: D.nextStepModel(m), sample: true } : name === "results-answers" ? { screen: name, results: m, answers: { suppressed: true, reason: "sample data has no answer rows" }, sample: true } : { screen: name, results: m, sample: true }; }
     if (name === "landing" || name === "about" || name === "help") return { screen: name };
     // Feedback posts the existing contract (ui/assess/feedback.js: POST /v2/feedback with require_authenticated); the sample tour and the
     // signed-out see the current UI's sign-in line instead of a form that would be refused.
@@ -340,6 +345,7 @@
   <Status {phone} {theme} kind="unavailable" message={page.data.message} back={page.data.assessment ? to("collect", { aid: page.data.assessment.id }) : to("home")} backLabel={page.data.assessment ? "Back to Collect" : "Home"} />
 {:else if page.data.screen === "next-step" || page.data.screen === "action-plan"}
   {@const m = page.data.results}
+  {#if page.data.sample}<Status {phone} {theme} kind="preview" inline message="Sample data: a made-up review that shows the design." back={to("home")} backLabel="Home" />{/if}
   {#if !page.data.plan}
     <Status {phone} {theme} kind="not_built" message={`No report has been built for ${m.review.title} yet, so there is nothing to plan from. ${m.canBuild ? "Build it on Results first." : "An owner or member of the review builds it."}`} back={to("results", route.params)} backLabel="Go to Results" />
   {:else}
@@ -373,6 +379,7 @@
 {:else if page.data.screen === "results" || page.data.screen === "results-gaps" || page.data.screen === "results-answers" || page.data.screen === "report" || page.data.screen === "report-detailed" || page.data.screen === "results-held"}
   {@const m = page.data.results}
   {@const rep = reportFor(m)}
+  {#if page.data.sample}<Status {phone} {theme} kind="preview" inline message="Sample data: a made-up review that shows the design. Your own reviews read their results from the server." back={to("home")} backLabel="Home" />{/if}
   {#if !rep && !m.held && page.data.screen !== "results-held"}
     <Status {phone} {theme} kind="not_built" message={`No report has been built for ${m.review.title} yet. ${m.canBuild ? "Building reads the answers collected so far and keeps that report." : "An owner or member of the review builds it."}${page.data.refreshed ? ` ${page.data.refreshed}` : ""}`} inline back={to("collect", route.params)} backLabel="Back to Collect" />
     {#if m.canBuild}<div class="l-page">{#if build}{@render buildConfirm(true)}{:else}<button class="btn btn-primary btn-lg" type="button" onclick={refreshResults} disabled={building || undefined}>{building ? "Building the results…" : "Build the report"}</button>{/if}</div>{/if}

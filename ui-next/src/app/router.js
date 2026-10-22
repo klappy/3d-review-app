@@ -67,6 +67,7 @@ const compiled = ROUTES.map(([name, pattern]) => {
 });
 
 export const ENTRY = /^#survey=/;
+export const SAMPLE_AID = "sample"; // #/review/sample/results|report…: the results lane on the fixture report, labelled sample data (captain 2026-10-22: show the look and feel)
 export const SAMPLE_HREF = "/?demo=1#assessment/demo-assessment/results"; // the current design's sample review (ui/demo.js)
 
 // parse(hash) -> { name, params, query: URLSearchParams }. Unknown -> home (ruling 12:53 in the current UI: never a page that shows sign-in).
@@ -86,7 +87,7 @@ export function parse(hash = "") {
   if (!body.startsWith("/")) {
     // "#results" is the lanes' "Try the sample review": the sample lives in the current design (ui/demo.js, in-memory demo data at
     // /?demo=1#assessment/demo-assessment), so the live app hands the visitor there rather than looping Home → Landing.
-    if (body === "results") return { name: "external", params: { href: SAMPLE_HREF }, query, anchor };
+    if (body === "results") return { name: "results", params: { aid: SAMPLE_AID }, query, anchor }; // the sample review, in this design, labelled sample
     const bare = { workspace: "workspaces", project: "home", review: "home", signin: "sign-in", "survey-code": "p-code", survey: "p-code", video: "help", main: "home", practice: "sandbox", "next-step": "home", "help-h7": "help", tour: "about" }[body] ?? body;
     return { name: BY_NAME.has(bare) && !BY_NAME.get(bare).includes(":") ? bare : "home", params: {}, query, anchor };
   }

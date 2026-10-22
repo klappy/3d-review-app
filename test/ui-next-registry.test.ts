@@ -30,9 +30,10 @@ describe("/next/ route for registered lane screens", () => {
     expect(route(p("?screen=fake-screen"), on())).toEqual(home);
     expect(route(p("?screen=Fake-Screen"), on(), FAKE)).toEqual(home);
   });
-  it("the flag still gates registered screens; ?page= still wins", () => {
-    expect(route(p("?screen=fake-screen"), undefined, FAKE).view).toBe("components");
-    expect(route(p("?screen=fake-screen"), store(), FAKE).view).toBe("components");
+  it("the opt-out still gates registered screens; ?page= still wins", () => {
+    expect(route(p("?screen=fake-screen&ui_next=off"), undefined, FAKE).view).toBe("components");
+    const off = store(); off.setItem("ui_next", "off");
+    expect(route(p("?screen=fake-screen"), off, FAKE).view).toBe("components");
     expect(route(p("?screen=fake-screen&page=layouts"), on(), FAKE).view).toBe("layouts");
     expect(route(p("?screen=fake-screen&page=home"), on(), FAKE).view).toBe("home-parts");
     expect(route(p("?screen=fake-screen&page=components"), on(), FAKE).view).toBe("components");

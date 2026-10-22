@@ -11,15 +11,15 @@ import { liveEntry, FLAG } from "../ui-next/src/route.js";
 
 describe("entry contract (route.js liveEntry; glass-v4 ASK option 1)", () => {
   const mem = () => { const m = new Map(); return { getItem: (k: string) => m.get(k) ?? null, setItem: (k: string, v: string) => m.set(k, v), removeItem: (k: string) => m.delete(k) }; };
-  it("flag off by default: bare /next/ is the gallery; ?ui_next=on stores the opt-in and mounts the live app; ?ui_next=off clears it", () => {
+  it("live by default (captain's ruling 2026-10-22, demo): bare /next/ mounts the live app; ?ui_next=off stores the opt-out (gallery); ?ui_next=on clears it", () => {
     const s = mem();
-    expect(liveEntry(new URLSearchParams(""), s)).toBe(false);
-    expect(liveEntry(new URLSearchParams("ui_next=on"), s)).toBe(true);
-    expect(s.getItem(FLAG)).toBe("on");
     expect(liveEntry(new URLSearchParams(""), s)).toBe(true);
     expect(liveEntry(new URLSearchParams("ui_next=off"), s)).toBe(false);
-    expect(s.getItem(FLAG)).toBeNull();
+    expect(s.getItem(FLAG)).toBe("off");
     expect(liveEntry(new URLSearchParams(""), s)).toBe(false);
+    expect(liveEntry(new URLSearchParams("ui_next=on"), s)).toBe(true);
+    expect(s.getItem(FLAG)).toBeNull();
+    expect(liveEntry(new URLSearchParams(""), s)).toBe(true);
   });
   it("explicit fixture selection wins over the flag: ?screen= is a board, ?page= the gallery", () => {
     const s = mem(); s.setItem(FLAG, "on");
@@ -27,9 +27,10 @@ describe("entry contract (route.js liveEntry; glass-v4 ASK option 1)", () => {
     expect(liveEntry(new URLSearchParams("page=components"), s)).toBe(false);
     expect(liveEntry(new URLSearchParams("theme=dark"), s)).toBe(true);
   });
-  it("works without storage (private mode): only an explicit ?ui_next=on this navigation", () => {
+  it("works without storage (private mode): live unless ?ui_next=off this navigation", () => {
     expect(liveEntry(new URLSearchParams("ui_next=on"), undefined)).toBe(true);
-    expect(liveEntry(new URLSearchParams(""), undefined)).toBe(false);
+    expect(liveEntry(new URLSearchParams(""), undefined)).toBe(true);
+    expect(liveEntry(new URLSearchParams("ui_next=off"), undefined)).toBe(false);
   });
 });
 

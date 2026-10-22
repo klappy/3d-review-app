@@ -8,20 +8,20 @@ export function liveEntry(params, storage) {
   return flagOn(params, storage) && !params.has("page") && !params.has("screen");
 }
 export function flagOn(params, storage) {
+  // Captain's ruling 2026-10-22 (demo): the live app is ON by default at bare /next/ — no ?ui_next=on, no stored opt-in needed.
+  // ?ui_next=off stores an opt-out (the gallery) for this browser; ?ui_next=on clears it. Fixture views stay explicit (?page=, ?screen=).
   const q = params.get(FLAG);
-  // An explicit query controls this navigation even when persistence is absent,
-  // blocked, or a storage implementation silently declines the write.
   if (q === "on" || q === "off") {
     try {
-      if (q === "on") storage?.setItem(FLAG, "on");
+      if (q === "off") storage?.setItem(FLAG, "off");
       else storage?.removeItem(FLAG);
     } catch { /* Persistence is optional for the current URL. */ }
     return q === "on";
   }
   try {
-    return storage?.getItem(FLAG) === "on";
+    return storage?.getItem(FLAG) !== "off";
   } catch {
-    return false;
+    return true;
   }
 }
 // Screens under the flag: ?screen=home (default) | about | landing (Landing = the signed-out entry; About from Landing and Home's account menu).

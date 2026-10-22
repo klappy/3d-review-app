@@ -60,7 +60,7 @@ export const report = async (id) => (await api(`/v2/reports/${enc(id)}`)).report
 export const buildReport = (aid) => confirmed(`/v2/assessments/${enc(aid)}/reports`);
 export const issueLink = (aid, sid) => confirmed(`/v2/assessments/${enc(aid)}/surveys/${enc(sid)}/links`, { params: {} });
 // People and workspaces: the same routes the current UI reads and writes (ui/assess/permissions.js header, ui/workspace-manager.js).
-export const SCOPE_SEG = Object.freeze({ workspace: "workspaces", project: "projects", assessment: "assessments" });
+export const SCOPE_SEG = Object.freeze({ workspace: "workspace", project: "project", assessment: "assessment" }); // singular: the grant routes are /v2/{scope}/{id}/… (src/handlers/common.ts reqScope)
 export const workspace = async (wid) => api(`/v2/workspaces/${enc(wid)}`); // { workspace, projects[] with assessment_count / response_count }
 export const grantsAt = async (scope) => api(`/v2/${SCOPE_SEG[scope.type]}/${enc(scope.id)}/grants`); // { grants, pending_invitations }; member+ only
 export const myInvitations = async () => (await api("/v2/me/invitations")).invitations ?? [];

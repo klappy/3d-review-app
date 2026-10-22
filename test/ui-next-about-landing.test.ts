@@ -174,9 +174,9 @@ describe("/next/ routes for About and Landing", () => {
     expect(route(p("?screen=home"), on()).view).toBe("home");
     expect(route(p("?screen=nope"), on()).view).toBe("home");
   });
-  it("flag off: the screens stay behind the gallery", () => {
-    expect(route(p("?screen=about"), undefined).view).toBe("components");
-    expect(route(p("?screen=landing"), undefined).view).toBe("components");
+  it("opted out (?ui_next=off this navigation): the screens stay behind the gallery", () => {
+    expect(route(p("?screen=about&ui_next=off"), undefined).view).toBe("components");
+    expect(route(p("?screen=landing&ui_next=off"), undefined).view).toBe("components");
   });
   it("Home's account menu reaches About through href(): ui_next stays on and w/theme carry (setup N8)", () => {
     const about = (from: string) => accountItems(from).find((i: { label?: string }) => i.label === "Why 3D Review exists").href;
