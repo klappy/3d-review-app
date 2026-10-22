@@ -4,7 +4,7 @@ import { api, confirmed, enc, token } from "./api.js";
 import { lensLabel } from "../../../ui/report-lenses.js";
 import { v3ScoreBand, v3ExpectedFor } from "../../../ui/assess/v3-assessment.js";
 import { parsePeriod, collectLine } from "../../../ui/v3/components/active-until.js";
-import { LEVEL_KEY } from "../screens/results/data.js";
+import { LEVEL_KEY, LEVEL_WORD, bandRows, lensCards } from "../screens/results/data.js";
 import { to } from "./router.js";
 import qrcode from "../../../ui/assess/vendor-qrcode.js";
 
@@ -142,7 +142,11 @@ export async function collectModel(aid, origin = globalThis.location?.origin ?? 
   const groups = [...byLens].map(([lens, rows]) => ({ lens, surveys: rows }));
   const stage = STAGE_OF[a.stage] ?? "setup";
   return {
-    aid, projectId: a.project_id, origin,
+    aid, projectId: a.project_id, origin, role: a.role ?? "viewer",
+    // Print paper surveys (app/print.js preparePapers): the review's and the project's participant languages (ui/assess/print-lang.js
+    // printLanguages reads both) and the passage line the paper names, as ui/assess/assess.js passageLine draws it.
+    lwc: { assessment: Array.isArray(a.lwc) ? a.lwc : [], project: Array.isArray(p.lwc) ? p.lwc : [] },
+    passageLine: passage ? `Before you answer, read or listen to: ${passage}` : "",
     user: { first: "", initials: "" }, workspace: "",
     project: { name: p.name, href: to("project", { pid: a.project_id }) },
     review: { id: a.id, title: a.name, stage, language, canClose: ["owner", "member"].includes(a.role), modality: a.format ? a.format[0].toUpperCase() + a.format.slice(1) : "", updated: ago(a.created_at), passage, opens: period?.starts ? shortDate(period.starts) : shortDate(a.created_at), closes, activeLine: collectLine(a.period), daysLeft, serverStage: a.stage },
@@ -284,4 +288,79 @@ export async function shareModel(aid, me) {
   };
   const share = { copied: -1, lead: "Each perspective — and each role inside it — has its own survey link. People answer without an account. One link can be used by everyone who answers that survey.", phoneLead: "Each survey has its own link. Send it, show the QR, or hand the phone over.", codes: { code: "", line: "", unused: "Access codes are issued from the current design's Share panel; this screen does not issue them yet" } };
   return { review, share };
+}
+
+// Print paper surveys (actions/Print.svelte, live): the collect model with every open survey's real link (the QR on the paper) and
+// the fixture's row shapes (groups[].surveys as indexes into one surveys list), plus the review's print languages
+// (ui/assess/print-lang.js rules through screens/actions/legacy.js printLanguages). Who may print: ui/stage-screens.js PRINT_ROLES.
+export async function printPageModel(aid, me) {
+  const m = await attachLinks(await collectModel(aid), { full: true });
+  const rows = m.groups.flatMap((g) => g.surveys.map((s) => ({ ...s, lens: g.lens })));
+  const NAME = { team: "Translation team", community: "Community", church: "Church" };
+  const groups = m.groups.map((g) => {
+    const idx = g.surveys.map((s) => rows.findIndex((r) => r.id === s.id));
+    const answered = g.surveys.reduce((n, s) => n + (s.answered ?? 0), 0), expected = g.surveys.reduce((n, s) => n + (s.expected ?? 0), 0);
+    return { lens: g.lens, name: NAME[g.lens] ?? g.lens, count: `${g.surveys.length} survey${g.surveys.length === 1 ? "" : "s"}`, expected: expected ? `${answered} of ${expected} expected` : `${answered} answered`, surveys: idx };
+  });
+  const first = String(me?.principal?.display_name || "").trim().split(/\s+/)[0] || "";
+  const initials = (String(me?.principal?.display_name || "").trim().split(/\s+/).slice(0, 2).map((w) => w[0]?.toUpperCase() ?? "").join("")) || "";
+  return {
+    aid: m.aid, projectId: m.projectId, role: m.role, lwc: m.lwc, passageLine: m.passageLine, origin: m.origin,
+    user: { first, initials }, workspace: "", project: m.project.name, projectHref: m.project.href,
+    review: { title: m.review.title, language: m.review.language, modality: m.review.modality, updated: m.review.updated, stage: m.review.serverStage },
+    deleteRefused: "Deleting a review is done from the current design's review page; this screen does not delete yet.",
+    groups, host: "",
+    // code: the full link (the row's identity on the paper: no short-code backend); pages: unknown until the form is read (preparePapers).
+    surveys: rows.map((s) => ({ id: s.id, lens: s.lens, name: s.name, code: s.fullLink ?? "", n: s.answered ?? 0, of: s.expected ?? "—", pages: null, open: s.open, qr: s.qr, linkError: s.linkError ?? "" })),
+    checked: rows.map((_, i) => i),
+  };
+}
+
+// Next step / Action plan (actions/NextStep.svelte, ActionPlan.svelte, live): what the built report says, through the results lane's own
+// banding (screens/results/data.js bandRows, lensCards): the widest gaps (the three rows with the most bands apart), the weakest areas
+// (urgent, then needs support) and each perspective's level. Notes, follow-up dates and recommendations have no store yet
+// (cap.recommendation.propose / review are RESERVED_NOT_BUILT in /v2/capabilities.json), so the model says so and carries none.
+export const RECS_UNAVAILABLE = "Recommendations are not available yet: the server's recommendation capabilities (POST /v2/assessments/{aid}/recommendations) are reserved, not built.";
+export const NOTES_UNAVAILABLE = "Notes, follow-up dates and the plan are not saved yet: there is no plan store in the API, so this screen reads the results only.";
+export function nextStepModel(m) {
+  const payload = m.payload;
+  if (!payload) throw new Error("next step: no built report to read");
+  const report = { payload };
+  const names = radarOf(payload);
+  const rows = bandRows(report, m.counts, names).filter((r) => r.dots.length >= 2)
+    .sort((x, y) => y.apart - x.apart || Number(y.spread ?? 0) - Number(x.spread ?? 0));
+  const apartText = (r) => (r.apart === 0 ? "same band" : `${r.apart} band${r.apart === 1 ? "" : "s"} apart`);
+  const gaps = rows.slice(0, 3).map((r) => {
+    const xs = r.dots.map((d) => d.x);
+    return { area: r.name, checked: r.apart >= 2, apart: apartText(r), span: r.span ? [r.span.from, r.span.to] : [Math.min(...xs), Math.max(...xs)], wide: r.apart >= 2, pts: r.dots.map((d) => [d.lens, d.x, LEVEL_WORD[d.level]]), dots: r.dots };
+  });
+  const cards = lensCards(payload, m.counts);
+  const NAME = { team: "Translation team", community: "Community", church: "Church" };
+  const weak = cards.flatMap((c) => c.rows.filter((r) => r.level === "urgent" || r.level === "support").map((r) => ({ lens: c.lens, label: `${NAME[c.lens]} · ${r.name}`, level: r.level, checked: r.level === "urgent" })))
+    .sort((x, y) => (x.level === "urgent" ? 0 : 1) - (y.level === "urgent" ? 0 : 1));
+  const glance = cards.map((c) => [c.lens, c.level]);
+  const talk = [...gaps.map((g) => [`${g.area} — ${g.dots.map((d) => `${d.lens} ${LEVEL_WORD[d.level]}`).join(" · ")}`, g.apart]), ...weak.map((w) => [w.label, LEVEL_WORD[w.level]])];
+  const stage = m.serverStage === "improve" ? "reviewed" : "results";
+  return {
+    review: m.review, stage, gaps, weak, glance, talk, recs: [], recsNote: RECS_UNAVAILABLE, notesNote: NOTES_UNAVAILABLE,
+    phone: { title: m.review.title, stage, lead: gaps.length ? "Where the perspectives pull apart, from the built report." : "The built report shows no area two perspectives both scored.", items: gaps.map((g) => ({ kind: "Tension", title: g.area, text: `${g.dots.map((d) => `${NAME[d.lens]} ${LEVEL_WORD[d.level]}`).join(" · ")} — ${g.apart}.`, inPlan: false })) },
+    doc: `Next steps · 1 page · ${m.review.title}`,
+    meta: [m.review.project, m.review.language, "3D Review next steps", m.review.closed ? `closed ${m.review.closed}` : "", `${m.review.responses} response${m.review.responses === 1 ? "" : "s"}`].filter(Boolean).join(" · "),
+    foot: `Built from ${m.review.responses} response${m.review.responses === 1 ? "" : "s"}${m.review.builtOn ? ` on ${m.review.builtOn}` : ""} · levels are bands, not scores · nothing here identifies a person`,
+  };
+}
+
+// The phone account menu sheet (actions/MenuSheet.svelte, live): HomePhone's list from the home model, the signed-in account and the
+// sheet's seven rows; no invitation store is read (the invitation card is not drawn), no workspace switch (one workspace tonight).
+export function menuModel(me, home, { onSignOut } = {}) {
+  const name = me?.principal?.display_name || "Signed in";
+  const who = [name, me?.principal?.email].filter(Boolean).join(" · ");
+  const reviews = home.groups.flatMap((g) => g.reviews.map((r) => ({ project: r.project, title: r.title, stage: g.stage, meta: r.phoneMeta ?? r.meta, action: r.action, href: r.href })));
+  return {
+    who, initials: home.user.initials, invitation: null, chips: [home.workspace, "Mine"], reviews, completed: home.completed.length,
+    items: [
+      ["people", `${home.workspace} — your workspace`, to("workspaces")], ["mail", "Invitations", to("invitations")], ["help", "Help and FAQ", to("help")],
+      ["sparkle", "Why 3D Review exists", to("about")], ["pen", "Send app feedback", to("feedback")], ["people", "Use another account", null, onSignOut], ["out", "Sign out", null, onSignOut],
+    ],
+  };
 }

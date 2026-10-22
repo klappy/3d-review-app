@@ -33,32 +33,43 @@
   import { carry } from "./links.js";
   import { modal, closeDialog } from "./modal.js";
   import { untrack } from "svelte";
-  import R from "../../../fixtures/actions/review.json";
-  import D from "../../../fixtures/actions/print.json";
+  import R0 from "../../../fixtures/actions/review.json";
+  import D0 from "../../../fixtures/actions/print.json";
 
-  let { phone = false, theme = "light" } = $props();
+  // data: the fixture shape (gallery) or app/data.js printPageModel (live: this review's surveys, links and languages). onprint({ picked, lang,
+  // paper }) prints for real (app/print.js preparePapers → openPapersPrint; live only): the primary is then a button, never a link to
+  // Collect; status is the live run's line (preparing, translating, blocked tab, the ready line); previews: each survey's read form by
+  // survey id (app/print.js paperPreview) for the sheet of the first ticked survey (live), else the board's paper.
+  let { phone = false, theme = "light", data = null, onprint, status = "", busy = false, previews = {} } = $props();
+  const live = $derived(!!data);
+  const R = $derived(data ?? R0);
+  const D = $derived(data ? { checked: data.checked, phoneChecked: data.checked, phoneStatus: data.surveys.map((s) => (s.open ? "" : "not collecting")), sizes: ["A4", "Letter"], missing: null, preview: "" } : D0);
   const at = $derived(carry(phone, theme));
   const crumbs = $derived([{ label: R.project, href: href("project", at) }, { label: R.review.title }]);
   let dialog = $state();
-  const langs = printLanguages(R.lwc.assessment, R.lwc.project);
+  const langs = $derived(printLanguages(R.lwc.assessment, R.lwc.project));
   // As legacy printLanguageField: no picker when the review has no participant language (./legacy.js showPrintLanguage).
-  const showLanguage = showPrintLanguage(langs);
-  const options = ["English", ...langs.map((l) => l.name)];
-  const chosen = langs[0]?.name ?? "English";
+  const showLanguage = $derived(showPrintLanguage(langs));
+  const options = $derived([{ code: "en", name: "English" }, ...langs.map((l) => ({ code: l.code, name: l.name }))]);
+  let lang = $state(untrack(() => (data ? "en" : (printLanguages(R0.lwc.assessment, R0.lwc.project)[0]?.code ?? "en"))));
+  let paper = $state("A4");
   // The ticked surveys (indexes into R.surveys): the checkboxes are bound to this list, so the count follows every tick.
   // Seeded once from the board's ticks for this width (phone is a route prop, fixed for the page's life).
-  let picked = $state(untrack(() => [...(phone ? D.phoneChecked : D.checked)]));
+  let picked = $state(untrack(() => [...(data ? data.checked : phone ? D0.phoneChecked : D0.checked)]));
   const count = $derived(picked.length);
   const printLabel = $derived(count === 0 ? "Print surveys" : count === 1 ? "Print 1 survey" : `Print ${count} surveys`);
   const NONE = "Tick at least one survey to print.";
+  const previewLine = $derived(live ? `Preview · ${R.surveys[picked[0]]?.name ?? "no survey ticked"} · ${paper}` : D.preview);
+  const preview = $derived(live ? previews[R.surveys[picked[0]]?.id] ?? null : null);
+  const print = () => onprint?.({ picked: picked.map((i) => R.surveys[i].id), lang, paper });
 </script>
 
 {#snippet top()}{#if phone}<PhoneHeader state="nested" title="Print paper surveys" parent="Collect" back={href("collect", at)} initials={R.user.initials} menuHref={href("menu", at)} />{:else}<TopBar home={href("home", at)} who={R.user.first} initials={R.user.initials} workspace={R.workspace} {crumbs} />{/if}{/snippet}
-{#snippet bar()}{#if phone}<PhoneBar label={printLabel} href={href("collect", at)} backHref={href("collect", at)} backLabel="Cancel" disabled={!count} ariaDescribedby="pp-why" />{/if}{/snippet}
-{#snippet meta()}{R.project} · {R.review.language} · {R.review.modality} · Updated just now{/snippet}
-{#snippet print()}<Ico d={A.print} />{/snippet}
+{#snippet bar()}{#if phone}{#if onprint}<div class="glass phone-bar" role="group" aria-label="Page actions"><Button label="Cancel" variant="quiet" href={href("collect", at)} /><button class="btn btn-primary btn-lg" type="button" disabled={!count || busy} aria-describedby="pp-why" onclick={print}>{printLabel}</button></div>{:else}<PhoneBar label={printLabel} href={href("collect", at)} backHref={href("collect", at)} backLabel="Cancel" disabled={!count} ariaDescribedby="pp-why" />{/if}{/if}{/snippet}
+{#snippet meta()}{R.project} · {R.review.language} · {R.review.modality} · Updated {R.review.updated ?? "just now"}{/snippet}
+{#snippet printIco()}<Ico d={A.print} />{/snippet}
 {#snippet language(id, label)}
-  {#if showLanguage}<div><label class="lbl" for={id}>{label}</label><label class="sel"><select class="in" {id}>{#each options as o}<option selected={o === chosen}>{o}</option>{/each}</select><Ico d={A.chev} /></label></div>{/if}
+  {#if showLanguage}<div><label class="lbl" for={id}>{label}</label><label class="sel"><select class="in" {id} bind:value={lang}>{#each options as o}<option value={o.code}>{o.name}</option>{/each}</select><Ico d={A.chev} /></label></div>{/if}
 {/snippet}
 
 <AppShell {phone} {theme} screen {top} {bar}>
@@ -66,7 +77,7 @@
     <ReviewHead phone {theme} title={R.review.title} project={R.project} stage="collecting" viewed="collect" live="collect" />
     <Card gap={2} label="Paper surveys">
       <span class="micro">Paper surveys</span>
-      <p class="small">Pick the surveys. Your phone opens its print or share sheet so you can send the PDF to a printer or to someone with one.<span role="status" id="pp-why">{#if !count} {NONE}{/if}</span></p>
+      <p class="small">Pick the surveys. Your phone opens its print or share sheet so you can send the PDF to a printer or to someone with one.<span role="status" id="pp-why">{#if !count} {NONE}{:else if status} {status}{/if}</span></p>
       {#each R.surveys as s, i}
         <label class="row-opt l-row" data-split><span class="l-row" data-gap="3"><input class="cb" type="checkbox" value={i} bind:group={picked} /><b>{s.name}</b></span><span class="small">{D.phoneStatus[i]}</span></label>
       {/each}
@@ -89,25 +100,25 @@
               <span class="lbl" id="pt-which">Which surveys</span>
               <Stack gap={2}>
                 {#each R.surveys as s, i}
-                  <label class="row-opt l-row" data-split><span class="l-row" data-gap="3"><input class="cb" type="checkbox" value={i} bind:group={picked} /><b>{s.name}</b></span><span class="small">{s.pages} pages</span></label>
+                  <label class="row-opt l-row" data-split><span class="l-row" data-gap="3"><input class="cb" type="checkbox" value={i} bind:group={picked} /><b>{s.name}</b></span><span class="small">{#if s.pages}{s.pages} pages{:else if s.linkError}{s.linkError}{:else if !s.open}not collecting{/if}</span></label>
                 {/each}
               </Stack>
             </div>
             <Grid cols={2} gap={4}>
               {@render language("pt-lang", "Language on paper")}
-              <div><label class="lbl" for="pt-size">Paper size</label><label class="sel"><select class="in" id="pt-size">{#each D.sizes as o, i}<option selected={i === 0}>{o}</option>{/each}</select><Ico d={A.chev} /></label></div>
+              <div><label class="lbl" for="pt-size">Paper size</label><label class="sel"><select class="in" id="pt-size" bind:value={paper}>{#each D.sizes as o}<option value={o}>{o}</option>{/each}</select><Ico d={A.chev} /></label></div>
             </Grid>
-            <div class="solid l-card l-row" data-pad="form" data-align="start" data-gap="3">
+            {#if D.missing}<div class="solid l-card l-row" data-pad="form" data-align="start" data-gap="3">
               <Ico d={A.warn} size={20} />
               <Stack gap={1}><h3 class="h3 t-15">{D.missing.title}</h3><p class="small">{D.missing.text} <a class="link" href={href("print", at)}>Try translating again</a> or print as is.</p></Stack>
-            </div>
+            </div>{/if}
             <!-- Nothing ticked: the primary is the shared Button disabled, with the reason beside it (design-system.md section 2
                  Disabled, "say why next to it"); the status line is always present (empty), so the reason is announced when it appears. -->
-            <div class="l-row" data-justify="end" data-gap="2"><p class="small" role="status" id="pt-why">{#if !count}{NONE}{/if}</p><Button label="Cancel" variant="quiet" href={href("collect", at)} />{#if count}<Button label={printLabel} variant="primary" lg href={href("collect", at)} lead={print} />{:else}<Button label={printLabel} variant="primary" lg disabled ariaDescribedby="pt-why" lead={print} />{/if}</div>
+            <div class="l-row" data-justify="end" data-gap="2"><p class="small" role="status" id="pt-why">{#if !count}{NONE}{:else}{status}{/if}</p><Button label="Cancel" variant="quiet" href={href("collect", at)} />{#if onprint}<button class="btn btn-primary btn-lg" type="button" disabled={!count || busy} aria-describedby="pt-why" onclick={print}><Ico d={A.print} />{printLabel}</button>{:else if count}<Button label={printLabel} variant="primary" lg href={href("collect", at)} lead={printIco} />{:else}<Button label={printLabel} variant="primary" lg disabled ariaDescribedby="pt-why" lead={printIco} />{/if}</div>
           </Stack>
           <Stack gap={2}>
-            <Row split gap={2}><span class="micro">{D.preview}</span><IconAction d={A.x} ariaLabel="Close" onclick={() => closeDialog(dialog)} /></Row>
-            <Paper paper={R.paper} qr={R.qr.survey} />
+            <Row split gap={2}><span class="micro">{previewLine}</span><IconAction d={A.x} ariaLabel="Close" onclick={() => closeDialog(dialog)} /></Row>
+            {#if live}{#if preview}<Paper paper={preview} cells={R.surveys[picked[0]]?.qr ?? null} fit={paper === "Letter" ? "letter" : "a4"} page="" />{:else}<p class="small">{picked.length ? "The sheet is drawn once the form is read: press Print." : NONE}</p>{/if}{:else}<Paper paper={R.paper} qr={R.qr.survey} />{/if}
           </Stack>
         </Grid>
       </dialog>
