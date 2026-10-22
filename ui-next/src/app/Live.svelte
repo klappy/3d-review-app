@@ -78,7 +78,7 @@
     const reviewQ = route.query.get("review");
     if (name === "setup5" && reviewQ) return { screen: "setup5", data: await D.setupModel(reviewQ), readOnly: true };
     // Steps 1–4 edit the review through the existing contracts (app/setup.js, wizard.js order); a bare #setup starts a new review.
-    if (["setup", "setup1", "setup2", "setup3", "setup4"].includes(name)) { suSt = await SU.openSetup(reviewQ || null, { pid: route.query.get("project") || liveContext()?.pid || "" }); suError = ""; bump(); const screen = name === "setup" ? "setup1" : name; return { screen, step: Number(screen.slice(-1)) }; }
+    if (["setup", "setup1", "setup2", "setup3", "setup4"].includes(name)) { suSt = await SU.openSetup(reviewQ || null, { pid: route.query.get("project") || liveContext()?.pid || "" }); suError = ""; bump(); const screen = name === "setup" ? "setup1" : name; if (suSt.stage !== "prepare" && screen !== "setup1") return { redirect: to("review", { aid: suSt.aid }) }; /* a launched review edits details and dates only (step 3 could archive a live survey with responses) */ return { screen, step: Number(screen.slice(-1)) }; }
     if (name === "workspaces") return { screen: "home", home: await D.homeModel(me), assessment: null };
     if (name === "setup5") return { redirect: to("home") }; // a review's own page is its Setup 5 while preparing (name === "review")
     // People and workspaces read the live stores (app/data.js): a workspace's grouped projects, a scope's roster (members and owners
@@ -290,7 +290,7 @@
     onadd: () => suAct(() => SU.addLanguage(suSt, suSt.draft.languageQuery), undefined, "The language could not be added."),
   };
   const suStep = {
-    1: () => { const errs = SU.validateDetails(suSt.draft); if (errs.length) { suError = errs.join(" "); bump(); return; } suAct(() => SU.saveDetails(suSt), () => suNext(2), "The review could not be saved."); },
+    1: () => { const errs = SU.validateDetails(suSt.draft); if (errs.length) { suError = errs.join(" "); bump(); return; } suAct(() => SU.saveDetails(suSt), () => (suSt.stage !== "prepare" ? go(to("review", { aid: suSt.aid })) : suNext(2)), "The review could not be saved."); },
     2: () => { if (!suSt.draft.purpose.trim()) { suError = "Name what people will respond to first."; bump(); return; } suAct(() => SU.savePassage(suSt), () => suNext(3)); },
     3: () => { const errs = SU.validateGroups(suSt.draft); if (errs.length) { suError = errs.join(" "); bump(); return; } suAct(() => SU.saveGroups(suSt), () => suNext(4), "The surveys could not be updated."); },
     4: () => suAct(() => SU.saveContext(suSt), () => go(to("setup5", {}, { review: suSt.aid })), "The surveys could not be added."),

@@ -11,7 +11,7 @@
 // Plain JS, no Svelte import, so vitest can drive it with a mocked fetch. The view builders return the shapes the approved
 // screens/setup/Setup1-4.svelte compositions already draw (ui-next/fixtures/setup/setup.json), so the design stays fixed.
 import { api, enc } from "./api.js";
-import { reconcile } from "../../../ui/v3/wizard.js";
+import { reconcile, refused } from "../../../ui/v3/wizard.js";
 import { packPeriod, parsePeriod, periodErrors, todayIso } from "../../../ui/v3/components/active-until.js";
 import { LWC_LANGUAGES, MAX_LWC } from "../../../ui/v3/lwc.js";
 export const MAX_LWC_COUNT = MAX_LWC;
@@ -116,7 +116,7 @@ export async function saveDetails(st) {
     // a matching review of ours created since that attempt is adopted; only when none exists is the POST sent again.
     let r = null;
     if (st.pendingCreate) { const found = await reconcile({ cap: "cap.assessment.create" }, { pid: d.project, lid: d.language || null, pending: { at: st.pendingCreate } }, { name: d.name }, api); if (found) r = found; }
-    if (!r) { const at = Date.now(); st.pendingCreate = at; try { r = await api(`/v2/projects/${enc(d.project)}/assessments`, { method: "POST", body: b }); } catch (e) { if (e?.status !== 0) st.pendingCreate = null; throw e; } }
+    if (!r) { const at = Date.now(); st.pendingCreate = at; try { r = await api(`/v2/projects/${enc(d.project)}/assessments`, { method: "POST", body: b }); } catch (e) { if (refused(e)) st.pendingCreate = null; throw e; } } // only a definite 4xx refusal clears the pending mark; 5xx / lost response stay uncertain (wizard.js refused)
     st.pendingCreate = null;
     st.aid = r.assessment.id; st.role = "owner"; st.stage = r.assessment.stage ?? "prepare"; st.snap = { ...snapOf(d), purpose: null, lwc: null };
     STATES.delete("new"); st.key = st.aid; STATES.set(st.aid, st);
