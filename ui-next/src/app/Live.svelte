@@ -156,13 +156,13 @@
 
   // Signed-in chrome for the live screens.
   const who = $derived(session ? { first: S.firstName(session.principal), initials: S.initialsOf(session.principal) } : null);
-  async function signOut() { try { await S.signOut(); session = null; go(to("landing")); } catch (e) { page = { status: "error", key: route.name, data: null, error: { kind: classify(e), message: `You are still signed in: ${e?.message || "the sign-out was not confirmed"}. Try again.` } }; } }
+  async function signOut() { try { await S.signOut(); D.clearLinks(); session = null; go(to("landing")); } catch (e) { page = { status: "error", key: route.name, data: null, error: { kind: classify(e), message: `You are still signed in: ${e?.message || "the sign-out was not confirmed"}. Try again.` } }; } }
   const accountItems = $derived(session ? [
     { kind: "head", label: session.principal?.display_name || "Signed in", sub: session.principal?.id ? "Facilitator" : "" }, { kind: "hr" },
     { label: "Help and FAQ", href: to("help") }, { label: "Why 3D Review exists", href: to("about") }, { label: "Send app feedback", href: to("feedback") },
     { label: "Current design", href: "/" }, { kind: "hr" }, { label: "Sign out", onclick: signOut },
   ] : []);
-  function onSignedIn() { S.forget(); session = undefined; const next = page.data?.next; go(next && next !== "#/signin" ? next : to("home")); }
+  function onSignedIn() { D.clearLinks(); S.forget(); session = undefined; const next = page.data?.next; go(next && next !== "#/signin" ? next : to("home")); }
   async function refreshResults() {
     const r = route;
     try { const out = await D.buildReport(r.params.aid); if (out.held) page = { ...page, data: { ...page.data, refreshed: "The results can’t be rebuilt yet: more answers are needed." } }; else load(); }

@@ -170,6 +170,9 @@ export async function attachLinks(m, { full = false } = {}) {
 // Keyed by the signed-in identity too (the tab's bearer): a link issued under one account is never handed to another in the
 // same tab (the server's issue_link needs member access; the cache must not bypass it).
 const LINKS = new Map();
+// Every authentication transition empties the cache (Live: sign-in, sign-out): on a cookie session token() is "", so the key
+// alone cannot tell identities apart (SECURITY-575-8583e170 finding 1).
+export function clearLinks() { LINKS.clear(); }
 export async function linkFor(aid, sid) {
   const k = `${token() ?? ""}|${aid}/${sid}`;
   if (LINKS.has(k)) return LINKS.get(k);
