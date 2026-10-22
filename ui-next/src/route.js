@@ -45,18 +45,27 @@ export function route(params, storage, screens = [], width) {
   if (page === "layouts") return { view: "layouts", props: { mode, phone: explicitPhone } };
   if (page === "home") return { view: "home-parts", props: { mode, phone: explicitPhone } };
   if (page === "components" || !on) return { view: "components", props: { mode } };
-  const phone = w ? explicitPhone : typeof width === "number" && width < PHONE_BELOW;
+  const live = typeof width === "number";
+  const phone = w ? explicitPhone : live && width < PHONE_BELOW;
+  // Live (width given): screens also get w, the explicit override ("phone" | "desktop" | null), kept apart from the effective
+  // layout so links carry only the override (screenHref, screens/href.js) and the destination re-derives phone from its own width.
+  const ov = live ? { w } : {};
+  const t = theme === "dark" ? "dark" : "light";
   const screen = params.get("screen");
-  if (screens.includes(screen) && !BUILTIN_VIEWS.includes(screen)) return { view: screen, props: { phone, theme: theme === "dark" ? "dark" : "light", state: params.get("state") ?? undefined } };
-  if (screen === "about" || screen === "landing") return { view: screen, props: { phone, theme: theme === "dark" ? "dark" : "light" } };
+  if (screens.includes(screen) && !BUILTIN_VIEWS.includes(screen)) return { view: screen, props: { phone, theme: t, state: params.get("state") ?? undefined, ...ov } };
+  if (screen === "about" || screen === "landing") return { view: screen, props: { phone, theme: t, ...ov } };
   const state = params.get("state") === "first" ? "first" : "reviews";
-  return { view: "home", props: { state: phone ? "reviews" : state, phone, theme: theme === "dark" ? "dark" : "light" } };
+  return { view: "home", props: { state: phone ? "reviews" : state, phone, theme: t, ...ov } };
 }
 
 // Links between mounted screens carry their presentation and flag explicitly;
 // they keep working when localStorage is unavailable and survive a full reload.
-export function screenHref(screen, { phone = false, theme = "light" } = {}) {
+// w: the explicit override from route() props ("phone" | "desktop" | null). When w is passed (live app), only it is carried, so a
+// width-derived phone page never pins the destination and ?w=desktop survives the link. Without w (board captures, tests with no
+// viewport), phone is carried as w=phone, as before.
+export function screenHref(screen, { phone = false, theme = "light", w } = {}) {
   const params = new URLSearchParams({ screen, [FLAG]: "on", theme });
-  if (phone) params.set("w", "phone");
+  const carry = w === undefined ? (phone ? "phone" : null) : w;
+  if (carry === "phone" || carry === "desktop") params.set("w", carry);
   return `?${params}`;
 }
