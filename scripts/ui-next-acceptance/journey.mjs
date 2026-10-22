@@ -98,7 +98,7 @@ await f.click('[aria-label^="QR code for"], [aria-label^="QR for"]'); // the row
 await f.waitForURL(/#\/review\/.*\/collect\/qr(\?state=\d+)?$/);
 await f.waitForSelector(".qr", { timeout: 30000 });
 // The room prints the host under each code; the full link is what the code encodes (app/data.js attachLinks). Take the first tile's.
-const link = await f.evaluate(() => { const t = document.querySelector(".qr-tile, .qr-tile-phone"); return t?.__link ?? null; }) ?? await f.evaluate(() => [...document.querySelectorAll(".kbd")].map((e) => e.textContent).find((t) => t.includes("#survey=")) ?? null) ?? firstLink;
+const link = firstLink; // the collect row's printed full link (the room prints only the host under each code)
 if (!link) fail("no survey link on the QR room");
 ok(`QR room shows a real link + QR: ${link.replace(/#survey=.*/, "#survey=…")}`);
 await shot(f, "qr-room");

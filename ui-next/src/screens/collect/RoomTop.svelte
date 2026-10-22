@@ -1,6 +1,6 @@
 <!-- UI Next (v4) collect lane room top bar (QRRoom.dc.html). Status: provisional. Lane variant of the shared TopBar, whose room variant
      is not ported ("flow, document and room are not ported yet"). Contract: design-system.md "Top bar variants and breadcrumb" (R12)
-     room — projector view: brand → .crumb ending in the review → right: the room-health line only (no instruction in the bar), the live
+     room — projector view: brand → .crumb ending in the review → right: no room-health line (retired 2026-10-22, cookbook PR 198), the live
      stage pill, the answer count as a neutral .tag beside it (§1.4 QR room pill), the offline pointer (R32: "Meeting offline? Print and
      paper", the board's words for the row's "Print these as pages") and a quiet "Exit room view". No menus and no help. -->
 <script>

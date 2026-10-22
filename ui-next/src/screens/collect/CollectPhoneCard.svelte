@@ -1,5 +1,5 @@
 <!-- UI Next (v4) collect lane phone hero card (CollectPhone.dc.html; behind the CollectMenuPhone and CloseCollectionPhone sheets).
-     Status: provisional. boards_fphone.py f_collect: count, room health, the survey list, the "Meeting offline?" block (offline actions'
+     Status: provisional. boards_fphone.py f_collect: count, the survey list (room health retired 2026-10-22, cookbook PR 198), the "Meeting offline?" block (offline actions'
      one home on phone, §2 Offline actions R32), then the open-until line. Card hero pad (design-system.md 8.2, data-pad=hero). The offline
      buttons grow to fill their row (§8.8 Growing button, .l-row > .btn-block on the PIN). -->
 <script>

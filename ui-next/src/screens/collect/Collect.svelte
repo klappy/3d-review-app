@@ -2,7 +2,7 @@
      Boards (cookbook design/2026-10-15-glass-redesign/canvas): Collect.dc.html (state default), CollectMenu.dc.html (state "menu": the ⋯ menu
      open), CollectPhone.dc.html (phone), CollectMenuPhone.dc.html (phone, state "menu": the ⋯ sheet), CollectDark.dc.html (theme dark).
      One .btn-primary: "Share the survey" (desktop head; phone: the phone-bar). Offline actions have one home, the "Meeting offline?" card
-     (design-system.md §2 Offline actions, R32). Room health: §2 Room health row. Composed of AppShell > Page > Grid > Card / Stack / Row
+     (design-system.md §2 Offline actions, R32). Room health row: retired 2026-10-22 (PR 198). Composed of AppShell > Page > Grid > Card / Stack / Row
      and the §2 components; no <style>, no inline style. -->
 <script module>
   export const STATES = Object.freeze(["default", "menu"]);

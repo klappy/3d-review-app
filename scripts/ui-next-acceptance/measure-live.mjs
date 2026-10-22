@@ -51,7 +51,8 @@ for (const [b, w, h, hash] of PAIRS.filter((x) => !ONLY || ONLY.includes(x[0])))
     }
     else if (!target.includes("welcome") && !target.includes("/p/")) await signIn(p);
     const sep = target.includes("?") ? "&" : "?";
-    await p.goto(`${base}/next/?ui_next=on${target}${sep}theme=${theme}`); // theme rides the hash query (app/Live.svelte reads route.query) await p.evaluate(() => document.fonts.ready); await p.waitForTimeout(1500);
+    // theme rides the hash query (app/Live.svelte reads route.query)
+    await p.goto(`${base}/next/?ui_next=on${target}${sep}theme=${theme}`); await p.evaluate(() => document.fonts.ready); await p.waitForTimeout(1500);
     await p.waitForFunction(() => !/Loading…/.test(document.body.textContent), null, { timeout: 30000 }).catch(() => {});
     await p.waitForTimeout(600);
     const af = path.join(out, `app-${b}-${w}x${h}-${theme}.png`); await p.screenshot({ path: af });
