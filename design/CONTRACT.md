@@ -148,6 +148,7 @@ Both sources live in the 3D Review cookbook at the sha shown. The current UI's m
 | Participant review and receipt | v3 `PReview` (F9c), `PReceipt` (F9f) | — |
 | Results | v3 `Results` (F10), `PhoneResults` | Bincy 10 results dashboard |
 | Next step | v3 `NextStep` (F11) | Bincy 11 next steps |
+| Public home (`/`, signed out) and About (`#about`) · Learn more open | none upstream in v3 or Bincy — the rendered pair is the mockup: cookbook `work/active/2026-10-19-current-ui-copy/screenshots/` @5cf37ff2 — `home-learn-more-open-390x844.png`, `home-learn-more-open-1280x800.png`, `about-learn-more-open-390x844.png`, `about-learn-more-open-1280x800.png` | the source board placement F01–F03 in that unit's `TICKET.md` (lead under the headline, captions under the three perspectives, How it works then who/when/how often inside the closed Learn more) |
 
 ## 8. Versioning
 
