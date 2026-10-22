@@ -49,11 +49,12 @@
   <div class="l-row" data-gap="5" data-split data-align="start">
     <Stack gap={2}>
       <Row gap={3}><h1 class="title-page">{review.title}</h1><StagePill stage={review.stage} /></Row>
-      <p class="small t-15">{review.project} · {review.language} · {review.modality} · {review.stage === "collecting" ? "Collecting" : `Closed ${review.closed}`} · {n} responses</p>
+      <p class="small t-15">{review.project} · {review.language} · {review.modality} · {review.stage === "collecting" ? "Collecting" : review.closed ? `Closed ${review.closed}` : "Collection closed"} · {n} responses</p>
     </Stack>
     <Row gap={2}>
       <Menu id="more" summary={dots} summaryClass="btn btn-icon" label="More actions" title="More actions" items={MORE} />
-      <Button label={primary.label} variant="primary" href={primary.href} lead={primary.lead ? lead : undefined} trail={primary.trail ? trail : undefined} />
+      {#if primary.disabled}<span class="small" id="primary-why">{primary.why}</span><Button label={primary.label} variant="primary" disabled ariaDescribedby="primary-why" lead={primary.lead ? lead : undefined} trail={primary.trail ? trail : undefined} />
+      {:else}<Button label={primary.label} variant="primary" href={primary.href} lead={primary.lead ? lead : undefined} trail={primary.trail ? trail : undefined} />{/if}
     </Row>
   </div>
   <StageTabs />

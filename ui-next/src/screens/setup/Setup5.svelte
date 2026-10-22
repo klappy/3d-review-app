@@ -24,7 +24,7 @@
   const value = (r) => (r.derive === "who" ? WHO : r.derive === "about" ? ABOUT : r.value);
 </script>
 
-<div class="l-stack" {@attach launching}><SetupFrame {phone} {theme} step={5} title="Ready to launch" next={collecting ? { label: "Go to Collect", href: COLLECT } : { label: "Launch the survey", href: COLLECT, play: true }}>
+<div class="l-stack" {@attach launching}><SetupFrame {phone} {theme} step={5} title="Ready to launch" next={collecting ? { label: "Go to Collect", href: COLLECT } : { label: "Launch the survey", href: COLLECT, play: true, blocked: data.launchBlocked || undefined }}>
   {#if phone}
     <p class="small">Check it over. You can change dates and details later.</p>
     {#each data.phoneSummary as r}

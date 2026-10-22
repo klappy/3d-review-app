@@ -28,7 +28,32 @@ export const results = async (aid) => api(`/v2/assessments/${enc(aid)}/results`)
 // Answer-by-answer rows: the server answers with a typed suppression for everyone (src/handlers/response.ts list: D7 disclosure
 // policy unresolved, no row-level disclosure even to owners). The screen shows that real state, never sample rows.
 export const responsesList = async (aid) => api(`/v2/assessments/${enc(aid)}/responses`);
-export const reports = async (aid) => api(`/v2/assessments/${enc(aid)}/reports`);
+// The list pages (src/handlers/report.ts list: five per page, ordered by id, next_cursor until exhausted): every page is read so the
+// newest by created_at is chosen from the whole list, never from the first five ids (Codex 112a0f6e P1).
+export const reports = async (aid) => {
+  const out = { reports: [] };
+  for (let cursor = null, n = 0; n < 200; n++) {
+    const r = await api(`/v2/assessments/${enc(aid)}/reports${cursor ? `?cursor=${enc(cursor)}` : ""}`);
+    Object.assign(out, r, { reports: out.reports.concat(Array.isArray(r?.reports) ? r.reports : []) });
+    cursor = typeof r?.next_cursor === "string" && r.next_cursor ? r.next_cursor : null;
+    if (!cursor) break;
+  }
+  return out;
+};
+// The newest report of a list by created_at (the list's order is by id, not time).
+export const newestReport = (list) => (Array.isArray(list) ? list : []).filter((x) => x?.id).slice().sort((x, y) => String(y.created_at || "").localeCompare(String(x.created_at || "")))[0] ?? null;
+// A review's language, as collectModel resolves it: language_name, else language_id through the project's languages.
+export async function languageOf(a) {
+  if (a.language_name) return a.language_name;
+  if (!a.language_id) return "";
+  const langs = await api(`/v2/projects/${enc(a.project_id)}/languages`).then((r) => r?.languages ?? []).catch(() => []);
+  return langs.find((l) => l.id === a.language_id)?.name || "";
+}
+// The report build's two steps, apart (ui/assess/report-build.js: preview → the person confirms with the response count → execute):
+// previewBuild is the dry run; executeBuild spends its confirm_token. buildReport (confirmed) stays the one-shot pair for callers that
+// have already confirmed.
+export const previewBuild = async (aid) => { const p = await api(`/v2/assessments/${enc(aid)}/reports`, { method: "POST", body: { mode: "dry_run" } }); if (p?.suppressed === true || p?.status === "held") return { held: true, preview: p }; if (typeof p?.confirm_token !== "string" || !p.confirm_token) throw new Error("Invalid preview"); return { held: false, preview: p, token: p.confirm_token, expires: Date.now() + (Number.isFinite(p.expires_in) ? p.expires_in * 1000 : 0) }; };
+export const executeBuild = async (aid, confirm_token) => { const r = await api(`/v2/assessments/${enc(aid)}/reports`, { method: "POST", body: { mode: "execute", confirm_token } }); if (r?.suppressed === true) return { held: true, preview: r }; if (!r?.report?.id) throw new Error("Unconfirmed report"); return { held: false, result: r }; };
 export const report = async (id) => (await api(`/v2/reports/${enc(id)}`)).report;
 export const buildReport = (aid) => confirmed(`/v2/assessments/${enc(aid)}/reports`);
 export const issueLink = (aid, sid) => confirmed(`/v2/assessments/${enc(aid)}/surveys/${enc(sid)}/links`, { params: {} });
@@ -65,10 +90,12 @@ export async function homeModel(me) {
 export async function projectModel(pid) {
   const [p, as, ws] = await Promise.all([project(pid), assessmentsOf(pid), workspaces().catch(() => [])]);
   const live = as.filter((a) => !a.archived_at).sort((x, y) => String(y.created_at).localeCompare(String(x.created_at)));
-  const w = ws.find((x) => x.id === p.workspace_id) ?? ws[0] ?? { name: "Your workspace" };
+  // A project outside any workspace (workspace_id null) is said so, never shown under the first workspace in the list.
+  const w = (p.workspace_id && ws.find((x) => x.id === p.workspace_id)) ?? (p.workspace_id ? { name: "Your workspace" } : { name: "No workspace" });
+  // A review's report list or counts failing to read is the shell's retryable error (never a review silently shown without levels).
   const lvl = await Promise.all(live.map(async (a) => {
     if (!["understand", "improve"].includes(a.stage)) return null;
-    try { const r = await reports(a.id); const newest = (r.reports ?? []).filter((x) => x?.id).sort((x, y) => String(y.created_at || "").localeCompare(String(x.created_at || "")))[0]; if (!newest) return null; const rep = newest.payload ? newest : await report(newest.id); return levelsOf(rep.payload, await lensCounts(a.id)); } catch { return null; }
+    const r = await reports(a.id); const newest = newestReport(r.reports); if (!newest) return null; const rep = newest.payload ? newest : await report(newest.id); return levelsOf(rep.payload, await lensCounts(a.id));
   }));
   const month = (iso) => { const d = new Date(iso); return isNaN(d) ? "" : d.toLocaleDateString("en-US", { month: "short", year: "numeric" }); };
   const reviews = live.map((a, i) => {
@@ -78,7 +105,8 @@ export async function projectModel(pid) {
   });
   const withLevels = reviews.filter((r) => r.levels).reverse().slice(-4); // the board's trend is four points wide (Project.svelte X(i) = 70 + 110 i in a 420 box): the newest four
   const lines = {};
-  for (const lens of ["team", "community", "church"]) { const col = withLevels.map((r) => Object.fromEntries(r.levels)[lens]).filter(Boolean); if (col.length) lines[lens] = withLevels.map((r) => Object.fromEntries(r.levels)[lens] ?? "more"); }
+  // A review that never surveyed a perspective leaves a gap (null) in that line, never a "More input needed" point it did not earn.
+  for (const lens of ["team", "community", "church"]) { const col = withLevels.map((r) => Object.fromEntries(r.levels)[lens]).filter(Boolean); if (col.length) lines[lens] = withLevels.map((r) => Object.fromEntries(r.levels)[lens] ?? null); }
   const count = live.length;
   const since = live.length ? month(live[live.length - 1].created_at) : "";
   const meta = [p.organization ? `lead organisation ${p.organization}` : "", `${count} review${count === 1 ? "" : "s"}${since ? ` since ${since}` : ""}`].filter(Boolean).join(" · ");
@@ -95,7 +123,7 @@ export async function projectModel(pid) {
 export async function lensCounts(aid) {
   const { surveys } = await assessment(aid);
   const live = surveys.filter((s) => !s.archived_at);
-  const per = await Promise.all(live.map((s) => surveyCounts(aid, s.id).catch(() => null)));
+  const per = await Promise.all(live.map((s) => surveyCounts(aid, s.id))); // a failed count is the caller's error, never a zero that holds a band
   const counts = { team: 0, community: 0, church: 0 };
   live.forEach((s, i) => { const k = lensKeyOf(s.perspective); if (k) counts[k] += Number(per[i]?.counts?.respondents ?? 0); });
   return counts;
@@ -116,12 +144,11 @@ export async function collectModel(aid, origin = globalThis.location?.origin ?? 
   // The same stores the current UI reads (ui/assess/assess.js): the project's languages resolve language_id when the assessment
   // carries no language_name; passages name what to read first; the expected count per survey is browser-local (v3:expected,
   // never an API field) — a facilitator sees the number they typed on this browser, as today.
-  const [counts, langs, passages] = await Promise.all([
+  const [counts, language, passages] = await Promise.all([
     Promise.all(live.map((s) => surveyCounts(aid, s.id).catch(() => null))),
-    a.language_name || !a.language_id ? Promise.resolve([]) : api(`/v2/projects/${enc(a.project_id)}/languages`).then((r) => r?.languages ?? []).catch(() => []),
+    languageOf(a),
     api(`/v2/assessments/${enc(aid)}/passages`).then((r) => r?.passages ?? []).catch(() => []),
   ]);
-  const language = a.language_name || langs.find((l) => l.id === a.language_id)?.name || "";
   const passage = [...new Set(passages.map((x) => String(x?.reference || x?.title || "").trim()).filter(Boolean))].join(" · ");
   const period = parsePeriod(a.period);
   const closes = period ? shortDate(period.until) : "";
@@ -213,10 +240,14 @@ export async function resultsModel(aid, { build = false } = {}) {
     const out = await buildReport(aid);
     if (out.held) held = out.preview; else list = [out.result?.report].filter(Boolean);
   }
-  const newest = list.sort((x, y) => String(y.created_at || "").localeCompare(String(x.created_at || "")))[0];
+  const newest = newestReport(list);
   if (newest) built = newest.payload ? newest : await report(newest.id);
-  const review = { id: a.id, project: p.name, projectId: a.project_id, language: a.language_name || "", modality: a.format ? a.format[0].toUpperCase() + a.format.slice(1) : "", title: a.name, stage: a.stage === "collect" ? "collecting" : built ? "results" : "closed", closed: a.stage === "collect" ? "" : shortDate(a.updated_at || a.created_at), closedLong: "", builtOn: built ? shortDate(built.created_at) : "", responses }; // results lane StagePill: the review's real state — collecting | closed (no report yet) | results
-  return { aid, review, counts, payload: built?.payload ?? null, reportId: built?.id ?? null, held: held ?? (res?.status === "held" ? res : null), results: res, serverStage: a.stage, canBuild: ["owner", "member"].includes(a.role) };
+  const member = ["owner", "member"].includes(a.role);
+  // No closure timestamp exists on the contract (created_at is when the review was made, not when collection closed): the date is
+  // left out rather than mislabelled. Language resolves as Collect does (language_name, else language_id via the project's languages).
+  const review = { id: a.id, project: p.name, projectId: a.project_id, language: await languageOf(a), modality: a.format ? a.format[0].toUpperCase() + a.format.slice(1) : "", title: a.name, stage: a.stage === "collect" ? "collecting" : built ? "results" : "closed", closed: "", closedLong: "", builtOn: built ? shortDate(built.created_at) : "", responses, canReadResponses: member, canReopen: member }; // results lane StagePill: the review's real state — collecting | closed (no report yet) | results
+  // Role flags (src/handlers: report build, stage and the response list need owner/member; viewers read results and reports only).
+  return { aid, review, counts, payload: built?.payload ?? null, reportId: built?.id ?? null, held: held ?? (res?.status === "held" ? res : null), results: res, serverStage: a.stage, canBuild: member, canReadResponses: member, canReopen: member };
 }
 
 // Gap names for ResultsGaps/Report (results/data.js bandRows reads the payload's cross-perspective areas by construct name):
@@ -259,7 +290,10 @@ export async function setupModel(aid) {
     { label: "About each group", sub: a.demographics_enabled ? "Participants asked age range and gender (skippable)" : "Participants are not asked about themselves", step: 4, derive: "about" },
   ];
   const phoneSummary = [{ label: "Review", value: a.name, step: 1 }, { label: "Respond to", value: passage, step: 2 }, { label: "Who", step: 3, derive: "who" }, { label: "Open", value: period, step: 1 }];
-  return { aid: a.id, stage: a.stage, summary, phoneSummary, groups, context: { open: null, values: {}, demographics: !!a.demographics_enabled }, steps: null, canLaunch: a.stage === "prepare" && live.length > 0 && ["owner", "member"].includes(a.role) }; // launch only while preparing (TICKET 4: Setup is read-only otherwise)
+  const canLaunch = a.stage === "prepare" && live.length > 0 && ["owner", "member"].includes(a.role); // launch only while preparing (TICKET 4: Setup is read-only otherwise)
+  // While preparing, a launch that cannot happen says why beside a disabled primary (Setup5 next.blocked), never a live link to Collect.
+  const launchBlocked = canLaunch || a.stage !== "prepare" ? "" : !["owner", "member"].includes(a.role) ? "Only an owner or member of the review can launch it." : "Pick at least one survey before launching.";
+  return { aid: a.id, stage: a.stage, summary, phoneSummary, groups, context: { open: null, values: {}, demographics: !!a.demographics_enabled }, steps: null, canLaunch, launchBlocked };
 }
 
 // Share: the shape actions/Share.svelte reads (fixtures/actions/review.json + share.json) from the real collect model with every open
