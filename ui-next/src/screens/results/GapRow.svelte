@@ -1,11 +1,10 @@
-<!-- UI Next (v4) results lane: one area's gap row (ResultsGaps.dc.html: a card holding the barbell Grid template 220px 1fr 220px,
-     design-system.md 8.4 "barbell row is a named Grid template"; ResultsGapsPhone.dc.html: name · perspectives, barbell, verdict).
+<!-- UI Next (v4) results lane: one area's gap row (ResultsGaps.dc.html: the glass card .glass.barbell-row, label · track · verdict,
+     design-system.md barbell rows @186fab0a; ResultsGapsPhone.dc.html: name · perspectives, barbell, verdict).
      Status: provisional. Levels: ./data.js bandRow (v3ScoreBand per perspective). -->
 <script>
   import Card from "../../Card.svelte";
   import Stack from "../../Stack.svelte";
   import Row from "../../Row.svelte";
-  import Grid from "../../Grid.svelte";
   import BandBar from "./BandBar.svelte";
   import { LEVEL_WORD, withNotes } from "./data.js";
   let { row, phone = false } = $props();
@@ -24,11 +23,9 @@
     <Stack gap={1}><BandBar {row} />{@render verdict()}</Stack>
   </Card>
 {:else}
-  <Card gap={3} label={row.name}>
-    <Grid template="barbell" gap={5}>
-      <Stack gap={1}><h3 class="h3">{row.name}</h3>{#if row.question}<span class="small">{row.question}</span>{/if}</Stack>
-      <BandBar {row} />
-      <Stack gap={1}>{@render verdict()}</Stack>
-    </Grid>
-  </Card>
+  <div class="glass barbell-row" role="group" aria-label={row.name}><!-- the screen card: .glass.barbell-row (220px minmax(0,1fr) 220px, gap 20) -->
+    <Stack gap={1}><h3 class="h3">{row.name}</h3>{#if row.question}<span class="small">{row.question}</span>{/if}</Stack>
+    <BandBar {row} />
+    <Stack gap={1}>{@render verdict()}</Stack>
+  </div>
 {/if}

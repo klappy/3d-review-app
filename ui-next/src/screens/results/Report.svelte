@@ -14,7 +14,6 @@
   import Card from "../../Card.svelte";
   import Stack from "../../Stack.svelte";
   import Row from "../../Row.svelte";
-  import Grid from "../../Grid.svelte";
   import PhoneHeader from "../../PhoneHeader.svelte";
   import PhoneBar from "../../PhoneBar.svelte";
   import { liveContext } from "../href.js";
@@ -86,11 +85,11 @@
         <h2 class="h3">Where the perspectives disagree</h2>
         <p class="small">Each dot is one perspective on the same area, placed in its band; a red line means two bands apart or more.</p>
         {#each rows as row}
-          <Grid template="barbell" gap={4}>
+          <div class="barbell-row"><!-- design-system.md barbell rows: .paper .barbell-row 180px minmax(0,1fr) 150px, gap 14 -->
             <span class="small"><strong>{row.name}</strong></span>
             <BandBar {row} size="paper" />
             <span class="small">{withNotes(row.verdict, row)}</span>
-          </Grid>
+          </div>
         {/each}
         <PaperLegend />
       </Stack>

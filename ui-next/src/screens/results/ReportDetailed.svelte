@@ -17,7 +17,6 @@
   import AppShell from "../../AppShell.svelte";
   import Stack from "../../Stack.svelte";
   import Row from "../../Row.svelte";
-  import Grid from "../../Grid.svelte";
   import Level from "../../Level.svelte";
   import Coverage from "./Coverage.svelte";
   import LensDot from "../../LensDot.svelte";
@@ -52,11 +51,11 @@
 {#snippet foot(n)}<div class="pfoot"><span>{FOOT}</span><span>{n} of {PAGES}</span></div>{/snippet}
 {#snippet scores(rows)}
   {#each rows as row}
-    <Grid template="barbell" gap={4}>
+    <div class="barbell-row" data-kind="score"><!-- the numeric paper row (.paper .barbell-row[data-kind=score]) -->
       <span class="small"><strong>{row.name}</strong></span>
       <ScoreBar {row} />
       <span class="small">{withNotes(gapLead(row), row)}</span>
-    </Grid>
+    </div>
   {/each}
   <PaperLegend />
 {/snippet}
