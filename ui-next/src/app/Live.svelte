@@ -30,6 +30,7 @@
   import { collectModel as collectView } from "../screens/collect/model.js";
   import Card from "../Card.svelte";
   import Row from "../Row.svelte";
+  import * as R from "../screens/results/data.js";
   import NotBuilt from "./NotBuilt.svelte";
   import { buildConfirmText } from "../../../ui/assess/report-build.js";
 
@@ -329,7 +330,13 @@
   };
   const suGroups = { ongroup: (tid, version, on) => { SU.setGroup(suSt, tid, version, on); suError = ""; bump(); }, onexpected: (tid, v) => { SU.setExpected(suSt, tid, v); bump(); } };
   const suContext = { oncontext: (key, field, v) => { const tid = SU.tidOfKey(suSt, key); if (tid) SU.setContext(suSt, tid, field, v); }, ondemographics: (on) => { suSt.draft.demographics = on; bump(); } };
-  const reportFor = (m) => (m.payload ? { review: m.review, counts: m.counts, sent: m.sent, payload: phone ? phonePayload(m.payload) : m.payload, gaps: D.gapsOf(m.payload), radar: D.radarOf(m.payload), lookNext: [] } : null);
+  // lookNext and standsOut (live QA Q4): derived from the built report's own levels and gaps (results/data.js), never a store.
+  const reportFor = (m) => {
+    if (!m.payload) return null;
+    const payload = phone ? phonePayload(m.payload) : m.payload, gaps = D.gapsOf(m.payload);
+    const cards = R.lensCards(payload, m.counts, { sent: m.sent }), rows = R.bandRows({ payload }, m.counts, [...gaps.biggest, ...gaps.agree]);
+    return { review: m.review, counts: m.counts, sent: m.sent, payload, gaps, radar: D.radarOf(m.payload), lookNext: R.lookNextOf(cards), standsOut: R.standsOutOf(cards, rows) };
+  };
 </script>
 
 <!-- The build confirm (report-build.js: one plain sentence with the response count, confirm "Build the results", cancel "Not now").

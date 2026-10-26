@@ -340,6 +340,44 @@ describe("the served level minimum reaches Help, Explore and the detailed report
   });
 });
 
+describe("Codex P2 4382475727: the results summary is a hold only with its low-count fields", () => {
+  it("DEV, one response, no built report: a member sees Not built yet with Build; a viewer sees the honest not-built state, not 'needs more answers'", async () => {
+    const noReports = { [`GET /v2/assessments/${AID}/reports`]: { reports: [], next_cursor: null }, [`GET /v2/assessments/${AID}/results`]: { status: "held", suppressed: true, level_minimum_responses: 1 } };
+    for (const role of ["owner", "viewer"]) {
+      serve(base({ ...noReports, [`GET /v2/assessments/${AID}`]: assessment({ role }) }));
+      const m = await resultsModel(AID);
+      expect(m.held).toBeNull();
+      globalThis.location.hash = to("results", { aid: AID });
+      const a = render(Live as never, { props: {} }).container;
+      await waitFor(() => expect(a.textContent).toContain("Not built yet"));
+      expect(a.textContent).not.toMatch(/Results are held|needs \d+ more|more answers/);
+      expect(!![...a.querySelectorAll("button")].find((b) => b.textContent === "Build the report")).toBe(role === "owner");
+      if (role === "viewer") expect(a.textContent).toContain("An owner or member of the review builds it.");
+    }
+    // below the server minimum the summary carries its low-count fields: a viewer then sees the hold
+    serve(base({ ...noReports, [`GET /v2/assessments/${AID}/results`]: { status: "held", responses_in: 0, responses_needed: 1, reason: "0 responses so far" }, [`GET /v2/assessments/${AID}`]: assessment({ role: "viewer" }) }));
+    expect((await resultsModel(AID)).held).toMatchObject({ responses_needed: 1 });
+  });
+});
+
+describe("live QA Q4: a live report's Where to look next and What stands out come from its own levels and gaps", () => {
+  it("fills both on the overview from the built report, with no store and no invented judgement", async () => {
+    const snap = { lenses: [{ lens: "Translation Team", score: 80, sub_dimensions: [{ sub_dimension: "External review", score: 30 }, { sub_dimension: "Brief", score: 85 }] }, { lens: "Community", score: 45, sub_dimensions: [{ sub_dimension: "Understandable", score: 20 }] }],
+      cross_lens_multi: [{ construct_name: "Clarity", agreement_range: 60, lens_scores: [{ lens: "Translation Team", score: 85 }, { lens: "Community", score: 20 }] }],
+      evidence: [{ label: "Translation Team — Translators", n: 4 }, { label: "Community — Community", n: 4 }] };
+    serve(base({ "GET /v2/reports/rep_11": { report: { id: "rep_11", created_at: "2026-10-20T00:00:00Z", payload: snap } } }));
+    useLevelMinimum(1);
+    globalThis.location.hash = to("report", { aid: AID });
+    const a = render(Live as never, { props: {} }).container;
+    await waitFor(() => expect(a.textContent).toContain("Where to look next"));
+    const items = [...a.querySelectorAll(".paper ol li")].map((l) => (l.textContent ?? "").trim());
+    expect(items).toEqual(["Translation team · External review — Needs urgent attention", "Community · Understandable — Needs urgent attention"]); // urgent first, perspective order
+    const stands = [...a.querySelectorAll(".paper h2")].find((h) => h.textContent === "What stands out")!.nextElementSibling!.textContent;
+    expect(stands).toBe("Overall: Translation team strong, Community needs support. The perspectives are furthest apart on Clarity (Translation team strong, Community needs urgent attention).");
+    useLevelMinimum(undefined);
+  });
+});
+
 describe("final batch: report totals from the snapshot, held lines from the sent set (Codex P1 4381767661, P2 4381767676)", () => {
   it("resultsModel: a built report's total is the sum of its snapshot counts; the live total is kept apart for the newer notice", async () => {
     // the report used 2 team + 1 community responses; the live surveys now hold 4 responses each

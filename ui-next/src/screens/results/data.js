@@ -200,6 +200,23 @@ export function bandRows(report, counts, names) {
   return byName(areas(report), names).map((a) => band(a, responses));
 }
 
+/** "Where to look next" for a live built report (live QA Q4; the fixtures carry the board's own): the weakest areas the cards show,
+ *  urgent before needs-support, in perspective order, at most `max`, as [lens, area] pairs. Derived from the levels, never stored. */
+export function lookNextOf(cards, max = 3) {
+  const weak = list(cards).flatMap((c) => list(c.rows).filter((r) => r.level === "urgent" || r.level === "support").map((r) => ({ lens: c.lens, area: r.name, level: r.level })));
+  return [...weak.filter((w) => w.level === "urgent"), ...weak.filter((w) => w.level === "support")].slice(0, max).map((w) => [w.lens, w.area]);
+}
+/** "What stands out" for a live built report (live QA Q4): one plain sentence from what the report already shows, each perspective's
+ *  level and the widest gap two or more bands apart, never a judgement the data does not carry. "" when there is nothing to say. */
+export function standsOutOf(cards, rows) {
+  const lv = list(cards).map((c) => `${c.label} ${LEVEL_WORD[c.level].toLowerCase()}`);
+  const wide = list(rows).filter((r) => r.apart >= 2).sort((x, y) => y.apart - x.apart)[0];
+  const parts = [];
+  if (lv.length) parts.push(`Overall: ${lv.join(", ")}.`);
+  if (wide) parts.push(`The perspectives are furthest apart on ${wide.name} (${wide.dots.map((d) => `${d.label} ${LEVEL_WORD[d.level].toLowerCase()}`).join(", ")}).`);
+  return parts.join(" ");
+}
+
 /** The words after a row's lead ("same band", "gap 14", the levels): " · "-joined, so no separator is lost in markup. */
 export const withNotes = (lead, row) => [lead, ...row.notes].filter(Boolean).join(" · ");
 /** A numeric row's lead: "gap 14", or, with fewer than two placed perspectives, the band row's words (never "gap null"). */
