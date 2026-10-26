@@ -4,8 +4,9 @@
      .l-row[data-align=start] (8.7 Collect lane rows): the buttons sit at the top of the title block, as the boards draw them.
      Phone (ResultsPhone and twins): project link, title + pill + quiet More actions (the collect menu sheet), then the stage tabs;
      the primary is the phone-bar's.
-     linkGap: the --sp step under the project link: 1 as the nested phone boards draw it (gap 4); ResultsPhone draws that link as a 44px
-     target with an inline min-height and no gap, so it passes 5.
+     hit: the project link is the page's only way up (ResultsPhone, a root-state phase page): a.link.small.crumb-hit, the 44px target
+     (design-system.md §9 root header, base.css .crumb-hit; boards_fphone rhead(hit=True)), in a column with no gap, so the 44px box,
+     not extra space, separates link and title. Off: the nested phone boards' gap 4 (--sp-1) under a plain link.
      responses: the count the meta line and the refused delete both say (default review.responses; ResultsHeld passes its closed count). -->
 <script>
   import Row from "../../Row.svelte";
@@ -18,7 +19,7 @@
   import StageTabs from "./StageTabs.svelte";
   import { G } from "./icons.js";
   import { out } from "./links.js";
-  let { review, phone = false, primary, responses, linkGap = 1 } = $props();
+  let { review, phone = false, primary, responses, hit = false } = $props();
   const collecting = $derived((review.stage ?? "") === "collecting"); // the close action exists only while collecting: from understand/improve the write would move the review backwards (Codex P1 on 26a86937)
   if (!review || typeof review.title !== "string") throw new TypeError("ReviewHead: review.title is required");
   if (!phone && !(primary && primary.label)) throw new TypeError("ReviewHead: the desktop head holds the page's one primary");
@@ -38,13 +39,15 @@
 {#snippet trail()}{#if primary?.trail}<Glyph d={G[primary.trail]} />{/if}{/snippet}
 
 {#if phone}
-  <Stack gap={linkGap}>
-    <a class="link small" href={out("project")}>{review.project}</a>
+  {#snippet titleRow()}
     <Row split gap={2}>
       <h1 class="title-phone">{review.title}</h1>
       <Row gap={2}><StagePill stage={review.stage} /><Button icon={dots} ariaLabel="More actions" variant="quiet" href={out("collect", { state: "menu" })} /></Row>
     </Row>
-  </Stack>
+  {/snippet}
+  <!-- hit: a plain block column, so no inherited --g gap: the 44px .crumb-hit box alone separates link and title (gap 0) -->
+  {#if hit}<div><a class="link small crumb-hit" href={out("project")}>{review.project}</a>{@render titleRow()}</div>
+  {:else}<Stack gap={1}><a class="link small" href={out("project")}>{review.project}</a>{@render titleRow()}</Stack>{/if}
   <StageTabs phone />
 {:else}
   <div class="l-row" data-gap="5" data-split data-align="start">

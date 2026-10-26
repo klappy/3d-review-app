@@ -6,4 +6,3 @@
 .crumb li+li::before{content:"›";color:var(--ink-3)}
 .crumb a,.crumb [aria-current]{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .crumb [aria-current]{color:var(--ink);font-weight:600}
-.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}

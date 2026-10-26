@@ -252,6 +252,24 @@ html:has(dialog[open]:modal){overflow:hidden}
 .paper[data-sheet]{width:794px;min-height:1000px;break-inside:avoid;padding:56px 64px;display:flex;flex-direction:column;gap:var(--sp-5);border-radius:var(--radius-s)}.paper[data-sheet=a4]{min-height:1120px}
 /* Held results preview: the perspective cards behind a hold are drawn dimmed (and aria-hidden on the board) (results_held() inline) */
 .l-grid[data-state=held]{opacity:.45}
+/* §8.11 held card, compact legend, project-link target (cook-cue-boards-1800, 2026-10-26, provisional; were board inlines, rule 16).
+   Component variants the app's generated base.css carries (rule 14): no generic pad or .seg default changes. */
+.held-card{border-radius:var(--radius-xl);padding:40px;display:grid;grid-template-columns:auto 1fr auto;gap:28px;align-items:center}
+.held-card .held-lines{padding-top:6px}
+.lvl-legend{border-radius:var(--radius-l);padding:12px 18px;display:flex;align-items:center;gap:22px;flex-wrap:wrap}
+.seg[data-size=compact]{padding:3px}.seg[data-size=compact] label{min-height:36px;padding:0 10px;font-size:var(--t-13)}
+.crumb-hit{min-height:var(--target);display:inline-flex;align-items:center;align-self:flex-start}
+/* §9 phone frame (cook-cue-boards-1800, provisional; DS §9 fixed bottom bar, §8.3 120px clearance): the board is the 390×844 viewport.
+   The page scrolls inside the frame under the header; the bar stays at the viewport's bottom; .l-phone's 120px bottom padding is
+   the clearance, so the last content scrolls clear of the bar. App: the document scrolls and .phone-bar is position:fixed. */
+.app[data-w=phone]>.l-shell>.phone-main{flex:1 1 0;min-height:0;overflow-y:auto;overscroll-behavior:contain}
+/* §2 Coverage cue (cook-cue-boards-1800, 2026-10-26, status: provisional; playbook rule 11b/16): quantity beside the Level.
+   .lvl-pair = app ui-next/components/type.css:19 (summary level pairs and the cue); .sr-only = app components/topbar.css:9 (the short
+   variants' full words); [data-newer] = the Results-card "N newer responses not in this report yet" line, drawn as a board state:
+   hidden unless the board's "Newer responses" tweak is on (.newer-state[data-newer-state=on]). gen.py coverage(). */
+.lvl-pair{display:inline-flex;align-items:center;gap:var(--sp-2);font-size:var(--t-14);color:var(--ink-2)}
+.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+.newer-state:not([data-newer-state=on]) [data-newer]{display:none}
 /* Shared slice 2 (auggie-fanout-shared-1133, playbook rule 11, provisional; parity-loop CORRECTIONS sh-1, sh-2) */
 .seg label{white-space:nowrap}/* §2 Segmented: a label is one line; the track shares its width equally and a longer label takes its own width (Feedback kinds at the 560 dialog: 155 · 160 · 155) */
 """
@@ -442,6 +460,27 @@ def meter(level):
     return (f'<span class="lvl" data-level="{LEVEL_KEY[level]}"><span class="g g-bars {cls}" aria-hidden="true">{bars}</span><span class="g g-faces" aria-hidden="true">{glyph_face(on)}</span>'
             f'<span class="g g-jars" aria-hidden="true">{glyph_jar(on)}</span><span class="g g-plants" aria-hidden="true">{glyph_plant(on)}</span><span style="color: var(--ink)">{level}</span></span>')
 
+# §2 Coverage cue (status: provisional): drawn exactly as app ui-next/src/screens/results/Coverage.svelte @24af049 with the tiers of
+# results/data.js coverageOf (0 No drops yet · 1-2 A few drops · 3-5 Filling up · 6+ Well filled · None not counted, no word).
+def coverage_of(n):
+    if n is None: return 0, ''
+    return (0, 'No drops yet') if n <= 0 else (1, 'A few drops') if n < 3 else (2, 'Filling up') if n < 6 else (3, 'Well filled')
+def responses_text(n):  # app results/data.js responsesText = ui/report-lenses.js lensesCopy.respondents / noCount
+    return 'responses not counted' if n is None else f'{n} {"response" if n == 1 else "responses"}'
+def coverage(n, variant='full'):
+    """variant: full ("Well filled · 6 responses": cards, paper head, evidence) · short ("Well filled · 6": Home, Project) ·
+    count (drops and "6": a Workspace card's third-width cell); the short variants carry the full words in title + .sr-only."""
+    fill, word = coverage_of(n)
+    words = (f'{word} · ' if word else '') + responses_text(n)
+    drops = ''.join(f'<path d="M{x} 5c0 0-4 5.5-4 9a4 4 0 0 0 8 0c0-3.5-4-9-4-9z" fill="{"currentColor" if i < fill else "none"}"{" stroke-dasharray=\"2 2\"" if fill == 0 else ""}></path>' for i, x in enumerate((5, 15, 25)))
+    svg = f'<svg width="22" height="18" viewBox="0 0 30 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" aria-hidden="true">{drops}</svg>'
+    if variant == 'full':
+        return f'<span class="lvl-pair small" data-coverage="{fill}">{svg}<span>{words}</span></span>'
+    shown = ('' if variant == 'count' or not word else f'{word} · ') + (str(n) if word else responses_text(n))
+    return f'<span class="lvl-pair small" data-coverage="{fill}" title="{words}">{svg}<span aria-hidden="true" data-short>{shown}</span><span class="sr-only">{words}</span></span>'
+def newer_line(k):  # app results/data.js newerText: Results cards only, never the printed report
+    return f'<span class="small" data-newer>{k} newer {"response" if k == 1 else "responses"} not in this report yet</span>' if k > 0 else ''
+
 def prov_panel(entries, w):
     # R45: review overlay drops .glass-hi's --sh-2 drop shadow (inline box-shadow keeps only --hl) so it never dims content under it
     if not entries: return ''
@@ -519,6 +558,8 @@ LENS_NAMES = [('team', 'Translation team'), ('community', 'Community'), ('church
 def page(title, body, w, h, theme_prop=True, extra_props=None, prov=None):
     props = {"dark": {"editor": "boolean", "default": False, "section": "Theme"}, "imagery": {"editor": "enum", "default": "bars", "options": ["bars", "faces", "jars", "plants"], "section": "Levels"}, "provenance": {"editor": "boolean", "default": False, "section": "Notes"}, "$preview": {"width": w, "height": h}}
     if extra_props: props.update(extra_props)
+    # a boolean board-state tweak (Results 'newer', cook-cue-boards-1800) renders as {{name}} = on | off; boards without one are unchanged
+    extra_vals = ''.join(f", {k}: (this.props.{k} ?? false) ? 'on' : 'off'" for k, v in (extra_props or {}).items() if v.get('editor') == 'boolean')
     # placeholder: the build step swaps in prov_panel(PROV[name], w) so it overlays without changing layout
     # match the class list, not the literal attribute: shell() emits class="layer l-shell" (fresh-review 6302493905 #1)
     body, n = re.subn(r'<div class="layer(?=[\s"])', f'<!--PROV:{w}--><div class="layer', body, count=1)
@@ -526,7 +567,7 @@ def page(title, body, w, h, theme_prop=True, extra_props=None, prov=None):
     return ('<!doctype html>\n<html lang="en">\n<head>\n<meta charset="utf-8">\n'
             f'<title>{html.escape(title)}</title>\n<script src="./support.js"></script>\n</head>\n<body>\n<x-dc>\n{H}\n{body}\n</x-dc>\n'
             f"<script type=\"text/x-dc\" data-dc-script data-props='{json.dumps(props).replace(chr(39), '&#39;')}'>\n"
-            "class Component extends DCLogic {\nrenderVals() {\nconst dark = this.props.dark ?? false;\nconst prov = this.props.provenance ?? false;\nconst imagery = this.props.imagery ?? 'bars';\nreturn { theme: dark ? 'dark' : 'light', prov, imagery };\n}\n}\n</script>\n</body>\n</html>\n")
+            "class Component extends DCLogic {\nrenderVals() {\nconst dark = this.props.dark ?? false;\nconst prov = this.props.provenance ?? false;\nconst imagery = this.props.imagery ?? 'bars';\nreturn { theme: dark ? 'dark' : 'light', prov, imagery" + extra_vals + " };\n}\n}\n</script>\n</body>\n</html>\n")
 
 def shell(body, w=1440, h=900, top=None):
     dw = ' data-w="phone"' if w < 720 else ''
@@ -534,39 +575,26 @@ def shell(body, w=1440, h=900, top=None):
             '<div class="aurora" aria-hidden="true"><i></i><i></i><i></i></div>'
             f'<div class="layer l-shell">{top or ""}{body}</div></div>')
 
-def review_page(h, head, content, title):
+def review_page(h, head, content, title, extra_props=None):
     body = shell(f'{topbar(crumb="Mark 1–4 draft")}<main class="l-main"><div class="l-page">{head}{content}</div></main>', h=h)
-    return page(title, body, 1440, h)
+    return page(title, body, 1440, h, extra_props=extra_props)
 
-def phone(title, h, header, main, bar=None, w=390, hh=844):
-    body = shell(f'{header}<main class="l-page l-phone" style="overflow: hidden">{main}</main>{("<div class=\"glass phone-bar\">" + bar + "</div>") if bar else ""}', w=w, h=hh)
-    return page(title, body, w, hh)
+PHONE_VH = 844  # §8.3 / §9 (cook-cue-boards-1800, provisional): a phone board IS the shipping viewport, 390×844 — never grown to fit
+def phone(title, h, header, main, bar=None, w=390, hh=PHONE_VH, extra_props=None):
+    """The phone frame is the real viewport (PHONE_VH): the header stays, <main class="l-phone"> scrolls inside the frame
+    (.phone-main), and the phone-bar is fixed to the viewport's bottom (§9 fixed bottom bar) with the 120px clearance of .l-phone
+    under the last content (§8.3). h/hh are kept for call-site compatibility and must equal PHONE_VH."""
+    assert hh == PHONE_VH, f'{title}: phone boards are {PHONE_VH} tall (the viewport); content scrolls, the board never grows'
+    body = shell(f'{header}<main class="l-page l-phone phone-main">{main}</main>{("<div class=\"glass phone-bar\">" + bar + "</div>") if bar else ""}', w=w, h=PHONE_VH)
+    return page(title, body, w, PHONE_VH, extra_props=extra_props)
 
 def phone_header(lang=True, brandlabel=True):
     # participant shell (design-system.md §2 Phone chrome, V-19): brand as plain text -> the language button; padding from the §9 participant row
     lang_btn = f'<button class="btn btn-quiet" type="button" aria-label="Language: English">{ic("globe")} English {ic("chev",16)}</button>' if lang else ''
     return f'<header class="phone-top" data-shell="participant"><span class="brand">{MARK.format(s=26)}{"<span>3D Review</span>" if brandlabel else ""}</span>{lang_btn}</header>'
 
-# QR module grid (design-system §8.7 QR module grid; parity-loop debt 7 closed 2026-10-22). Real cells come from generator/qr_data.json
-# (or the file named by QR_DATA): the app's own encoder output (ui/assess/vendor-qrcode.js, typeNumber auto, error correction M) for the
-# seeded survey links the live screen draws, so board and app render the same n x n modules. qr(seed) keeps the 21x21 placeholder for
-# boards that draw a decorative code with no link (ActionPlan share line); a survey board passes cells.
-import json as _json, os as _os
-_QR_DATA = None
-def qr_data():
-    global _QR_DATA
-    if _QR_DATA is None:
-        path = _os.environ.get('QR_DATA') or _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), 'qr_data.json')
-        _QR_DATA = _json.load(open(path)) if _os.path.exists(path) else {'encoder': 'none', 'host': '3dreview.app', 'surveys': []}
-    return _QR_DATA
-def qr(seed=7, cells=None, size=None):
-    sz = f' data-size="{size}"' if size else ''
-    if cells:
-        n = int(round(len(cells) ** 0.5))
-        assert n * n == len(cells) and n >= 21, 'qr: cells are an n x n (n >= 21) 0/1 string'
-        body = ''.join('<i></i>' if c == '1' else '<i class="o"></i>' for c in cells)
-        return f'<div class="qr"{sz} data-n="{n}" aria-hidden="true">{body}</div>'
-    out = []
+def qr(seed=7):
+    cells = []
     import random
     r = random.Random(seed)
     for y in range(21):
@@ -577,8 +605,8 @@ def qr(seed=7, cells=None, size=None):
                 on = fx in (0, 6) or fy in (0, 6) or (2 <= fx <= 4 and 2 <= fy <= 4)
             else:
                 on = r.random() < .45
-            out.append('<i></i>' if on else '<i class="o"></i>')
-    return f'<div class="qr"{sz} aria-hidden="true">{"".join(out)}</div>'
+            cells.append('<i></i>' if on else '<i class="o"></i>')
+    return f'<div class="qr" aria-hidden="true">{"".join(cells)}</div>'
 
 # Language field: searchable suggestions state (app 0.29.1, ui/v3/language-picker.js). Borrows .chip (Setup2),
 # the search input + icon (Setup2), .row-opt rows as result buttons and a quiet button; no new component.
@@ -630,7 +658,7 @@ HELP_FAQ = [('What is the 3D Review tool?', 'A survey-based review that shows a 
                                ('How does it measure use and impact?', 'Community members say how the translation has shaped their understanding and their lives; church leaders record changes they observe in their congregations. The two can be compared.'),
                                ('What does the report include?', 'A high-level summary from each perspective, where to improve, and detailed comparisons that pinpoint disconnects. Repeated reviews show a trajectory over time.'),
                                ('Is there a right answer?', 'No. Participants are told there are no wrong answers and may say "I don\'t know".'),
-                               ('How many answers do we need?', 'At least 3 from each perspective before levels show, so nobody can be picked out.'),
+                               ('How many answers do we need?', 'A perspective shows its level from its first answer. The drops beside each level show how much evidence it rests on: a few drops is little evidence, not a low result. Answer-by-answer splits still wait for at least 3 answers in every group.'),  # floor of 1, provisional (app help-copy.js:41 @24af049; cook-cue-boards-1800)
                                ('Can we do this on paper?', 'Yes. Print the survey in any answer language, collect it, and enter the answers under Collect.'),
                                ('What stage is 3D Review in?', 'Experimentation. Early-adopter teams are testing it and shaping the next iterations — your feedback is part of the product.'),
                                ('How can my team try it?', 'Use Send app feedback from the account menu, or ask the Innovation Lab team — the contact address lives on the Lab\'s 3D Review page.')]

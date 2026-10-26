@@ -1,4 +1,5 @@
-<!-- UI Next (v4) Results screen ("Understand"). Status: provisional (playbook rule 12). ?screen=results (&w=phone); any ?state= renders the default.
+<!-- UI Next (v4) Results screen ("Understand"). Status: provisional (playbook rule 12). ?screen=results (&w=phone); ?state=newer is the
+     boards' "Newer responses" state (3 church answers arrived after the report: the church card says so); any other ?state= renders the default.
      Boards (cookbook design/2026-10-15-glass-redesign/canvas): Results.dc.html (desktop), ResultsPhone.dc.html (phone).
      Composed of AppShell > Page > Card / Stack / Row / Grid and the section 2 components; no <style>, no inline style.
      Data: ui-next/fixtures/results/report.json through ./data.js (levels by ui/assess/v3-assessment.js v3ScoreBand).
@@ -26,8 +27,9 @@
   import { REPORT, lensCards, detailedPages, bandRows, LEVEL_WORD } from "./data.js";
 
   // report (live): { review, counts, payload } from app/data.js resultsModel; default the fixture. onrefresh (live): rebuilds from new answers.
-  let { phone = false, theme = "light", report, onrefresh, refreshed = "" } = $props();
-  const D = $derived(report ?? (phone ? REPORT.phone : REPORT.desktop));
+  let { phone = false, theme = "light", state: view, report, onrefresh, refreshed = "" } = $props(); // state renamed: a binding named state would shadow the $state rune
+  const fixture = (f) => (view === "newer" ? { ...f, counts: { ...f.counts, church: f.counts.church + 3 } } : f); // live counts past the report's own
+  const D = $derived(report ?? fixture(phone ? REPORT.phone : REPORT.desktop));
   const cards = $derived(lensCards(D.payload, D.counts));
   const review = $derived(D.review);
   // The disagreement line: the board's sentence for the fixture; for a live report, the widest cross-perspective gap in its own words.
@@ -53,7 +55,7 @@
 
 <AppShell {phone} {theme} screen {top} {bar}>
   {#if phone}
-    <ReviewHead {review} phone linkGap={5} />
+    <ReviewHead {review} phone hit />
     <Row gap={2}>
       {#if canRead}<Button label="See the answers" href={href("results-answers")} lead={list} block />{:else}<Button label="See the answers" lead={list} block disabled ariaDescribedby="answers-why" />{/if}
       <Button label="Reports" href={href("report")} lead={doc} block />

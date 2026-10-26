@@ -290,7 +290,10 @@ describe("each board renders as a screen", () => {
     expect(text(a.querySelector(".mi-why"))).toBe("Reviews with responses can't be deleted. This one has 18.");
     expect(a.querySelector("summary.btn.btn-icon > svg")).not.toBeNull(); // the shared 44x44 icon summary, no .icn stand-in
     expect(a.querySelector(".l-page > .l-row[data-split][data-align=start] h1")).not.toBeNull(); // head row top-aligned (8.7)
-    expect(a.querySelector(".seg[data-size=wide][aria-label='Show levels as']")).not.toBeNull(); // F1: contract .seg width
+    // §8.11 compact level legend: .glass.lvl-legend, the note at the end, the compact switch (no 320px wide stand-in)
+    const legend = a.querySelector(".glass.lvl-legend[aria-label=Levels]")!;
+    expect([legend.querySelectorAll(":scope > .lvl").length, legend.querySelector(":scope > .small.mi-end") !== null, legend.querySelector(":scope > .seg[data-size=compact][aria-label='Show levels as']") !== null]).toEqual([5, true, true]);
+    expect(a.querySelector(".seg[data-size=wide]")).toBeNull();
     expect(a.querySelectorAll(".glass[data-lens=team] .lvl-row").length).toBe(5); // 8.11 area rows
   });
   it("Results: Refresh with new answers is a no-op that says so", async () => {
@@ -327,10 +330,23 @@ describe("each board renders as a screen", () => {
     expect(hk.map((n) => (n.nodeType === 1 ? (n as Element).tagName.toLowerCase() : "label"))).toEqual(["svg", "label"]);
     expect(held.querySelector("svg path")!.getAttribute("d")).toBe(G.qr);
   });
-  it("board ports (ResultsHeld desktop card pad, ReportDetailed page 2 copy)", () => {
-    const card = mount(ResultsHeld).querySelector(".glass-hi[aria-label='Results are held']")!;
-    expect([card.classList.contains("l-card"), card.getAttribute("data-pad"), card.getAttribute("data-gap"), card.getAttribute("role")]).toEqual([true, "work", "3", "group"]);
+  it("board ports (ResultsHeld §8.11 held card, compact legend on both legend screens, ResultsPhone 44px project link, ReportDetailed page 2 copy)", () => {
+    const held = mount(ResultsHeld);
+    const card = held.querySelector("section.glass-hi.held-card[aria-label='Results are held']")!;
+    const kids = [...card.children];
+    expect(kids.map((k) => `${k.tagName.toLowerCase()}.${[...k.classList].join(".")}`)).toEqual(["span.icn", "div.l-stack", "div.l-stack"]);
+    expect([kids[0].getAttribute("data-size"), kids[0].querySelector("svg")!.getAttribute("width"), kids[1].getAttribute("data-gap"), kids[2].getAttribute("data-gap")]).toEqual(["64", "30", "2", "2"]);
+    expect([kids[1].querySelector("h2.h2.t-24") !== null, kids[1].querySelector("p.small.t-15") !== null, kids[1].querySelector(".l-row.held-lines[data-gap='5']")!.children.length]).toEqual([true, true, 3]);
     expect(card.hasAttribute("style")).toBe(false);
+    expect(held.querySelector("[data-pad=work]")).toBeNull();
+    for (const el of [held, mount(Results)]) expect(el.querySelectorAll(".glass.lvl-legend .seg[data-size=compact]").length).toBe(1);
+    const link = mount(Results, { phone: true }).querySelector("a.link.small.crumb-hit")!;
+    expect(link.textContent).toBe(REPORT.phone.review.project);
+    expect([link.parentElement!.tagName, link.parentElement!.className, link.nextElementSibling!.querySelector("h1.title-phone") !== null]).toEqual(["DIV", "", true]); // gap 0: a plain block column (no inherited --g)
+    expect(mount(ResultsGaps, { phone: true }).querySelector(".crumb-hit")).toBeNull(); // nested boards keep the plain link, gap 4
+    // ?state=newer (the boards' "Newer responses" state): only the church card names 3 newer responses, desktop and phone
+    for (const phone of [false, true]) expect(all(mount(Results, { phone, state: "newer" }), "[data-newer]")).toEqual(["3 newer responses not in this report yet"]);
+    expect(mount(Results).querySelector("[data-newer]")).toBeNull();
     expect(text(mount(ReportDetailed))).toContain("the drops beside each perspective show how many answered (a few drops is little evidence, not a low result)");
   });
   it("ResultsAnswers: perspective switch, split, one card per question with answer rows and bars, their words", () => {

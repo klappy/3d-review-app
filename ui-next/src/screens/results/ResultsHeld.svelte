@@ -3,15 +3,14 @@
      (./data.js currentLevelMin: the server's level minimum, else the safe 3) holds the results; every level of that perspective is
      More input needed (v3ScoreBand), shown as a preview of the first rows, dimmed by the contract .l-grid[data-state=held] (8.11)
      and inert (the board marks it aria-hidden; inert also keeps its links out of the tab order). Hero: the 64px chip
-     .icn[data-size="64"] and the --t-24 heading .h2.t-24 (contract rows); the held card is the §8.2 desktop work card
-     (data-pad=work, 32/36: the nearest kit value to the board's 40, which no token gives; no inline style). Any ?state= renders the default.
+     .icn[data-size="64"] and the --t-24 heading .h2.t-24 (contract rows); the held card is design-system.md §8.11
+     "Held card" (base.css .glass-hi.held-card: 40px pad, grid auto 1fr auto; lines .l-row.held-lines; actions .l-stack). Any ?state= renders the default.
      One .btn-primary: desktop "Reopen collection" (review head); phone the phone-bar. Copy: the boards. -->
 <script>
   import AppShell from "../../AppShell.svelte";
   import Page from "../../Page.svelte";
   import Card from "../../Card.svelte";
   import Stack from "../../Stack.svelte";
-  import Row from "../../Row.svelte";
   import TopBar from "../../TopBar.svelte";
   import PhoneHeader from "../../PhoneHeader.svelte";
   import Button from "../../Button.svelte";
@@ -77,19 +76,15 @@
     <Page gap={5}>
       <ReviewHead review={D.review} responses={H.review.closedResponses} {primary} />
       <LevelLegend />
-      <div class="glass-hi l-card l-stack" data-pad="work" data-gap="3" role="group" aria-label="Results are held"><!-- §8.2 desktop work card (32/36): the board draws 40, which no kit value gives -->
-        <Row split gap={6}>
-          <Row gap={6}>
-            <span class="icn" data-size="64" data-lens="team"><Glyph d={G.lock} size={30} /></span>
-            <Stack gap={2}>
-              <h2 class="h2 t-24">{srv ? "Results are held until enough answers are in" : "Results are held until every perspective has enough answers"}</h2>
-              <p class="small t-15">{#if srv}The server holds this report: {srv.responses_in} of {srv.responses_needed} responses so far{srv.reason ? ` (${srv.reason})` : ""}. {collecting ? "Collection is still open: share the links and come back." : "Keep collecting."}{:else}Levels need at least {MIN} {MIN === 1 ? "answer" : "answers"} from a perspective. {first.label} has {first.n} of {MIN}. Keep collecting, or go on without the {first.label.toLowerCase()} perspective.{/if}</p>
-              <Row wrap gap={5}>{#each lines as l}<span class="small"><LensDot lens={l.lens} decorative /> {l.text}</span>{/each}</Row>
-            </Stack>
-          </Row>
-          <Stack gap={2}>{#if primary.disabled}<Button label={primary.label} lead={qr} disabled ariaDescribedby="primary-why" />{:else}<Button label={primary.label} href={primary.href} lead={qr} />{/if}{#if escape}<Button label={without} variant="quiet" href={href("results")} />{/if}</Stack>
-        </Row>
-      </div>
+      <section class="glass-hi held-card" aria-label="Results are held">
+        <span class="icn" data-size="64" data-lens="team"><Glyph d={G.lock} size={30} /></span>
+        <div class="l-stack" data-gap="2">
+          <h2 class="h2 t-24">{srv ? "Results are held until enough answers are in" : "Results are held until every perspective has enough answers"}</h2>
+          <p class="small t-15">{#if srv}The server holds this report: {srv.responses_in} of {srv.responses_needed} responses so far{srv.reason ? ` (${srv.reason})` : ""}. {collecting ? "Collection is still open: share the links and come back." : "Keep collecting."}{:else}Levels need at least {MIN} {MIN === 1 ? "answer" : "answers"} from a perspective. {first.label} has {first.n} of {MIN}. Keep collecting, or go on without the {first.label.toLowerCase()} perspective.{/if}</p>
+          <div class="l-row held-lines" data-gap="5" data-wrap>{#each lines as l}<span class="small"><LensDot lens={l.lens} decorative /> {l.text}</span>{/each}</div>
+        </div>
+        <div class="l-stack" data-gap="2">{#if primary.disabled}<Button label={primary.label} lead={qr} disabled ariaDescribedby="primary-why" />{:else}<Button label={primary.label} href={primary.href} lead={qr} />{/if}{#if escape}<Button label={without} variant="quiet" href={href("results")} />{/if}</div>
+      </section>
       <div class="l-grid" data-cols="3" data-gap="4" data-state="held" inert>{#each cards as card (card.lens)}<Stack><LensCard {card} rows={H.preview} /></Stack>{/each}</div>
     </Page>
   {/if}
