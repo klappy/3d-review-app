@@ -28,5 +28,5 @@
       <Button label="Enter paper answers" block href={href("paper-entry")} lead={pen} />
     </Row>
   </div>
-  <p class="small">Open until {m.review.closes} · <a class="link" href={href("setup1")}>Change dates</a> · <a class="link" href={href("setup2")}>Open the passage</a></p>
+  <p class="small">{m.review.closes ? `Open until ${m.review.closes}` : "No closing date set"} · <a class="link" href={href("setup1")}>Change dates</a> · <a class="link" href={href("setup2")}>Open the passage</a></p>
 </Card>

@@ -384,6 +384,11 @@ describe("live QA Q4: a live report's Where to look next and What stands out com
     expect(items).toEqual(["Translation team · External review — Needs urgent attention", "Community · Understandable — Needs urgent attention"]); // urgent first, perspective order
     const stands = [...a.querySelectorAll(".paper h2")].find((h) => h.textContent === "What stands out")!.nextElementSibling!.textContent;
     expect(stands).toBe("Overall: Translation team strong, Community needs support. The perspectives are furthest apart on Clarity (Translation team strong, Community needs urgent attention).");
+    // no weak area: the section says so instead of an empty list
+    const strong = { ...snap, lenses: snap.lenses.map((l) => ({ ...l, sub_dimensions: l.sub_dimensions.map((x) => ({ ...x, score: 90 })) })) };
+    serve(base({ "GET /v2/reports/rep_11": { report: { id: "rep_11", created_at: "2026-10-20T00:00:00Z", payload: strong } } }));
+    const b = render(Live as never, { props: {} }).container;
+    await waitFor(() => expect(b.textContent).toContain("No area reads Needs support or Needs urgent attention."));
     useLevelMinimum(undefined);
   });
 });

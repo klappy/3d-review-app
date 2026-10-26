@@ -669,3 +669,22 @@ describe("collect view model and data wiring", () => {
     expect([...lintDir(resolve(__dirname, "../ui-next/fixtures/collect"))]).toEqual([]);
   });
 });
+
+describe("live QA N5: a review with no closing date shows no blank date parts", () => {
+  it("says what is true with and without a closing date (desktop aside and phone card)", () => {
+    const t = (el: Element) => (el.textContent ?? "").replace(/\s+/g, " ").trim();
+    const withDate = shot(Collect);
+    expect(t(withDate)).toContain("28 Sep – 31 Oct · 33 days left");
+    expect(t(withDate)).toContain("Results open on 31 Oct, or earlier if you close collection from the ⋯ menu.");
+    const none = structuredClone(fixture); none.review.closes = ""; (none.review as { daysLeft: number | null }).daysLeft = null;
+    const d = shot(Collect, { data: none });
+    expect(t(d)).toContain("Open since 28 Sep · no closing date set");
+    expect(t(d)).toContain("Results open when you close collection from the ⋯ menu.");
+    expect(t(d)).not.toMatch(/ – ·|days left|open on ,|Open until ·/);
+    const p = shot(Collect, { data: none, phone: true });
+    expect(t(p)).toContain("No closing date set");
+    expect(t(p)).not.toMatch(/Open until ·|Open until $/);
+    const one = structuredClone(fixture); (one.review as { daysLeft: number }).daysLeft = 1;
+    expect(t(shot(Collect, { data: one }))).toContain("· 1 day left");
+  });
+});

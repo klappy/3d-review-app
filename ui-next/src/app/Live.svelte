@@ -5,7 +5,7 @@
      and labelled as a preview (never hidden): the receipt lists them. -->
 <script>
   import { tick } from "svelte";
-  import { openQrPrint, preparePapers, openPapersPrint, paperPreview, printReadyLine, printAllowed } from "./print.js";
+  import { openQrPrint, preparePapers, openPapersPrint, paperPreview, printOpenedLine, printAllowed } from "./print.js";
   import { loadBlankPrint } from "../../../ui/stage-screens.js";
   import { SAMPLE_HREF, SAMPLE_AID } from "./router.js";
   import { REPORT as SAMPLE_REPORT } from "../screens/results/data.js";
@@ -193,7 +193,7 @@
     printBusy = true; printStatus = "Preparing the forms…";
     try {
       const models = await preparePapers(m, picked, { lang, onProgress: (t) => { printStatus = t; } });
-      printStatus = openPapersPrint(globalThis, models, { paper, title: `${m.review.title} · paper surveys` }) ? models.map((x) => `${x.identity?.survey?.name ?? x.title}: ${printReadyLine(x)}`).join(" ") : "Your browser blocked the print page. Allow pop-ups for this site, then use Print again.";
+      printStatus = openPapersPrint(globalThis, models, { paper, title: `${m.review.title} · paper surveys` }) ? models.map((x) => `${x.identity?.survey?.name ?? x.title}: ${printOpenedLine(x)}`).join(" ") : "Your browser blocked the print page. Allow pop-ups for this site, then use Print again.";
     } catch (e) { printStatus = e?.message || "The blank questionnaire could not be prepared. Try Print again."; }
     finally { printBusy = false; }
   }

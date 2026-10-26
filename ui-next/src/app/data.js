@@ -5,7 +5,7 @@ import { api, classify, confirmed, enc, token } from "./api.js";
 import { lensLabel } from "../../../ui/report-lenses.js";
 import { v3ScoreBand, v3ExpectedFor } from "../../../ui/assess/v3-assessment.js";
 import { parsePeriod, collectLine } from "../../../ui/v3/components/active-until.js";
-import { LEVEL_KEY, LEVEL_WORD, levelCutoffs, useLevelMinimum, levelMinimumOf, currentLevelMin, sentLenses, snapshotTotal, footPrivacy, bandRows, lensCards, responsesFor } from "../screens/results/data.js";
+import { LEVEL_KEY, LEVEL_WORD, levelCutoffs, useLevelMinimum, levelMinimumOf, currentLevelMin, sentLenses, snapshotTotal, footPrivacy, gapRows, bandRows, lensCards, responsesFor } from "../screens/results/data.js";
 import { to } from "./router.js";
 import qrcode from "../../../ui/assess/vendor-qrcode.js";
 import { acceptInvitationById } from "../../../ui/v3/components/invite.js";
@@ -433,9 +433,8 @@ export function nextStepModel(m) {
   const payload = m.payload;
   if (!payload) throw new Error("next step: no built report to read");
   const report = { payload };
-  const names = radarOf(payload);
-  const rows = bandRows(report, m.counts, names).filter((r) => r.dots.length >= 2)
-    .sort((x, y) => y.apart - x.apart || Number(y.spread ?? 0) - Number(x.spread ?? 0));
+  // Live QA N4: the same gap order as the detailed report's tensions and Results (results/data.js gapRows); no same-band pair is a gap.
+  const rows = gapRows(report, m.counts);
   const apartText = (r) => (r.apart === 0 ? "same band" : `${r.apart} band${r.apart === 1 ? "" : "s"} apart`);
   const gaps = rows.slice(0, 3).map((r) => {
     const xs = r.dots.map((d) => d.x);
@@ -467,7 +466,7 @@ export function menuModel(me, home, { onSignOut } = {}) {
     who, initials: home.user.initials, invitation: null, chips: [home.workspace, "Mine"], reviews, completed: home.completed.length,
     items: [
       ["people", `${home.workspace} — your workspace`, to("workspaces")], ["mail", "Invitations", to("invitations")], ["help", "Help and FAQ", to("help")],
-      ["sparkle", "Why 3D Review exists", to("about")], ["pen", "Send app feedback", to("feedback")], ["people", "Use another account", null, onSignOut], ["out", "Sign out", null, onSignOut],
+      ["sparkle", "Why 3D Review exists", to("about")], ["pen", "Send app feedback", to("feedback")], ["globe", "Public website home", to("landing")], ["people", "Use another account", null, onSignOut], ["out", "Sign out", null, onSignOut],
     ],
   };
 }

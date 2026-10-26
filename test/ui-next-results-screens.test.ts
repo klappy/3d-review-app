@@ -5,6 +5,8 @@
 // work/active/2026-10-21-ui-next-screens-fanout. Data: ui-next/fixtures/results/*.json through screens/results/data.js.
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { fireEvent, render } from "@testing-library/svelte";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 // @ts-expect-error -- plain .js module, no type declarations
 import { route } from "../ui-next/src/route.js";
 // @ts-expect-error -- plain .js module, no type declarations
@@ -14,7 +16,7 @@ import { OUT } from "../ui-next/src/screens/results/links.js";
 // @ts-expect-error -- plain .js module, no type declarations
 import results from "../ui-next/src/screens/results/index.js";
 // @ts-expect-error -- plain .js module, no type declarations
-import { REPORT, lensCards, bandRow, bandRows, scoreRows, comparedRows, radar, heldLines, levelOf, pct, answerView, withNotes, gapLead, responsesFor, countWord, detailedPages, lensKey, canonicalPayload, responsesText, LENS_ORDER, sentLenses, fmtScore, useLevelMinimum, currentLevelMin, levelMinimumOf } from "../ui-next/src/screens/results/data.js";
+import { REPORT, lensCards, bandRow, bandRows, scoreRows, comparedRows, radar, heldLines, levelOf, pct, answerView, withNotes, gapLead, responsesFor, countWord, detailedPages, lensKey, canonicalPayload, responsesText, LENS_ORDER, sentLenses, fmtScore, gapRows, useLevelMinimum, currentLevelMin, levelMinimumOf } from "../ui-next/src/screens/results/data.js";
 // The fixtures are DEV-like reviews: they band at the DEV level minimum of 1, set explicitly (the live app reads the served value).
 beforeEach(() => { useLevelMinimum(1); });
 import { LENSES } from "../ui/lens-surveys.js";
@@ -943,6 +945,25 @@ describe("results round 5: a live payload renders; counts read right", () => {
       expect(text(d)).toContain(read);
     }
     useLevelMinimum(1);
+  });
+  it("live QA N4: one gap order everywhere; a same-band pair is never called a gap", () => {
+    const D = REPORT.desktop;
+    const rows = gapRows(D, D.counts);
+    expect(rows.every((r: { apart: number; dots: unknown[] }) => r.apart >= 1 && r.dots.length >= 2)).toBe(true);
+    expect(rows.map((r: { name: string }) => r.name)).toEqual(scoreRows(D, D.counts).filter((r: { spread: number | null; name: string }) => r.spread !== null && rows.some((g: { name: string }) => g.name === r.name)).map((r: { name: string }) => r.name));
+    // a report whose shared areas all sit in one band: Results never calls one the most useful gap
+    const flat = copy() as Built & { payload: { cross_lens_multi: { lens_scores: { score: number }[] }[] } };
+    for (const a of flat.payload.cross_lens_multi) for (const sc of a.lens_scores) sc.score = 66;
+    expect(gapRows(flat, flat.counts)).toEqual([]);
+    const res = mount(Results, { report: flat });
+    expect(text(res)).toContain("The perspectives sit in the same band on every area they share");
+    expect(text(res)).not.toContain("most useful");
+  });
+  it("live QA N3: the disabled PDF reason never wraps out of the document bar; the bar does not print", () => {
+    const src = readFileSync(resolve(__dirname, "../ui-next/src/screens/results/DocBar.svelte"), "utf8");
+    expect(src).toContain('<span class="sr-only" id="doc-pdf-why">');
+    expect(src).not.toContain('<span class="small" id="doc-pdf-why">');
+    expect(readFileSync(resolve(__dirname, "../ui-next/components/topbar.css"), "utf8")).toContain("@media print{.app header.top[data-variant=document]{display:none}}");
   });
   it("R5-3 + R5-5: Results counts the detailed report's pages; the phone overview line counts the gaps the sheet draws, no radar", () => {
     expect(text([...mount(Results).querySelectorAll("a.btn")].find((a) => text(a).startsWith("Detailed report")) ?? null)).toBe(`Detailed report · ${detailedPages(lensCards(REPORT.desktop.payload, REPORT.desktop.counts))} pages`);

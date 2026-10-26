@@ -245,6 +245,13 @@ export function scoreRows(report, counts, names) {
     .sort(({ a: x, row: p }, { a: y, row: q }) => (p.spread === null) - (q.spread === null) || (q.spread ?? 0) - (p.spread ?? 0) || x.order - y.order)
     .map(({ row }) => row);
 }
+/** The one gap ordering every screen uses (live QA N4): the detailed report's tensions order (scoreRows: biggest placed spread first,
+ *  ties on payload order), as band rows, keeping only areas where two placed perspectives sit at least one band apart. A same-band
+ *  pair is never a gap. */
+export function gapRows(report, counts) {
+  const order = scoreRows(report, counts).filter((r) => r.spread !== null).map((r) => r.name);
+  return bandRows(report, counts, order).filter((r) => r.dots.length >= 2 && r.apart >= 1);
+}
 /** Every cross_lens_multi area in payload order (detailed report page 2, "All areas compared"), malformed entries skipped and
  *  blank or odd names kept as constructName reads them (R4-3). */
 export function comparedRows(report, counts) {

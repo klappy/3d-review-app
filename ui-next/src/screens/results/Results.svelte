@@ -24,7 +24,7 @@
   import { G } from "./icons.js";
   import { href } from "../href.js";
   import { out } from "./links.js";
-  import { REPORT, lensCards, detailedPages, bandRows, LEVEL_WORD, snapshotTotal } from "./data.js";
+  import { REPORT, lensCards, detailedPages, gapRows, scoreRows, LEVEL_WORD, snapshotTotal } from "./data.js";
 
   // report (live): { review, counts, payload } from app/data.js resultsModel; default the fixture. onrefresh (live): rebuilds from new answers.
   // children (live): the report-build confirm, drawn inside this screen's .app (never after it, unstyled and outside the shell).
@@ -34,8 +34,10 @@
   const cards = $derived(lensCards(D.payload, D.counts, { sent: D.sent }));
   const review = $derived(D.review);
   // The disagreement line: the board's sentence for the fixture; for a live report, the widest cross-perspective gap in its own words.
-  const gap = $derived(report ? bandRows(D, D.counts, D.gaps?.biggest ?? []).find((r) => r.dots.length >= 2) : null);
-  const disagree = $derived(!report ? "The team feels strong about the brief and consistency; the community finds the text hard to follow and not yet part of daily life. That gap is the most useful thing in this review." : gap ? `${gap.name}: ${gap.dots.map((d) => `${d.label} ${LEVEL_WORD[d.level].toLowerCase()}`).join(", ")} — ${gap.verdict}. That gap is the most useful thing in this review.` : "No area has two perspectives to compare yet; levels above are per perspective.");
+  // Live QA N4: the widest gap in the one shared order (data.js gapRows); a same-band pair is never called a gap.
+  const gap = $derived(report ? gapRows(D, D.counts)[0] ?? null : null);
+  const shared = $derived(report ? scoreRows(D, D.counts).some((r) => r.spread !== null) : false);
+  const disagree = $derived(!report ? "The team feels strong about the brief and consistency; the community finds the text hard to follow and not yet part of daily life. That gap is the most useful thing in this review." : gap ? `${gap.name}: ${gap.dots.map((d) => `${d.label} ${LEVEL_WORD[d.level].toLowerCase()}`).join(", ")} — ${gap.verdict}. That gap is the most useful thing in this review.` : shared ? "The perspectives sit in the same band on every area they share; levels above are per perspective." : "No area has two perspectives to compare yet; levels above are per perspective.");
   // The report's own total: the sum of the snapshot counts the cards show (data.js snapshotTotal), never the live survey total.
   const built = $derived(`Report built ${report ? review.builtOn : review.closed} from ${snapshotTotal(cards)} responses.`);
   const crumbs = $derived([{ label: review.project, href: out("project") }, { label: review.title }]);

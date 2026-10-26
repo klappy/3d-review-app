@@ -126,7 +126,7 @@ describe("actions lane links: the shared href() helper, literal names, w/theme c
       const src = readFileSync(join(LANE_DIR, f), "utf8").replace(/<!--[\s\S]*?-->/g, "").replace(/^\s*\/\/.*$/gm, "");
       expect(src.match(/[?&]screen=/g), f).toBeNull();
     }
-    expect([...declared].sort()).toEqual(["about", "action-plan", "close-collection", "collect", "explore", "feedback", "help", "home", "invitations", "menu", "next-step", "paper-entry", "people", "print", "project", "qr-room", "results", "sandbox", "setup1", "setup5", "share", "sign-in", "workspace"]);
+    expect([...declared].sort()).toEqual(["about", "action-plan", "close-collection", "collect", "explore", "feedback", "help", "home", "invitations", "landing", "menu", "next-step", "paper-entry", "people", "print", "project", "qr-room", "results", "sandbox", "setup1", "setup5", "share", "sign-in", "workspace"]);
   });
   it("no fixture carries a link (links are built in the .svelte files, where the shared link test reads them)", () => {
     const dir = resolve(__dirname, "../ui-next/fixtures/actions");
@@ -241,13 +241,17 @@ describe("actions lane parts", () => {
     expect(rect.getAttribute("height")).toBe("8");
     expect(rect.getAttribute("width")).toBe("8%");
   });
-  it("menu: the account sheet is a native dialog.sheet with the seven board rows, a Close, and a backdrop tap that closes it", async () => {
+  it("menu: the account sheet is a native dialog.sheet with the eight board rows, a Close, and a backdrop tap that closes it", async () => {
     const a = mount(MenuSheet);
     const d = a.querySelector("dialog.glass-hi.sheet[data-pad=menu]") as HTMLDialogElement;
     expect(d).toBeTruthy();
     expect(d.hasAttribute("open")).toBe(true);
     expect(d.getAttribute("closedby")).toBe("any");
-    expect(d.querySelectorAll("a.mi[data-size=lg]").length).toBe(7);
+    expect(d.querySelectorAll("a.mi[data-size=lg]").length).toBe(8);
+    // MenuPhone: "Public website home" (design-system.md :344/:603), then the theme row right after it (:346)
+    const web = [...d.querySelectorAll("a.mi")].find((x) => x.textContent === "Public website home")!;
+    expect(new URLSearchParams(web.getAttribute("href")!).get("screen")).toBe("landing");
+    expect(web.nextElementSibling!.matches("div.mi-theme[role=group]")).toBe(true);
     expect(d.querySelector("a.mi")?.hasAttribute("data-autofocus")).toBe(true);
     expect(document.activeElement).toBe(d.querySelector("a.mi"));
     expect(d.querySelector(".sheet-handle")?.getAttribute("aria-hidden")).toBe("true");
@@ -501,7 +505,7 @@ describe("actions lane controls act, and the ones that cannot yet are named debt
     "Edit details and dates → setup1", "Explore all → explore", "Help and FAQ → help", "Hindi New Testament → project", "Invitations · 1 new → invitations",
     "Luke 1–2 · improve → next-step", "Mark 1–4 draft → collect", "Meeting offline? Print and paper → collect#offline", "Meeting offline? card on Collect → collect#offline",
     "More actions → collect[menu]", "People with access → people", "Print or share the plan → action-plan", "Print {survey} survey → print",
-    "QR code for {survey} → qr-room", "QR for {survey} → qr-room", "See all results → results", "Send app feedback → feedback", "Share the practice survey → share",
+    "QR code for {survey} → qr-room", "QR for {survey} → qr-room", "See all results → results", "Public website home → landing", "Send app feedback → feedback", "Share the practice survey → share",
     "Share the survey → share", "Show QR codes for the room → qr-room", "Start a 3D Review → setup1", "BCS · India — switch workspace → workspace",
     "Why 3D Review exists → about",
   ];
@@ -619,5 +623,19 @@ describe("actions lane controls act, and the ones that cannot yet are named debt
     const b = render(Share, { props: { phone: false, data: withLink, share } }).container;
     expect((b.querySelector("input.in[readonly]") as HTMLInputElement).value).toBe("http://x/next/?ui_next=on#survey=link_1");
     expect(text(b)).toContain("no codes yet"); expect(b.querySelector("button[aria-label='Copy link for Written']")).not.toBeNull();
+  });
+});
+
+describe("live QA N6: print copy counts right and says where printing went", () => {
+  it("printOpenedLine pluralises and never says 'Use Print below'; a survey row's question count is not called pages", async () => {
+    const { printOpenedLine } = await import("../ui-next/src/app/print.js");
+    expect(printOpenedLine({ items: [1] })).toBe("1 question ready; the print tab has opened.");
+    expect(printOpenedLine({ items: [1, 2, 3] })).toBe("3 questions ready; the print tab has opened.");
+    expect(printOpenedLine({ items: [1], lang: "hi", language: "Hindi", english: 0, phrases: 4, review: true })).toBe("1 question ready in Hindi. Machine translation, not yet checked by a speaker of this language. The print tab has opened.");
+    expect(printOpenedLine({ items: [1], lang: "hi", language: "Hindi", english: 2, phrases: 4 })).toMatch(/^Translation incomplete for Hindi\. 2 of 4 phrases .* The print tab uses these English fallbacks; choose Print again to retry\.$/);
+    for (const v of [printOpenedLine({ items: [1] }), printOpenedLine({ items: [1], lang: "hi", language: "Hindi", english: 1, phrases: 2 })]) expect(v).not.toContain("Use Print below");
+    const src = readFileSync(resolve(__dirname, "../ui-next/src/screens/actions/Print.svelte"), "utf8");
+    expect(src).toContain('{#if typeof s.pages === "string"}{s.pages}'); // a live row's "1 question" is shown as it is, never "1 question pages"
+    expect(src).toContain('{s.pages === 1 ? "page" : "pages"}');
   });
 });

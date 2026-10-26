@@ -96,7 +96,8 @@
       </Stack>
       <Stack gap={2}>
         <h2 class="h3">Where to look next</h2>
-        <ol class="l-stack small" data-gap="1">{#each next as n}<li>{lensLabel(n.lens)} · {n.area} — {LEVEL_WORD[n.level]}</li>{/each}</ol>
+        {#if next.length}<ol class="l-stack small" data-gap="1">{#each next as n}<li>{lensLabel(n.lens)} · {n.area} — {LEVEL_WORD[n.level]}</li>{/each}</ol>
+        {:else}<p class="small">No area reads Needs support or Needs urgent attention.</p>{/if}
       </Stack>
       <div class="pfoot"><span>Built from {snapshotTotal(cards)} responses on {D.review.builtOn} · levels are bands, not scores · {footPrivacy()}</span><span>1 of 1</span></div>
     </div>

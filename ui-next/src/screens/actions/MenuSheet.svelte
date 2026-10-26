@@ -8,7 +8,7 @@
      one click listener that closes when the tap lands outside the sheet's box). Closing leaves HomePhone's list, which is what the sheet sits on.
      One .btn-primary: the phone-bar's "Start a 3D Review" (inert behind the open sheet, as R13 sheet stacking says). -->
 <script>
-  import ThemeControl from "../../ThemeControl.svelte"; // design-system.md Theme control placement: before the account actions
+  import ThemeControl from "../../ThemeControl.svelte"; // design-system.md Theme control placement: right after "Public website home"
   import AppShell from "../../AppShell.svelte";
   import Card from "../../Card.svelte";
   import Row from "../../Row.svelte";
@@ -32,8 +32,8 @@
   // Where each review card goes, by its stage (the boards: CollectPhone, SetupPhone, ResultsPhone); a live card carries its own href.
   const byStage = $derived({ collecting: href("collect", at), setup: href("setup1", at), results: href("results", at) });
   // The sheet's rows in the board's order (fixture labels): workspace, invitations, help, about, feedback, another account, sign out.
-  const to = $derived([href("workspace", at), href("invitations", at), href("help", at), href("about", at), href("feedback", at), href("sign-in", at), href("sign-in", at)]);
-  if (D.items.length !== 7) throw new TypeError("MenuSheet: the sheet draws the board's seven rows");
+  const to = $derived([href("workspace", at), href("invitations", at), href("help", at), href("about", at), href("feedback", at), href("landing", at), href("sign-in", at), href("sign-in", at)]);
+  if (D.items.length !== 8) throw new TypeError("MenuSheet: the sheet draws the board's eight rows"); // MenuPhone: + Public website home (design-system.md :344/:603)
   const initials = $derived(D.initials ?? "BK");
 
   let sheet = $state();
@@ -61,7 +61,7 @@
     <Row split gap={2}><p class="micro sheet-title" id="menu-who">{D.who}</p><IconAction d={A.x} ariaLabel="Close" onclick={() => closeDialog(sheet)} /></Row>
     <!-- R14 Focus on open: a sheet of menu rows focuses its first row (./modal.js focuses [data-autofocus]). -->
     <nav aria-label="Workspace and account">
-      {#each D.items as [icon, label, link, onclick], i}{#if label === "Use another account"}<ThemeControl uid="sheet" />{/if}{#if typeof onclick === "function"}<button class="mi" data-size="lg" type="button" {onclick} data-autofocus={i === 0 ? "" : undefined}><Ico d={A[icon]} /><span>{label}</span></button>{:else}<a class="mi" data-size="lg" href={link ?? to[i]} data-autofocus={i === 0 ? "" : undefined}><Ico d={A[icon]} /><span>{label}</span></a>{/if}{/each}
+      {#each D.items as [icon, label, link, onclick], i}{#if typeof onclick === "function"}<button class="mi" data-size="lg" type="button" {onclick} data-autofocus={i === 0 ? "" : undefined}><Ico d={A[icon]} /><span>{label}</span></button>{:else}<a class="mi" data-size="lg" href={link ?? to[i]} data-autofocus={i === 0 ? "" : undefined}><Ico d={A[icon]} /><span>{label}</span></a>{/if}{#if label === "Public website home"}<ThemeControl uid="sheet" />{/if}{/each}
     </nav>
   </dialog>
 </AppShell>

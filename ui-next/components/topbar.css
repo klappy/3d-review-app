@@ -10,3 +10,5 @@
    cards (which also blur, so also stack) so a menu never opens under them. */
 .app .top{position:relative;z-index:30}
 .dd[data-menu][open]{z-index:30}
+/* Live QA N3: a printed report is its paper sheets only; the document bar (and its controls) never prints. */
+@media print{.app header.top[data-variant=document]{display:none}}

@@ -14,6 +14,16 @@ import { LENSES } from "../../../ui/lens-surveys.js";
 import { token } from "./api.js";
 
 export { printReadyLine, printAllowed };
+/** UI Next's status line once the print tab has opened (live QA N6): the same facts as the current UI's printReadyLine (question count,
+ *  language, English fallbacks, machine translation) with a correct plural and no "Use Print below" (printing opens its own tab). */
+export function printOpenedLine(model) {
+  const n = model?.items?.length ?? 0, qs = `${n} ${n === 1 ? "question" : "questions"}`;
+  if (!model?.lang) return `${qs} ready; the print tab has opened.`;
+  const english = model.english ? ` ${model.english} of ${model.phrases} phrases have no translation yet and stay in English, marked EN on the paper.` : "";
+  const machine = model.english === model.phrases ? "" : model.review ? " Machine translation, not yet checked by a speaker of this language." : " Machine translation.";
+  if (model.english > 0) return `Translation incomplete for ${model.language}.${english}${machine} The print tab uses these English fallbacks; choose Print again to retry.`;
+  return `${qs} ready in ${model.language}.${english}${machine} The print tab has opened.`;
+}
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const PERSPECTIVE = { team: "Translation Team", community: "Community", church: "Church" };
 const lensName = (lens) => (LENSES.includes(PERSPECTIVE[lens]) ? PERSPECTIVE[lens] : "Other perspective");
