@@ -1,7 +1,8 @@
 import type { Ctx, Handler } from "./types";
 import { notVisible } from "./errors";
 import { gate, reqStr, responseCountForAssessment, roleAt } from "./common";
-import { participantReportMinimum, participantReportsAllowed, perspectiveLevelMinimum } from "../report-admission";
+import { participantReportMinimum, perspectiveLevelMinimum } from "../report-admission";
+import { observeBuildEligibility } from "../synthetic-report-store";
 import { demographicsEnabled, demographicsProjection } from "../context-fields";
 
 /** Below the D7 minimum (report-admission.ts participantReportMinimum: SUPPRESSION_THRESHOLD, a held working default; 1 on DEV,
@@ -28,6 +29,7 @@ export const summary: Handler = async (ctx, params) => {
   const { results } = await ctx.db.prepare("SELECT context_json FROM assessment_survey WHERE assessment_id = ? AND state = 'selected'")
     .bind(aid).all<{ context_json?: string }>().catch(() => ({ results: [] as { context_json?: string }[] }));
   const low = await minimumHold(ctx, aid);
+  const allowed = await observeBuildEligibility(ctx, aid, "viewer").then((r) => r.ok && r.marker.eligible).catch(() => false);
   return { result: {
     ...demographicsProjection((results || []).some((r) => demographicsEnabled(r.context_json))),
     assessment_id: aid,
@@ -40,10 +42,10 @@ export const summary: Handler = async (ctx, params) => {
     policy_version: "D7-held",
     // One additive field: the per-perspective level minimum clients band with (report-admission.ts; DEV 1, otherwise 3).
     level_minimum_responses: perspectiveLevelMinimum(ctx.env),
-    // One additive field (Codex P2 4383266687): whether a participant report build can be admitted here, from the same two gates
-    // the report store applies (report-admission.ts participantReportsAllowed, then the floor minimumHold names). False wherever
-    // the environment does not admit participant reports, whatever the count. Read-only: build and list re-check everything.
-    report_build_allowed: participantReportsAllowed(ctx.env) && low === null,
+    // One additive field (Codex P2s 4383266687, 4383599307): the report store's own build-eligibility answer (the same function the
+    // build dry run reads), so participant admission, the floor and trusted synthetic captures can never disagree with build.
+    // Read-only: build re-checks everything; any failure reads false.
+    report_build_allowed: allowed,
     ...(low ?? {}),
   }, scope: { type: "assessment", id: aid } };
 };

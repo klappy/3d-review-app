@@ -153,13 +153,14 @@ SELECT t.id AS assessment_id,c.capture_json AS current_capture
 FROM target t LEFT JOIN captured c ON c.assessment_id=t.id;`;
 type Observation={assessment_id:string;current_capture:string|null};
 type BuildObservation={ok:true;aid:string;capture:CapturedAssessment|null}|{ok:false;reason:'NOT_VISIBLE'|'UNAVAILABLE'};
-/** One authorized SELECT; subsequent attestation uses only its immutable bytes. */
-async function observeBuild(ctx:StoreContext,assessmentId:string,attest:Attest=attestPackedCapture):Promise<BuildObservation>{
+/** One authorized SELECT; subsequent attestation uses only its immutable bytes. role: the grant floor of that SELECT ('member' for
+ * build and preview; 'viewer' only for the read-only eligibility answer on Results, which never builds). */
+async function observeBuild(ctx:StoreContext,assessmentId:string,attest:Attest=attestPackedCapture,role:'member'|'viewer'='member'):Promise<BuildObservation>{
   const who=principal(ctx);if(!who)return NOT_VISIBLE;
   let aid:string;try{aid=text(assessmentId);approved(descriptor());}catch{return NOT_VISIBLE;}
   let row:Observation|null;
   let t=clock();
-  try{row=await ctx.db.prepare(REPORT_OBSERVE_SQL).bind(who[0],null,aid,who[1],'member').first<Observation>();}catch{return UNAVAILABLE;}
+  try{row=await ctx.db.prepare(REPORT_OBSERVE_SQL).bind(who[0],null,aid,who[1],role).first<Observation>();}catch{return UNAVAILABLE;}
   t=stageSpan(ctx,'observe_sql',t);
   if(!row)return NOT_VISIBLE;
   if(row.assessment_id!==aid)return UNAVAILABLE;
@@ -167,9 +168,11 @@ async function observeBuild(ctx:StoreContext,assessmentId:string,attest:Attest=a
   stageSpan(ctx,'attest_observe',t);
   return {ok:true,aid,capture:current.eligible?current.capture:null};
 }
-/** Preview exposes no captured token, count, digest or report identity. */
-export async function observeBuildEligibility(ctx:StoreContext,assessmentId:string):Promise<EligibilityResult>{
-  const observation=await observeBuild(ctx,assessmentId);if(!observation.ok)return observation;
+/** Preview exposes no captured token, count, digest or report identity. The one build-eligibility decision: the build dry run
+ * (role 'member') and Results' report_build_allowed (role 'viewer', read-only; Codex P2 4383599307) both read it, so the field and
+ * the build cannot disagree: participant admission, the floor and trusted synthetic captures are decided here, not re-derived. */
+export async function observeBuildEligibility(ctx:StoreContext,assessmentId:string,role:'member'|'viewer'='member'):Promise<EligibilityResult>{
+  const observation=await observeBuild(ctx,assessmentId,attestPackedCapture,role);if(!observation.ok)return observation;
   if(!observation.capture)return {ok:true,marker:marker(observation.aid,false)};
   const t=clock();
   try{await descriptor().render(observation.capture);stageSpan(ctx,'render_preview',t);return {ok:true,marker:marker(observation.aid,true)};}

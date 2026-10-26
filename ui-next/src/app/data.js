@@ -345,7 +345,10 @@ export const radarOf = (payload) => areasOf(payload).map((a) => a.construct_name
 
 // The phone Results cards (ResultsPhone.dc.html, fixtures/results/report.json "phone") draw each perspective's strongest and weakest
 // area only; that compact payload is for those cards alone (Codex P2 4383033516).
-export const phonePayload = (payload) => ({ ...payload, lenses: (payload.lenses ?? []).map((l) => { const sd = [...(l.sub_dimensions ?? [])].filter((x) => Number.isFinite(Number(x.score))).sort((a, b) => Number(b.score) - Number(a.score)); return { ...l, sub_dimensions: sd.length > 2 ? [sd[0], sd[sd.length - 1]] : l.sub_dimensions }; }) });
+// An unscored area (null, blank or non-numeric score) is never the strongest or weakest: it is rejected before numeric coercion,
+// since Number(null) and Number("") are 0 (Codex P2 4383599311).
+const scoreOf = (v) => (typeof v === "number" ? v : typeof v === "string" && v.trim() !== "" ? Number(v) : NaN);
+export const phonePayload = (payload) => ({ ...payload, lenses: (payload.lenses ?? []).map((l) => { const sd = [...(l.sub_dimensions ?? [])].filter((x) => Number.isFinite(scoreOf(x?.score))).sort((a, b) => scoreOf(b.score) - scoreOf(a.score)); return { ...l, sub_dimensions: sd.length > 2 ? [sd[0], sd[sd.length - 1]] : l.sub_dimensions }; }) });
 /** The built report a live results screen reads, from resultsModel's m. The report readers (overview, detailed, both widths) get the
  *  full snapshot; only the phone Results screen gets phonePayload (Codex P2 4383033516). lookNext and standsOut (live QA Q4) come from
  *  the full snapshot at every width; standsOut's widest gap is gapRows' all-area order after suppression, so a perspective under the

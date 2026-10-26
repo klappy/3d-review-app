@@ -8,7 +8,7 @@ import { fireEvent, render, waitFor } from "@testing-library/svelte";
 import { reports, newestReport, resultsModel, projectModel, setupModel, shortDate, levelsOf, respondentsOf, levelTriples } from "../ui-next/src/app/data.js";
 // @ts-expect-error -- plain .js module, no type declarations
 import { forget, me as sessionMe } from "../ui-next/src/app/session.js";
-import { exploreModel, liveReport, gapsOf } from "../ui-next/src/app/data.js";
+import { exploreModel, liveReport, gapsOf, phonePayload } from "../ui-next/src/app/data.js";
 import { exploreRows } from "../ui-next/src/screens/explore/explore-data.js";
 import Help from "../ui-next/src/screens/explore/Help.svelte";
 import ReportDetailed from "../ui-next/src/screens/results/ReportDetailed.svelte";
@@ -437,8 +437,8 @@ describe("Codex P2s on ed291878: the report readers' payload and the stands-out 
     for (const screen of ["report", "report-detailed", "results-gaps", "results-answers"]) expect(liveReport(m, { phone: true, screen }).payload).toBe(m.payload);
     expect(liveReport(m, { phone: false, screen: "results" }).payload).toBe(m.payload);
     const compact = liveReport(m, { phone: true, screen: "results" }).payload.lenses[0].sub_dimensions as Sub[];
-    expect(compact).toHaveLength(2); expect(compact[0].sub_dimension).toBe("Translation process & brief");
-    expect(compact.map((x) => x.sub_dimension)).not.toContain("Understanding the source");
+    // Codex P2 4383599311: the strongest and the weakest SCORED area; Governance (null) is never the weakest
+    expect(compact.map((x) => x.sub_dimension)).toEqual(["Translation process & brief", "External review"]);
     // the derived claims are the same at both widths, from the full snapshot
     expect(liveReport(m, { phone: true, screen: "results" }).lookNext).toEqual(liveReport(m, { phone: false, screen: "results" }).lookNext);
     expect(liveReport(m, { phone: true, screen: "report" }).standsOut).toBe(liveReport(m, { phone: false, screen: "report" }).standsOut);
@@ -502,5 +502,19 @@ describe("Codex P2 4383266687: Build is offered only on the server's report_buil
       expect(a.textContent).toContain("the server didn’t confirm that a report can be built");
       expect(buildButton(a)).toBeUndefined();
     }
+  });
+});
+
+describe("Codex P2 4383599311: the phone cards' strongest and weakest are scored areas only", () => {
+  it("null, blank and non-numeric scores (the fixture's Governance and Impact observation) are never the weakest", () => {
+    const f = JSON.parse(JSON.stringify(REPORT.desktop));
+    const nulls = f.payload.lenses.flatMap((l: { lens: string; sub_dimensions: { sub_dimension: string; score: unknown }[] }) => l.sub_dimensions.filter((x) => x.score === null).map((x) => x.sub_dimension));
+    expect(nulls).toEqual(expect.arrayContaining(["Governance", "Impact observation"]));
+    const pick = (p: unknown) => (phonePayload(p).lenses as { lens: string; sub_dimensions: { sub_dimension: string; score: unknown }[] }[]).map((l) => [l.lens, l.sub_dimensions.map((x) => x.sub_dimension)]);
+    for (const [, names] of pick(f.payload)) expect(names).not.toContain("Governance"), expect(names).not.toContain("Impact observation");
+    expect(pick(f.payload)[0]).toEqual(["team", ["Translation process & brief", "External review"]]);
+    // a blank or non-numeric score is unscored too; a numeric string still counts
+    f.payload.lenses[0].sub_dimensions[2].score = " "; f.payload.lenses[0].sub_dimensions[3].score = "41";
+    expect(pick(f.payload)[0]).toEqual(["team", ["Translation process & brief", "Consistency"]]);
   });
 });

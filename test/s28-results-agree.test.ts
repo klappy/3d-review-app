@@ -47,17 +47,21 @@ describe('S28: Results, responses list and report agree below the D7 minimum',()
   // the per-perspective level minimum rides on Results only, and is 3 outside DEV; the overall floor of 5 above is unchanged
   expect(r.level_minimum_responses).toBe(3);expect((await summary(ctx('dev'),{aid:one})).result).toMatchObject({level_minimum_responses:1});
  },60000);
- it('Codex P2 4383266687: report_build_allowed on Results agrees with the build gate in every environment',async()=>{
-  // the flag off (production without PARTICIPANT_REPORTS, an unknown environment) holds every participant build whatever the count:
-  // Results must say so instead of omitting the low-count fields and reading as eligible.
+ it('Codex P2s 4383266687, 4383599307: report_build_allowed on Results is the store\'s own build eligibility, in every environment',async()=>{
+  // the flag off (production without PARTICIPANT_REPORTS, an unknown environment) holds every participant build whatever the count,
+  // while a trusted pinned synthetic capture still builds (participant=false): Results must answer exactly what the build decides.
   const off=(ENVIRONMENT:string):Ctx=>{const c=ctx(ENVIRONMENT);return {...c,env:{...c.env,PARTICIPANT_REPORTS:undefined}} as Ctx;};
-  const cases:[string,Ctx,string,boolean][]=[['production, flag off, 50 responses',off('production'),full,false],['unknown environment, 50 responses',off('staging'),full,false],
-   ['production, flag on, 50 responses',ctx('production'),full,true],['production, flag on, 1 response',ctx('production'),one,false],['DEV, 1 response',ctx('dev'),one,true]];
+  const cases:[string,Ctx,string,boolean][]=[['production, flag off, 50 participant responses',off('production'),full,false],['unknown environment, 50 participant responses',off('staging'),full,false],
+   ['production, flag on, 50 participant responses',ctx('production'),full,true],['production, flag on, 1 participant response',ctx('production'),one,false],['DEV, 1 participant response',ctx('dev'),one,true],
+   ['production, flag off, trusted synthetic capture',off('production'),src,true]];
   for(const [name,c,aid,want] of cases){
    const r:any=(await summary(c,{aid})).result, dry:any=(await build(c,{aid},{dryRun:true} as any)).result;
    expect(r.report_build_allowed,name).toBe(want);
    expect(dry.status,name).toBe(want?'ready':'held');
   }
+  // and the synthetic capture really builds there, the production participant floor (5) unchanged
+  const made:any=(await build(off('production'),{aid:src})).result;expect(made.suppressed).toBe(false);expect(made.report?.id).toMatch(/^sreport_/);
+  expect(SUPPRESSION_THRESHOLD).toBe(5);
  },60000);
  it('DEV: one response is enough to build; zero responses hold and name a floor of one',async()=>{
   // 3d-review-cookbook work/active/2026-10-26-3d-report-threshold-coverage: >=1 response in each included lens builds the report.
