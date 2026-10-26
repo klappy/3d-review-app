@@ -51,10 +51,10 @@
 {#snippet foot(n)}<div class="pfoot"><span>{FOOT}</span><span>{n} of {PAGES}</span></div>{/snippet}
 {#snippet scores(rows)}
   {#each rows as row}
-    <div class="barbell-row" data-kind="score"><!-- the numeric paper row (.paper .barbell-row[data-kind=score]) -->
-      <span class="small"><strong>{row.name}</strong></span>
+    <div class="barbell-row" data-kind="score"><!-- the numeric paper row (.paper .barbell-row[data-kind=score]); bb-label / bb-verdict -->
+      <span class="bb-label">{row.name}</span>
       <ScoreBar {row} />
-      <span class="small">{withNotes(gapLead(row), row)}</span>
+      <span class="bb-verdict">{withNotes(gapLead(row), row)}</span>
     </div>
   {/each}
   <PaperLegend />

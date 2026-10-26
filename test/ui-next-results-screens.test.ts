@@ -483,10 +483,13 @@ describe("each board renders as a screen", () => {
     expect(all(a, ".paper ol li")).toEqual(["Community · Impactful — Needs urgent attention", "Community · Understandable — Needs urgent attention", "Translation team · External review — Needs support"]);
     expect(text(a.querySelector(".pfoot"))).toContain("1 of 1");
     // N2: a space on both sides of the middot before "not asked"
-    expect(all(a, ".paper .barbell-row > span.small:last-child").filter((t) => /not asked/.test(t))).toEqual(["same band · Community not asked"]);
+    expect(all(a, ".paper .barbell-row > span.bb-verdict").filter((t) => /not asked/.test(t))).toEqual(["same band · Community not asked"]);
     // design-system.md barbell rows @186fab0a: the paper row is div.barbell-row (label · band-axis · verdict), never the screen Grid template
     expect([...a.querySelectorAll(".paper .barbell-row")].every((r) => r.tagName === "DIV" && !r.hasAttribute("data-kind") && r.children.length === 3 && r.children[1].matches(".band-axis"))).toBe(true);
     expect(a.querySelector(".paper .l-grid[data-tpl=barbell]")).toBeNull();
+    // its label and verdict are span.bb-label / span.bb-verdict (13px 600 / 12px, design-system.md:747 @c9dfe1ff): never .small on paper
+    expect([...a.querySelectorAll(".paper .barbell-row")].every((r) => r.children[0].matches("span.bb-label") && r.children[2].matches("span.bb-verdict"))).toBe(true);
+    expect(a.querySelectorAll(".paper .barbell-row .small").length).toBe(0);
     expect(text(a)).not.toMatch(/\S· /);
   });
   it("ReportDetailed: four sheets, radar, numeric barbells, evidence tables", () => {
@@ -506,7 +509,7 @@ describe("each board renders as a screen", () => {
     expect(all(a, "table").length).toBe(3);
     expect(all(a, ".ev-table th")).toContain("Observation");
     // N2: the notes after "gap n" keep the space before the middot
-    expect(all(a, ".paper .barbell-row > span.small:last-child").filter((t) => /not asked/.test(t))).toEqual([
+    expect(all(a, ".paper .barbell-row > span.bb-verdict").filter((t) => /not asked/.test(t))).toEqual([
       "gap 14 · Community not asked", "gap 4 · Community not asked", "gap 14 · Community not asked", "gap 9 · Translation team not asked", "gap 4 · Community not asked"]);
     expect(text(a)).not.toMatch(/\S· /);
   });
@@ -520,10 +523,10 @@ describe("each board renders as a screen", () => {
     expect(text(a)).toContain("Church more input needed");
     expect(text(a)).not.toContain("church stay wide"); // the fixture's three-shape reading needs every perspective drawn
     const sheets = [...a.querySelectorAll(".paper[data-sheet=page]")];
-    expect(all(sheets[0], ".barbell-row > span.small:first-child")).toEqual(["Clarity / naturalness", "Impact / use", "Trust / readiness"]);
+    expect(all(sheets[0], ".barbell-row > span.bb-label")).toEqual(["Clarity / naturalness", "Impact / use", "Trust / readiness"]);
     const churchTable = a.querySelector(".ev-card[data-lens=church] table.ev-table")!;
     expect([...churchTable.querySelectorAll("tbody tr")].map((tr) => text(tr.children[2]))).toEqual(Array(6).fill("—"));
-    const leads = all(a, ".paper .barbell-row > span.small:last-child");
+    const leads = all(a, ".paper .barbell-row > span.bb-verdict");
     expect(leads).toContain("too few perspectives to compare · Church more input needed · Community not asked");
     expect(text(a)).not.toMatch(/gap null|undefined|NaN/);
     expect(attrs(a)).not.toMatch(/gap null|undefined|NaN/);
@@ -556,7 +559,7 @@ describe("each board renders as a screen", () => {
   });
   it("ReportDetailed: the tensions order and every sheet are the same whatever the held perspective's score (R4-1)", () => {
     const a = mount(ReportDetailed, { report: tieProbe(20, 60) }), b = mount(ReportDetailed, { report: tieProbe(60, 10) });
-    const tense = (el: Element) => all(el.querySelectorAll(".paper[data-sheet=page]")[0], ".barbell-row > span.small:first-child");
+    const tense = (el: Element) => all(el.querySelectorAll(".paper[data-sheet=page]")[0], ".barbell-row > span.bb-label");
     expect(tense(a)).toEqual(["Zeal", "Accord"]);
     expect(tense(b)).toEqual(["Zeal", "Accord"]);
     expect(a.innerHTML).toBe(b.innerHTML); // nothing on any sheet moves with church's hidden score
@@ -584,9 +587,9 @@ describe("each board renders as a screen", () => {
     const d = mount(ReportDetailed, { report: D });
     expect(d.querySelectorAll("h1").length).toBe(1);
     const page2 = d.querySelectorAll(".paper[data-sheet=page]")[1];
-    expect(all(page2, ".barbell-row > span.small:first-child").slice(-2)).toEqual(["—", "42"]);
+    expect(all(page2, ".barbell-row > span.bb-label").slice(-2)).toEqual(["—", "42"]);
     expect([...page2.querySelectorAll(".barbell-row")].every((r) => r.getAttribute("data-kind") === "score")).toBe(true);
-    expect(all(page2, ".barbell-row > span.small:last-child").slice(-2)).toEqual(["gap 6 · Church not asked", "gap 8 · Community not asked"]);
+    expect(all(page2, ".barbell-row > span.bb-verdict").slice(-2)).toEqual(["gap 6 · Church not asked", "gap 8 · Community not asked"]);
     expect(d.querySelectorAll("svg[data-part=score-barbell]").length).toBe(3 + 9);
     expect(text(d)).not.toMatch(/gap null|undefined|NaN/);
   });

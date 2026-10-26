@@ -85,10 +85,10 @@
         <h2 class="h3">Where the perspectives disagree</h2>
         <p class="small">Each dot is one perspective on the same area, placed in its band; a red line means two bands apart or more.</p>
         {#each rows as row}
-          <div class="barbell-row"><!-- design-system.md barbell rows: .paper .barbell-row 180px minmax(0,1fr) 150px, gap 14 -->
-            <span class="small"><strong>{row.name}</strong></span>
+          <div class="barbell-row"><!-- design-system.md barbell rows: .paper .barbell-row 180px minmax(0,1fr) 150px, gap 14; bb-label / bb-verdict, never .small on paper -->
+            <span class="bb-label">{row.name}</span>
             <BandBar {row} size="paper" />
-            <span class="small">{withNotes(row.verdict, row)}</span>
+            <span class="bb-verdict">{withNotes(row.verdict, row)}</span>
           </div>
         {/each}
         <PaperLegend />

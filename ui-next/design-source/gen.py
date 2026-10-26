@@ -182,6 +182,7 @@ html:has(dialog[open]:modal){overflow:hidden}
    Screen: 220px 1fr 220px, gap 20 (the glass card: --radius-l, 18/24/24). Paper: 180px 1fr 150px, gap 14, min-height 56 (48 for the
    numeric score row, data-kind=score) so the band labels keep a ~300px track on the 794 sheet. */
 .barbell-row{display:grid;grid-template-columns:220px minmax(0,1fr) 220px;gap:20px;align-items:center}.glass.barbell-row{border-radius:var(--radius-l);padding:18px 24px 24px}
+.paper .barbell-row>.bb-label{font-size:var(--t-13);font-weight:600;color:var(--ink)}.paper .barbell-row>.bb-verdict{font-size:var(--t-12);color:var(--ink-2)}/* paper barbell label and verdict (cook-cue-boards-1800; V-34 tokens, was #555) */
 .paper .barbell-row{grid-template-columns:180px minmax(0,1fr) 150px;gap:14px;min-height:56px}.paper .barbell-row[data-kind=score]{min-height:48px}
 .l-main[data-rhythm=center]{justify-content:center;padding:var(--sp-6) var(--gutter)}/* §8.2 a single-card page centred in the viewport (SignInCheck; Invitations) */
 .icn[data-size="28"],.app .icn.icn-lens.su-icn-s{width:28px;height:28px;border-radius:var(--radius-s)}/* §2 lens chip on a project card (36/56/64 are the participant rows) */
@@ -600,7 +601,7 @@ def band_barbell(area, who, scores, paper=False, phone=False):
     if phone:  # R37: axis full card width, verdict below it (no desktop 220px columns)
         return (f'<div style="display: flex; flex-direction: column; gap: 4px">{axis}<span class="small"><strong style="color: var(--ink)">{verdict}</strong></span><span class="small">{" · ".join(dict(LENS_NAMES)[k] + " " + b for k, b in pts)}{na}</span></div>')
     if paper:
-        return (f'<div class="barbell-row"><span style="font-size: var(--t-13); font-weight: 600">{area}</span>{axis}<span style="font-size: var(--t-12); color: #555">{verdict}{na}</span></div>')
+        return (f'<div class="barbell-row"><span class="bb-label">{area}</span>{axis}<span class="bb-verdict">{verdict}{na}</span></div>')
     return (f'<div class="glass barbell-row">'
             f'<div><div class="h3">{area}</div><span class="small">{who}</span></div>{axis}'
             f'<div style="display: flex; flex-direction: column; gap: 4px"><span class="small"><strong style="color: var(--ink)">{verdict}</strong></span><span class="small">{" · ".join(dict(LENS_NAMES)[k] + " " + b for k, b in pts)}{na}</span></div></div>')
