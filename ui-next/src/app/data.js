@@ -5,7 +5,7 @@ import { api, classify, confirmed, enc, token } from "./api.js";
 import { lensLabel } from "../../../ui/report-lenses.js";
 import { v3ScoreBand, v3ExpectedFor } from "../../../ui/assess/v3-assessment.js";
 import { parsePeriod, collectLine } from "../../../ui/v3/components/active-until.js";
-import { LEVEL_KEY, LEVEL_WORD, levelCutoffs, useLevelMinimum, levelMinimumOf, currentLevelMin, sentLenses, snapshotTotal, footPrivacy, gapRows, bandRows, lensCards, responsesFor } from "../screens/results/data.js";
+import { LEVEL_KEY, LEVEL_WORD, levelCutoffs, useLevelMinimum, levelMinimumOf, currentLevelMin, sentLenses, snapshotTotal, footPrivacy, gapRows, bandRows, lensCards, responsesFor, lookNextOf, standsOutOf } from "../screens/results/data.js";
 import { to } from "./router.js";
 import qrcode from "../../../ui/assess/vendor-qrcode.js";
 import { acceptInvitationById } from "../../../ui/v3/components/invite.js";
@@ -333,6 +333,20 @@ export function gapsOf(payload) {
   return { biggest: a.slice(0, 3).map((x) => x.construct_name), agree: a.length > 3 ? [a[a.length - 1].construct_name] : [] };
 }
 export const radarOf = (payload) => areasOf(payload).map((a) => a.construct_name).slice(0, 8);
+
+// The phone Results cards (ResultsPhone.dc.html, fixtures/results/report.json "phone") draw each perspective's strongest and weakest
+// area only; that compact payload is for those cards alone (Codex P2 4383033516).
+export const phonePayload = (payload) => ({ ...payload, lenses: (payload.lenses ?? []).map((l) => { const sd = [...(l.sub_dimensions ?? [])].filter((x) => Number.isFinite(Number(x.score))).sort((a, b) => Number(b.score) - Number(a.score)); return { ...l, sub_dimensions: sd.length > 2 ? [sd[0], sd[sd.length - 1]] : l.sub_dimensions }; }) });
+/** The built report a live results screen reads, from resultsModel's m. The report readers (overview, detailed, both widths) get the
+ *  full snapshot; only the phone Results screen gets phonePayload (Codex P2 4383033516). lookNext and standsOut (live QA Q4) come from
+ *  the full snapshot at every width; standsOut's widest gap is gapRows' all-area order after suppression, so a perspective under the
+ *  level minimum never chooses or names the area (Codex P2 4383033523). null when no report is built. */
+export function liveReport(m, { phone = false, screen = "" } = {}) {
+  if (!m?.payload) return null;
+  const full = m.payload, cards = lensCards(full, m.counts, { sent: m.sent }), rows = gapRows({ payload: full }, m.counts);
+  return { review: m.review, counts: m.counts, sent: m.sent, payload: phone && screen === "results" ? phonePayload(full) : full,
+    gaps: gapsOf(full), radar: radarOf(full), lookNext: lookNextOf(cards), standsOut: standsOutOf(cards, rows) };
+}
 
 // Setup step 5 ("Ready to launch") for a review still in preparation: fixtures/setup/setup.json's summary/phoneSummary/groups/context from
 // the real review and its selected surveys, so screens/setup/Setup5.svelte draws it unchanged. Fields the API does not hold (passage file,

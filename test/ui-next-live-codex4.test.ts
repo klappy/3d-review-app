@@ -8,7 +8,7 @@ import { fireEvent, render, waitFor } from "@testing-library/svelte";
 import { reports, newestReport, resultsModel, projectModel, setupModel, shortDate, levelsOf, respondentsOf, levelTriples } from "../ui-next/src/app/data.js";
 // @ts-expect-error -- plain .js module, no type declarations
 import { forget, me as sessionMe } from "../ui-next/src/app/session.js";
-import { exploreModel } from "../ui-next/src/app/data.js";
+import { exploreModel, liveReport, gapsOf } from "../ui-next/src/app/data.js";
 import { exploreRows } from "../ui-next/src/screens/explore/explore-data.js";
 import Help from "../ui-next/src/screens/explore/Help.svelte";
 import ReportDetailed from "../ui-next/src/screens/results/ReportDetailed.svelte";
@@ -422,6 +422,48 @@ describe("final batch: report totals from the snapshot, held lines from the sent
     // only team sent and ready: the first is team, never the unsent community or church
     const ready = render(ResultsHeld as never, { props: { report: { ...held, sent: ["team"] }, phone: true } }).container;
     expect(ready.textContent).toContain("The translation team survey has 3 answers"); expect(ready.textContent).not.toMatch(/church|community/i);
+    useLevelMinimum(undefined);
+  });
+});
+
+describe("Codex P2s on ed291878: the report readers' payload and the stands-out claim", () => {
+  type Sub = { sub_dimension: string; score: number | null };
+  type M = { review: unknown; counts: Record<string, number>; sent?: string[]; payload: { lenses: { lens: string; sub_dimensions?: Sub[] }[]; cross_lens_multi: unknown[] } };
+  const fromFixture = (): M => { const f = JSON.parse(JSON.stringify(REPORT.desktop)); return { review: f.review, counts: f.counts, payload: f.payload }; };
+  it("4383033516: overview and detailed read the full snapshot at phone width; only phone Results gets the compact cards", () => {
+    useLevelMinimum(1);
+    const m = fromFixture(), full = m.payload.lenses[0].sub_dimensions as Sub[];
+    expect(full.length).toBeGreaterThan(2);
+    for (const screen of ["report", "report-detailed", "results-gaps", "results-answers"]) expect(liveReport(m, { phone: true, screen }).payload).toBe(m.payload);
+    expect(liveReport(m, { phone: false, screen: "results" }).payload).toBe(m.payload);
+    const compact = liveReport(m, { phone: true, screen: "results" }).payload.lenses[0].sub_dimensions as Sub[];
+    expect(compact).toHaveLength(2); expect(compact[0].sub_dimension).toBe("Translation process & brief");
+    expect(compact.map((x) => x.sub_dimension)).not.toContain("Understanding the source");
+    // the derived claims are the same at both widths, from the full snapshot
+    expect(liveReport(m, { phone: true, screen: "results" }).lookNext).toEqual(liveReport(m, { phone: false, screen: "results" }).lookNext);
+    expect(liveReport(m, { phone: true, screen: "report" }).standsOut).toBe(liveReport(m, { phone: false, screen: "report" }).standsOut);
+    // the phone evidence sheet ("Every area, with evidence") draws a middle area the compact payload would drop
+    const el = render(ReportDetailed as never, { props: { phone: true, report: liveReport(m, { phone: true, screen: "report-detailed" }) } }).container;
+    expect(el.textContent).toContain("Every area, with evidence");
+    expect(el.textContent).toContain("Understanding the source");
+    useLevelMinimum(undefined);
+  });
+  it("4383033523: What stands out uses gapRows' post-suppression order; a hidden low-count perspective neither picks nor leaks", () => {
+    useLevelMinimum(3); // outside DEV: church has 1 answer, so its scores are suppressed
+    const area = (name: string, team: number, community: number, church: number) => ({ construct_name: name, question: `${name}?`,
+      agreement_range: Math.max(team, community, church) - Math.min(team, community, church),
+      lens_scores: [{ lens: "team", score: team }, { lens: "community", score: community }, { lens: "church", score: church }] });
+    const m: M = { review: { title: "R" }, counts: { team: 6, community: 8, church: 1 }, payload: {
+      lenses: [{ lens: "team", score: 70, sub_dimensions: [] }, { lens: "community", score: 60, sub_dimensions: [] }, { lens: "church", score: 20, sub_dimensions: [] }],
+      cross_lens_multi: [area("Hidden swing", 70, 72, 5), area("Raw two", 60, 62, 10), area("Raw three", 50, 52, 95), area("Visible gap", 80, 45, 50), area("Quiet", 66, 68, 64)] } };
+    // the raw agreement_range top three are all chosen by the hidden church score, and miss the gap the shown perspectives have
+    expect(gapsOf(m.payload).biggest).toEqual(["Hidden swing", "Raw two", "Raw three"]);
+    const said = liveReport(m, { phone: false, screen: "report" }).standsOut as string;
+    const gap = said.slice(said.indexOf("furthest apart"));
+    expect(said).toContain("furthest apart on Visible gap (Translation team strong, Community needs support).");
+    expect(gap).not.toMatch(/church|hidden swing|raw two|raw three|\b(5|10|95|50)\b/i);
+    expect(said).not.toMatch(/hidden swing|raw two|raw three/i);
+    expect(liveReport(m, { phone: true, screen: "report" }).standsOut).toBe(said);
     useLevelMinimum(undefined);
   });
 });

@@ -30,7 +30,6 @@
   import { collectModel as collectView } from "../screens/collect/model.js";
   import Card from "../Card.svelte";
   import Row from "../Row.svelte";
-  import * as R from "../screens/results/data.js";
   import { systemTheme } from "../theme.svelte.js";
   import NotBuilt from "./NotBuilt.svelte";
   import { buildConfirmText } from "../../../ui/assess/report-build.js";
@@ -300,8 +299,6 @@
   const applyChrome = (s) => setLiveChrome(s ? { who: S.firstName(s.principal), initials: S.initialsOf(s.principal), workspace: "Your workspace", workspaces: [], accountItems, home: to("home"), workspaceItems: [{ kind: "micro", label: "Your workspaces" }, { label: "Home", href: to("home") }] } : { who: "", initials: "", workspace: "", workspaces: [], accountItems: [], home: to("home"), workspaceItems: [], signedOut: true });
   const chrome = $derived({ phone, theme, who, accountItems, session });
   $effect(() => { setLiveChrome(session ? { who: who.first, initials: who.initials, workspace: page.data?.home?.workspace ?? "Your workspace", workspaces: [], accountItems, home: to("home"), workspaceItems: [{ kind: "micro", label: "Your workspaces" }, { label: "Home", href: to("home") }] } : { who: "", initials: "", workspace: "", workspaces: [], accountItems: [], home: to("home"), workspaceItems: [], signedOut: true }); });
-  // The phone boards (ResultsPhone.dc.html, fixtures/results/report.json "phone") draw each perspective's strongest and weakest area only.
-  const phonePayload = (payload) => ({ ...payload, lenses: (payload.lenses ?? []).map((l) => { const sd = [...(l.sub_dimensions ?? [])].filter((x) => Number.isFinite(Number(x.score))).sort((a, b) => Number(b.score) - Number(a.score)); return { ...l, sub_dimensions: sd.length > 2 ? [sd[0], sd[sd.length - 1]] : l.sub_dimensions }; }) });
   // Setup steps 1-4 (app/setup.js): the open state lives outside the page (its draft is edited in place); suRev re-derives the views.
   let suSt = null, suRev = $state(0), suBusy = $state(false), suError = $state("");
   const bump = () => { suRev++; };
@@ -335,13 +332,8 @@
   };
   const suGroups = { ongroup: (tid, version, on) => { SU.setGroup(suSt, tid, version, on); suError = ""; bump(); }, onexpected: (tid, v) => { SU.setExpected(suSt, tid, v); bump(); } };
   const suContext = { oncontext: (key, field, v) => { const tid = SU.tidOfKey(suSt, key); if (tid) SU.setContext(suSt, tid, field, v); }, ondemographics: (on) => { suSt.draft.demographics = on; bump(); } };
-  // lookNext and standsOut (live QA Q4): derived from the built report's own levels and gaps (results/data.js), never a store.
-  const reportFor = (m) => {
-    if (!m.payload) return null;
-    const payload = phone ? phonePayload(m.payload) : m.payload, gaps = D.gapsOf(m.payload);
-    const cards = R.lensCards(payload, m.counts, { sent: m.sent }), rows = R.bandRows({ payload }, m.counts, [...gaps.biggest, ...gaps.agree]);
-    return { review: m.review, counts: m.counts, sent: m.sent, payload, gaps, radar: D.radarOf(m.payload), lookNext: R.lookNextOf(cards), standsOut: R.standsOutOf(cards, rows) };
-  };
+  // The built report for this screen (app/data.js liveReport: full snapshot for the readers, compact payload for phone Results only).
+  const reportFor = (m, screen) => D.liveReport(m, { phone, screen });
 </script>
 
 <!-- The build confirm (report-build.js: one plain sentence with the response count, confirm "Build the results", cancel "Not now").
@@ -420,7 +412,7 @@
   {/if}
 {:else if page.data.screen === "results" || page.data.screen === "results-gaps" || page.data.screen === "results-answers" || page.data.screen === "report" || page.data.screen === "report-detailed" || page.data.screen === "results-held"}
   {@const m = page.data.results}
-  {@const rep = reportFor(m)}
+  {@const rep = reportFor(m, page.data.screen)}
   {#if page.data.sample}<Status {phone} {theme} kind="preview" inline message="Sample data: a made-up review that shows the design. Your own reviews read their results from the server." back={to("home")} backLabel="Home" />{/if}
   {#if !rep && !m.held && page.data.screen !== "results-held"}
     <NotBuilt {chrome} {phone} {theme} crumbs={[{ label: m.review.project, href: m.review.projectId ? to("project", { pid: m.review.projectId }) : to("home") }, { label: m.review.title }]} message={`No report has been built for ${m.review.title} yet. ${m.canBuild ? "Building reads the answers collected so far and keeps that report." : "An owner or member of the review builds it."}${page.data.refreshed ? ` ${page.data.refreshed}` : ""}`} back={to("collect", route.params)} backLabel="Back to Collect">
