@@ -48,7 +48,7 @@
   },
   "held": {
     "_note": "ResultsHeld / ResultsHeldPhone: the church survey has no response yet (below results/data.js LEVEL_MIN), so every church level is More input needed.",
-    "review": { "closedResponses": 15 },
+    "review": { "closedResponses": 14 },
     "counts": { "team": 6, "community": 8, "church": 0 },
     "phoneCounts": { "church": 0 },
     "preview": 3

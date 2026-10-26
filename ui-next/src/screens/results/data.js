@@ -47,7 +47,7 @@ export function canonicalPayload(payload) {
 export const MIN_RESPONSES = V3_BAND_CUTOFFS.minResponses; // answer splits (complementary suppression) keep this floor
 // A perspective's level needs one response in UI Next (3d-review-cookbook work/active/2026-10-26-3d-report-threshold-coverage,
 // REQ-0018): the same floor the DEV server builds a report at; none reads More input needed. Low counts are shown by the
-// coverage jar (Coverage.svelte, "a few drops"), never by holding the level. The current UI keeps V3_BAND_CUTOFFS unchanged.
+// coverage cue (Coverage.svelte drops, "a few drops"), never by holding the level. The current UI keeps V3_BAND_CUTOFFS unchanged.
 export const LEVEL_MIN = 1;
 export const LEVEL_CUTOFFS = Object.freeze({ ...V3_BAND_CUTOFFS, minResponses: LEVEL_MIN });
 /** Coverage (quantity) beside the level (quality): drops filled by how many people answered (no jar: the Level's Jars imagery owns the jar). Provisional tiers, presentation only. */
@@ -67,14 +67,25 @@ export function levelOf(score, responses) {
   return key;
 }
 
-/** One response-count resolver for every place a perspective is placed or hidden (R4-2): the report's counts, else the
- *  payload's own evidence n (ui/report-lenses.js lensRespondents, what the live payload carries), else null (More input
- *  needed). Cards, evidence tables, band and score barbells, the tensions order and the radar all read it, so a perspective
- *  under the minimum is hidden in every one of them, with or without `counts`. */
-export function responsesFor(payload, counts) {
+/** One response-count resolver for every place a perspective is placed or hidden (R4-2). Snapshot first: a built report's level
+ *  and coverage rest on that report's own immutable evidence n (ui/report-lenses.js lensRespondents of the payload), never on
+ *  answers that arrived after it was built. `counts` (the live survey counts) stand in only where the payload carries no count
+ *  for that perspective; with neither, null (More input needed). Cards, evidence tables, band and score barbells, the tensions
+ *  order and the radar all read it, so a perspective under the minimum is hidden in every one of them, with or without `counts`.
+ *  prefer "live" (the held preview only, which shows the collection as it stands, not a built report) reads `counts` first. */
+export function responsesFor(payload, counts, { prefer = "report" } = {}) {
   const evidence = lensRespondents(canonicalPayload(payload));
-  return (lens) => counts?.[lens] ?? evidence.get(lens) ?? null;
+  if (prefer === "live") return (lens) => counts?.[lens] ?? evidence.get(lens) ?? null;
+  return (lens) => evidence.get(lens) ?? counts?.[lens] ?? null;
 }
+/** Live responses a built report does not include yet, per perspective: the live count over the report's own evidence n, else 0
+ *  (no evidence count to compare, or no live count). Presentation only: never a level, never a coverage tier. */
+export function newerFor(payload, counts) {
+  const evidence = lensRespondents(canonicalPayload(payload));
+  return (lens) => { const was = evidence.get(lens), now = Number(counts?.[lens]); return Number.isFinite(was) && Number.isFinite(now) && now > was ? now - was : 0; };
+}
+/** "2 newer responses not in this report yet" (Results cards; the printed report is the snapshot and never says it). */
+export const newerText = (k) => (k > 0 ? `${k} newer ${k === 1 ? "response" : "responses"} not in this report yet` : "");
 /** "6 responses", "1 response" (ui/report-lenses.js lensesCopy.respondents); with no count anywhere, the current UI's words
  *  ("responses not counted"), never "null responses" (R5-2). */
 export const responsesText = (n) => (n === null || n === undefined ? lensesCopy.noCount : lensesCopy.respondents(n));
@@ -84,16 +95,18 @@ export const BANDS = Object.freeze(["urgent", "support", "growing", "strong"]);
 export const BAND_SHORT = Object.freeze({ urgent: "Urgent", support: "Support", growing: "Growing", strong: "Strong" });
 export const bandCentre = (band) => 12.5 + 25 * BANDS.indexOf(band);
 
-/** Per-perspective cards: [{ lens, label, n, level, rows: [{ name, score, level, items, note }] }] in lens order; a perspective
+/** Per-perspective cards: [{ lens, label, n, newer, level, rows: [{ name, score, level, items, note }] }] in lens order (n: the
+ *  report's own evidence count, responsesFor; newer: live responses after it, newerFor); a perspective
  *  missing from the payload has no card (callers iterate, never index). An area at "more" (under the minimum responses, or no
  *  score) carries score null, so no table or label can print a score the level hides (R3-1). */
-export function lensCards(raw, counts) {
+export function lensCards(raw, counts, { prefer = "report" } = {}) {
   const payload = canonicalPayload(raw);
-  const lenses = Array.isArray(payload?.lenses) ? payload.lenses : [], responses = responsesFor(payload, counts);
+  const lenses = Array.isArray(payload?.lenses) ? payload.lenses : [], responses = responsesFor(payload, counts, { prefer });
+  const newer = prefer === "live" ? () => 0 : newerFor(payload, counts);
   return LENS_ORDER.map((lens) => lenses.find((l) => l && l.lens === lens)).filter(Boolean).map((l) => {
     const n = responses(l.lens);
     return {
-      lens: l.lens, label: lensLabel(l.lens), n, level: levelOf(l.score, n),
+      lens: l.lens, label: lensLabel(l.lens), n, newer: newer(l.lens), level: levelOf(l.score, n),
       rows: (Array.isArray(l.sub_dimensions) ? l.sub_dimensions : []).filter(Boolean).map((s) => {
         const level = levelOf(s.score, n);
         return { name: s.sub_dimension, score: level === "more" ? null : s.score ?? null, level, items: s.items ?? s.n_items_included, note: s.note };

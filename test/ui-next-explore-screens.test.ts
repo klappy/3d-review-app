@@ -337,6 +337,10 @@ describe("Help (Help.dc.html, HelpPhone.dc.html)", () => {
     const qs = [...a.querySelectorAll("#h8 details.disc")];
     expect(qs.map((d) => text(d.querySelector("summary")!))).toEqual(FAQ.map(([q]: string[]) => q));
     expect(qs.map((d) => text(d.querySelector(".disc-body")!))).toEqual(FAQ.map(([, ans]: string[]) => ans));
+    // Codex P1 on 992b610: the answers-needed FAQ follows the level floor of 1 and makes no "nobody can be picked out" promise
+    const need = FAQ.find(([q]: string[]) => q === "How many answers do we need?")![1];
+    expect(need).toBe("A perspective shows its level from its first answer. The drops beside each level show how much evidence it rests on: a few drops is little evidence, not a low result. Answer-by-answer splits still wait for at least 3 answers in every group.");
+    expect(FAQ.flat().join(" ")).not.toMatch(/At least 3 from each perspective|picked out/);
     expect(qs.every((d) => !(d as HTMLDetailsElement).open)).toBe(true);
     expect(text(a)).toContain("Still stuck? Send app feedback, or read why 3D Review exists.");
     const hrefs = [...a.querySelectorAll("main a.link")].map((l) => l.getAttribute("href"));

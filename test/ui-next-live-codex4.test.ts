@@ -5,7 +5,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { fireEvent, render, waitFor } from "@testing-library/svelte";
 // @ts-expect-error -- plain .js module, no type declarations
-import { reports, newestReport, resultsModel, projectModel, setupModel, shortDate } from "../ui-next/src/app/data.js";
+import { reports, newestReport, resultsModel, projectModel, setupModel, shortDate, levelsOf, respondentsOf, levelTriples } from "../ui-next/src/app/data.js";
 // @ts-expect-error -- plain .js module, no type declarations
 import { forget } from "../ui-next/src/app/session.js";
 // @ts-expect-error -- plain .js module, no type declarations
@@ -145,6 +145,22 @@ describe("projectModel (P2: workspace, trend gaps, surfaced failures)", () => {
     const g = render(Project as never, { props: { data: gap } }).container;
     expect(g.querySelectorAll('polyline[data-lens="church"]').length).toBe(2);
     expect(g.querySelectorAll('circle[data-lens="church"]').length).toBe(4); // three points plus the legend dot;
+  });
+  it("Codex P1/P2 on 992b610: levels rest on the report's own evidence counts, and each summary level carries its count beside it", async () => {
+    // a report built from 1 team and 2 community responses; the live surveys now read 6 each
+    const snap = { ...payload, evidence: [{ label: "Translation Team — Translators", n: 1 }, { label: "Community — Community", n: 2 }] };
+    expect(respondentsOf(snap, { team: 6, community: 6 })).toEqual({ team: 1, community: 2 });
+    expect(respondentsOf(payload, { team: 6, community: 6 })).toEqual({ team: 6, community: 6 }); // no evidence n: the live count stands in
+    expect(levelsOf({ ...snap, evidence: [{ label: "Translation Team — Translators", n: 0 }, { label: "Community — Community", n: 2 }] }, { team: 6, community: 6 })).toEqual({ team: "more", community: "support" });
+    expect(levelTriples({ team: { score: 80, responses: 2 }, church: { score: 50, responses: 0 } })).toEqual([["team", "strong", 2], ["church", "more", 0]]);
+    serve(routes({ "GET /v2/reports/r1": { report: { id: "r1", created_at: "2026-08-02T00:00:00Z", payload: snap } } }));
+    const m = await projectModel(PID);
+    expect(m.reviews.find((r: { id: string }) => r.id === "a1").levels).toEqual([["team", "strong", 1], ["community", "support", 2]]);
+    expect(m.reviews.find((r: { id: string }) => r.id === "a2").levels).toEqual([["team", "strong", 6]]);
+    const a = render(Project as never, { props: { data: m } }).container;
+    const first = [...a.querySelectorAll("a.su-rev")].find((x) => x.querySelector(".h3")?.textContent === "First")!; // newest first: a1 is the second card
+    expect([...first.querySelectorAll(".lvl-pair [data-coverage] [data-short]")].map((c) => (c.textContent ?? "").replace(/\s+/g, " ").trim())).toEqual(["A few drops · 1", "A few drops · 2"]);
+    expect(first.querySelector("[data-coverage]")!.getAttribute("title")).toBe("A few drops · 1 response");
   });
   it("a review's report list or count failing to read rejects the model (the shell's retryable error), never a review without levels", async () => {
     serve(routes({ "GET /v2/assessments/a2/reports": new Error("list down") }));

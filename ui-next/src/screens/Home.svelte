@@ -36,6 +36,7 @@
   import Pill from "../Pill.svelte";
   import Tag from "../Tag.svelte";
   import Level from "../Level.svelte";
+  import Coverage from "./results/Coverage.svelte";
   import LensDot, { LENSES } from "../LensDot.svelte";
   import Icon from "../Icon.svelte";
   import { I } from "../icons.js";
@@ -142,7 +143,7 @@
                 <Row wrap gap={3}><h3 class="h2">{r.title}</h3><Pill stage={g.stage} /></Row>
                 <Row wrap gap={4}>
                   <span class="small">{r.meta}</span>
-                  {#if r.levels}{#each r.levels as [lens, level]}<span class="lvl-pair">{LENSES[lens]} <Level {level} /></span>{/each}{/if}
+                  {#if r.levels}{#each r.levels as [lens, level, n]}<span class="lvl-pair">{LENSES[lens]} <Level {level} /><Coverage {n} variant="short" /></span>{/each}{/if}
                   {#if r.counts}{#each r.counts as [lens, n]}<span class="lvl-pair"><LensDot {lens} decorative />{LENSES[lens]} {n}</span>{/each}<span class="small">{r.until}</span>{/if}
                   {#if r.tag}<Tag label={r.tag} />{/if}
                 </Row>

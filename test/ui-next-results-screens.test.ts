@@ -42,13 +42,16 @@ const withoutChurch = () => {
   D.gaps = { biggest: [...D.gaps.biggest, "No such area"], agree: D.gaps.agree };
   return D;
 };
-const heldReport = () => ({ ...REPORT.desktop, counts: REPORT.held.counts }); // church 0 (no response): More input needed
 type Built = { payload: Payload & { cross_lens_multi: unknown[] }; counts?: Record<string, number>; review: Record<string, string> };
 const copy = () => JSON.parse(JSON.stringify(REPORT.desktop)) as Built;
+// A built report whose own evidence holds church at n (snapshot first, Codex P1 on 992b610: a report's levels rest on its own
+// evidence counts, never on live counts passed beside it). heldReport: church 0 in the report and in the live counts.
+const churchAt = <T extends Built>(D: T, n: number) => { D.payload.evidence = D.payload.evidence.map((e) => (e.label.startsWith("church") ? { ...e, n } : e)); return D; };
+const heldReport = () => { const D = churchAt(copy(), 0) as Built & typeof REPORT.desktop; D.counts = { ...REPORT.held.counts }; return D; }; // church 0 (no response): More input needed
 // R4-1: two areas whose placed perspectives (team, community) are both 20 apart; church (0 of 1, held) differs. Payload order
 // Zeal then Accord, so neither the hidden score nor the alphabet can be what orders them.
 const tieProbe = (zeal: number, accord: number) => {
-  const D = copy();
+  const D = churchAt(copy(), 0);
   D.counts = { ...REPORT.held.counts };
   D.payload.cross_lens_multi = [
     { construct_name: "Zeal", question: "Zeal?", lens_scores: [{ lens: "team", score: 50 }, { lens: "community", score: 70 }, { lens: "church", score: zeal }] },
@@ -113,7 +116,7 @@ describe("data adapter: levels through the current UI's pure modules (board valu
     expect(withNotes(brief.verdict, brief)).toBe("same band · Community not asked");
   });
   it("band barbell: a perspective under the minimum gets no dot and no part in the verdict; it is named instead (N3)", () => {
-    const D = REPORT.desktop, H = REPORT.held.counts; // church 0 (no response): More input needed
+    const D = heldReport(), H = D.counts; // church 0 (no response): More input needed
     const clarity = bandRow(D, H, "Clarity / naturalness");
     expect(clarity.dots.map((d: { lens: string; x: number }) => `${d.lens}:${d.x}`)).toEqual(["team:87.5", "community:12.5"]);
     expect(clarity.dots.every((d: { x: unknown }) => typeof d.x === "number")).toBe(true);
@@ -130,7 +133,7 @@ describe("data adapter: levels through the current UI's pure modules (board valu
   });
   it("band barbell SVG: every point has a numeric cx, held counts included (N3: never cx=undefined%)", () => {
     const D = REPORT.desktop;
-    const { container } = render(BandBar as never, { props: { row: bandRow(D, REPORT.held.counts, "Clarity / naturalness") } });
+    const { container } = render(BandBar as never, { props: { row: bandRow(heldReport(), REPORT.held.counts, "Clarity / naturalness") } });
     const cx = [...container.querySelectorAll("circle")].map((c) => c.getAttribute("cx"));
     expect(cx.length).toBe(4);
     for (const v of cx) expect(v).toMatch(/^\d+(\.\d+)?%$/);
@@ -146,7 +149,7 @@ describe("data adapter: levels through the current UI's pure modules (board valu
     expect([shape.legend.map((l: { lens: string }) => l.lens), shape.notes]).toEqual([["team", "community", "church"], []]);
   });
   it("held counts: a perspective under the minimum feeds no spread, tensions order, radar point or table score (R3-1)", () => {
-    const D = REPORT.desktop, H = REPORT.held.counts; // church 0 of 1
+    const D = heldReport(), H = D.counts; // church 0 in the report's own evidence
     type R = { name: string; spread: number | null; dots: { lens: string; score: number }[]; notes: string[] };
     const rows: R[] = scoreRows(D, H);
     for (const r of rows) {
@@ -178,26 +181,30 @@ describe("data adapter: levels through the current UI's pure modules (board valu
     const church = E.payload.cross_lens_multi.map((a) => a.lens_scores.find((s) => s.lens === "church"));
     const scores = church.map((s) => s?.score).reverse();
     church.forEach((s, i) => { if (s) s.score = scores[i] ?? s.score; });
-    E.counts = { ...REPORT.held.counts };
+    churchAt(E, 0); E.counts = { ...REPORT.held.counts };
     expect(names(E)).toEqual(names(D as Built));
   });
   it("one response-count resolver: a report without counts places and hides by its evidence n (R4-2)", () => {
     const D = REPORT.desktop, H = REPORT.held.counts;
     const r = responsesFor(noCounts(4).payload, undefined);
     expect(["team", "community", "church", "nobody"].map(r)).toEqual([6, 8, 4, null]);
-    expect(responsesFor(D.payload, { church: 1 })("church")).toBe(1); // counts first, then evidence
+    expect(responsesFor(D.payload, { church: 9 })("church")).toBe(4); // snapshot first: the report's own evidence n, never a live count
+    expect(responsesFor({ lenses: [] }, { church: 9 })("church")).toBe(9); // a payload with no count: the live count stands in
+    expect(responsesFor(D.payload, { church: 9 }, { prefer: "live" })("church")).toBe(9); // the held preview reads the collection as it stands
     // evidence n equal to the counts: every helper reads the same as with counts
     const live = noCounts(4);
     expect(lensCards(live.payload, live.counts)).toEqual(lensCards(D.payload, D.counts));
     expect(scoreRows(live, live.counts)).toEqual(scoreRows(D, D.counts));
     expect(radar(live, D.radar, live.counts)).toEqual(radar(D, D.radar, D.counts));
-    // church at 0 in the evidence, no counts: hidden everywhere exactly as with held counts
-    const held = noCounts(0);
-    expect(lensCards(held.payload, held.counts)).toEqual(lensCards(D.payload, H));
-    expect(scoreRows(held, held.counts)).toEqual(scoreRows(D, H));
-    expect(comparedRows(held, held.counts)).toEqual(comparedRows(D, H));
-    expect(bandRows(held, held.counts, D.gaps.biggest)).toEqual(bandRows(D, H, D.gaps.biggest));
-    expect(radar(held, D.radar, held.counts)).toEqual(radar(D, D.radar, H));
+    // church at 0 in the evidence, no counts: hidden everywhere exactly as with the held live counts beside it
+    const held = noCounts(0), HR = heldReport();
+    expect(lensCards(held.payload, held.counts)).toEqual(lensCards(HR.payload, H));
+    expect(scoreRows(held, held.counts)).toEqual(scoreRows(HR, H));
+    expect(comparedRows(held, held.counts)).toEqual(comparedRows(HR, H));
+    expect(bandRows(held, held.counts, D.gaps.biggest)).toEqual(bandRows(HR, H, D.gaps.biggest));
+    expect(radar(held, D.radar, held.counts)).toEqual(radar(HR, D.radar, H));
+    // live counts never move a built report's levels: church 0 live beside a report that used 4 keeps church's level and drops
+    expect(lensCards(D.payload, H)).toEqual(lensCards(D.payload, D.counts));
     expect(lensCards(held.payload, held.counts).find((c: { lens: string }) => c.lens === "church").rows.every((x: { score: unknown }) => x.score === null)).toBe(true);
     // no count anywhere: More input needed, never a level or a score
     const none = noCounts(1);
@@ -402,9 +409,12 @@ describe("each board renders as a screen", () => {
     expect(grid.querySelectorAll(".glass[data-lens]").length).toBe(3);
     expect(a.querySelector(".glass-hi .icn[data-size='64']")).not.toBeNull();
     expect(text(a.querySelector(".glass-hi h2.h2.t-24"))).toBe("Results are held until every perspective has enough answers");
-    // F5: one source for the count: the meta line and the refused delete both say 15
-    expect(text(a.querySelector(".l-page > .l-row p.small"))).toContain("· 15 responses");
-    expect(text(a.querySelector(".mi-why"))).toBe("Reviews with responses can't be deleted. This one has 15.");
+    // F5: one source for the count: the meta line and the refused delete both say 14, and the fixture's total is its
+    // perspective lines' sum (6 + 8 + 0; Codex P2 on 992b610: the total was 15 beside lines that add to 14)
+    const total = Object.values(REPORT.held.counts as Record<string, number>).reduce((n, k) => n + k, 0);
+    expect([REPORT.held.review.closedResponses, total]).toEqual([14, 14]);
+    expect(text(a.querySelector(".l-page > .l-row p.small"))).toContain("· 14 responses");
+    expect(text(a.querySelector(".mi-why"))).toBe("Reviews with responses can't be deleted. This one has 14.");
   });
   it("ResultsHeldPhone: nested header, closed pill, held card with the two ways on", () => {
     const a = mount(ResultsHeld, { phone: true });
@@ -712,7 +722,7 @@ describe("results round 5: a live payload renders; counts read right", () => {
   });
   it("R5-2: one response, singular, on the cards and the report heads", () => {
     expect([responsesText(1), responsesText(6), responsesText(null)]).toEqual(["1 response", "6 responses", "responses not counted"]);
-    const D = copy();
+    const D = churchAt(copy(), 1);
     D.counts = { ...D.counts, church: 1 };
     const cards = lensCards(D.payload, D.counts);
     const desk = render(LensCard as never, { props: { card: cards.find((c) => c.lens === "church") } }).container;
@@ -721,6 +731,25 @@ describe("results round 5: a live payload renders; counts read right", () => {
     const none = render(LensCard as never, { props: { card: { ...cards[0], n: null }, phone: true } }).container;
     expect(text(none.querySelector(".h3"))).toBe("Translation team");
     expect(text(none.querySelector("[data-coverage]"))).toBe("responses not counted");
+  });
+  it("Codex P1 on 992b610: a built report's level and drops come from its own evidence; newer live answers are said apart", () => {
+    const D = copy(); // the report used 6 / 8 / 4; since then the live surveys read 6 / 8 / 7
+    D.counts = { team: 6, community: 8, church: 7 };
+    const church = lensCards(D.payload, D.counts).find((c: { lens: string }) => c.lens === "church");
+    expect([church.n, church.newer]).toEqual([4, 3]);
+    const card = render(LensCard as never, { props: { card: church } }).container;
+    expect(text(card.querySelector("[data-coverage]"))).toBe("Filling up · 4 responses");
+    expect(text(card.querySelector("[data-newer]"))).toBe("3 newer responses not in this report yet");
+    const res = mount(Results, { report: D });
+    expect(all(res, ".glass[data-lens=church] [data-coverage]")).toEqual(["Filling up · 4 responses"]);
+    expect(all(res, ".glass[data-lens=church] [data-newer]")).toEqual(["3 newer responses not in this report yet"]);
+    // the printed report is the snapshot: its paper head counts what it used and never names the newer answers
+    const rep = mount(Report, { report: D });
+    expect(all(rep, ".paper .solid[data-lens=church] [data-coverage]")).toEqual(["Filling up · 4 responses"]);
+    expect(text(rep)).not.toContain("newer response");
+    // a live count no larger than the report's: nothing to say
+    expect(lensCards(D.payload, REPORT.desktop.counts).every((c: { newer: number }) => c.newer === 0)).toBe(true);
+    expect(render(LensCard as never, { props: { card: lensCards(D.payload, REPORT.desktop.counts)[0] } }).container.querySelector("[data-newer]")).toBeNull();
   });
   it("R5-3 + R5-5: Results counts the detailed report's pages; the phone overview line counts the gaps the sheet draws, no radar", () => {
     expect(text([...mount(Results).querySelectorAll("a.btn")].find((a) => text(a).startsWith("Detailed report")) ?? null)).toBe(`Detailed report · ${detailedPages(lensCards(REPORT.desktop.payload, REPORT.desktop.counts))} pages`);

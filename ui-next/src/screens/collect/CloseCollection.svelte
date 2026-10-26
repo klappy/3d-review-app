@@ -4,8 +4,9 @@
      native modal <dialog>, title row with the visible Close (desktop title .h2.t-24, the §1.2 dialog-heading row); focus opens on the least destructive action ("Keep collecting", autofocus);
      Close, Escape and the backdrop go back to Collect; the confirm reads "Yes, …" (0.22.7).
      One .btn-primary: the dialog's / sheet's own "Yes, close and see results"; the head Share and the phone bar go secondary behind it.
-     "Every perspective has at least 3 answers, so results can show" is said only when it is true (0.27.0 held line): there is at
-     least one perspective and each has 3 (never vacuously, with none). Counts read "1 response is in" / "N responses are in".
+     "Every perspective has an answer, so its level can show" is said only when it is true (0.27.0 held line): there is at least one
+     perspective and each has results/data.js LEVEL_MIN (never vacuously, with none); the drops and the answer-split floor
+     (MIN_RESPONSES) are said beside it, so one answer never reads as plenty. Counts read "1 response is in" / "N responses are in".
      The boards draw one state (the open confirm): any ?state= renders it. -->
 <script>
   import Button from "../../Button.svelte";
@@ -15,6 +16,7 @@
   import Dialog from "./Dialog.svelte";
   import Glyph from "./Glyph.svelte";
   import { collectModel, plural } from "./model.js";
+  import { LEVEL_MIN, MIN_RESPONSES } from "../results/data.js";
   import { href } from "../href.js";
   import fixture from "../../../fixtures/collect/collect.json";
 
@@ -22,7 +24,8 @@
   let { phone = false, theme = "light", data = fixture, onclose } = $props();
   const closing = (el) => { const f = (e) => { if (onclose && e.target instanceof Element && e.target.closest(".btn-primary")) { e.preventDefault(); onclose(); } }; el.addEventListener("click", f); return () => el.removeEventListener("click", f); };
   const m = $derived(collectModel(data));
-  const enough = $derived(m.groups.length > 0 && m.groups.every((g) => g.answered >= 3));
+  const enough = $derived(m.groups.length > 0 && m.groups.every((g) => g.answered >= LEVEL_MIN));
+  const ready = LEVEL_MIN === 1 ? "Every perspective has an answer, so its level can show" : `Every perspective has at least ${LEVEL_MIN} answers, so its level can show`;
 </script>
 
 {#snippet arrow()}<Glyph name="arrow" />{/snippet}
@@ -42,7 +45,7 @@
     <SurveyGroups groups={m.groups} />
     <Dialog labelledby="close-title" cancel={href("collect")} titleTop title={deskTitle}>
       <p class="small t-15">Links and codes stop working and the review moves to <strong>Understand</strong>. {m.countsUnavailable ? "Some response counts could not be read just now — reload before closing on a number." : `${plural(m.answered, "response is", "responses are")} in.`} You can reopen collection later — results refresh when you do.</p>
-      {#if m.groups.length && !m.countsUnavailable}<div class="solid l-card l-stack"><span class="small">{m.byLens}.{#if enough}{" "}Every perspective has at least 3 answers, so results can show.{/if}</span></div>{/if}
+      {#if m.groups.length && !m.countsUnavailable}<div class="solid l-card l-stack"><span class="small">{m.byLens}.{#if enough}{" "}{ready}; the drops beside each level show how much evidence it rests on. Answer-by-answer splits wait for {MIN_RESPONSES}.{/if}</span></div>{/if}
       <div class="l-row" data-gap="2" data-justify="end">
         <!-- svelte-ignore a11y_autofocus -->
         <a class="btn btn-quiet" href={href("collect")} autofocus>Keep collecting</a>

@@ -28,6 +28,7 @@
   import Pill, { STAGE_LABELS } from "../../Pill.svelte";
   import Tag from "../../Tag.svelte";
   import Level from "../../Level.svelte";
+  import Coverage from "../results/Coverage.svelte";
   import { LENSES } from "../../LensDot.svelte";
   import Icon from "../../Icon.svelte";
   import { I } from "../../icons.js";
@@ -116,7 +117,7 @@
             </Row>
             <hr class="hr" />
             {#if p.levels}
-              <Grid cols={3} gap={3}>{#each p.levels as [lens, level]}<Row gap={2}><span class="icn icn-lens su-icn-s" data-lens={lens} role="img" aria-label={LENSES[lens]}><Icon d={LENS_ICON[lens]} /></span><Level {level} /></Row>{/each}</Grid>
+              <Grid cols={3} gap={3}>{#each p.levels as [lens, level, n]}<Row gap={2}><span class="icn icn-lens su-icn-s" data-lens={lens} role="img" aria-label={LENSES[lens]}><Icon d={LENS_ICON[lens]} /></span><Stack gap={1}><Level {level} /><Coverage {n} variant="count" /></Stack></Row>{/each}</Grid>
             {:else}
               <span class="small l-row" data-gap="2"><Icon d={I.clock} />No results yet</span>
             {/if}

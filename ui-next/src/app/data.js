@@ -5,7 +5,7 @@ import { api, classify, confirmed, enc, token } from "./api.js";
 import { lensLabel } from "../../../ui/report-lenses.js";
 import { v3ScoreBand, v3ExpectedFor } from "../../../ui/assess/v3-assessment.js";
 import { parsePeriod, collectLine } from "../../../ui/v3/components/active-until.js";
-import { LEVEL_KEY, LEVEL_WORD, LEVEL_CUTOFFS, bandRows, lensCards } from "../screens/results/data.js";
+import { LEVEL_KEY, LEVEL_WORD, LEVEL_CUTOFFS, bandRows, lensCards, responsesFor } from "../screens/results/data.js";
 import { to } from "./router.js";
 import qrcode from "../../../ui/assess/vendor-qrcode.js";
 import { acceptInvitationById } from "../../../ui/v3/components/invite.js";
@@ -131,13 +131,15 @@ export async function projectModel(pid) {
   // A review's report list or counts failing to read is the shell's retryable error (never a review silently shown without levels).
   const lvl = await Promise.all(live.map(async (a) => {
     if (!["understand", "improve"].includes(a.stage)) return null;
-    const r = await reports(a.id); const newest = newestReport(r.reports); if (!newest) return null; const rep = newest.payload ? newest : await report(newest.id); return levelsOf(rep.payload, await lensCounts(a.id));
+    const r = await reports(a.id); const newest = newestReport(r.reports); if (!newest) return null; const rep = newest.payload ? newest : await report(newest.id);
+    const counts = await lensCounts(a.id), levels = levelsOf(rep.payload, counts);
+    return levels ? { levels, ns: respondentsOf(rep.payload, counts) } : null;
   }));
   const month = (iso) => { const d = new Date(iso); return isNaN(d) ? "" : d.toLocaleDateString("en-US", { month: "short", year: "numeric" }); };
   const reviews = live.map((a, i) => {
     const stage = a.stage === "improve" ? "done" : (STAGE_OF[a.stage] ?? "setup");
     const toKey = stage === "done" ? "nextStep" : stage === "results" ? "results" : "collect";
-    return { id: a.id, when: month(a.created_at), title: a.name, stage, to: toKey, href: to(stage === "done" || stage === "results" ? "results" : stage === "collecting" ? "collect" : "review", { aid: a.id }), note: stage === "setup" ? "Setup not finished" : "No results yet", levels: lvl[i] ? Object.entries(lvl[i]).filter(([, l]) => l) : undefined, overall: lvl[i]?.overall };
+    return { id: a.id, when: month(a.created_at), title: a.name, stage, to: toKey, href: to(stage === "done" || stage === "results" ? "results" : stage === "collecting" ? "collect" : "review", { aid: a.id }), note: stage === "setup" ? "Setup not finished" : "No results yet", levels: lvl[i] ? Object.entries(lvl[i].levels).filter(([, l]) => l).map(([k, l]) => [k, l, lvl[i].ns[k] ?? null]) : undefined, overall: lvl[i]?.levels?.overall }; // [lens, level, respondents]: the count travels with the level (Coverage beside it)
   });
   const withLevels = reviews.filter((r) => r.levels).reverse().slice(-4); // the board's trend is four points wide (Project.svelte X(i) = 70 + 110 i in a 420 box): the newest four
   const lines = {};
@@ -164,11 +166,18 @@ export async function lensCounts(aid) {
   live.forEach((s, i) => { const k = lensKeyOf(s.perspective); if (k) counts[k] += Number(per[i]?.counts?.respondents ?? 0); });
   return counts;
 }
+// Respondents behind each perspective's level in a built report, snapshot first (results/data.js responsesFor): the payload's own
+// evidence n, else the live survey count (`counts`) where the payload carries none, else null. { team: 6, community: 2, … }.
+export function respondentsOf(payload, counts = null) {
+  const responses = responsesFor(payload, counts), out = {};
+  for (const l of payload?.lenses ?? []) { const k = lensKeyOf(l.lens) ?? l.lens; out[k] = responses(k); }
+  return out;
+}
 export function levelsOf(payload, counts = null) {
-  const out = {};
-  // v3ScoreBand (LEVEL_CUTOFFS) holds a perspective at "More input needed" with no response: the count comes from the payload's own evidence
-  // (n_responses / respondents per lens) when it carries one; without a count the band is held (never shown as a level on a guess).
-  for (const l of payload?.lenses ?? []) { const k = lensKeyOf(l.lens) ?? l.lens; const n = Number(counts?.[k] ?? NaN); const w = v3ScoreBand(Number(l.score), Number.isFinite(n) ? n : 0, LEVEL_CUTOFFS); out[k] = LEVEL_KEY[w] ?? "more"; }
+  const out = {}, ns = respondentsOf(payload, counts);
+  // v3ScoreBand (LEVEL_CUTOFFS) holds a perspective at "More input needed" with no response: the count is the report's own (respondentsOf,
+  // snapshot first); without a count anywhere the band is held (never shown as a level on a guess).
+  for (const l of payload?.lenses ?? []) { const k = lensKeyOf(l.lens) ?? l.lens; const n = Number(ns[k] ?? NaN); const w = v3ScoreBand(Number(l.score), Number.isFinite(n) ? n : 0, LEVEL_CUTOFFS); out[k] = LEVEL_KEY[w] ?? "more"; }
   return Object.keys(out).length ? out : null;
 }
 
@@ -504,13 +513,15 @@ export async function reviewLenses(a) {
     const newest = (r.reports ?? []).filter((x) => x?.id).sort((x, y) => String(y.created_at || "").localeCompare(String(x.created_at || "")))[0];
     if (!newest) return null;
     const rep = newest.payload ? newest : await report(newest.id);
-    const counts = await lensCounts(a.id);
+    const ns = respondentsOf(rep.payload, await lensCounts(a.id)); // snapshot first: the report's own evidence n, else the live count
     const out = {};
-    for (const l of rep.payload?.lenses ?? []) { const k = lensKeyOf(l.lens) ?? l.lens; out[k] = { score: Number(l.score), responses: Number(counts[k] ?? 0) }; }
+    for (const l of rep.payload?.lenses ?? []) { const k = lensKeyOf(l.lens) ?? l.lens; out[k] = { score: Number(l.score), responses: Number(ns[k] ?? 0) }; }
     return Object.keys(out).length ? out : null;
   } catch { return null; }
 }
 export const levelWords = (lenses) => Object.fromEntries(Object.entries(lenses ?? {}).map(([k, v]) => [k, LEVEL_KEY[v3ScoreBand(Number(v.score), Number(v.responses), LEVEL_CUTOFFS)] ?? "more"]));
+/** [lens, level, respondents] for the summary cards (Workspace): the count travels with each level so a low-evidence level is never bare. */
+export const levelTriples = (lenses) => Object.entries(levelWords(lenses)).map(([k, l]) => [k, l, Number.isFinite(Number(lenses[k]?.responses)) ? Number(lenses[k].responses) : null]);
 const monthOf = (iso) => { const d = new Date(iso); return isNaN(d) ? "" : d.toLocaleDateString("en-US", { month: "short", year: "numeric" }); };
 const formatIconOf = (formats) => (formats.some((f) => /audio|oral/i.test(f)) ? "mic" : formats.some((f) => /video|sign/i.test(f)) ? "video" : "list");
 
@@ -533,7 +544,7 @@ export async function workspaceModel(wid, me) {
       id: p.id, title: p.name, href: to("project", { pid: p.id }), stage: as[0] ? PILL_OF[as[0].stage] ?? "setup" : "setup",
       language: langs.join(" · ") || "Language not set", format: formats.join(" · ") || "Format not set", formatIcon: formatIconOf(formats),
       orgs: p.organization ? [[p.organization, false]] : [], reviews: Number(p.assessment_count ?? as.length), responses: Number(p.response_count ?? 0),
-      activity: as[0] ? ago(as[0].updated_at || as[0].created_at) : "no review yet", levels: lenses ? Object.entries(levelWords(lenses)) : null,
+      activity: as[0] ? ago(as[0].updated_at || as[0].created_at) : "no review yet", levels: lenses ? levelTriples(lenses) : null,
       phone: [langs[0], formats[0]].filter(Boolean).join(" · ") || "No review yet",
     };
   }));

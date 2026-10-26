@@ -25,15 +25,18 @@
       "levels": [
         [
           "team",
-          "growing"
+          "growing",
+          9
         ],
         [
           "community",
-          "support"
+          "support",
+          10
         ],
         [
           "church",
-          "growing"
+          "growing",
+          5
         ]
       ],
       "overall": "growing"
@@ -46,15 +49,18 @@
       "levels": [
         [
           "team",
-          "growing"
+          "growing",
+          7
         ],
         [
           "community",
-          "support"
+          "support",
+          6
         ],
         [
           "church",
-          "support"
+          "support",
+          2
         ]
       ],
       "overall": "growing"
@@ -67,15 +73,18 @@
       "levels": [
         [
           "team",
-          "support"
+          "support",
+          4
         ],
         [
           "community",
-          "more"
+          "more",
+          0
         ],
         [
           "church",
-          "support"
+          "support",
+          3
         ]
       ],
       "overall": "support"

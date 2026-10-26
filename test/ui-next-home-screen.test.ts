@@ -36,6 +36,8 @@ describe("Home renders each state", () => {
     expect([...a.querySelectorAll(".pill")].map((p) => p.getAttribute("data-stage"))).toEqual(["results", "collecting", "setup"]);
     expect([...a.querySelectorAll("a.card-link.glass")].map((c) => c.querySelector(".btn")!.textContent)).toEqual(["Read the results", "Share the survey", "Continue setup"]);
     expect([...a.querySelectorAll(".lvl-name")].map((l) => l.textContent)).toEqual(["Growing", "Needs support", "Growing"]);
+    // Codex P2 on 992b610: each level carries its respondent count, so a low-evidence level never shows bare
+    expect([...a.querySelectorAll(".lvl-pair [data-coverage] [data-short]")].map((c) => (c.textContent ?? "").replace(/\s+/g, " ").trim())).toEqual(["Well filled · 9", "Well filled · 10", "Filling up · 5"]);
     expect(a.querySelector("main .tag")!.textContent).toBe("Not yet reviewed");
     expect([...a.querySelectorAll("input.cb")].map((c) => (c as HTMLInputElement).checked)).toEqual([true, true, true, false]);
     expect(a.querySelector("details:not(.dd)")!.hasAttribute("open")).toBe(false);
