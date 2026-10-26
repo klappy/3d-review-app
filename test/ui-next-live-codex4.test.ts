@@ -354,9 +354,19 @@ describe("Codex P2 4382475727: the results summary is a hold only with its low-c
       expect(!![...a.querySelectorAll("button")].find((b) => b.textContent === "Build the report")).toBe(role === "owner");
       if (role === "viewer") expect(a.textContent).toContain("An owner or member of the review builds it.");
     }
-    // below the server minimum the summary carries its low-count fields: a viewer then sees the hold
-    serve(base({ ...noReports, [`GET /v2/assessments/${AID}/results`]: { status: "held", responses_in: 0, responses_needed: 1, reason: "0 responses so far" }, [`GET /v2/assessments/${AID}`]: assessment({ role: "viewer" }) }));
-    expect((await resultsModel(AID)).held).toMatchObject({ responses_needed: 1 });
+    // below the server minimum the summary carries its low-count fields: the hold applies to every role, members included
+    // (Codex P2 4382607192: a member below the floor is never offered a Build that can only fail)
+    const below = { status: "held", responses_in: 0, responses_needed: 1, reason: "0 responses so far; at least 1 is needed before any score is shown. Scores are held until then." };
+    for (const role of ["viewer", "owner", "member"]) {
+      serve(base({ ...noReports, [`GET /v2/assessments/${AID}/results`]: below, [`GET /v2/assessments/${AID}`]: assessment({ role }) }));
+      expect((await resultsModel(AID)).held).toMatchObject({ responses_needed: 1 });
+    }
+    serve(base({ ...noReports, [`GET /v2/assessments/${AID}/results`]: below, [`GET /v2/assessments/${AID}`]: assessment({ role: "owner" }) }));
+    globalThis.location.hash = to("results", { aid: AID });
+    const held = render(Live as never, { props: {} }).container;
+    await waitFor(() => expect(held.textContent).toContain("Results are held"));
+    expect(held.textContent).toContain("0 of 1 responses so far");
+    expect([...held.querySelectorAll("button")].find((b) => b.textContent === "Build the report")).toBeUndefined();
   });
 });
 

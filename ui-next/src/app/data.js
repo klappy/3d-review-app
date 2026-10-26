@@ -290,7 +290,8 @@ export function qrModules(text) {
 }
 
 // The results summary is an admission hold only when it carries the low-count fields (src/handlers/results.ts minimumHold:
-// responses_in / responses_needed); its standing status "held" (D7) alone is not one, so an eligible unbuilt review reads Not built yet.
+// responses_in / responses_needed); its standing status "held" (D7) alone is not one, so an eligible unbuilt review reads Not built yet. A real hold applies to every
+// role (Codex P2 4382607192): a member below the floor is never offered a Build that can only fail; an eligible member always is.
 export const admissionHold = (res) => !!res && typeof res.responses_needed === "number" && typeof res.responses_in === "number";
 // Results: the newest built report (or build one) in the shape results/data.js reads: { review, counts, payload } plus a held reason.
 export async function resultsModel(aid, { build = false } = {}) {
@@ -321,7 +322,7 @@ export async function resultsModel(aid, { build = false } = {}) {
   // left out rather than mislabelled. Language resolves as Collect does (language_name, else language_id via the project's languages).
   const review = { id: a.id, project: p.name, projectId: a.project_id, language: await languageOf(a), modality: a.format ? a.format[0].toUpperCase() + a.format.slice(1) : "", title: a.name, stage: a.stage === "collect" ? "collecting" : built ? "results" : "closed", closed: "", closedLong: "", builtOn: built ? shortDate(built.created_at) : "", responses, liveResponses, canReadResponses: member, canReopen: member }; // results lane StagePill: the review's real state — collecting | closed (no report yet) | results
   // Role flags (src/handlers: report build, stage and the response list need owner/member; viewers read results and reports only).
-  return { aid, review, counts, sent: sentLenses(live), payload: built?.payload ?? null, reportId: built?.id ?? null, held: held ?? (admissionHold(res) && !member && !built ? res : null), results: res, serverStage: a.stage, canBuild: member, canReadResponses: member, canReopen: member }; // D7: /results is held for everyone until a report exists; a member's first Build must not be hidden behind it (Codex P1 on 26a86937)
+  return { aid, review, counts, sent: sentLenses(live), payload: built?.payload ?? null, reportId: built?.id ?? null, held: held ?? (admissionHold(res) && !built ? res : null), results: res, serverStage: a.stage, canBuild: member, canReadResponses: member, canReopen: member }; // D7: /results is held for everyone until a report exists; a member's first Build must not be hidden behind it (Codex P1 on 26a86937)
 }
 
 // Gap names for ResultsGaps/Report (results/data.js bandRows reads the payload's cross-perspective areas by construct name):
