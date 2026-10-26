@@ -246,8 +246,11 @@ describe("report build confirm (P1: Live.svelte)", () => {
     const a = render(Live as never, { props: {} }).container;
     await waitFor(() => expect(a.textContent).toContain("No report has been built"));
     const trigger = [...a.querySelectorAll("button")].find((b) => b.textContent === "Build the report")!;
+    // live QA N1: the action and its confirm sit inside the signed-in shell (.app with its top bar), never after it
+    expect(trigger.closest(".app")).not.toBeNull(); expect(a.querySelector(".app header.top")).not.toBeNull();
     await fireEvent.click(trigger);
     await waitFor(() => expect(a.querySelector("[data-confirm-text]")).not.toBeNull());
+    expect(a.querySelector("[data-confirm-report]")!.closest(".app main")).not.toBeNull();
     expect(a.querySelector("[data-confirm-text]")!.textContent).toBe("Build results from 8 responses? Everyone with access can see them.");
     expect(calls.filter((c) => c.method === "POST").map((c) => (c.body as { mode: string }).mode)).toEqual(["dry_run"]);
     expect(executed).toBe(0);
@@ -268,6 +271,7 @@ describe("report build confirm (P1: Live.svelte)", () => {
     await waitFor(() => expect(a.querySelector("[data-confirm-text]")).not.toBeNull());
     expect(executed).toBe(1);
     expect(a.querySelector("[data-confirm-report]")!.classList.contains("btn-primary")).toBe(false); // Results keeps its one primary (Plan the next step)
+    expect(a.querySelector("[data-confirm-report]")!.closest(".app main")).not.toBeNull(); // the refresh confirm is drawn inside Results' shell
     await fireEvent.click(a.querySelector("[data-confirm-report]")!);
     await waitFor(() => expect(executed).toBe(2));
   });

@@ -29,6 +29,8 @@
   import Status from "./Status.svelte";
   import { collectModel as collectView } from "../screens/collect/model.js";
   import Card from "../Card.svelte";
+  import Row from "../Row.svelte";
+  import NotBuilt from "./NotBuilt.svelte";
   import { buildConfirmText } from "../../../ui/assess/report-build.js";
 
   let hash = $state(globalThis.location?.hash ?? "");
@@ -409,8 +411,9 @@
   {@const rep = reportFor(m)}
   {#if page.data.sample}<Status {phone} {theme} kind="preview" inline message="Sample data: a made-up review that shows the design. Your own reviews read their results from the server." back={to("home")} backLabel="Home" />{/if}
   {#if !rep && !m.held && page.data.screen !== "results-held"}
-    <Status {phone} {theme} kind="not_built" message={`No report has been built for ${m.review.title} yet. ${m.canBuild ? "Building reads the answers collected so far and keeps that report." : "An owner or member of the review builds it."}${page.data.refreshed ? ` ${page.data.refreshed}` : ""}`} inline back={to("collect", route.params)} backLabel="Back to Collect" />
-    {#if m.canBuild}<div class="l-page">{#if build}{@render buildConfirm(true)}{:else}<button class="btn btn-primary btn-lg" type="button" onclick={refreshResults} disabled={building || undefined}>{building ? "Building the results…" : "Build the report"}</button>{/if}</div>{/if}
+    <NotBuilt {chrome} {phone} {theme} crumbs={[{ label: m.review.project, href: m.review.projectId ? to("project", { pid: m.review.projectId }) : to("home") }, { label: m.review.title }]} message={`No report has been built for ${m.review.title} yet. ${m.canBuild ? "Building reads the answers collected so far and keeps that report." : "An owner or member of the review builds it."}${page.data.refreshed ? ` ${page.data.refreshed}` : ""}`} back={to("collect", route.params)} backLabel="Back to Collect">
+      {#if m.canBuild}{#if build}{@render buildConfirm(true)}{:else}<Row gap={2}><button class="btn btn-primary btn-lg" type="button" onclick={refreshResults} disabled={building || undefined}>{building ? "Building the results…" : "Build the report"}</button></Row>{/if}{/if}
+    </NotBuilt>
   {:else if !rep || page.data.screen === "results-held"}
     {@const Held = REGISTRY["results-held"]}
     <Held {phone} {theme} report={{ review: m.review, counts: m.counts, sent: m.sent, payload: m.payload ?? { lenses: [] }, held: m.held }} onreopen={reopenCollection} />
@@ -423,8 +426,7 @@
     {/if}
   {:else if page.data.screen === "results"}
     {@const C = REGISTRY.results}
-    <C {phone} {theme} report={rep} onrefresh={refreshResults} refreshed={building ? "Building the results…" : page.data.refreshed ?? ""} />
-    {#if build}<div class="l-page">{@render buildConfirm(false)}</div>{/if}
+    <C {phone} {theme} report={rep} onrefresh={refreshResults} refreshed={building ? "Building the results…" : page.data.refreshed ?? ""}>{#if build}{@render buildConfirm(false)}{/if}</C>
   {:else}
     {@const C = REGISTRY[page.data.screen]}
     <C {phone} {theme} report={rep} />

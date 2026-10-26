@@ -27,7 +27,8 @@
   import { REPORT, lensCards, detailedPages, bandRows, LEVEL_WORD, snapshotTotal } from "./data.js";
 
   // report (live): { review, counts, payload } from app/data.js resultsModel; default the fixture. onrefresh (live): rebuilds from new answers.
-  let { phone = false, theme = "light", state: view, report, onrefresh, refreshed = "" } = $props(); // state renamed: a binding named state would shadow the $state rune
+  // children (live): the report-build confirm, drawn inside this screen's .app (never after it, unstyled and outside the shell).
+  let { phone = false, theme = "light", state: view, report, onrefresh, refreshed = "", children } = $props(); // state renamed: a binding named state would shadow the $state rune
   const fixture = (f) => (view === "newer" ? { ...f, counts: { ...f.counts, church: f.counts.church + 3 } } : f); // live counts past the report's own
   const D = $derived(report ?? fixture(phone ? REPORT.phone : REPORT.desktop));
   const cards = $derived(lensCards(D.payload, D.counts, { sent: D.sent }));
@@ -64,12 +65,14 @@
     </Row>
     {#if !canRead}<p class="small" id="answers-why">Owners and members of the review see the answers.</p>{/if}
     {#if line}<p class="small" role="status">{line}</p>{/if}
+    {@render children?.()}
     {#each cards as card (card.lens)}<LensCard {card} phone />{/each}
     <a class="link" href={href("results-gaps")}>See the three biggest gaps <Glyph d={G.arrow} /></a>
     <a class="link" href={out("people")}>Share results with someone <Glyph d={G.arrow} /></a>
   {:else}
     <Page gap={5}>
       <ReviewHead {review} primary={{ label: "Plan the next step", href: out("nextStep"), trail: "arrow" }} />
+      {@render children?.()}
       <LevelLegend />
       <Grid cols={3} gap={4}>{#each cards as card (card.lens)}<Stack><LensCard {card} answers={canRead} /></Stack>{/each}</Grid>
       <Card hi gap={3} label="Where the perspectives disagree">
