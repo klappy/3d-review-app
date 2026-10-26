@@ -296,6 +296,21 @@ describe("the served level minimum reaches Help, Explore and the detailed report
     expect(currentLevelMin()).toBe(3);
     expect(faqNeed(render(Help as never, { props: {} }).container)).toContain("once it has at least 3 answers");
   });
+  it("Codex P2 4381912241: a cached /v2/me re-applies its policy; a failed or malformed per-review read never overwrites it", async () => {
+    serve({ "GET /v2/me": { principal: { id: "p1", display_name: "Kay" }, grants: [], level_minimum_responses: 1 } });
+    await sessionMe();
+    useLevelMinimum(3); // a later per-review read served 3 (another environment's value cannot occur; this only proves the re-apply)
+    await sessionMe(); // cache hit
+    expect(currentLevelMin()).toBe(1);
+    for (const bad of [undefined, null, "1", 0, 2.5]) { useLevelMinimum(bad); expect(currentLevelMin()).toBe(1); } // failed / malformed read
+    // a results read that fails keeps the session's 1 (resultsModel: res is { error })
+    serve({ ...base({ [`GET /v2/assessments/${AID}/results`]: new Error("results down") }), "GET /v2/me": { principal: { id: "p1" }, grants: [], level_minimum_responses: 1 } });
+    await resultsModel(AID);
+    expect(currentLevelMin()).toBe(1);
+    forget(); // a forgotten session leaves no policy: the safe 3 until a value is served again
+    useLevelMinimum(undefined);
+    expect(currentLevelMin()).toBe(3);
+  });
   it("Explore bands with the served cut-off, as Results and Project do: 2 responses show a level on DEV, are held at 3 or unread", async () => {
     const snap = { lenses: [{ lens: "Translation Team", score: 80, sub_dimensions: [] }], cross_lens_multi: [], evidence: [{ label: "Translation Team — Translators", n: 2 }] };
     const routes = (min: unknown) => ({

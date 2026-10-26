@@ -52,9 +52,13 @@ export const MIN_RESPONSES = V3_BAND_CUTOFFS.minResponses; // answer splits (com
 export const SAFE_LEVEL_MIN = V3_BAND_CUTOFFS.minResponses;
 /** The level minimum a served value allows: a whole number >= 1, else the safe floor. */
 export const levelMinimumOf = (served) => (Number.isInteger(served) && served >= 1 ? served : SAFE_LEVEL_MIN);
-let levelMin = SAFE_LEVEL_MIN;
-/** Record the server's level_minimum_responses (one value per environment). Anything absent or unknown resets to the safe floor. */
-export function useLevelMinimum(served) { levelMin = levelMinimumOf(served); return levelMin; }
+let levelMin = SAFE_LEVEL_MIN, sessionMin = null;
+const valid = (v) => Number.isInteger(v) && v >= 1;
+/** The session's policy from GET /v2/me (app/session.js me()). It stands until the session is forgotten; null clears it. */
+export function useSessionLevelMinimum(served) { sessionMin = valid(served) ? served : null; levelMin = sessionMin ?? SAFE_LEVEL_MIN; return levelMin; }
+/** Record a per-review read's level_minimum_responses. An absent, failed or malformed value never overwrites a policy the session
+ *  already served: it falls back to that, and to the safe 3 only when no value was ever served. */
+export function useLevelMinimum(served) { levelMin = valid(served) ? served : sessionMin ?? SAFE_LEVEL_MIN; return levelMin; }
 /** The level minimum in force now (the served value, else 3). */
 export const currentLevelMin = () => levelMin;
 /** v3ScoreBand cut-offs with the level minimum in force. */

@@ -1,15 +1,16 @@
 // UI Next (v4) session store. Status: provisional. Reads the same identity the current UI reads (GET /v2/me) and signs in/out by the
 // same routes (ui/assess/scope.js entry page: /v2/auth/email link, /v2/auth/link + /v2/auth/session code; assess.js signOut: DELETE /v2/auth/session).
 import { api, classify, setToken } from "./api.js";
-import { useLevelMinimum } from "../screens/results/data.js";
+import { useSessionLevelMinimum } from "../screens/results/data.js";
 let cached = null; // { principal, grants } | null (signed out) ; undefined = not read yet
 export async function me({ fresh = false } = {}) {
-  if (cached !== null && cached !== undefined && !fresh) return cached;
-  try { cached = await api("/v2/me"); useLevelMinimum(cached?.level_minimum_responses); } // the server's level minimum (else the safe 3)
+  // Every read, a cache hit included, re-applies the session's served level minimum (else the safe 3).
+  if (cached !== null && cached !== undefined && !fresh) { useSessionLevelMinimum(cached.level_minimum_responses); return cached; }
+  try { cached = await api("/v2/me"); useSessionLevelMinimum(cached?.level_minimum_responses); }
   catch (e) { if (classify(e) === "unauthenticated") { cached = null; return null; } throw e; }
   return cached;
 }
-export const forget = () => { cached = undefined; };
+export const forget = () => { cached = undefined; useSessionLevelMinimum(null); }; // a forgotten session leaves no served policy behind
 export function initialsOf(p) {
   const n = String(p?.display_name || "").trim();
   if (n) return n.split(/\s+/).slice(0, 2).map((w) => w[0].toUpperCase()).join("");

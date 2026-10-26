@@ -28,7 +28,7 @@ export const surveyCounts = async (aid, sid) => api(`/v2/assessments/${enc(aid)}
 export const setStage = async (aid, stage) => api(`/v2/assessments/${enc(aid)}/stage`, { method: "POST", body: { stage } });
 export const results = async (aid) => api(`/v2/assessments/${enc(aid)}/results`);
 // The server's per-perspective level minimum (results level_minimum_responses; src/report-admission.ts). Each read below records
-// the strictest value its reviews serve; a failed or absent read is undefined, which useLevelMinimum turns into the safe 3.
+// the strictest value its reviews serve; a failed or absent read is undefined, which useLevelMinimum turns into the session's /v2/me value, else the safe 3.
 const servedMinimum = (aid) => results(aid).then((r) => r?.level_minimum_responses).catch(() => undefined);
 // No review to read leaves the value in force (the /v2/me read or the safe 3); any unread or unknown value among them gives the safe 3.
 const useStrictest = (served) => (served.length ? useLevelMinimum(served.every((v) => levelMinimumOf(v) === v) ? Math.max(...served) : undefined) : currentLevelMin());
@@ -294,7 +294,7 @@ export async function resultsModel(aid, { build = false } = {}) {
   // The report list and every survey count must load: a failed read is the shell's retryable error, never an empty list (which
   // would offer a build beside an existing report) nor a zero (which would band a perspective as held and understate the total).
   const [{ assessment: a, surveys }, res, rep] = await Promise.all([assessment(aid), results(aid).catch((e) => ({ error: e })), reports(aid)]);
-  useLevelMinimum(res?.level_minimum_responses); // the server decides (DEV 1, else 3); a failed or absent read is the safe 3
+  useLevelMinimum(res?.level_minimum_responses); // the server decides (DEV 1, else 3); a failed or absent read keeps the session's /v2/me value, else the safe 3
   const p = await project(a.project_id).catch(() => ({ name: "Project", id: a.project_id }));
   const live = surveys.filter((s) => !s.archived_at);
   const counts = { team: 0, community: 0, church: 0 };
