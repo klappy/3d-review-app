@@ -270,6 +270,9 @@ html:has(dialog[open]:modal){overflow:hidden}
 .ev-table th{padding:6px 14px;font-weight:600;color:var(--ink-2);text-align:left}
 .ev-table td{padding:8px 14px;border-top:1px solid var(--line);color:var(--ink)}
 .ev-table [data-align=end]{text-align:right}.ev-table td.ev-muted{color:var(--ink-2)}
+/* §8.11 Phone perspective card (cook-cue-boards-1800, provisional; were f_results() inlines): .glass.l-card.l-stack.lens-card[data-gap="1"]
+   (4px between children) > .lens-card-head (name · level, 6px under) · coverage cue · [newer line] · .lvl-row area rows as DIRECT children. */
+.lens-card-head{display:flex;align-items:center;justify-content:space-between;padding-bottom:6px}.lens-card>.lvl-row>.small{color:var(--ink)}
 /* §9 phone frame (cook-cue-boards-1800, provisional; DS §9 fixed bottom bar, §8.3 120px clearance): the board is the 390×844 viewport.
    The page scrolls inside the frame under the header; the bar stays at the viewport's bottom; .l-phone's 120px bottom padding is
    the clearance, so the last content scrolls clear of the bar. App: the document scrolls and .phone-bar is position:fixed. */

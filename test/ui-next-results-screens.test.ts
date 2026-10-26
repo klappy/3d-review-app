@@ -347,6 +347,20 @@ describe("each board renders as a screen", () => {
     // ?state=newer (the boards' "Newer responses" state): only the church card names 3 newer responses, desktop and phone
     for (const phone of [false, true]) expect(all(mount(Results, { phone, state: "newer" }), "[data-newer]")).toEqual(["3 newer responses not in this report yet"]);
     expect(mount(Results).querySelector("[data-newer]")).toBeNull();
+    // §8.11 phone perspective card: section.lens-card[data-gap=1] > head (name, level) · cue · [newer] · area rows as direct children
+    for (const state of [undefined, "newer"]) {
+      const cards = [...mount(Results, { phone: true, state }).querySelectorAll("section.glass.l-card.l-stack.lens-card[data-lens][data-gap='1']")];
+      expect(cards.length).toBe(3);
+      for (const c of cards) {
+        const k = [...c.children];
+        expect(k[0].matches("div.lens-card-head") && k[0].children[0].matches("span.h3") && k[0].children[1].matches(".lvl")).toBe(true);
+        expect(k[1].matches(".lvl-pair.small[data-coverage]")).toBe(true);
+        const rest = k.slice(2), newer = rest.filter((e) => e.matches("span.small[data-newer]"));
+        expect(newer.length).toBe(state === "newer" && c.getAttribute("data-lens") === "church" ? 1 : 0);
+        expect(rest.slice(newer.length).every((e) => e.matches("div.lvl-row") && e.children[0].matches("span.small") && e.children[1].matches(".lvl"))).toBe(true);
+        expect(rest.length - newer.length).toBeGreaterThan(0);
+      }
+    }
     expect(text(mount(ReportDetailed))).toContain("the drops beside each perspective show how many answered (a few drops is little evidence, not a low result)");
   });
   it("ResultsAnswers: perspective switch, split, one card per question with answer rows and bars, their words", () => {
