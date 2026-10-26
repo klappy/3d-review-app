@@ -98,7 +98,7 @@ describe("data adapter: levels through the current UI's pure modules (board valu
     expect(cards[0].rows.map((r: { name: string; level: string }) => `${r.name}:${r.level}`)).toEqual([
       "Translation process & brief:strong", "Understanding the source:growing", "External review:support", "Consistency:growing", "Governance:more"]);
     expect(levelOf(90, 0)).toBe("more"); // under the minimum (no response): More input needed, never a low result
-    expect(levelOf(90, 1)).toBe("strong"); // one response is enough for a level (cookbook 2026-10-26-3d-report-threshold-coverage); the jar shows it is few
+    expect(levelOf(90, 1)).toBe("strong"); // one response is enough for a level (cookbook 2026-10-26-3d-report-threshold-coverage); the drops show it is few
   });
   it("band barbell: band centres, shared bands spread in lens order, red span at two bands or more (ResultsGaps board)", () => {
     const D = REPORT.desktop;
