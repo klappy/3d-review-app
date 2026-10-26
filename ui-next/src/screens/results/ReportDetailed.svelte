@@ -28,7 +28,7 @@
   import Radar from "./Radar.svelte";
   import Report from "./Report.svelte";
   import { href } from "../href.js";
-  import { REPORT, lensCards, scoreRows, comparedRows, radar, withNotes, gapLead, countWord, evidenceSheets, detailedPages } from "./data.js";
+  import { REPORT, currentLevelMin, lensCards, scoreRows, comparedRows, radar, withNotes, gapLead, countWord, evidenceSheets, detailedPages } from "./data.js";
 
   let { phone = false, theme = "light", report } = $props();
   const D = $derived(report ?? REPORT.desktop);
@@ -37,6 +37,8 @@
   const all = $derived(comparedRows(D, D.counts));
   const shape = $derived(radar(D, D.radar, D.counts));
   const sheets = $derived(evidenceSheets(cards));
+  // "How to read the scores" names the level minimum in force (served, else the safe 3): at 1 the board's words, "no answers".
+  const MIN = currentLevelMin(), fewWords = MIN === 1 ? "no answers" : `fewer than ${MIN} answers`;
   const PAGES = $derived(detailedPages(cards));
   const FOOT = $derived(`Built from ${D.review.responses} responses on ${D.review.builtOn} · Scores are 0–100. Every other page shows levels, which are bands · nothing here identifies a person`);
   const shapeHeading = $derived(shape ? `The ${countWord(shape.legend.length)} perspectives as one shape` : "The perspectives as one shape");
@@ -101,7 +103,7 @@
       </Stack>
       <Stack gap={2}>
         <h2 class="h3">How to read the scores</h2>
-        <p class="small">Scores are the pinned report model's area values (0–100) aggregated from the item answers listed under Evidence. Levels are bands on those scores. A perspective with no answers shows More input needed and no score; the drops beside each perspective show how many answered (a few drops is little evidence, not a low result). Nothing in this report identifies a person.</p>
+        <p class="small">Scores are the pinned report model's area values (0–100) aggregated from the item answers listed under Evidence. Levels are bands on those scores. A perspective with {fewWords} shows More input needed and no score; the drops beside each perspective show how many answered (a few drops is little evidence, not a low result). Nothing in this report identifies a person.</p>
       </Stack>
       {#if !sheets.length}{@render words()}{/if}
       {@render foot(2)}

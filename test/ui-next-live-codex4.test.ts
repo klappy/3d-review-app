@@ -7,7 +7,11 @@ import { fireEvent, render, waitFor } from "@testing-library/svelte";
 // @ts-expect-error -- plain .js module, no type declarations
 import { reports, newestReport, resultsModel, projectModel, setupModel, shortDate, levelsOf, respondentsOf, levelTriples } from "../ui-next/src/app/data.js";
 // @ts-expect-error -- plain .js module, no type declarations
-import { forget } from "../ui-next/src/app/session.js";
+import { forget, me as sessionMe } from "../ui-next/src/app/session.js";
+import { exploreModel } from "../ui-next/src/app/data.js";
+import { exploreRows } from "../ui-next/src/screens/explore/explore-data.js";
+import Help from "../ui-next/src/screens/explore/Help.svelte";
+import ReportDetailed from "../ui-next/src/screens/results/ReportDetailed.svelte";
 // @ts-expect-error -- plain .js module, no type declarations
 import { to } from "../ui-next/src/app/router.js";
 import Live from "../ui-next/src/app/Live.svelte";
@@ -16,7 +20,7 @@ import ResultsHeld from "../ui-next/src/screens/results/ResultsHeld.svelte";
 import Setup5 from "../ui-next/src/screens/setup/Setup5.svelte";
 import Project from "../ui-next/src/screens/setup/Project.svelte";
 // @ts-expect-error -- plain .js module, no type declarations
-import { REPORT, useLevelMinimum } from "../ui-next/src/screens/results/data.js";
+import { REPORT, useLevelMinimum, currentLevelMin } from "../ui-next/src/screens/results/data.js";
 import projectFixture from "../ui-next/fixtures/setup/project.json";
 import setupFixture from "../ui-next/fixtures/setup/setup.json";
 
@@ -266,5 +270,43 @@ describe("report build confirm (P1: Live.svelte)", () => {
     await waitFor(() => expect(a.textContent).toContain("can’t be built yet"));
     expect(a.querySelector("[data-confirm-text]")).toBeNull();
     expect(calls.filter((c) => c.method === "POST").length).toBe(1);
+  });
+});
+
+describe("the served level minimum reaches Help, Explore and the detailed report (Codex P2s on 5d3633e)", () => {
+  const faqNeed = (el: Element) => [...el.querySelectorAll("details .disc-body, .disc-body")].map((d) => d.textContent ?? "").find((t) => t.startsWith("A perspective shows its level")) ?? "";
+  it("Help: a fresh DEV session reads level_minimum_responses from /v2/me before the page and says 1; without it, the safe 3", async () => {
+    useLevelMinimum(undefined);
+    serve({ "GET /v2/me": { principal: { id: "p1", display_name: "Kay" }, grants: [], level_minimum_responses: 1 } });
+    await sessionMe();
+    expect(currentLevelMin()).toBe(1);
+    expect(faqNeed(render(Help as never, { props: {} }).container)).toContain("from its first answer");
+    forget(); serve({ "GET /v2/me": { principal: { id: "p1", display_name: "Kay" }, grants: [] } });
+    await sessionMe();
+    expect(currentLevelMin()).toBe(3);
+    expect(faqNeed(render(Help as never, { props: {} }).container)).toContain("from 3 answers");
+  });
+  it("Explore bands with the served cut-off, as Results and Project do: 2 responses show a level on DEV, are held at 3 or unread", async () => {
+    const snap = { lenses: [{ lens: "Translation Team", score: 80, sub_dimensions: [] }], cross_lens_multi: [], evidence: [{ label: "Translation Team — Translators", n: 2 }] };
+    const routes = (min: unknown) => ({
+      "GET /v2/projects": { projects: [{ id: PID, name: "Kikuyu" }] }, "GET /v2/workspaces": { workspaces: [] },
+      [`GET /v2/projects/${PID}/assessments`]: { assessments: [{ id: "a1", name: "First", stage: "understand", created_at: "2026-08-01T00:00:00Z", language_name: "Kikuyu" }] },
+      "GET /v2/assessments/a1": { assessment: { id: "a1", project_id: PID, stage: "understand", role: "owner" }, surveys: [{ id: "s1", perspective: "Translation Team" }] },
+      "GET /v2/assessments/a1/surveys/s1": { survey: {}, counts: { responses: 2, respondents: 2 } },
+      "GET /v2/assessments/a1/results": { status: "held", ...(min === undefined ? {} : { level_minimum_responses: min }) },
+      "GET /v2/assessments/a1/reports": { reports: [{ id: "r1", created_at: "2026-08-02T00:00:00Z" }], next_cursor: null },
+      "GET /v2/reports/r1": { report: { id: "r1", created_at: "2026-08-02T00:00:00Z", payload: snap } },
+    });
+    const team = async (min: unknown) => { serve(routes(min)); const m = await exploreModel({ principal: { id: "p1", display_name: "Kay" }, grants: [] }); return [m.levelMinimum, exploreRows(m.reviews)[0].levels.team]; };
+    expect(await team(1)).toEqual([1, "strong"]);
+    expect(await team(3)).toEqual([3, "more"]);
+    expect(await team(undefined)).toEqual([3, "more"]);
+  });
+  it("detailed report: \"How to read the scores\" names the minimum in force (DEV 1: no answers; otherwise fewer than 3); the drops … show", () => {
+    useLevelMinimum(1);
+    expect(render(ReportDetailed as never, { props: {} }).container.textContent).toContain("A perspective with no answers shows More input needed and no score; the drops beside each perspective show how many answered");
+    useLevelMinimum(3);
+    expect(render(ReportDetailed as never, { props: {} }).container.textContent).toContain("A perspective with fewer than 3 answers shows More input needed and no score; the drops beside each perspective show how many answered");
+    useLevelMinimum(undefined);
   });
 });

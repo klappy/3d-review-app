@@ -25,7 +25,9 @@
   // Live: a section anchor must stay on the help route (`#/help#h1`; router.parse carries the anchor); the gallery keeps the bare `#h1`.
   const anchor = (id) => (liveContext() ? `${href("help")}#${id}` : `#${id}`);
   import { INTRO, VIDEO, TOPICS, faqFor, FAQ_TITLE } from "./help-copy.js";
-  const FAQ = faqFor(); // the answers-needed line follows the level minimum in force (served, else the safe 3)
+  // The answers-needed line follows the level minimum in force: Live reads /v2/me (level_minimum_responses) before it renders a
+  // page, so a fresh session's Help already has the served value; with none read yet it is the safe 3.
+  const FAQ = faqFor();
 
   let { phone = false, theme = "light" } = $props();
   const W = $derived({ w: phone ? "phone" : null });

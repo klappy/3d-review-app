@@ -1,10 +1,11 @@
 // UI Next (v4) session store. Status: provisional. Reads the same identity the current UI reads (GET /v2/me) and signs in/out by the
 // same routes (ui/assess/scope.js entry page: /v2/auth/email link, /v2/auth/link + /v2/auth/session code; assess.js signOut: DELETE /v2/auth/session).
 import { api, classify, setToken } from "./api.js";
+import { useLevelMinimum } from "../screens/results/data.js";
 let cached = null; // { principal, grants } | null (signed out) ; undefined = not read yet
 export async function me({ fresh = false } = {}) {
   if (cached !== null && cached !== undefined && !fresh) return cached;
-  try { cached = await api("/v2/me"); }
+  try { cached = await api("/v2/me"); useLevelMinimum(cached?.level_minimum_responses); } // the server's level minimum (else the safe 3)
   catch (e) { if (classify(e) === "unauthenticated") { cached = null; return null; } throw e; }
   return cached;
 }

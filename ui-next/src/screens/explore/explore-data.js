@@ -15,6 +15,7 @@
 //     FeedbackPhone.dc.html (phone page); "from" is the page and review the dialog names.
 import { v3ScoreBand, V3_STAGES } from "../../../../ui/assess/v3-assessment.js";
 import { LEVELS } from "../../Level.svelte";
+import { levelOf as bandLevel } from "../results/data.js";
 
 // Band word (v3ScoreBand) -> Level key (Level.svelte, design-system.md section 2 Level row).
 const BAND_TO_LEVEL = Object.freeze(Object.fromEntries(Object.entries(LEVELS).map(([key, word]) => [word, key])));
@@ -22,13 +23,12 @@ const BAND_TO_LEVEL = Object.freeze(Object.fromEntries(Object.entries(LEVELS).ma
 export const STAGE_PILL = Object.freeze({ prepare: "setup", collect: "collecting", understand: "results", improve: "reviewed" });
 export const LENS_KEYS = Object.freeze(["team", "community", "church"]);
 
-/** One perspective's level key from a built report's score and its response count; null when no report exists yet (the board's dash). */
+/** One perspective's level key from a built report's score and its response count; null when no report exists yet (the board's dash).
+ *  Banded by the results lane's levelOf, so Explore, Results, Project and Workspace share one cut-off: the server's level minimum
+ *  (level_minimum_responses, read by app/data.js exploreModel), else the safe 3. */
 export function levelOf(lens) {
   if (lens === null || lens === undefined) return null;
-  const word = v3ScoreBand(lens.score, lens.responses);
-  const key = BAND_TO_LEVEL[word];
-  if (!key) throw new TypeError(`explore-data: v3ScoreBand returned an unknown band "${word}"`);
-  return key;
+  return bandLevel(lens.score, lens.responses);
 }
 
 /** Stage pill for an app stage id; throws on an id the app does not have. */

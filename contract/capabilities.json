@@ -203,6 +203,11 @@
           },
           "grants": {
             "type": "array"
+          },
+          "level_minimum_responses": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Fewest responses from one perspective before its level shows: 1 on DEV, 3 elsewhere (src/report-admission.ts perspectiveLevelMinimum)."
           }
         }
       }

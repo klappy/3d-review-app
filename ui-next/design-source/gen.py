@@ -605,8 +605,26 @@ def phone_header(lang=True, brandlabel=True):
     lang_btn = f'<button class="btn btn-quiet" type="button" aria-label="Language: English">{ic("globe")} English {ic("chev",16)}</button>' if lang else ''
     return f'<header class="phone-top" data-shell="participant"><span class="brand">{MARK.format(s=26)}{"<span>3D Review</span>" if brandlabel else ""}</span>{lang_btn}</header>'
 
-def qr(seed=7):
-    cells = []
+# QR module grid (design-system §8.7 QR module grid; parity-loop debt 7 closed 2026-10-22). Real cells come from generator/qr_data.json
+# (or the file named by QR_DATA): the app's own encoder output (ui/assess/vendor-qrcode.js, typeNumber auto, error correction M) for the
+# seeded survey links the live screen draws, so board and app render the same n x n modules. qr(seed) keeps the 21x21 placeholder for
+# boards that draw a decorative code with no link (ActionPlan share line); a survey board passes cells.
+import json as _json, os as _os
+_QR_DATA = None
+def qr_data():
+    global _QR_DATA
+    if _QR_DATA is None:
+        path = _os.environ.get('QR_DATA') or _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), 'qr_data.json')
+        _QR_DATA = _json.load(open(path)) if _os.path.exists(path) else {'encoder': 'none', 'host': '3dreview.app', 'surveys': []}
+    return _QR_DATA
+def qr(seed=7, cells=None, size=None):
+    sz = f' data-size="{size}"' if size else ''
+    if cells:
+        n = int(round(len(cells) ** 0.5))
+        assert n * n == len(cells) and n >= 21, 'qr: cells are an n x n (n >= 21) 0/1 string'
+        body = ''.join('<i></i>' if c == '1' else '<i class="o"></i>' for c in cells)
+        return f'<div class="qr"{sz} data-n="{n}" aria-hidden="true">{body}</div>'
+    out = []
     import random
     r = random.Random(seed)
     for y in range(21):
@@ -617,8 +635,8 @@ def qr(seed=7):
                 on = fx in (0, 6) or fy in (0, 6) or (2 <= fx <= 4 and 2 <= fy <= 4)
             else:
                 on = r.random() < .45
-            cells.append('<i></i>' if on else '<i class="o"></i>')
-    return f'<div class="qr" aria-hidden="true">{"".join(cells)}</div>'
+            out.append('<i></i>' if on else '<i class="o"></i>')
+    return f'<div class="qr"{sz} aria-hidden="true">{"".join(out)}</div>'
 
 # Language field: searchable suggestions state (app 0.29.1, ui/v3/language-picker.js). Borrows .chip (Setup2),
 # the search input + icon (Setup2), .row-opt rows as result buttons and a quiet button; no new component.

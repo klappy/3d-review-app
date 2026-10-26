@@ -5,7 +5,7 @@ import { api, classify, confirmed, enc, token } from "./api.js";
 import { lensLabel } from "../../../ui/report-lenses.js";
 import { v3ScoreBand, v3ExpectedFor } from "../../../ui/assess/v3-assessment.js";
 import { parsePeriod, collectLine } from "../../../ui/v3/components/active-until.js";
-import { LEVEL_KEY, LEVEL_WORD, levelCutoffs, useLevelMinimum, levelMinimumOf, bandRows, lensCards, responsesFor } from "../screens/results/data.js";
+import { LEVEL_KEY, LEVEL_WORD, levelCutoffs, useLevelMinimum, levelMinimumOf, currentLevelMin, bandRows, lensCards, responsesFor } from "../screens/results/data.js";
 import { to } from "./router.js";
 import qrcode from "../../../ui/assess/vendor-qrcode.js";
 import { acceptInvitationById } from "../../../ui/v3/components/invite.js";
@@ -30,7 +30,8 @@ export const results = async (aid) => api(`/v2/assessments/${enc(aid)}/results`)
 // The server's per-perspective level minimum (results level_minimum_responses; src/report-admission.ts). Each read below records
 // the strictest value its reviews serve; a failed or absent read is undefined, which useLevelMinimum turns into the safe 3.
 const servedMinimum = (aid) => results(aid).then((r) => r?.level_minimum_responses).catch(() => undefined);
-const useStrictest = (served) => useLevelMinimum(served.length && served.every((v) => levelMinimumOf(v) === v) ? Math.max(...served) : undefined);
+// No review to read leaves the value in force (the /v2/me read or the safe 3); any unread or unknown value among them gives the safe 3.
+const useStrictest = (served) => (served.length ? useLevelMinimum(served.every((v) => levelMinimumOf(v) === v) ? Math.max(...served) : undefined) : currentLevelMin());
 // Answer-by-answer rows: the server answers with a typed suppression for everyone (src/handlers/response.ts list: D7 disclosure
 // policy unresolved, no row-level disclosure even to owners). The screen shows that real state, never sample rows.
 export const responsesList = async (aid) => api(`/v2/assessments/${enc(aid)}/responses`);
@@ -586,11 +587,13 @@ export async function invitationsModel(me) {
 // no list/roll-up capability for them), so none is claimed: the chips, group-by options and add-filter rows are empty.
 export async function exploreModel(me) {
   const home = await homeModel(me);
+  // Explore bands with the results lane's cut-off (explore-data.js levelOf): the strictest level minimum its reported reviews serve.
+  const levelMinimum = useStrictest(await Promise.all(home.rows.filter(({ a }) => ["understand", "improve"].includes(a.stage)).map(({ a }) => servedMinimum(a.id))));
   const rows = await Promise.all(home.rows.map(async ({ a, p }) => ({
     id: a.id, title: a.name, project: p.name, language: a.language_name || "", region: "", orgs: p.organization || "",
     stage: Object.hasOwn(PILL_OF, a.stage) ? a.stage : "prepare", responses: { n: Number(a.response_count ?? 0) }, lenses: await reviewLenses(a),
     updated: ago(a.updated_at || a.created_at), href: to(a.stage === "prepare" ? "review" : a.stage === "collect" ? "collect" : "results", { aid: a.id }),
   })));
   const phone = rows.map((r) => ({ title: r.title, href: r.href, meta: [r.project, monthOf(home.rows.find((x) => x.a.id === r.id)?.a.created_at)].filter(Boolean).join(" · "), team: r.lenses?.team ?? null }));
-  return { user: home.user, workspace: home.workspace, visible: rows.length, filters: [], groupBy: { options: ["None"], selected: "None" }, addFilter: [], reviews: rows, phone: { chips: [], rows: phone, sheet: [] } };
+  return { levelMinimum, user: home.user, workspace: home.workspace, visible: rows.length, filters: [], groupBy: { options: ["None"], selected: "None" }, addFilter: [], reviews: rows, phone: { chips: [], rows: phone, sheet: [] } };
 }
