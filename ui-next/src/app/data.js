@@ -5,7 +5,7 @@ import { api, classify, confirmed, enc, token } from "./api.js";
 import { lensLabel } from "../../../ui/report-lenses.js";
 import { v3ScoreBand, v3ExpectedFor } from "../../../ui/assess/v3-assessment.js";
 import { parsePeriod, collectLine } from "../../../ui/v3/components/active-until.js";
-import { LEVEL_KEY, LEVEL_WORD, bandRows, lensCards } from "../screens/results/data.js";
+import { LEVEL_KEY, LEVEL_WORD, LEVEL_CUTOFFS, bandRows, lensCards } from "../screens/results/data.js";
 import { to } from "./router.js";
 import qrcode from "../../../ui/assess/vendor-qrcode.js";
 import { acceptInvitationById } from "../../../ui/v3/components/invite.js";
@@ -154,8 +154,8 @@ export async function projectModel(pid) {
   };
 }
 // Lens levels of a built report's payload (results/data.js lensCards does the banding; here the lens word only).
-// Respondents per perspective for a review (the survey counts the Results page bands with): v3ScoreBand holds a perspective at
-// "More input needed" under three, so a trend never shows a level from one or two people.
+// Respondents per perspective for a review (the survey counts the Results page bands with): v3ScoreBand (LEVEL_CUTOFFS) holds a
+// perspective at "More input needed" with no response; one or two show their level beside the coverage jar's "a few drops".
 export async function lensCounts(aid) {
   const { surveys } = await assessment(aid);
   const live = surveys.filter((s) => !s.archived_at);
@@ -166,9 +166,9 @@ export async function lensCounts(aid) {
 }
 export function levelsOf(payload, counts = null) {
   const out = {};
-  // v3ScoreBand holds a perspective at "More input needed" under three responses: the count comes from the payload's own evidence
+  // v3ScoreBand (LEVEL_CUTOFFS) holds a perspective at "More input needed" with no response: the count comes from the payload's own evidence
   // (n_responses / respondents per lens) when it carries one; without a count the band is held (never shown as a level on a guess).
-  for (const l of payload?.lenses ?? []) { const k = lensKeyOf(l.lens) ?? l.lens; const n = Number(counts?.[k] ?? NaN); const w = v3ScoreBand(Number(l.score), Number.isFinite(n) ? n : 0); out[k] = LEVEL_KEY[w] ?? "more"; }
+  for (const l of payload?.lenses ?? []) { const k = lensKeyOf(l.lens) ?? l.lens; const n = Number(counts?.[k] ?? NaN); const w = v3ScoreBand(Number(l.score), Number.isFinite(n) ? n : 0, LEVEL_CUTOFFS); out[k] = LEVEL_KEY[w] ?? "more"; }
   return Object.keys(out).length ? out : null;
 }
 
@@ -510,7 +510,7 @@ export async function reviewLenses(a) {
     return Object.keys(out).length ? out : null;
   } catch { return null; }
 }
-export const levelWords = (lenses) => Object.fromEntries(Object.entries(lenses ?? {}).map(([k, v]) => [k, LEVEL_KEY[v3ScoreBand(Number(v.score), Number(v.responses))] ?? "more"]));
+export const levelWords = (lenses) => Object.fromEntries(Object.entries(lenses ?? {}).map(([k, v]) => [k, LEVEL_KEY[v3ScoreBand(Number(v.score), Number(v.responses), LEVEL_CUTOFFS)] ?? "more"]));
 const monthOf = (iso) => { const d = new Date(iso); return isNaN(d) ? "" : d.toLocaleDateString("en-US", { month: "short", year: "numeric" }); };
 const formatIconOf = (formats) => (formats.some((f) => /audio|oral/i.test(f)) ? "mic" : formats.some((f) => /video|sign/i.test(f)) ? "video" : "list");
 

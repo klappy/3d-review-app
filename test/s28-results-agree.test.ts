@@ -12,8 +12,9 @@ import type {Ctx} from '../src/handlers/types';
 // how many responses are in, how many are needed, scores held — and no report is scored from too few answers.
 const mf=new Miniflare(convertV4MiniflareOptions({workers:[{name:'s28-results-agree',modules:true,script:"export default {fetch(){return new Response('x')}}",d1Databases:{DB:'s28-fixture'}}]}));
 let db:D1Database;
-const src='assess_syn_earning-trust-2026-01', one='assess_s28_one', full='assess_s28_full';
-const ctx=():Ctx=>({env:{DB:db,SESSION_SECRET:'s28-test',ENVIRONMENT:'dev'} as unknown as Ctx['env'],db,principal:{id:'person_mara',kind:'user'},traceId:'tr_s28',now:()=>new Date('2026-09-30T16:00:00.000Z'),log:()=>{}});
+const src='assess_syn_earning-trust-2026-01', one='assess_s28_one', full='assess_s28_full', zero='assess_s28_zero';
+// production (reports enabled) keeps the five-response floor; DEV's floor is one response (report-admission.ts participantReportMinimum).
+const ctx=(ENVIRONMENT='dev'):Ctx=>({env:{DB:db,SESSION_SECRET:'s28-test',ENVIRONMENT,PARTICIPANT_REPORTS:'enabled'} as unknown as Ctx['env'],db,principal:{id:'person_mara',kind:'user'},traceId:'tr_s28',now:()=>new Date('2026-09-30T16:00:00.000Z'),log:()=>{}});
 const run=(sql:string,...a:unknown[])=>db.prepare(sql).bind(...a).run();
 async function clone(aid:string,limit:number){
  await run(`INSERT INTO assessment (id,project_id,language_id,name,purpose,period,format,stage,created_at,created_by) SELECT ?1,project_id,language_id,name||' (participant)',purpose,period,format,stage,created_at,created_by FROM assessment WHERE id=?2`,aid,src);
@@ -27,21 +28,32 @@ beforeAll(async()=>{
   const sql=readFileSync(new URL('../'+file,import.meta.url),'utf8').split('\n').filter(l=>!l.trimStart().startsWith('--')).join('\n');
   const statements=sql.split(';\n').map(s=>s.trim()).filter(Boolean);for(let i=0;i<statements.length;i+=50)await db.batch(statements.slice(i,i+50).map(s=>db.prepare(s)));
  }
- await clone(one,1);await clone(full,50);
+ await clone(one,1);await clone(full,50);await clone(zero,0);
 },60000);
 afterAll(()=>mf.dispose());
 const reports=async(aid:string)=>Number((await db.prepare('SELECT count(*) AS n FROM synthetic_report WHERE assessment_id=?').bind(aid).first<{n:number}>())?.n);
 describe('S28: Results, responses list and report agree below the D7 minimum',()=>{
  it('below the minimum: all three are held and name the same numbers; no report is built',async()=>{
   const want={suppressed:true,status:'held',responses_in:1,responses_needed:SUPPRESSION_THRESHOLD};
-  const r:any=(await summary(ctx(),{aid:one})).result, l:any=(await responseList(ctx(),{aid:one})).result;
-  const preview:any=(await build(ctx(),{aid:one},{dryRun:true} as any)).result, made:any=(await build(ctx(),{aid:one})).result;
-  const listed:any=(await reportList(ctx(),{aid:one})).result;
+  const P=ctx('production');
+  const r:any=(await summary(P,{aid:one})).result, l:any=(await responseList(P,{aid:one})).result;
+  const preview:any=(await build(P,{aid:one},{dryRun:true} as any)).result, made:any=(await build(P,{aid:one})).result;
+  const listed:any=(await reportList(P,{aid:one})).result;
   for(const view of [r,l,preview,made,listed])expect(view).toMatchObject(want);
   expect(new Set([r,l,preview,made,listed].map(v=>v.reason)).size).toBe(1);
   expect(r.reason).toBe(`1 response so far; at least ${SUPPRESSION_THRESHOLD} are needed before any score is shown. Scores are held until then.`);
   expect(r.summary).toBeNull();expect(l.responses).toEqual([]);expect(made.report).toBeNull();expect(listed.reports).toEqual([]);
   expect(await reports(one)).toBe(0);
+ },60000);
+ it('DEV: one response is enough to build; zero responses hold and name a floor of one',async()=>{
+  // 3d-review-cookbook work/active/2026-10-26-3d-report-threshold-coverage: >=1 response in each included lens builds the report.
+  const z:any=(await summary(ctx(),{aid:zero})).result, zb:any=(await build(ctx(),{aid:zero},{dryRun:true} as any)).result;
+  for(const v of [z,zb])expect(v).toMatchObject({suppressed:true,status:'held',responses_in:0,responses_needed:1});
+  expect(z.reason).toBe('0 responses so far; at least 1 is needed before any score is shown. Scores are held until then.');
+  const preview:any=(await build(ctx(),{aid:one},{dryRun:true} as any)).result;expect(preview).toMatchObject({suppressed:false,status:'ready'});
+  const made:any=(await build(ctx(),{aid:one})).result;expect(made.suppressed).toBe(false);expect(made.report?.id).toMatch(/^sreport_/);
+  const listed:any=(await reportList(ctx(),{aid:one})).result;expect(listed.reports.map((x:any)=>x.id)).toContain(made.report.id);
+  const held:any=(await reportGet(ctx('production'),{id:made.report.id})).result;expect(held).toMatchObject({suppressed:true,status:'held',responses_needed:SUPPRESSION_THRESHOLD});
  },60000);
  it('a stored or listed participant report re-attests through the same minimum, so reads hold too',async()=>{
   // get and list re-attest the capture before disclosure; the minimum lives in that one attestation step.

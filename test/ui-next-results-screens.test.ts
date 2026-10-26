@@ -42,10 +42,10 @@ const withoutChurch = () => {
   D.gaps = { biggest: [...D.gaps.biggest, "No such area"], agree: D.gaps.agree };
   return D;
 };
-const heldReport = () => ({ ...REPORT.desktop, counts: REPORT.held.counts }); // church 1 of 3: More input needed
+const heldReport = () => ({ ...REPORT.desktop, counts: REPORT.held.counts }); // church 0 (no response): More input needed
 type Built = { payload: Payload & { cross_lens_multi: unknown[] }; counts?: Record<string, number>; review: Record<string, string> };
 const copy = () => JSON.parse(JSON.stringify(REPORT.desktop)) as Built;
-// R4-1: two areas whose placed perspectives (team, community) are both 20 apart; church (1 of 3, held) differs. Payload order
+// R4-1: two areas whose placed perspectives (team, community) are both 20 apart; church (0 of 1, held) differs. Payload order
 // Zeal then Accord, so neither the hidden score nor the alphabet can be what orders them.
 const tieProbe = (zeal: number, accord: number) => {
   const D = copy();
@@ -97,7 +97,8 @@ describe("data adapter: levels through the current UI's pure modules (board valu
     expect(cards.map((c: { level: string }) => c.level)).toEqual(["growing", "support", "growing"]);
     expect(cards[0].rows.map((r: { name: string; level: string }) => `${r.name}:${r.level}`)).toEqual([
       "Translation process & brief:strong", "Understanding the source:growing", "External review:support", "Consistency:growing", "Governance:more"]);
-    expect(levelOf(90, 2)).toBe("more"); // under the minimum: More input needed, never a low result
+    expect(levelOf(90, 0)).toBe("more"); // under the minimum (no response): More input needed, never a low result
+    expect(levelOf(90, 1)).toBe("strong"); // one response is enough for a level (cookbook 2026-10-26-3d-report-threshold-coverage); the jar shows it is few
   });
   it("band barbell: band centres, shared bands spread in lens order, red span at two bands or more (ResultsGaps board)", () => {
     const D = REPORT.desktop;
@@ -112,7 +113,7 @@ describe("data adapter: levels through the current UI's pure modules (board valu
     expect(withNotes(brief.verdict, brief)).toBe("same band · Community not asked");
   });
   it("band barbell: a perspective under the minimum gets no dot and no part in the verdict; it is named instead (N3)", () => {
-    const D = REPORT.desktop, H = REPORT.held.counts; // church 1 of 3: More input needed
+    const D = REPORT.desktop, H = REPORT.held.counts; // church 0 (no response): More input needed
     const clarity = bandRow(D, H, "Clarity / naturalness");
     expect(clarity.dots.map((d: { lens: string; x: number }) => `${d.lens}:${d.x}`)).toEqual(["team:87.5", "community:12.5"]);
     expect(clarity.dots.every((d: { x: unknown }) => typeof d.x === "number")).toBe(true);
@@ -145,7 +146,7 @@ describe("data adapter: levels through the current UI's pure modules (board valu
     expect([shape.legend.map((l: { lens: string }) => l.lens), shape.notes]).toEqual([["team", "community", "church"], []]);
   });
   it("held counts: a perspective under the minimum feeds no spread, tensions order, radar point or table score (R3-1)", () => {
-    const D = REPORT.desktop, H = REPORT.held.counts; // church 1 of 3
+    const D = REPORT.desktop, H = REPORT.held.counts; // church 0 of 1
     type R = { name: string; spread: number | null; dots: { lens: string; score: number }[]; notes: string[] };
     const rows: R[] = scoreRows(D, H);
     for (const r of rows) {
@@ -190,8 +191,8 @@ describe("data adapter: levels through the current UI's pure modules (board valu
     expect(lensCards(live.payload, live.counts)).toEqual(lensCards(D.payload, D.counts));
     expect(scoreRows(live, live.counts)).toEqual(scoreRows(D, D.counts));
     expect(radar(live, D.radar, live.counts)).toEqual(radar(D, D.radar, D.counts));
-    // church at 1 in the evidence, no counts: hidden everywhere exactly as with held counts
-    const held = noCounts(1);
+    // church at 0 in the evidence, no counts: hidden everywhere exactly as with held counts
+    const held = noCounts(0);
     expect(lensCards(held.payload, held.counts)).toEqual(lensCards(D.payload, H));
     expect(scoreRows(held, held.counts)).toEqual(scoreRows(D, H));
     expect(comparedRows(held, held.counts)).toEqual(comparedRows(D, H));
@@ -229,7 +230,7 @@ describe("data adapter: levels through the current UI's pure modules (board valu
     expect(radar(D, ["Clarity / naturalness"], D.counts)).toBeNull(); // under radarModel's three spokes: no shape
   });
   it("held lines and answer bars", () => {
-    expect(heldLines(REPORT.held.counts).map((l: { text: string }) => l.text)).toEqual(["Translation team 6 — ready", "Community 8 — ready", "Church 1 — needs 2 more"]);
+    expect(heldLines(REPORT.held.counts).map((l: { text: string }) => l.text)).toEqual(["Translation team 6 — ready", "Community 8 — ready", "Church 0 — needs 1 more"]);
     expect([pct(1, 8), pct(3, 8), pct(0, 8)]).toEqual([12, 37, 0]);
   });
   it("answers: counted from the anonymous rows, the community counts are the board's (ResultsAnswers)", () => {
@@ -297,7 +298,8 @@ describe("each board renders as a screen", () => {
     expect(a.querySelector(".phone-top[data-state=root]")).not.toBeNull();
     expect(text(a.querySelector("h1.title-phone"))).toBe("Luke 1–2");
     expect(text(a.querySelector(".pill[data-stage=results]"))).toBe("Results ready");
-    expect(all(a, ".glass[data-lens] .h3")).toEqual(["Translation team · 9", "Community · 10", "Church · 5"]);
+    expect(all(a, ".glass[data-lens] .h3")).toEqual(["Translation team", "Community", "Church"]);
+    expect(all(a, ".glass[data-lens] [data-coverage]")).toEqual(["Well filled · 9 responses", "Well filled · 10 responses", "Filling up · 5 responses"]);
     expect(all(a, "main > a.link")).toEqual(["See the three biggest gaps", "Share results with someone"]);
   });
   it("phone-bar 'Plan the next step' draws the boards' trailing arrow (ResultsPhone, ResultsAnswersPhone, ResultsGapsPhone; integration N3)", () => {
@@ -391,8 +393,8 @@ describe("each board renders as a screen", () => {
   it("ResultsHeld: held card names the short perspective; preview cards show More input needed for it", () => {
     const a = mount(ResultsHeld);
     expect(text(a)).toContain("Results are held until every perspective has enough answers");
-    expect(text(a)).toContain("Church has 1 of 3.");
-    expect(all(a, ".glass-hi .small").filter((t) => / — /.test(t))).toEqual(["Translation team 6 — ready", "Community 8 — ready", "Church 1 — needs 2 more"]);
+    expect(text(a)).toContain("Church has 0 of 1.");
+    expect(all(a, ".glass-hi .small").filter((t) => / — /.test(t))).toEqual(["Translation team 6 — ready", "Community 8 — ready", "Church 0 — needs 1 more"]);
     expect(all(a, ".glass[data-lens=church] .lvl-name")).toEqual(["More input needed", "More input needed", "More input needed", "More input needed"]);
     expect(text(a.querySelector(".btn-primary"))).toBe("Reopen collection");
     const grid = a.querySelector(".l-grid[data-state=held]")!; // F4: dimmed by the contract row, and inert
@@ -408,7 +410,7 @@ describe("each board renders as a screen", () => {
     const a = mount(ResultsHeld, { phone: true });
     expect(text(a.querySelector(".phone-title"))).toBe("Luke 1–2");
     expect(a.querySelector(".pill[data-stage=closed]")).not.toBeNull();
-    expect(text(a)).toContain("The church survey has 2 answers; we show a perspective at 3 or more so no one can be picked out.");
+    expect(text(a)).toContain("The church survey has 0 answers; a perspective shows its level from its first answer.");
     expect(all(a, ".glass a.link")).toEqual(["Show results without the church", "See the answers so far"]);
   });
   it("Report: document bar, one paper sheet with levels, gaps, where to look next and the attestation footer", () => {
@@ -490,10 +492,10 @@ describe("each board renders as a screen", () => {
   });
   it("Report and ReportDetailed without counts hide a perspective under the minimum as held counts do (R4-2)", () => {
     for (const C of [Report, ReportDetailed]) {
-      expect(mount(C, { report: noCounts(1) }).innerHTML).toBe(mount(C, { report: heldReport() }).innerHTML);
+      expect(mount(C, { report: noCounts(0) }).innerHTML).toBe(mount(C, { report: heldReport() }).innerHTML);
       expect(mount(C, { report: noCounts(4) }).innerHTML).toBe(mount(C).innerHTML);
     }
-    const a = mount(ReportDetailed, { report: noCounts(1) });
+    const a = mount(ReportDetailed, { report: noCounts(0) });
     expect(a.querySelectorAll("svg[data-part=score-barbell] g[data-lens=church], svg[aria-label^='Radar'] [data-lens=church]").length).toBe(0);
     expect([...a.querySelector(".solid[data-lens=church] table")!.querySelectorAll("tbody tr")].map((tr) => text(tr.children[2]))).toEqual(Array(6).fill("—"));
     const none = noCounts(1);
@@ -699,7 +701,7 @@ describe("results round 5: a live payload renders; counts read right", () => {
     const names = ctx.cross_lens_multi.map((a) => a.construct_name);
     const live = { ...REPORT.desktop, payload: ctx, counts: undefined, gaps: { biggest: names.slice(0, 3), agree: [] }, radar: names, lookNext: [] };
     const d = mount(ReportDetailed, { report: live });
-    expect(all(d, ".paper .solid[data-lens] > .l-row .small")).toEqual(["4 responses", "6 responses", "2 responses"]);
+    expect(all(d, ".paper .solid[data-lens] > .l-row .small")).toEqual(["Filling up · 4 responses", "Well filled · 6 responses", "A few drops · 2 responses"]);
     expect(text(d)).not.toMatch(/null|undefined|NaN/);
     const r = mount(Report, { report: live });
     expect(r.querySelectorAll(".paper .solid[data-lens]").length).toBe(3);
@@ -714,7 +716,8 @@ describe("results round 5: a live payload renders; counts read right", () => {
     expect(text(desk)).toContain("1 response");
     expect(text(desk)).not.toContain("1 responses");
     const none = render(LensCard as never, { props: { card: { ...cards[0], n: null }, phone: true } }).container;
-    expect(text(none.querySelector(".h3"))).toBe("Translation team · responses not counted");
+    expect(text(none.querySelector(".h3"))).toBe("Translation team");
+    expect(text(none.querySelector("[data-coverage]"))).toBe("responses not counted");
   });
   it("R5-3 + R5-5: Results counts the detailed report's pages; the phone overview line counts the gaps the sheet draws, no radar", () => {
     expect(text([...mount(Results).querySelectorAll("a.btn")].find((a) => text(a).startsWith("Detailed report")) ?? null)).toBe(`Detailed report · ${detailedPages(lensCards(REPORT.desktop.payload, REPORT.desktop.counts))} pages`);

@@ -19,6 +19,7 @@
   import Row from "../../Row.svelte";
   import Grid from "../../Grid.svelte";
   import Level from "../../Level.svelte";
+  import Coverage from "./Coverage.svelte";
   import LensDot from "../../LensDot.svelte";
   import DocBar from "./DocBar.svelte";
   import PaperHead from "./PaperHead.svelte";
@@ -27,7 +28,7 @@
   import Radar from "./Radar.svelte";
   import Report from "./Report.svelte";
   import { href } from "../href.js";
-  import { REPORT, lensCards, scoreRows, comparedRows, radar, withNotes, gapLead, responsesText, countWord, evidenceSheets, detailedPages } from "./data.js";
+  import { REPORT, lensCards, scoreRows, comparedRows, radar, withNotes, gapLead, countWord, evidenceSheets, detailedPages } from "./data.js";
 
   let { phone = false, theme = "light", report } = $props();
   const D = $derived(report ?? REPORT.desktop);
@@ -56,7 +57,7 @@
 {/snippet}
 {#snippet evidence(c)}
   <div class="solid l-card l-stack" data-lens={c.lens} data-gap="2">
-    <Row gap={3}><strong>{c.label}</strong><span class="small">{responsesText(c.n)}</span></Row>
+    <Row gap={3}><strong>{c.label}</strong><Coverage n={c.n} /></Row>
     <table>
       <thead><tr><th class="th">Area</th><th class="th">Level</th><th class="th">Score</th><th class="th">Evidence</th><th class="th">Observation</th></tr></thead>
       <tbody>{#each c.rows as r}<tr><td class="td">{r.name}</td><td class="td"><Level level={r.level} /></td><td class="td tab-n">{r.level === "more" || r.score === null ? "—" : r.score}</td><td class="td">{r.items} items</td><td class="td">{r.note}</td></tr>{/each}</tbody>
@@ -99,7 +100,7 @@
       </Stack>
       <Stack gap={2}>
         <h2 class="h3">How to read the scores</h2>
-        <p class="small">Scores are the pinned report model's area values (0–100) aggregated from the item answers listed under Evidence. Levels are bands on those scores. An area with fewer than three answers shows More input needed and no score. Nothing in this report identifies a person.</p>
+        <p class="small">Scores are the pinned report model's area values (0–100) aggregated from the item answers listed under Evidence. Levels are bands on those scores. A perspective with no answers shows More input needed and no score; the jar beside each perspective shows how many answered (a few drops is little evidence, not a low result). Nothing in this report identifies a person.</p>
       </Stack>
       {#if !sheets.length}{@render words()}{/if}
       {@render foot(2)}

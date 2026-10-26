@@ -1,17 +1,20 @@
 import type { Ctx, Handler } from "./types";
 import { notVisible } from "./errors";
-import { gate, reqStr, responseCountForAssessment, roleAt, SUPPRESSION_THRESHOLD } from "./common";
+import { gate, reqStr, responseCountForAssessment, roleAt } from "./common";
+import { participantReportMinimum } from "../report-admission";
 import { demographicsEnabled, demographicsProjection } from "../context-fields";
 
-/** Below the D7 minimum (SUPPRESSION_THRESHOLD, a held working default): Results, the responses list and the report all
+/** Below the D7 minimum (report-admission.ts participantReportMinimum: SUPPRESSION_THRESHOLD, a held working default; 1 on DEV,
+ * the same floor the report attestation applies): Results, the responses list and the report all
  * name the same numbers — the assessment's response count (the one Collect and the assessment card show) and the minimum.
  * Callers read it only after their own grant check. Null at or above the minimum: those views stay exactly as they were. */
 export type MinimumHold = { responses_in: number; responses_needed: number; reason: string };
-export async function minimumHold(ctx: Pick<Ctx, "db">, aid: string): Promise<MinimumHold | null> {
+export async function minimumHold(ctx: Pick<Ctx, "db"> & { env?: { ENVIRONMENT?: string } }, aid: string): Promise<MinimumHold | null> {
   const { responses: n } = await responseCountForAssessment(ctx as Ctx, aid);
-  if (n >= SUPPRESSION_THRESHOLD) return null;
-  return { responses_in: n, responses_needed: SUPPRESSION_THRESHOLD,
-    reason: `${n} response${n === 1 ? "" : "s"} so far; at least ${SUPPRESSION_THRESHOLD} are needed before any score is shown. Scores are held until then.` };
+  const min = participantReportMinimum(ctx.env);
+  if (n >= min) return null;
+  return { responses_in: n, responses_needed: min,
+    reason: `${n} response${n === 1 ? "" : "s"} so far; at least ${min} ${min === 1 ? "is" : "are"} needed before any score is shown. Scores are held until then.` };
 }
 
 /** D7 is held. A typed success state is the only safe disclosure, including to owners. */

@@ -2,6 +2,7 @@
 import type { Ctx } from './handlers/types.js';
 import { attestCapture, type CaptureRow } from './report-attestation.js';
 import { canonicalJson } from './report-canonical-json.js';
+import { SUPPRESSION_THRESHOLD } from './handlers/common.js';
 
 // Exact approved B1 SQL8e3f51e2. The broader B2 target/report lookup is NOT used.
 export const B1_CAPTURE_SQL = `-- PROPOSED, NOT EXECUTED. Common prefix for the separately reviewed query variants.
@@ -180,10 +181,10 @@ export function isAttestedCapture(c: unknown): boolean {
   return typeof c === 'object' && c !== null && attested.has(c);
 }
 /** Internal adapter, not authorization: callers must obtain the token in one guarded SELECT. */
-export async function attestPackedCapture(expectedAssessmentId: string, raw: string, participant = false): Promise<CaptureResult> {
+export async function attestPackedCapture(expectedAssessmentId: string, raw: string, participant = false, minimum = SUPPRESSION_THRESHOLD): Promise<CaptureResult> {
   try {
     const rows = decodePackedCapture(expectedAssessmentId, raw);
-    const result = await attestCapture(expectedAssessmentId, rows, participant === true);
+    const result = await attestCapture(expectedAssessmentId, rows, participant === true, minimum);
     if (!result.eligible) return { eligible: false, reason: 'HELD' };
     const capture: CapturedAssessment = Object.freeze({ assessmentId: expectedAssessmentId, packedCapture: raw, rows, responseIds: Object.freeze(result.responseIds), captureDigest: result.captureDigest, participant: participant === true });
     attested.add(capture);

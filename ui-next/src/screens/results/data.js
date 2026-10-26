@@ -44,13 +44,24 @@ export function canonicalPayload(payload) {
   canon.set(payload, out);
   return out;
 }
-export const MIN_RESPONSES = V3_BAND_CUTOFFS.minResponses;
+export const MIN_RESPONSES = V3_BAND_CUTOFFS.minResponses; // answer splits (complementary suppression) keep this floor
+// A perspective's level needs one response in UI Next (3d-review-cookbook work/active/2026-10-26-3d-report-threshold-coverage,
+// REQ-0018): the same floor the DEV server builds a report at; none reads More input needed. Low counts are shown by the
+// coverage jar (Coverage.svelte, "a few drops"), never by holding the level. The current UI keeps V3_BAND_CUTOFFS unchanged.
+export const LEVEL_MIN = 1;
+export const LEVEL_CUTOFFS = Object.freeze({ ...V3_BAND_CUTOFFS, minResponses: LEVEL_MIN });
+/** Coverage (quantity) beside the level (quality): a jar filled by how many people answered. Provisional tiers, presentation only. */
+export function coverageOf(n) {
+  if (n === null || n === undefined || !Number.isFinite(Number(n))) return { fill: 0, word: "" }; // not counted: no jar word on a guess
+  const k = Number(n);
+  return k <= 0 ? { fill: 0, word: "Empty jar" } : k < 3 ? { fill: 1, word: "A few drops" } : k < 6 ? { fill: 2, word: "Filling up" } : { fill: 3, word: "Well filled" };
+}
 
 // Band word (v3ScoreBand) -> Level key (ui-next/src/Level.svelte LEVELS; design-system.md section 4 level words).
 export const LEVEL_KEY = Object.freeze({ Strong: "strong", Growing: "growing", "Needs support": "support", "Needs urgent attention": "urgent", "More input needed": "more" });
 export const LEVEL_WORD = Object.freeze(Object.fromEntries(Object.entries(LEVEL_KEY).map(([w, k]) => [k, w])));
 export function levelOf(score, responses) {
-  const word = v3ScoreBand(score, responses);
+  const word = v3ScoreBand(score, responses, LEVEL_CUTOFFS);
   const key = LEVEL_KEY[word];
   if (!key) throw new TypeError(`results: v3ScoreBand returned an unknown band "${word}"`);
   return key;
@@ -223,7 +234,7 @@ export const detailedPages = (cards) => 2 + evidenceSheets(cards).length;
 /** Held state: who is below the minimum, in the board's words ("Church 1 — needs 2 more"). */
 export function heldLines(counts) {
   return LENS_ORDER.map((lens) => {
-    const n = counts?.[lens] ?? 0, short = Math.max(0, MIN_RESPONSES - n);
+    const n = counts?.[lens] ?? 0, short = Math.max(0, LEVEL_MIN - n);
     return { lens, label: lensLabel(lens), n, short, text: short ? `${lensLabel(lens)} ${n} — needs ${short} more` : `${lensLabel(lens)} ${n} — ready` };
   });
 }
