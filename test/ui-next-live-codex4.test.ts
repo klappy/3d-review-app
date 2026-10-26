@@ -16,7 +16,7 @@ import ResultsHeld from "../ui-next/src/screens/results/ResultsHeld.svelte";
 import Setup5 from "../ui-next/src/screens/setup/Setup5.svelte";
 import Project from "../ui-next/src/screens/setup/Project.svelte";
 // @ts-expect-error -- plain .js module, no type declarations
-import { REPORT } from "../ui-next/src/screens/results/data.js";
+import { REPORT, useLevelMinimum } from "../ui-next/src/screens/results/data.js";
 import projectFixture from "../ui-next/fixtures/setup/project.json";
 import setupFixture from "../ui-next/fixtures/setup/setup.json";
 
@@ -147,13 +147,16 @@ describe("projectModel (P2: workspace, trend gaps, surfaced failures)", () => {
     expect(g.querySelectorAll('circle[data-lens="church"]').length).toBe(4); // three points plus the legend dot;
   });
   it("Codex P1/P2 on 992b610: levels rest on the report's own evidence counts, and each summary level carries its count beside it", async () => {
+    useLevelMinimum(1); // DEV: the direct levelsOf calls below band at the DEV level minimum
     // a report built from 1 team and 2 community responses; the live surveys now read 6 each
     const snap = { ...payload, evidence: [{ label: "Translation Team — Translators", n: 1 }, { label: "Community — Community", n: 2 }] };
     expect(respondentsOf(snap, { team: 6, community: 6 })).toEqual({ team: 1, community: 2 });
     expect(respondentsOf(payload, { team: 6, community: 6 })).toEqual({ team: 6, community: 6 }); // no evidence n: the live count stands in
     expect(levelsOf({ ...snap, evidence: [{ label: "Translation Team — Translators", n: 0 }, { label: "Community — Community", n: 2 }] }, { team: 6, community: 6 })).toEqual({ team: "more", community: "support" });
     expect(levelTriples({ team: { score: 80, responses: 2 }, church: { score: 50, responses: 0 } })).toEqual([["team", "strong", 2], ["church", "more", 0]]);
-    serve(routes({ "GET /v2/reports/r1": { report: { id: "r1", created_at: "2026-08-02T00:00:00Z", payload: snap } } }));
+    // DEV serves level_minimum_responses 1 on each reported review's results read
+    const dev = { "GET /v2/assessments/a1/results": { status: "held", level_minimum_responses: 1 }, "GET /v2/assessments/a2/results": { status: "held", level_minimum_responses: 1 } };
+    serve(routes({ ...dev, "GET /v2/reports/r1": { report: { id: "r1", created_at: "2026-08-02T00:00:00Z", payload: snap } } }));
     const m = await projectModel(PID);
     expect(m.reviews.find((r: { id: string }) => r.id === "a1").levels).toEqual([["team", "strong", 1], ["community", "support", 2]]);
     expect(m.reviews.find((r: { id: string }) => r.id === "a2").levels).toEqual([["team", "strong", 6]]);
@@ -161,6 +164,21 @@ describe("projectModel (P2: workspace, trend gaps, surfaced failures)", () => {
     const first = [...a.querySelectorAll("a.su-rev")].find((x) => x.querySelector(".h3")?.textContent === "First")!; // newest first: a1 is the second card
     expect([...first.querySelectorAll(".lvl-pair [data-coverage] [data-short]")].map((c) => (c.textContent ?? "").replace(/\s+/g, " ").trim())).toEqual(["A few drops · 1", "A few drops · 2"]);
     expect(first.querySelector("[data-coverage]")!.getAttribute("title")).toBe("A few drops · 1 response");
+  });
+  it("level minimum from the server: production-like (3) holds a level at 1 or 2 responses; DEV (1) shows it; absent is the safe 3", async () => {
+    const snap = { ...payload, evidence: [{ label: "Translation Team — Translators", n: 1 }, { label: "Community — Community", n: 2 }] };
+    const at = (min: unknown) => ({ "GET /v2/assessments/a1/results": { status: "held", ...(min === undefined ? {} : { level_minimum_responses: min }) }, "GET /v2/assessments/a2/results": { status: "held", ...(min === undefined ? {} : { level_minimum_responses: min }) }, "GET /v2/reports/r1": { report: { id: "r1", created_at: "2026-08-02T00:00:00Z", payload: snap } } });
+    const first = async () => (await projectModel(PID)).reviews.find((r: { id: string }) => r.id === "a1").levels;
+    serve(routes(at(3)));
+    expect(await first()).toEqual([["team", "more", 1], ["community", "more", 2]]);
+    serve(routes(at(1)));
+    expect(await first()).toEqual([["team", "strong", 1], ["community", "support", 2]]);
+    serve(routes(at(undefined)));
+    expect(await first()).toEqual([["team", "more", 1], ["community", "more", 2]]);
+    serve(routes(at("1"))); // not a whole number: the safe 3
+    expect(await first()).toEqual([["team", "more", 1], ["community", "more", 2]]);
+    serve(routes({ ...at(1), "GET /v2/assessments/a2/results": new Error("results down") })); // one review unread: the strictest, 3
+    expect(await first()).toEqual([["team", "more", 1], ["community", "more", 2]]);
   });
   it("a review's report list or count failing to read rejects the model (the shell's retryable error), never a review without levels", async () => {
     serve(routes({ "GET /v2/assessments/a2/reports": new Error("list down") }));

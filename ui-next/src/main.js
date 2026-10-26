@@ -26,6 +26,7 @@ import Landing from "./screens/Landing.svelte";
 import { REGISTRY } from "./screens/registry.js";
 import { route, wOverride, PHONE_QUERY, liveEntry } from "./route.js";
 import Live from "./app/Live.svelte";
+import { useLevelMinimum } from "./screens/results/data.js";
 
 let storage;
 try { storage = window.localStorage; } catch { storage = undefined; }
@@ -41,6 +42,9 @@ const live = liveEntry(params, storage);
 if (live) {
   mount(Live, { target });
 } else {
+// Fixture harness only (never the live app): the fixtures are DEV-like reviews, so they band at the DEV level minimum of 1, set
+// explicitly here. The live app reads the server's level_minimum_responses instead and falls back to the safe 3.
+useLevelMinimum(1);
 // Screens follow the viewport (phone below 720px, route.js PHONE_BELOW) unless ?w= overrides; remount when the width crosses it.
 const mq = typeof window.matchMedia === "function" ? window.matchMedia(PHONE_QUERY) : null;
 let view;

@@ -5,7 +5,7 @@ import { api, classify, confirmed, enc, token } from "./api.js";
 import { lensLabel } from "../../../ui/report-lenses.js";
 import { v3ScoreBand, v3ExpectedFor } from "../../../ui/assess/v3-assessment.js";
 import { parsePeriod, collectLine } from "../../../ui/v3/components/active-until.js";
-import { LEVEL_KEY, LEVEL_WORD, LEVEL_CUTOFFS, bandRows, lensCards, responsesFor } from "../screens/results/data.js";
+import { LEVEL_KEY, LEVEL_WORD, levelCutoffs, useLevelMinimum, levelMinimumOf, bandRows, lensCards, responsesFor } from "../screens/results/data.js";
 import { to } from "./router.js";
 import qrcode from "../../../ui/assess/vendor-qrcode.js";
 import { acceptInvitationById } from "../../../ui/v3/components/invite.js";
@@ -27,6 +27,10 @@ export const assessment = async (aid) => api(`/v2/assessments/${enc(aid)}`); // 
 export const surveyCounts = async (aid, sid) => api(`/v2/assessments/${enc(aid)}/surveys/${enc(sid)}`); // { survey, counts, expected_count? }
 export const setStage = async (aid, stage) => api(`/v2/assessments/${enc(aid)}/stage`, { method: "POST", body: { stage } });
 export const results = async (aid) => api(`/v2/assessments/${enc(aid)}/results`);
+// The server's per-perspective level minimum (results level_minimum_responses; src/report-admission.ts). Each read below records
+// the strictest value its reviews serve; a failed or absent read is undefined, which useLevelMinimum turns into the safe 3.
+const servedMinimum = (aid) => results(aid).then((r) => r?.level_minimum_responses).catch(() => undefined);
+const useStrictest = (served) => useLevelMinimum(served.length && served.every((v) => levelMinimumOf(v) === v) ? Math.max(...served) : undefined);
 // Answer-by-answer rows: the server answers with a typed suppression for everyone (src/handlers/response.ts list: D7 disclosure
 // policy unresolved, no row-level disclosure even to owners). The screen shows that real state, never sample rows.
 export const responsesList = async (aid) => api(`/v2/assessments/${enc(aid)}/responses`);
@@ -128,6 +132,7 @@ export async function projectModel(pid) {
   const live = as.filter((a) => !a.archived_at).sort((x, y) => String(y.created_at).localeCompare(String(x.created_at)));
   // A project outside any workspace (workspace_id null) is said so, never shown under the first workspace in the list.
   const w = (p.workspace_id && ws.find((x) => x.id === p.workspace_id)) ?? (p.workspace_id ? { name: "Your workspace" } : { name: "No workspace" });
+  useStrictest(await Promise.all(live.filter((a) => ["understand", "improve"].includes(a.stage)).map((a) => servedMinimum(a.id))));
   // A review's report list or counts failing to read is the shell's retryable error (never a review silently shown without levels).
   const lvl = await Promise.all(live.map(async (a) => {
     if (!["understand", "improve"].includes(a.stage)) return null;
@@ -156,8 +161,8 @@ export async function projectModel(pid) {
   };
 }
 // Lens levels of a built report's payload (results/data.js lensCards does the banding; here the lens word only).
-// Respondents per perspective for a review (the survey counts the Results page bands with): v3ScoreBand (LEVEL_CUTOFFS) holds a
-// perspective at "More input needed" with no response; one or two show their level beside the coverage jar's "a few drops".
+// Respondents per perspective for a review (the survey counts the Results page bands with): v3ScoreBand (levelCutoffs()) holds a
+// perspective under the served level minimum at "More input needed"; at or over it a low count shows beside the coverage drops.
 export async function lensCounts(aid) {
   const { surveys } = await assessment(aid);
   const live = surveys.filter((s) => !s.archived_at);
@@ -175,9 +180,9 @@ export function respondentsOf(payload, counts = null) {
 }
 export function levelsOf(payload, counts = null) {
   const out = {}, ns = respondentsOf(payload, counts);
-  // v3ScoreBand (LEVEL_CUTOFFS) holds a perspective at "More input needed" with no response: the count is the report's own (respondentsOf,
+  // v3ScoreBand (levelCutoffs()) holds a perspective under the served level minimum at "More input needed": the count is the report's own (respondentsOf,
   // snapshot first); without a count anywhere the band is held (never shown as a level on a guess).
-  for (const l of payload?.lenses ?? []) { const k = lensKeyOf(l.lens) ?? l.lens; const n = Number(ns[k] ?? NaN); const w = v3ScoreBand(Number(l.score), Number.isFinite(n) ? n : 0, LEVEL_CUTOFFS); out[k] = LEVEL_KEY[w] ?? "more"; }
+  for (const l of payload?.lenses ?? []) { const k = lensKeyOf(l.lens) ?? l.lens; const n = Number(ns[k] ?? NaN); const w = v3ScoreBand(Number(l.score), Number.isFinite(n) ? n : 0, levelCutoffs()); out[k] = LEVEL_KEY[w] ?? "more"; }
   return Object.keys(out).length ? out : null;
 }
 
@@ -193,6 +198,7 @@ export async function collectModel(aid, origin = globalThis.location?.origin ?? 
     Promise.all(live.map((s) => surveyCounts(aid, s.id).catch(() => null))),
     languageOf(a),
     api(`/v2/assessments/${enc(aid)}/passages`).then((r) => r?.passages ?? []).catch(() => []),
+    servedMinimum(aid).then((v) => useLevelMinimum(v)), // CloseCollection's readiness line: the served minimum, else the safe 3
   ]);
   const passage = [...new Set(passages.map((x) => String(x?.reference || x?.title || "").trim()).filter(Boolean))].join(" · ") || String(a.purpose || "").trim(); // step 2's name when no attachment names one
   const period = parsePeriod(a.period);
@@ -280,6 +286,7 @@ export async function resultsModel(aid, { build = false } = {}) {
   // The report list and every survey count must load: a failed read is the shell's retryable error, never an empty list (which
   // would offer a build beside an existing report) nor a zero (which would band a perspective as held and understate the total).
   const [{ assessment: a, surveys }, res, rep] = await Promise.all([assessment(aid), results(aid).catch((e) => ({ error: e })), reports(aid)]);
+  useLevelMinimum(res?.level_minimum_responses); // the server decides (DEV 1, else 3); a failed or absent read is the safe 3
   const p = await project(a.project_id).catch(() => ({ name: "Project", id: a.project_id }));
   const live = surveys.filter((s) => !s.archived_at);
   const counts = { team: 0, community: 0, church: 0 };
@@ -519,7 +526,7 @@ export async function reviewLenses(a) {
     return Object.keys(out).length ? out : null;
   } catch { return null; }
 }
-export const levelWords = (lenses) => Object.fromEntries(Object.entries(lenses ?? {}).map(([k, v]) => [k, LEVEL_KEY[v3ScoreBand(Number(v.score), Number(v.responses), LEVEL_CUTOFFS)] ?? "more"]));
+export const levelWords = (lenses) => Object.fromEntries(Object.entries(lenses ?? {}).map(([k, v]) => [k, LEVEL_KEY[v3ScoreBand(Number(v.score), Number(v.responses), levelCutoffs())] ?? "more"]));
 /** [lens, level, respondents] for the summary cards (Workspace): the count travels with each level so a low-evidence level is never bare. */
 export const levelTriples = (lenses) => Object.entries(levelWords(lenses)).map(([k, l]) => [k, l, Number.isFinite(Number(lenses[k]?.responses)) ? Number(lenses[k].responses) : null]);
 const monthOf = (iso) => { const d = new Date(iso); return isNaN(d) ? "" : d.toLocaleDateString("en-US", { month: "short", year: "numeric" }); };
@@ -534,6 +541,7 @@ export async function workspaceModel(wid, me) {
   const live = (wps ?? []).filter((p) => !p.archived_at);
   const lists = await Promise.all(live.map((p) => assessmentsOf(p.id).then((as) => as.filter((a) => !a.archived_at).sort((x, y) => String(y.created_at).localeCompare(String(x.created_at))))));
   const all = lists.flat();
+  useStrictest(await Promise.all(lists.map((as) => as.find((a) => ["understand", "improve"].includes(a.stage))).filter(Boolean).map((a) => servedMinimum(a.id))));
   const cards = await Promise.all(live.map(async (p, i) => {
     const as = lists[i];
     const langs = [...new Set(as.map((a) => a.language_name).filter(Boolean))];

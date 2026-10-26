@@ -24,7 +24,8 @@
   import { href, liveContext } from "../href.js";
   // Live: a section anchor must stay on the help route (`#/help#h1`; router.parse carries the anchor); the gallery keeps the bare `#h1`.
   const anchor = (id) => (liveContext() ? `${href("help")}#${id}` : `#${id}`);
-  import { INTRO, VIDEO, TOPICS, FAQ, FAQ_TITLE } from "./help-copy.js";
+  import { INTRO, VIDEO, TOPICS, faqFor, FAQ_TITLE } from "./help-copy.js";
+  const FAQ = faqFor(); // the answers-needed line follows the level minimum in force (served, else the safe 3)
 
   let { phone = false, theme = "light" } = $props();
   const W = $derived({ w: phone ? "phone" : null });

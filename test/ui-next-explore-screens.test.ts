@@ -4,6 +4,7 @@
 // Boards: 3d-review-cookbook design/2026-10-15-glass-redesign/canvas Explore.dc.html, ExplorePhone.dc.html, ExploreFiltersPhone.dc.html,
 // Feedback.dc.html, FeedbackPhone.dc.html, Help.dc.html, HelpPhone.dc.html; nesting design-system.md 8.1; dialogs "Dialog and sheet states".
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { useLevelMinimum } from "../ui-next/src/screens/results/data.js";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { render } from "@testing-library/svelte";
@@ -18,7 +19,7 @@ import { levelOf, stagePill, responsesText, exploreRows, phoneRows, matchCounts,
 // @ts-expect-error -- plain .js module, no type declarations
 import { modal, backdropClose, closeTo } from "../ui-next/src/screens/explore/dialog.js";
 // @ts-expect-error -- plain .js module, no type declarations
-import { TOPICS, FAQ, INTRO } from "../ui-next/src/screens/explore/help-copy.js";
+import { TOPICS, FAQ, INTRO, faqFor } from "../ui-next/src/screens/explore/help-copy.js";
 // @ts-expect-error -- plain .js module, no type declarations
 import { v3ScoreBand } from "../ui/assess/v3-assessment.js";
 // @ts-expect-error -- plain .js module, no type declarations
@@ -336,10 +337,18 @@ describe("Help (Help.dc.html, HelpPhone.dc.html)", () => {
     for (const [id, , runs] of TOPICS) expect(text(a.querySelector(`#${id} p`)!)).toBe(runs.join(""));
     const qs = [...a.querySelectorAll("#h8 details.disc")];
     expect(qs.map((d) => text(d.querySelector("summary")!))).toEqual(FAQ.map(([q]: string[]) => q));
-    expect(qs.map((d) => text(d.querySelector(".disc-body")!))).toEqual(FAQ.map(([, ans]: string[]) => ans));
-    // Codex P1 on 992b610: the answers-needed FAQ follows the level floor of 1 and makes no "nobody can be picked out" promise
-    const need = FAQ.find(([q]: string[]) => q === "How many answers do we need?")![1];
-    expect(need).toBe("A perspective shows its level from its first answer. The drops beside each level show how much evidence it rests on: a few drops is little evidence, not a low result. Answer-by-answer splits still wait for at least 3 answers in every group.");
+    expect(qs.map((d) => text(d.querySelector(".disc-body")!))).toEqual(faqFor().map(([, ans]: string[]) => ans));
+    // The answers-needed FAQ follows the served level minimum: absent (this test) is the safe 3; DEV 1 reads "its first answer";
+    // no "nobody can be picked out" promise either way
+    const need = (rows: string[][]) => rows.find(([q]) => q === "How many answers do we need?")![1];
+    const TAIL = " The drops beside each level show how much evidence it rests on: a few drops is little evidence, not a low result. Answer-by-answer splits still wait for at least 3 answers in every group.";
+    expect(need(FAQ)).toBe(`A perspective shows its level from 3 answers.${TAIL}`);
+    expect(need(faqFor(3))).toBe(`A perspective shows its level from 3 answers.${TAIL}`);
+    expect(need(faqFor(1))).toBe(`A perspective shows its level from its first answer.${TAIL}`);
+    useLevelMinimum(1);
+    const dev = [...mount(Help, {}).querySelectorAll("#h8 details.disc")].map((d) => text(d.querySelector(".disc-body")!));
+    expect(dev).toContain(`A perspective shows its level from its first answer.${TAIL}`);
+    useLevelMinimum(undefined);
     expect(FAQ.flat().join(" ")).not.toMatch(/At least 3 from each perspective|picked out/);
     expect(qs.every((d) => !(d as HTMLDetailsElement).open)).toBe(true);
     expect(text(a)).toContain("Still stuck? Send app feedback, or read why 3D Review exists.");

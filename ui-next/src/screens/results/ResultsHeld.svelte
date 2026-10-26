@@ -1,6 +1,6 @@
 <!-- UI Next (v4) Results held screen. Status: provisional (playbook rule 12). ?screen=results-held (&w=phone).
      Boards: ResultsHeld.dc.html (desktop), ResultsHeldPhone.dc.html (phone). A perspective under the minimum
-     (./data.js LEVEL_MIN: no response yet) holds the results; every level of that perspective is
+     (./data.js currentLevelMin: the server's level minimum, else the safe 3) holds the results; every level of that perspective is
      More input needed (v3ScoreBand), shown as a preview of the first rows, dimmed by the contract .l-grid[data-state=held] (8.11)
      and inert (the board marks it aria-hidden; inert also keeps its links out of the tab order). Hero: the 64px chip
      .icn[data-size="64"] and the --t-24 heading .h2.t-24 (contract rows); the held card is the §8.2 desktop work card
@@ -23,7 +23,8 @@
   import { G } from "./icons.js";
   import { href } from "../href.js";
   import { out } from "./links.js";
-  import { REPORT, LEVEL_MIN, lensCards, heldLines } from "./data.js";
+  import { REPORT, currentLevelMin, lensCards, heldLines } from "./data.js";
+  const MIN = currentLevelMin(), fromWords = MIN === 1 ? "its first answer" : `${MIN} answers`;
 
   // report (live): { review, counts, payload } with too few responses in some perspective; default the fixture's held state.
   // onreopen (live): moves the review back to Collect (setStage) before Share, so the links the page asks people to use are open.
@@ -66,7 +67,7 @@
     <Card gap={3} label="Results are held">
       <div class="l-row" data-gap="3" data-align="start">
         <span class="icn icn-lens" data-lens={first.lens}><Glyph d={G.clock} /></span>
-        <Stack gap={1}><span class="h3">Results are held</span><span class="small">{#if srv}{srv.responses_in} of {srv.responses_needed} responses so far; the server holds the report until then.{:else}The {first.label.toLowerCase()} survey has {phoneN} answers; a perspective shows its level from its first answer.{/if}</span></Stack>
+        <Stack gap={1}><span class="h3">Results are held</span><span class="small">{#if srv}{srv.responses_in} of {srv.responses_needed} responses so far; the server holds the report until then.{:else}The {first.label.toLowerCase()} survey has {phoneN} answers; a perspective shows its level from {fromWords}.{/if}</span></Stack>
       </div>
       {#if escape}<a class="link" href={href("results")}>{without} <Glyph d={G.arrow} /></a>{/if}
       {#if canRead}<a class="link" href={href("results-answers")}>See the answers so far <Glyph d={G.arrow} /></a>{/if}
@@ -82,7 +83,7 @@
             <span class="icn" data-size="64" data-lens="team"><Glyph d={G.lock} size={30} /></span>
             <Stack gap={2}>
               <h2 class="h2 t-24">{srv ? "Results are held until enough answers are in" : "Results are held until every perspective has enough answers"}</h2>
-              <p class="small t-15">{#if srv}The server holds this report: {srv.responses_in} of {srv.responses_needed} responses so far{srv.reason ? ` (${srv.reason})` : ""}. {collecting ? "Collection is still open: share the links and come back." : "Keep collecting."}{:else}Levels need at least {LEVEL_MIN} answer from a perspective. {first.label} has {first.n} of {LEVEL_MIN}. Keep collecting, or go on without the {first.label.toLowerCase()} perspective.{/if}</p>
+              <p class="small t-15">{#if srv}The server holds this report: {srv.responses_in} of {srv.responses_needed} responses so far{srv.reason ? ` (${srv.reason})` : ""}. {collecting ? "Collection is still open: share the links and come back." : "Keep collecting."}{:else}Levels need at least {MIN} {MIN === 1 ? "answer" : "answers"} from a perspective. {first.label} has {first.n} of {MIN}. Keep collecting, or go on without the {first.label.toLowerCase()} perspective.{/if}</p>
               <Row wrap gap={5}>{#each lines as l}<span class="small"><LensDot lens={l.lens} decorative /> {l.text}</span>{/each}</Row>
             </Stack>
           </Row>

@@ -5,7 +5,8 @@
 // (§2 Room health, Offline actions, Dialog and sheet states (R14), Field and button states (R16), Top bar variants); data
 // ui-next/fixtures/collect/collect.json (one source per value). Links come from the shared screens/href.js, which carries ?w= and ?theme=
 // from location.search: each render sets the URL the route would have (at()).
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { useLevelMinimum } from "../ui-next/src/screens/results/data.js";
 import { readFileSync, readdirSync } from "node:fs";
 import { resolve } from "node:path";
 import { createRawSnippet, flushSync } from "svelte";
@@ -272,6 +273,7 @@ describe("Dialog (R14 dismissal): title row + Close, Escape, a forced close and 
 });
 
 describe("CloseCollection (CloseCollection, CloseCollectionPhone)", () => {
+  beforeEach(() => { useLevelMinimum(1); }); // DEV-like fixtures band at 1, set explicitly
   it("desktop: modal dialog with icon tile + title + Close, consequence, per-perspective counts, Keep collecting (focused) then the one primary", () => {
     const a = shot(CloseCollection);
     const d = a.querySelector("dialog.glass-hi:not(.sheet)")!;
@@ -287,7 +289,15 @@ describe("CloseCollection (CloseCollection, CloseCollectionPhone)", () => {
     expect(a.querySelector(".btn-primary")!.getAttribute("href")).toBe("?ui_next=on&screen=results");
     expect(text(a.querySelector("main .l-row > .l-row .btn:not(details .btn)"))).toBe("Share the survey");
   });
-  it("the ready line follows the level floor (results/data.js LEVEL_MIN = 1): one answer is enough to say it, none is not; no 3-answer promise", () => {
+  it("the ready line follows the served level minimum: DEV 1 says it from one answer; production-like or absent (3) waits for 3; no 3-answer promise", () => {
+    useLevelMinimum(3);
+    const two = structuredClone(fixture);
+    two.groups[2].surveys.forEach((x: { answered: number }, i: number) => { x.answered = i ? 0 : 2; });
+    expect(text(shot(CloseCollection, { data: two }).querySelector("dialog .solid"))).toBe("Translation team 6 · Community 8 · Church 2.");
+    expect(text(shot(CloseCollection).querySelector("dialog .solid"))).toBe("Translation team 6 · Community 8 · Church 4. Every perspective has at least 3 answers, so its level can show; the drops beside each level show how much evidence it rests on. Answer-by-answer splits wait for 3.");
+    useLevelMinimum(undefined); // absent: the safe 3
+    expect(text(shot(CloseCollection, { data: two }).querySelector("dialog .solid"))).toBe("Translation team 6 · Community 8 · Church 2.");
+    useLevelMinimum(1);
     const one = structuredClone(fixture);
     one.groups[2].surveys.forEach((x: { answered: number }, i: number) => { x.answered = i ? 0 : 1; });
     const a = shot(CloseCollection, { data: one });

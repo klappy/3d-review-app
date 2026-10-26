@@ -45,11 +45,20 @@ export function canonicalPayload(payload) {
   return out;
 }
 export const MIN_RESPONSES = V3_BAND_CUTOFFS.minResponses; // answer splits (complementary suppression) keep this floor
-// A perspective's level needs one response in UI Next (3d-review-cookbook work/active/2026-10-26-3d-report-threshold-coverage,
-// REQ-0018): the same floor the DEV server builds a report at; none reads More input needed. Low counts are shown by the
-// coverage cue (Coverage.svelte drops, "a few drops"), never by holding the level. The current UI keeps V3_BAND_CUTOFFS unchanged.
-export const LEVEL_MIN = 1;
-export const LEVEL_CUTOFFS = Object.freeze({ ...V3_BAND_CUTOFFS, minResponses: LEVEL_MIN });
+// Per-perspective level minimum: the SERVER decides it (src/report-admission.ts perspectiveLevelMinimum, served as
+// level_minimum_responses on GET /v2/assessments/{aid}/results: DEV 1, every other environment 3). Until a served value is
+// read, or when it is absent or not a whole number >= 1, UI Next uses the SAFE floor (V3_BAND_CUTOFFS.minResponses, 3), never 1.
+// Under the minimum a perspective reads More input needed; at or over it, low counts are shown by the coverage cue (drops).
+export const SAFE_LEVEL_MIN = V3_BAND_CUTOFFS.minResponses;
+/** The level minimum a served value allows: a whole number >= 1, else the safe floor. */
+export const levelMinimumOf = (served) => (Number.isInteger(served) && served >= 1 ? served : SAFE_LEVEL_MIN);
+let levelMin = SAFE_LEVEL_MIN;
+/** Record the server's level_minimum_responses (one value per environment). Anything absent or unknown resets to the safe floor. */
+export function useLevelMinimum(served) { levelMin = levelMinimumOf(served); return levelMin; }
+/** The level minimum in force now (the served value, else 3). */
+export const currentLevelMin = () => levelMin;
+/** v3ScoreBand cut-offs with the level minimum in force. */
+export const levelCutoffs = () => Object.freeze({ ...V3_BAND_CUTOFFS, minResponses: levelMin });
 /** Coverage (quantity) beside the level (quality): drops filled by how many people answered (no jar: the Level's Jars imagery owns the jar). Provisional tiers, presentation only. */
 export function coverageOf(n) {
   if (n === null || n === undefined || !Number.isFinite(Number(n))) return { fill: 0, word: "" }; // not counted: no jar word on a guess
@@ -61,7 +70,7 @@ export function coverageOf(n) {
 export const LEVEL_KEY = Object.freeze({ Strong: "strong", Growing: "growing", "Needs support": "support", "Needs urgent attention": "urgent", "More input needed": "more" });
 export const LEVEL_WORD = Object.freeze(Object.fromEntries(Object.entries(LEVEL_KEY).map(([w, k]) => [k, w])));
 export function levelOf(score, responses) {
-  const word = v3ScoreBand(score, responses, LEVEL_CUTOFFS);
+  const word = v3ScoreBand(score, responses, levelCutoffs());
   const key = LEVEL_KEY[word];
   if (!key) throw new TypeError(`results: v3ScoreBand returned an unknown band "${word}"`);
   return key;
@@ -247,7 +256,7 @@ export const detailedPages = (cards) => 2 + evidenceSheets(cards).length;
 /** Held state: who is below the minimum, in the board's words ("Church 1 — needs 2 more"). */
 export function heldLines(counts) {
   return LENS_ORDER.map((lens) => {
-    const n = counts?.[lens] ?? 0, short = Math.max(0, LEVEL_MIN - n);
+    const n = counts?.[lens] ?? 0, short = Math.max(0, levelMin - n);
     return { lens, label: lensLabel(lens), n, short, text: short ? `${lensLabel(lens)} ${n} — needs ${short} more` : `${lensLabel(lens)} ${n} — ready` };
   });
 }

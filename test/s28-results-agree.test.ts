@@ -44,6 +44,8 @@ describe('S28: Results, responses list and report agree below the D7 minimum',()
   expect(r.reason).toBe(`1 response so far; at least ${SUPPRESSION_THRESHOLD} are needed before any score is shown. Scores are held until then.`);
   expect(r.summary).toBeNull();expect(l.responses).toEqual([]);expect(made.report).toBeNull();expect(listed.reports).toEqual([]);
   expect(await reports(one)).toBe(0);
+  // the per-perspective level minimum rides on Results only, and is 3 outside DEV; the overall floor of 5 above is unchanged
+  expect(r.level_minimum_responses).toBe(3);expect((await summary(ctx('dev'),{aid:one})).result).toMatchObject({level_minimum_responses:1});
  },60000);
  it('DEV: one response is enough to build; zero responses hold and name a floor of one',async()=>{
   // 3d-review-cookbook work/active/2026-10-26-3d-report-threshold-coverage: >=1 response in each included lens builds the report.

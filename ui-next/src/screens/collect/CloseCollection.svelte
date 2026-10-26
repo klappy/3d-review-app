@@ -5,7 +5,7 @@
      Close, Escape and the backdrop go back to Collect; the confirm reads "Yes, …" (0.22.7).
      One .btn-primary: the dialog's / sheet's own "Yes, close and see results"; the head Share and the phone bar go secondary behind it.
      "Every perspective has an answer, so its level can show" is said only when it is true (0.27.0 held line): there is at least one
-     perspective and each has results/data.js LEVEL_MIN (never vacuously, with none); the drops and the answer-split floor
+     perspective and each has results/data.js currentLevelMin (the server's level minimum, else the safe 3) (never vacuously, with none); the drops and the answer-split floor
      (MIN_RESPONSES) are said beside it, so one answer never reads as plenty. Counts read "1 response is in" / "N responses are in".
      The boards draw one state (the open confirm): any ?state= renders it. -->
 <script>
@@ -16,7 +16,7 @@
   import Dialog from "./Dialog.svelte";
   import Glyph from "./Glyph.svelte";
   import { collectModel, plural } from "./model.js";
-  import { LEVEL_MIN, MIN_RESPONSES } from "../results/data.js";
+  import { currentLevelMin, MIN_RESPONSES } from "../results/data.js";
   import { href } from "../href.js";
   import fixture from "../../../fixtures/collect/collect.json";
 
@@ -24,8 +24,9 @@
   let { phone = false, theme = "light", data = fixture, onclose } = $props();
   const closing = (el) => { const f = (e) => { if (onclose && e.target instanceof Element && e.target.closest(".btn-primary")) { e.preventDefault(); onclose(); } }; el.addEventListener("click", f); return () => el.removeEventListener("click", f); };
   const m = $derived(collectModel(data));
-  const enough = $derived(m.groups.length > 0 && m.groups.every((g) => g.answered >= LEVEL_MIN));
-  const ready = LEVEL_MIN === 1 ? "Every perspective has an answer, so its level can show" : `Every perspective has at least ${LEVEL_MIN} answers, so its level can show`;
+  const MIN = currentLevelMin();
+  const enough = $derived(m.groups.length > 0 && m.groups.every((g) => g.answered >= MIN));
+  const ready = MIN === 1 ? "Every perspective has an answer, so its level can show" : `Every perspective has at least ${MIN} answers, so its level can show`;
 </script>
 
 {#snippet arrow()}<Glyph name="arrow" />{/snippet}

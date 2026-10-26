@@ -1,7 +1,7 @@
 import type { Ctx, Handler } from "./types";
 import { notVisible } from "./errors";
 import { gate, reqStr, responseCountForAssessment, roleAt } from "./common";
-import { participantReportMinimum } from "../report-admission";
+import { participantReportMinimum, perspectiveLevelMinimum } from "../report-admission";
 import { demographicsEnabled, demographicsProjection } from "../context-fields";
 
 /** Below the D7 minimum (report-admission.ts participantReportMinimum: SUPPRESSION_THRESHOLD, a held working default; 1 on DEV,
@@ -38,6 +38,8 @@ export const summary: Handler = async (ctx, params) => {
     snapshot_version: null,
     algorithm_version: null,
     policy_version: "D7-held",
+    // One additive field: the per-perspective level minimum clients band with (report-admission.ts; DEV 1, otherwise 3).
+    level_minimum_responses: perspectiveLevelMinimum(ctx.env),
     ...(low ?? {}),
   }, scope: { type: "assessment", id: aid } };
 };

@@ -1,8 +1,9 @@
 // UI Next (v4) explore lane: Help and FAQ copy, word for word from the boards (cookbook design/2026-10-15-glass-redesign/canvas
 // Help.dc.html desktop, HelpPhone.dc.html phone). Status: provisional. No current-UI module holds this copy (searched ui/ and ui-next/src).
-// The answers-needed FAQ is this lane's own (not the board's "at least 3"): it follows results/data.js LEVEL_MIN and MIN_RESPONSES.
-import { LEVEL_MIN, MIN_RESPONSES } from "../results/data.js";
-const firstAnswers = LEVEL_MIN === 1 ? "its first answer" : `${LEVEL_MIN} answers`;
+// The answers-needed FAQ follows the level minimum in force (results/data.js currentLevelMin: the server's value, else the safe
+// 3) and MIN_RESPONSES; faqFor(min) builds it, FAQ is the safe-floor wording.
+import { currentLevelMin, SAFE_LEVEL_MIN, MIN_RESPONSES } from "../results/data.js";
+const answersNeeded = (min) => `A perspective shows its level from ${min === 1 ? "its first answer" : `${min} answers`}. The drops beside each level show how much evidence it rests on: a few drops is little evidence, not a low result. Answer-by-answer splits still wait for at least ${MIN_RESPONSES} answers in every group.`;
 // TOPICS: [id, title, desktop paragraph, phone paragraph]. A desktop paragraph is a list of runs; odd runs are bold (the board's <strong>).
 export const INTRO = "Everything that used to be inside the steps now lives here. The steps stay short.";
 export const VIDEO = Object.freeze({ title: "What 3D Review is", duration: "2:10", also: "Also: The three perspectives (1:40) · Running a review (3:05)" });
@@ -38,8 +39,10 @@ export const FAQ = Object.freeze([
   ["How does it measure use and impact?", "Community members say how the translation has shaped their understanding and their lives; church leaders record changes they observe in their congregations. The two can be compared."],
   ["What does the report include?", "A high-level summary from each perspective, where to improve, and detailed comparisons that pinpoint disconnects. Repeated reviews show a trajectory over time."],
   ["Is there a right answer?", "No. Participants are told there are no wrong answers and may say \"I don't know\"."],
-  ["How many answers do we need?", `A perspective shows its level from ${firstAnswers}. The drops beside each level show how much evidence it rests on: a few drops is little evidence, not a low result. Answer-by-answer splits still wait for at least ${MIN_RESPONSES} answers in every group.`],
+  ["How many answers do we need?", answersNeeded(SAFE_LEVEL_MIN)],
   ["Can we do this on paper?", "Yes. Print the survey in any answer language, collect it, and enter the answers under Collect."],
   ["What stage is 3D Review in?", "Experimentation. Early-adopter teams are testing it and shaping the next iterations — your feedback is part of the product."],
   ["How can my team try it?", "Use Send app feedback from the account menu, or ask the Innovation Lab team — the contact address lives on the Lab's 3D Review page."],
 ]);
+/** The FAQ with the answers-needed line for the level minimum in force (default: currentLevelMin()). */
+export const faqFor = (min = currentLevelMin()) => FAQ.map(([q, a]) => [q, q === "How many answers do we need?" ? answersNeeded(min) : a]);

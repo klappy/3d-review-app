@@ -3,7 +3,7 @@
 // Boards: 3d-review-cookbook design/2026-10-15-glass-redesign/canvas Results, ResultsPhone, ResultsAnswers, ResultsAnswersPhone,
 // ResultsGaps, ResultsGapsPhone, ResultsHeld, ResultsHeldPhone, Report, ReportDetailed, ReportPhone; unit
 // work/active/2026-10-21-ui-next-screens-fanout. Data: ui-next/fixtures/results/*.json through screens/results/data.js.
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { fireEvent, render } from "@testing-library/svelte";
 // @ts-expect-error -- plain .js module, no type declarations
 import { route } from "../ui-next/src/route.js";
@@ -14,7 +14,9 @@ import { OUT } from "../ui-next/src/screens/results/links.js";
 // @ts-expect-error -- plain .js module, no type declarations
 import results from "../ui-next/src/screens/results/index.js";
 // @ts-expect-error -- plain .js module, no type declarations
-import { REPORT, lensCards, bandRow, bandRows, scoreRows, comparedRows, radar, heldLines, levelOf, pct, answerView, withNotes, gapLead, responsesFor, countWord, detailedPages, lensKey, canonicalPayload, responsesText, LENS_ORDER } from "../ui-next/src/screens/results/data.js";
+import { REPORT, lensCards, bandRow, bandRows, scoreRows, comparedRows, radar, heldLines, levelOf, pct, answerView, withNotes, gapLead, responsesFor, countWord, detailedPages, lensKey, canonicalPayload, responsesText, LENS_ORDER, useLevelMinimum, currentLevelMin, levelMinimumOf } from "../ui-next/src/screens/results/data.js";
+// The fixtures are DEV-like reviews: they band at the DEV level minimum of 1, set explicitly (the live app reads the served value).
+beforeEach(() => { useLevelMinimum(1); });
 import { LENSES } from "../ui/lens-surveys.js";
 import synthetic from "./fixtures/synthetic-report-renderer-v1.json";
 import Results from "../ui-next/src/screens/results/Results.svelte";
@@ -762,6 +764,21 @@ describe("results round 5: a live payload renders; counts read right", () => {
     // a live count no larger than the report's: nothing to say
     expect(lensCards(D.payload, REPORT.desktop.counts).every((c: { newer: number }) => c.newer === 0)).toBe(true);
     expect(render(LensCard as never, { props: { card: lensCards(D.payload, REPORT.desktop.counts)[0] } }).container.querySelector("[data-newer]")).toBeNull();
+  });
+  it("level minimum: the server's value decides; absent or unknown is the safe 3, never 1", () => {
+    expect([useLevelMinimum(undefined), useLevelMinimum(null), useLevelMinimum("1"), useLevelMinimum(0), useLevelMinimum(1.5)]).toEqual([3, 3, 3, 3, 3]);
+    // production-like (served 3): a perspective at 1 or 2 responses is held; at 3 it shows its level
+    useLevelMinimum(3);
+    expect([levelOf(80, 1), levelOf(80, 2), levelOf(80, 3)]).toEqual(["more", "more", "strong"]);
+    expect(heldLines({ team: 1, community: 3, church: 0 }).map((l: { text: string }) => l.text)).toEqual(["Translation team 1 — needs 2 more", "Community 3 — ready", "Church 0 — needs 3 more"]);
+    const D = churchAt(copy(), 2);
+    expect(lensCards(D.payload, D.counts).find((c: { lens: string }) => c.lens === "church").level).toBe("more");
+    const held = mount(ResultsHeld);
+    expect(text(held)).toContain("Levels need at least 3 answers from a perspective. Church has 0 of 3.");
+    // DEV (served 1): one response shows its level
+    useLevelMinimum(1);
+    expect([currentLevelMin(), levelOf(80, 1), levelOf(80, 0)]).toEqual([1, "strong", "more"]);
+    expect(levelMinimumOf(undefined)).toBe(3);
   });
   it("R5-3 + R5-5: Results counts the detailed report's pages; the phone overview line counts the gaps the sheet draws, no radar", () => {
     expect(text([...mount(Results).querySelectorAll("a.btn")].find((a) => text(a).startsWith("Detailed report")) ?? null)).toBe(`Detailed report · ${detailedPages(lensCards(REPORT.desktop.payload, REPORT.desktop.counts))} pages`);
