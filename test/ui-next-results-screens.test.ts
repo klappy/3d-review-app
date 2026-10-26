@@ -891,6 +891,17 @@ describe("results round 5: a live payload renders; counts read right", () => {
     expect(svg.querySelectorAll("polygon[data-lens=team]").length).toBe(1);
     expect(text(d.querySelector("p[data-skip=community]"))).toBe(`Community has no score for ${com.skipped.join(", ")}.`);
   });
+  it("live QA Q10: no answer CSV yet; both CSV buttons are disabled and name the visible reason (no row-level disclosure)", () => {
+    for (const phone of [false, true]) {
+      const a = mount(ResultsAnswers, { phone });
+      const why = a.querySelector("[id=csv-why]")!;
+      expect(why.textContent).toContain("does not release answer-by-answer rows");
+      const btns = [...a.querySelectorAll(".btn")].filter((b) => /CSV/.test(b.textContent ?? ""));
+      expect(btns.length).toBe(1);
+      for (const b of btns) expect([b.tagName, (b as HTMLButtonElement).disabled, b.getAttribute("aria-describedby")]).toEqual(["BUTTON", true, "csv-why"]);
+      expect(a.querySelector("a[href='#csv']")).toBeNull();
+    }
+  });
   it("R5-3 + R5-5: Results counts the detailed report's pages; the phone overview line counts the gaps the sheet draws, no radar", () => {
     expect(text([...mount(Results).querySelectorAll("a.btn")].find((a) => text(a).startsWith("Detailed report")) ?? null)).toBe(`Detailed report · ${detailedPages(lensCards(REPORT.desktop.payload, REPORT.desktop.counts))} pages`);
     expect(mount(Report, { phone: true }).textContent).toContain("Levels, the three biggest gaps.");
