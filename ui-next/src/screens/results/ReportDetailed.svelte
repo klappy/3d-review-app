@@ -100,7 +100,7 @@
       </Stack>
       <Stack gap={2}>
         <h2 class="h3">How to read the scores</h2>
-        <p class="small">Scores are the pinned report model's area values (0–100) aggregated from the item answers listed under Evidence. Levels are bands on those scores. A perspective with no answers shows More input needed and no score; the drops beside each perspective shows how many answered (a few drops is little evidence, not a low result). Nothing in this report identifies a person.</p>
+        <p class="small">Scores are the pinned report model's area values (0–100) aggregated from the item answers listed under Evidence. Levels are bands on those scores. A perspective with no answers shows More input needed and no score; the drops beside each perspective show how many answered (a few drops is little evidence, not a low result). Nothing in this report identifies a person.</p>
       </Stack>
       {#if !sheets.length}{@render words()}{/if}
       {@render foot(2)}

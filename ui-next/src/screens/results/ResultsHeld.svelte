@@ -3,8 +3,8 @@
      (./data.js LEVEL_MIN: no response yet) holds the results; every level of that perspective is
      More input needed (v3ScoreBand), shown as a preview of the first rows, dimmed by the contract .l-grid[data-state=held] (8.11)
      and inert (the board marks it aria-hidden; inert also keeps its links out of the tab order). Hero: the 64px chip
-     .icn[data-size="64"] and the --t-24 heading .h2.t-24 (contract rows); the board's 40px hero padding stays inline there (res-5),
-     so the card is the Card pad=hero contract. Any ?state= renders the default.
+     .icn[data-size="64"] and the --t-24 heading .h2.t-24 (contract rows); the held card is the §8.2 desktop work card
+     (data-pad=work, 32/36: the nearest kit value to the board's 40, which no token gives; no inline style). Any ?state= renders the default.
      One .btn-primary: desktop "Reopen collection" (review head); phone the phone-bar. Copy: the boards. -->
 <script>
   import AppShell from "../../AppShell.svelte";
@@ -14,7 +14,6 @@
   import Row from "../../Row.svelte";
   import TopBar from "../../TopBar.svelte";
   import PhoneHeader from "../../PhoneHeader.svelte";
-  import PhoneBar from "../../PhoneBar.svelte";
   import Button from "../../Button.svelte";
   import LensDot from "../../LensDot.svelte";
   import Glyph from "./Glyph.svelte";
@@ -58,7 +57,8 @@
 
 {#snippet qr()}<Glyph d={G.qr} />{/snippet}
 {#snippet top()}{#if phone}<PhoneHeader state="nested" title={P.review.title} parent={P.review.project} back={out("project")} menuHref={out("menu")} />{:else}<TopBar {crumbs} home={out("workspace")} />{/if}{/snippet}
-{#snippet bar()}{#if phone}<PhoneBar label={primary.label} href={primary.href} disabled={!!primary.disabled} ariaDescribedby={primary.disabled ? "reopen-why" : undefined} />{/if}{/snippet}
+<!-- The phone bar is PhoneBar's markup with the board's QR lead (PhoneBar takes a plus/arrow lead only), as collect/ReviewFrame.svelte does. -->
+{#snippet bar()}{#if phone}<div class="glass phone-bar" role="group" aria-label="Page actions"><Button label={primary.label} variant="primary" lg href={primary.disabled ? undefined : primary.href} disabled={!!primary.disabled} ariaDescribedby={primary.disabled ? "reopen-why" : undefined} lead={qr} /></div>{/if}{/snippet}
 
 <div class="l-stack" {@attach reopening}><AppShell {phone} {theme} screen {top} {bar}>
   {#if phone}
@@ -76,7 +76,7 @@
     <Page gap={5}>
       <ReviewHead review={D.review} responses={H.review.closedResponses} {primary} />
       <LevelLegend />
-      <Card hi pad="hero" gap={3} label="Results are held">
+      <div class="glass-hi l-card l-stack" data-pad="work" data-gap="3" role="group" aria-label="Results are held"><!-- §8.2 desktop work card (32/36): the board draws 40, which no kit value gives -->
         <Row split gap={6}>
           <Row gap={6}>
             <span class="icn" data-size="64" data-lens="team"><Glyph d={G.lock} size={30} /></span>
@@ -88,7 +88,7 @@
           </Row>
           <Stack gap={2}>{#if primary.disabled}<Button label={primary.label} lead={qr} disabled ariaDescribedby="primary-why" />{:else}<Button label={primary.label} href={primary.href} lead={qr} />{/if}{#if escape}<Button label={without} variant="quiet" href={href("results")} />{/if}</Stack>
         </Row>
-      </Card>
+      </div>
       <div class="l-grid" data-cols="3" data-gap="4" data-state="held" inert>{#each cards as card (card.lens)}<Stack><LensCard {card} rows={H.preview} /></Stack>{/each}</div>
     </Page>
   {/if}

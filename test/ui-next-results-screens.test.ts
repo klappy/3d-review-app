@@ -25,6 +25,7 @@ import Report from "../ui-next/src/screens/results/Report.svelte";
 import ReportDetailed from "../ui-next/src/screens/results/ReportDetailed.svelte";
 import LensCard from "../ui-next/src/screens/results/LensCard.svelte";
 import BandBar from "../ui-next/src/screens/results/BandBar.svelte";
+import { G } from "../ui-next/src/screens/results/icons.js";
 
 type Props = Record<string, unknown>;
 const mount = (C: unknown, props: Props = {}) => render(C as never, { props }).container.querySelector(".app") as HTMLElement;
@@ -317,7 +318,18 @@ describe("each board renders as a screen", () => {
       expect(kids.map((n) => (n.nodeType === 1 ? (n as Element).tagName.toLowerCase() : "label"))).toEqual(["label", "svg"]);
       expect(p.querySelector("svg path")!.getAttribute("d")).toBe("M5 12h14M13 6l6 6-6 6");
     }
-    expect(mount(ResultsHeld, { phone: true }).querySelector(".phone-bar .btn-primary svg")).toBeNull(); // Reopen collection: no trail
+    // Reopen collection: the board's leading QR icon, no trail (ResultsHeldPhone)
+    const held = mount(ResultsHeld, { phone: true }).querySelector(".phone-bar .btn-primary")!;
+    expect(text(held)).toBe("Reopen collection");
+    const hk = [...held.childNodes].filter((n) => n.nodeType === 1 || (n.textContent ?? "").trim());
+    expect(hk.map((n) => (n.nodeType === 1 ? (n as Element).tagName.toLowerCase() : "label"))).toEqual(["svg", "label"]);
+    expect(held.querySelector("svg path")!.getAttribute("d")).toBe(G.qr);
+  });
+  it("board ports (ResultsHeld desktop card pad, ReportDetailed page 2 copy)", () => {
+    const card = mount(ResultsHeld).querySelector(".glass-hi[aria-label='Results are held']")!;
+    expect([card.classList.contains("l-card"), card.getAttribute("data-pad"), card.getAttribute("data-gap"), card.getAttribute("role")]).toEqual([true, "work", "3", "group"]);
+    expect(card.hasAttribute("style")).toBe(false);
+    expect(text(mount(ReportDetailed))).toContain("the drops beside each perspective show how many answered (a few drops is little evidence, not a low result)");
   });
   it("ResultsAnswers: perspective switch, split, one card per question with answer rows and bars, their words", () => {
     const a = mount(ResultsAnswers);
