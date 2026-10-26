@@ -2,12 +2,12 @@
    scroll: keep phone actions in the viewport and respect the device safe area. */
 .app.l-screen{overflow:clip}
 .phone-bar{position:fixed;padding-bottom:calc(28px + env(safe-area-inset-bottom))}/* design-system.md §9 phone-bar: fixed to the viewport foot (left/right/bottom 0 from base.css); main.l-phone's 120px bottom padding (§8.3) keeps the last content clear of it */
-/* Short phone pages: .l-shell's height:100% cannot resolve against .app's min-height, so the shell was only as tall as its content
-   and the in-flow sticky bar sat mid-screen. The phone screen is a flex column at least one dynamic viewport tall, the shell
-   grows to fill it, and main.l-phone (flex-grow:1) pushes the bar to the viewport foot; a long page scrolls and the bar sticks.
-   Desktop screens are unchanged. (cookbook VALIDATION-integration.md B1) */
-.app.l-screen[data-w=phone]{display:flex;flex-direction:column;min-height:100dvh}
-.app.l-screen[data-w=phone]>.l-shell{flex:1 0 auto}
+/* The phone screen is the board's frame (design-system.md §9 Phone frame; Codex P2 4383334410): exactly one dynamic viewport tall,
+   the shell fills it, and main.l-page.l-phone.phone-main (base.css .phone-main: flex 1 1 0, min-height 0, overflow-y auto) scrolls
+   inside it, so the header stays put; short pages still put the bar at the viewport foot, and .l-phone's 120px bottom padding is the
+   bar's clearance. Desktop screens are unchanged. (cookbook VALIDATION-integration.md B1) */
+.app.l-screen[data-w=phone]{display:flex;flex-direction:column;height:100dvh}
+.app.l-screen[data-w=phone]>.l-shell{flex:1 1 0;min-height:0}
 
 .phone-top .btn,.phone-top .menu-btn{min-width:44px}
 .phone-top .menu-btn{padding:0;justify-content:center}

@@ -1,7 +1,7 @@
 import type { Ctx, Handler } from "./types";
 import { notVisible } from "./errors";
 import { gate, reqStr, responseCountForAssessment, roleAt } from "./common";
-import { participantReportMinimum, perspectiveLevelMinimum } from "../report-admission";
+import { participantReportMinimum, participantReportsAllowed, perspectiveLevelMinimum } from "../report-admission";
 import { demographicsEnabled, demographicsProjection } from "../context-fields";
 
 /** Below the D7 minimum (report-admission.ts participantReportMinimum: SUPPRESSION_THRESHOLD, a held working default; 1 on DEV,
@@ -40,6 +40,10 @@ export const summary: Handler = async (ctx, params) => {
     policy_version: "D7-held",
     // One additive field: the per-perspective level minimum clients band with (report-admission.ts; DEV 1, otherwise 3).
     level_minimum_responses: perspectiveLevelMinimum(ctx.env),
+    // One additive field (Codex P2 4383266687): whether a participant report build can be admitted here, from the same two gates
+    // the report store applies (report-admission.ts participantReportsAllowed, then the floor minimumHold names). False wherever
+    // the environment does not admit participant reports, whatever the count. Read-only: build and list re-check everything.
+    report_build_allowed: participantReportsAllowed(ctx.env) && low === null,
     ...(low ?? {}),
   }, scope: { type: "assessment", id: aid } };
 };

@@ -255,7 +255,7 @@
     if (building || build) return;
     if (uncertainBuild === aid) { say("A report build's outcome is unknown. Reload this page to see the report list before building again."); return; }
     build = null; say("");
-    try { const out = await D.previewBuild(aid); if (out.held) { say("The results can’t be built yet: more answers are needed. Nothing was built."); return; } build = { aid, text: buildConfirmText(m?.review?.liveResponses ?? m?.review?.responses), token: out.token, expires: out.expires }; }
+    try { const out = await D.previewBuild(aid); if (out.held) { say(D.heldBuildText(out.preview, "Nothing was built.")); return; } build = { aid, text: buildConfirmText(m?.review?.liveResponses ?? m?.review?.responses), token: out.token, expires: out.expires }; }
     catch (e) { say(`The preview could not be loaded. Nothing was built; ${e?.message || "try again"}.`); }
   }
   function cancelBuild() { build = null; say("Cancelled. Nothing was built."); }
@@ -263,7 +263,7 @@
     const b = build; if (!b || building) return;
     if (Date.now() >= b.expires) { build = null; say("Preview expired. Preview again before building."); return; }
     build = null; building = true;
-    try { const out = await D.executeBuild(b.aid, b.token); if (out.held) say("The results can’t be built yet: more answers are needed. No report was built."); else load(); }
+    try { const out = await D.executeBuild(b.aid, b.token); if (out.held) say(D.heldBuildText(out.preview, "No report was built.")); else load(); }
     catch (e) { uncertainBuild = b.aid; say(`The report build outcome could not be confirmed: ${e?.message || "reload to see whether a report was built"}. Rebuilding is locked until this page reloads the report list.`); }
     finally { building = false; }
   }

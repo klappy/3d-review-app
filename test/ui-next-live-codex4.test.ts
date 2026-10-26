@@ -51,7 +51,7 @@ const counts = { survey: {}, counts: { responses: 4, respondents: 4 } };
 const base = (over: Record<string, unknown> = {}): Record<string, unknown> => ({
   "GET /v2/me": { principal: { id: "p1", display_name: "Kay Facilitator" } },
   [`GET /v2/assessments/${AID}`]: assessment(),
-  [`GET /v2/assessments/${AID}/results`]: { status: "ready" },
+  [`GET /v2/assessments/${AID}/results`]: { status: "ready", report_build_allowed: true },
   [`GET /v2/projects/${PID}`]: { project: { id: PID, name: "Kikuyu", workspace_id: null } },
   [`GET /v2/projects/${PID}/languages`]: { languages: [{ id: "lang_1", name: "Kikuyu" }] },
   [`GET /v2/assessments/${AID}/surveys/s1`]: counts, [`GET /v2/assessments/${AID}/surveys/s2`]: counts,
@@ -342,7 +342,7 @@ describe("the served level minimum reaches Help, Explore and the detailed report
 
 describe("Codex P2 4382475727: the results summary is a hold only with its low-count fields", () => {
   it("DEV, one response, no built report: a member sees Not built yet with Build; a viewer sees the honest not-built state, not 'needs more answers'", async () => {
-    const noReports = { [`GET /v2/assessments/${AID}/reports`]: { reports: [], next_cursor: null }, [`GET /v2/assessments/${AID}/results`]: { status: "held", suppressed: true, level_minimum_responses: 1 } };
+    const noReports = { [`GET /v2/assessments/${AID}/reports`]: { reports: [], next_cursor: null }, [`GET /v2/assessments/${AID}/results`]: { status: "held", suppressed: true, level_minimum_responses: 1, report_build_allowed: true } };
     for (const role of ["owner", "viewer"]) {
       serve(base({ ...noReports, [`GET /v2/assessments/${AID}`]: assessment({ role }) }));
       const m = await resultsModel(AID);
@@ -356,7 +356,7 @@ describe("Codex P2 4382475727: the results summary is a hold only with its low-c
     }
     // below the server minimum the summary carries its low-count fields: the hold applies to every role, members included
     // (Codex P2 4382607192: a member below the floor is never offered a Build that can only fail)
-    const below = { status: "held", responses_in: 0, responses_needed: 1, reason: "0 responses so far; at least 1 is needed before any score is shown. Scores are held until then." };
+    const below = { status: "held", report_build_allowed: false, responses_in: 0, responses_needed: 1, reason: "0 responses so far; at least 1 is needed before any score is shown. Scores are held until then." };
     for (const role of ["viewer", "owner", "member"]) {
       serve(base({ ...noReports, [`GET /v2/assessments/${AID}/results`]: below, [`GET /v2/assessments/${AID}`]: assessment({ role }) }));
       expect((await resultsModel(AID)).held).toMatchObject({ responses_needed: 1 });
@@ -465,5 +465,42 @@ describe("Codex P2s on ed291878: the report readers' payload and the stands-out 
     expect(said).not.toMatch(/hidden swing|raw two|raw three/i);
     expect(liveReport(m, { phone: true, screen: "report" }).standsOut).toBe(said);
     useLevelMinimum(undefined);
+  });
+});
+
+describe("Codex P2 4383266687: Build is offered only on the server's report_build_allowed", () => {
+  const noReports = { [`GET /v2/assessments/${AID}/reports`]: { reports: [], next_cursor: null } };
+  const buildButton = (el: Element) => [...el.querySelectorAll("button")].find((b) => b.textContent === "Build the report");
+  it("flag off with 5 or more responses: no Build, and the hold says reports aren't available here, not 'more answers'", async () => {
+    // production without PARTICIPANT_REPORTS (or an unknown environment): no low-count fields, and the server says no build
+    serve(base({ ...noReports, [`GET /v2/assessments/${AID}/results`]: { status: "held", suppressed: true, level_minimum_responses: 3, report_build_allowed: false } }));
+    const m = await resultsModel(AID);
+    expect(m.review.responses).toBeGreaterThanOrEqual(5);
+    expect(m.held).toMatchObject({ unavailable: true });
+    globalThis.location.hash = to("results", { aid: AID });
+    const a = render(Live as never, { props: {} }).container;
+    await waitFor(() => expect(a.textContent).toContain("Reports aren’t available here"));
+    expect(a.textContent).toContain("this environment doesn’t build reports from participant answers");
+    expect(a.textContent).not.toMatch(/Not built yet|needs \d+ more|more answers are needed|has enough answers/);
+    expect(buildButton(a)).toBeUndefined();
+  });
+  it("DEV eligible: report_build_allowed true offers a member Build", async () => {
+    serve(base({ ...noReports, [`GET /v2/assessments/${AID}/results`]: { status: "held", suppressed: true, level_minimum_responses: 1, report_build_allowed: true } }));
+    expect((await resultsModel(AID)).held).toBeNull();
+    globalThis.location.hash = to("results", { aid: AID });
+    const a = render(Live as never, { props: {} }).container;
+    await waitFor(() => expect(a.textContent).toContain("Not built yet"));
+    expect(buildButton(a)).toBeDefined();
+  });
+  it("the field absent (an older server, or a failed read): no Build", async () => {
+    for (const res of [{ status: "held", suppressed: true, level_minimum_responses: 1 }, new Error("results down")]) {
+      serve(base({ ...noReports, [`GET /v2/assessments/${AID}/results`]: res }));
+      expect((await resultsModel(AID)).held).toMatchObject({ unavailable: true });
+      globalThis.location.hash = to("results", { aid: AID });
+      const a = render(Live as never, { props: {} }).container;
+      await waitFor(() => expect(a.textContent).toContain("Reports aren’t available here"));
+      expect(a.textContent).toContain("the server didn’t confirm that a report can be built");
+      expect(buildButton(a)).toBeUndefined();
+    }
   });
 });

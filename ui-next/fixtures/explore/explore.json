@@ -12,20 +12,20 @@
   "addFilter": ["Project", "Language", "Cluster", "Organisation involved", "Translation format", "Facilitator"],
   "reviews": [
     { "title": "Mark 1–4 draft", "project": "Hindi New Testament", "language": "Hindi", "region": "South Asia", "orgs": "BCS", "stage": "collect", "responses": { "n": 18, "expected": 30 }, "lenses": null, "updated": "today" },
-    { "title": "Luke 1–2 community review", "project": "Hindi New Testament", "language": "Hindi", "region": "South Asia", "orgs": "BCS", "stage": "understand", "responses": { "n": 24 }, "lenses": { "team": { "score": 68, "responses": 8 }, "community": { "score": 52, "responses": 10 }, "church": { "score": 64, "responses": 6 } }, "updated": "12 Sep" },
+    { "title": "Luke 1–2 community review", "project": "Hindi New Testament", "language": "Hindi", "region": "South Asia", "orgs": "BCS", "stage": "understand", "responses": { "n": 24 }, "lenses": { "team": { "score": 68, "responses": 9 }, "community": { "score": 52, "responses": 10 }, "church": { "score": 64, "responses": 5 } }, "updated": "12 Sep" },
     { "title": "Workshop 2 · Luke 1", "project": "Kurubaru Scripture", "language": "Kurubaru Yellavaru", "region": "South Asia", "orgs": "BCS · SIL", "stage": "collect", "responses": { "n": 9, "expected": 24 }, "lenses": null, "updated": "3 days ago" },
     { "title": "Workshop 2 · Luke 1", "project": "Kurubaru Scripture", "language": "Kurubaru Adi Dravida", "region": "South Asia", "orgs": "BCS · SIL", "stage": "collect", "responses": { "n": 11, "expected": 24 }, "lenses": null, "updated": "3 days ago" },
-    { "title": "Mark 2 signed", "project": "ISL Mark", "language": "Indian Sign Language", "region": "South Asia", "orgs": "BCS · Deaf Bible Society", "stage": "understand", "responses": { "n": 15 }, "lenses": { "team": { "score": 81, "responses": 7 }, "community": { "score": 66, "responses": 6 }, "church": { "score": 70, "responses": 2 } }, "updated": "28 Sep" },
+    { "title": "Mark 2 signed", "project": "ISL Mark", "language": "Indian Sign Language", "region": "South Asia", "orgs": "BCS · Deaf Bible Society", "stage": "understand", "responses": { "n": 15 }, "lenses": { "team": { "score": 81, "responses": 8 }, "community": { "score": 66, "responses": 7 }, "church": { "score": null, "responses": 0 } }, "updated": "28 Sep" },
     { "title": "Genesis audio check", "project": "Lao Old Testament", "language": "Lao", "region": "Southeast Asia", "orgs": "Partner · shared", "stage": "prepare", "responses": null, "lenses": null, "updated": "26 Sep" }
   ],
   "phone": {
     "chips": ["BCS · India", "South Asia", "Results ready", "2026"],
     "rows": [
-      { "title": "Luke 1–2 community review", "meta": "Hindi NT · Sep 2026", "team": { "score": 68, "responses": 8 } },
-      { "title": "Genesis audio check", "meta": "Lao OT · Sep 2026", "team": { "score": 47, "responses": 5 } },
-      { "title": "Mark 1–4 draft", "meta": "Hindi NT · Oct 2026", "team": { "score": null, "responses": 2 } },
-      { "title": "Acts listening review", "meta": "Hindi NT · Aug 2026", "team": { "score": 63, "responses": 9 } },
-      { "title": "Psalms reading group", "meta": "Lao OT · Jul 2026", "team": { "score": 79, "responses": 6 } }
+      { "title": "Luke 1–2 community review", "meta": "Hindi NT · Sep 2026", "team": { "score": 68, "responses": 9 }, "lenses": { "team": { "score": 68, "responses": 9 }, "community": { "responses": 10 }, "church": { "responses": 5 } } },
+      { "title": "Genesis audio check", "meta": "Lao OT · Sep 2026", "team": { "score": 47, "responses": 5 }, "lenses": { "team": { "score": 47, "responses": 5 }, "community": { "responses": 4 }, "church": { "responses": 3 } } },
+      { "title": "Mark 1–4 draft", "meta": "Hindi NT · Oct 2026", "team": { "score": null, "responses": 2 }, "lenses": { "team": { "score": null, "responses": 2 }, "community": { "responses": 1 }, "church": { "responses": 0 } } },
+      { "title": "Acts listening review", "meta": "Hindi NT · Aug 2026", "team": { "score": 63, "responses": 9 }, "lenses": { "team": { "score": 63, "responses": 9 }, "community": { "responses": 4 }, "church": { "responses": 2 } } },
+      { "title": "Psalms reading group", "meta": "Lao OT · Jul 2026", "team": { "score": 79, "responses": 6 }, "lenses": { "team": { "score": 79, "responses": 6 }, "community": { "responses": 8 }, "church": { "responses": 7 } } }
     ],
     "sheet": [
       { "icon": "people", "label": "Workspace · BCS · India" },

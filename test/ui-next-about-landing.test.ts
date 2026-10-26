@@ -281,7 +281,8 @@ it("a short phone page fills the viewport and the fixed bar sits at its foot; de
     const shell = app.querySelector(":scope > .l-shell") as HTMLElement;
     expect(getComputedStyle(app).display).toBe("flex");
     expect(getComputedStyle(app).flexDirection).toBe("column");
-    expect(getComputedStyle(app).minHeight).toBe("100dvh");
+    expect(getComputedStyle(app).height).toBe("100dvh"); // the bounded frame (§9 Phone frame; Codex P2 4383334410): main scrolls inside it
+    expect(getComputedStyle(app.querySelector("main.l-phone.phone-main")!).overflowY).toBe("auto");
     expect(getComputedStyle(shell).flexGrow).toBe("1");
     expect(getComputedStyle(app.querySelector("main.l-phone")!).flexGrow).toBe("1");
     expect(shell.lastElementChild!.matches(".phone-bar")).toBe(true);

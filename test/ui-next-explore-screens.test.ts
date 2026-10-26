@@ -15,7 +15,7 @@ import Help from "../ui-next/src/screens/explore/Help.svelte";
 // @ts-expect-error -- plain .js module, no type declarations
 import lane from "../ui-next/src/screens/explore/index.js";
 // @ts-expect-error -- plain .js module, no type declarations
-import { levelOf, stagePill, responsesText, exploreRows, phoneRows, matchCounts, LENS_KEYS, STAGE_PILL } from "../ui-next/src/screens/explore/explore-data.js";
+import { levelOf, stagePill, responsesText, exploreRows, phoneRows, fewestOf, matchCounts, LENS_KEYS, STAGE_PILL } from "../ui-next/src/screens/explore/explore-data.js";
 // @ts-expect-error -- plain .js module, no type declarations
 import { modal, backdropClose, closeTo } from "../ui-next/src/screens/explore/dialog.js";
 // @ts-expect-error -- plain .js module, no type declarations
@@ -124,7 +124,18 @@ describe("Explore (Explore.dc.html, ExplorePhone.dc.html, ExploreFiltersPhone.dc
     expect(rows.map((r) => r[0])).toEqual(["Mark 1–4 draft", "Luke 1–2 community review", "Workshop 2 · Luke 1", "Workshop 2 · Luke 1", "Mark 2 signed", "Genesis audio check"]);
     expect(rows.map((r) => r[5])).toEqual(["Collecting", "Results ready", "Collecting", "Collecting", "Results ready", "Setting up"]);
     expect(rows.map((r) => r[6])).toEqual(["18 / 30", "24", "9 / 24", "11 / 24", "15", "—"]);
-    expect(rows.map((r) => r.slice(7, 10))).toEqual([["—", "—", "—"], ["Growing", "Needs support", "Growing"], ["—", "—", "—"], ["—", "—", "—"], ["Strong", "Growing", "More input needed"], ["—", "—", "—"]]);
+    // each level cell: the Level, then the Coverage cue's count variant under it in .l-stack[data-gap="1"] (Codex P2 4383334399;
+    // design-system.md §2 Coverage cue, Explore placement @5edfbfab); no report is the board's dash with no cue
+    const cell = (td: Element) => (td.querySelector(".lvl-name") ? text(td.querySelector(".lvl-name")!) : text(td));
+    const lvl = [...a.querySelectorAll("tbody tr")].map((tr) => [...tr.querySelectorAll("td")].slice(7, 10));
+    expect(lvl.map((r) => r.map(cell))).toEqual([["—", "—", "—"], ["Growing", "Needs support", "Growing"], ["—", "—", "—"], ["—", "—", "—"], ["Strong", "Growing", "More input needed"], ["—", "—", "—"]]);
+    expect(lvl.map((r) => r.map((td) => td.querySelector("[data-coverage] [data-short]")?.textContent ?? null))).toEqual([[null, null, null], ["9", "10", "5"], [null, null, null], [null, null, null], ["8", "7", "0"], [null, null, null]]);
+    for (const td of lvl.flat().filter((td) => td.querySelector(".lvl-name"))) {
+      const stack = td.firstElementChild!;
+      expect([stack.tagName, stack.className, stack.getAttribute("data-gap")]).toEqual(["SPAN", "l-stack", "1"]);
+      expect([...stack.children].map((c) => c.matches("[data-coverage]") ? "cue" : c.querySelector(".lvl-name") || c.matches(".lvl, [data-level]") ? "level" : c.className)).toEqual(["level", "cue"]);
+      expect(td.querySelector("[data-coverage]")!.getAttribute("title")).toMatch(/· \d+ responses?$/);
+    }
     expect(rows.map((r) => r[10])).toEqual(["today", "12 Sep", "3 days ago", "3 days ago", "28 Sep", "26 Sep"]);
     expect(text(a)).toContain("6 of 23 reviews match · 4 projects · 5 languages"); // counted from the six rows (N4), not the board's literal
     expect(text(a)).toContain("Nothing here identifies a participant.");
@@ -143,6 +154,9 @@ describe("Explore (Explore.dc.html, ExplorePhone.dc.html, ExploreFiltersPhone.dc
     const rows = [...a.querySelectorAll("a.card-link.list-row")];
     expect(rows.map((r) => text(r.querySelector(".list-title")!))).toEqual(["Luke 1–2 community review", "Genesis audio check", "Mark 1–4 draft", "Acts listening review", "Psalms reading group"]);
     expect(rows.map((r) => text(r.querySelector(".lvl-name")!))).toEqual(["Growing", "Needs support", "More input needed", "Growing", "Strong"]);
+    // one overall level per row, the count under it is the perspective with the fewest responses (provisional, parity R72)
+    expect(rows.map((r) => r.querySelector("[data-coverage] [data-short]")?.textContent)).toEqual(["5", "3", "0", "2", "6"]);
+    expect(rows.map((r) => r.querySelector(".l-stack[data-gap='1'] > [data-coverage]") !== null)).toEqual(Array(5).fill(true));
     expect(rows.map((r) => text(r.querySelector(".small")!))).toEqual(["Hindi NT · Sep 2026", "Lao OT · Sep 2026", "Hindi NT · Oct 2026", "Hindi NT · Aug 2026", "Lao OT · Jul 2026"]);
     expect(text(a)).toContain("Save this view");
     expect(text(a)).toContain("Download CSV");
@@ -244,6 +258,13 @@ describe("Explore data adapts through the current UI's level function (ui/assess
       const l = (r.lenses as Record<string, { score: number; responses: number }> | null)?.[k];
       if (l) expect({ strong: "Strong", growing: "Growing", support: "Needs support", urgent: "Needs urgent attention", more: "More input needed" }[levelOf(l) as string]).toBe(v3ScoreBand(l.score, l.responses));
     }
+  });
+  it("fewestOf: a phone row's cue counts the perspective with the fewest responses; none carried is null", () => {
+    expect(fewestOf({ team: { score: 68, responses: 9 }, community: { responses: 10 }, church: { responses: 5 } })).toBe(5);
+    expect(fewestOf({ team: { score: null, responses: 2 }, church: { responses: 0 } })).toBe(0);
+    expect(fewestOf({ team: { score: 60 } })).toBeNull();
+    expect(fewestOf(null)).toBeNull();
+    expect(phoneRows([{ title: "x", team: { score: 70, responses: 4 } }])[0].n).toBe(4); // a row with only team still counts it
   });
   it("app stage ids map onto the Stage pill; responses read n / expected only when an expected count exists", () => {
     expect(STAGE_PILL).toEqual({ prepare: "setup", collect: "collecting", understand: "results", improve: "reviewed" });
@@ -423,7 +444,9 @@ describe("the pinned 8.7 Explore-lane rows (ui-next/design-source/PIN a594830, b
     const a = mount(Explore, { phone: true });
     const rows = [...a.querySelectorAll("section.glass.l-card[data-pad=rows] > a.card-link.list-row")];
     expect(rows.length).toBe(5);
-    for (const r of rows) expect([...r.children].map((c) => c.className)).toEqual(["icn icn-row", "list-body", "lvl"]);
+    // the right column is the Level over the Coverage count in .l-stack[data-gap="1"] (ExplorePhone @5edfbfab), no inline style
+    for (const r of rows) expect([...r.children].map((c) => c.className)).toEqual(["icn icn-row", "list-body", "l-stack"]);
+    for (const r of rows) expect([...r.lastElementChild!.children].map((c) => c.className)).toEqual(["lvl", "lvl-pair small"]);
     expect(a.querySelectorAll(".l-row > .btn.btn-block").length).toBe(3);
     const d = mount(Explore, { phone: true, state: "filters" }).querySelector("dialog.glass-hi.sheet[data-pad=menu]")!;
     expect(d.querySelector(".sheet-handle")!.getAttribute("aria-hidden")).toBe("true");
@@ -465,6 +488,18 @@ describe("the pinned 8.7 Explore-lane rows (ui-next/design-source/PIN a594830, b
   });
   it("Feedback: the shared dialog row and the 24px heading row", () => {
     expect(mount(Feedback, {}).querySelector("dialog.glass-hi h1.h2.t-24")).not.toBeNull();
+  });
+});
+
+describe("Codex P2 4383334410: a live phone screen is the board's bounded frame (design-system.md §9 Phone frame)", () => {
+  it("phone screens scroll main.l-page.l-phone.phone-main inside one viewport; desktop and the non-screen gallery shell do not", () => {
+    expect(mount(Explore, { phone: true }).querySelector("main")!.className).toBe("l-page l-phone phone-main");
+    expect(mount(Explore, {}).querySelector("main")!.className).toBe("l-main");
+    const css = readFileSync(resolve(__dirname, "../ui-next/components/phone.css"), "utf8");
+    expect(css).toContain(".app.l-screen[data-w=phone]{display:flex;flex-direction:column;height:100dvh}");
+    expect(css).toContain(".app.l-screen[data-w=phone]>.l-shell{flex:1 1 0;min-height:0}");
+    expect(readFileSync(resolve(__dirname, "../ui-next/components/base.css"), "utf8")).toContain(".app[data-w=phone]>.l-shell>.phone-main{flex:1 1 0;min-height:0;overflow-y:auto");
+    expect(readFileSync(resolve(__dirname, "../ui-next/src/AppShell.svelte"), "utf8")).toContain('phone ? (screen ? "l-page l-phone phone-main" : "l-page l-phone") : "l-main"');
   });
 });
 

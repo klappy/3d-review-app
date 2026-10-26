@@ -30,6 +30,7 @@
   import Button from "../../Button.svelte";
   import Pill from "../../Pill.svelte";
   import Level from "../../Level.svelte";
+  import Coverage from "../results/Coverage.svelte";
   import Icon from "../../Icon.svelte";
   import { I } from "../../icons.js";
   import { E } from "./icons.js";
@@ -82,7 +83,7 @@
         <a class="card-link list-row" href={r.href ?? RESULTS}>
           <span class="icn icn-row" data-lens="team" aria-hidden="true"><Icon d={E.doc} /></span>
           <div class="list-body"><div class="list-title">{r.title}</div><div class="small">{r.meta}</div></div>
-          <Level level={r.level} />
+          <span class="l-stack" data-gap="1"><Level level={r.level} /><Coverage n={r.n} variant="count" /></span>
         </a>
       {/each}
     </section>
@@ -133,7 +134,7 @@
                   <tr>
                     <td class="td">{r.title}</td><td class="td">{r.project}</td><td class="td">{r.language}</td><td class="td">{r.region}</td><td class="td">{r.orgs}</td>
                     <td class="td"><Pill stage={r.pill} /></td><td class="td">{r.responsesText}</td>
-                    {#each LENS_KEYS as k}<td class="td">{#if r.levels[k]}<Level level={r.levels[k]} />{:else}<span class="micro">—</span>{/if}</td>{/each}
+                    {#each LENS_KEYS as k}<td class="td">{#if r.levels[k]}<span class="l-stack" data-gap="1"><Level level={r.levels[k]} /><Coverage n={r.counts[k]} variant="count" /></span>{:else}<span class="micro">—</span>{/if}</td>{/each}
                     <td class="td">{r.updated}</td>
                   </tr>
                 {/each}

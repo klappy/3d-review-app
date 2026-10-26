@@ -51,6 +51,8 @@ export function exploreRows(reviews) {
     pill: stagePill(r.stage),
     responsesText: responsesText(r.responses),
     levels: Object.fromEntries(LENS_KEYS.map((k) => [k, r.lenses ? levelOf(r.lenses[k]) : null])),
+    // Each level's response count for its coverage cue (count variant under the Level; Codex P2 4383334399).
+    counts: Object.fromEntries(LENS_KEYS.map((k) => [k, countOf(r.lenses?.[k])])),
   }));
 }
 
@@ -61,7 +63,15 @@ export function matchCounts(rows) {
   return { reviews: rows.length, projects: distinct("project"), languages: distinct("language") };
 }
 
-/** Phone list rows: one level per row (the boards draw the translation-team level). */
+/** A perspective's response count, or null when none is carried (the cue then reads "responses not counted"). */
+const countOf = (lens) => (Number.isInteger(lens?.responses) && lens.responses >= 0 ? lens.responses : null);
+/** The coverage count a phone row shows beside its one overall level: the perspective with the fewest responses (design-system.md
+ *  §2 Coverage cue, Explore placement; provisional, parity R72), null when no perspective carries a count. */
+export function fewestOf(lenses) {
+  const n = LENS_KEYS.map((k) => countOf(lenses?.[k])).filter((v) => v !== null);
+  return n.length ? Math.min(...n) : null;
+}
+/** Phone list rows: one level per row (the boards draw the translation-team level) and the fewest-responses count under it. */
 export function phoneRows(rows) {
-  return rows.map((r) => ({ ...r, level: levelOf(r.team) ?? "more" }));
+  return rows.map((r) => ({ ...r, level: levelOf(r.team) ?? "more", n: fewestOf(r.lenses ?? (r.team ? { team: r.team } : null)) }));
 }

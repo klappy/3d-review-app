@@ -50,8 +50,10 @@ describe("B2. the phone bar stays in the thumb zone on every phone screen (secti
     const decl = (sel: string) => phone.filter(([s]) => s === sel).map(([, d]) => d).join(";");
     expect(decl(".app.l-screen[data-w=phone]")).toMatch(/(^|;)display:flex(;|$)/);
     expect(decl(".app.l-screen[data-w=phone]")).toMatch(/(^|;)flex-direction:column(;|$)/);
-    expect(decl(".app.l-screen[data-w=phone]")).toMatch(/(^|;)min-height:100dvh(;|$)/);
-    expect(decl(".app.l-screen[data-w=phone]>.l-shell")).toMatch(/(^|;)flex:1 0 auto(;|$)/);
+    // the bounded frame (§9 Phone frame; Codex P2 4383334410): one dynamic viewport tall, the shell fills it, main.phone-main scrolls
+    expect(decl(".app.l-screen[data-w=phone]")).toMatch(/(^|;)height:100dvh(;|$)/);
+    expect(decl(".app.l-screen[data-w=phone]>.l-shell")).toMatch(/(^|;)flex:1 1 0(;|$)/);
+    expect(decl(".app.l-screen[data-w=phone]>.l-shell")).toMatch(/(^|;)min-height:0(;|$)/);
     // phone only: no phone.css rule gives a desktop screen a flex or min-height shell (desktop pixels unchanged)
     expect(phone.filter(([s, d]) => /\.app\.l-screen(?!\[data-w=phone\])/.test(s) && /(display|min-height|flex)/.test(d))).toEqual([]);
     // what the bar's place rests on in the generated helmet: the shell is a column and main.l-phone takes the free space
