@@ -233,7 +233,7 @@
   const accountItems = $derived(session ? [
     { kind: "head", label: session.principal?.display_name || "Signed in", sub: session.principal?.id ? "Facilitator" : "" }, { kind: "hr" },
     { label: "Help and FAQ", href: to("help") }, { label: "Why 3D Review exists", href: to("about") }, { label: "Send app feedback", href: to("feedback", {}, { from: route.name, review: page.data?.data?.review?.title ?? page.data?.results?.review?.title ?? "" }) },
-    { label: "Current design", href: "/" }, { kind: "hr" }, { label: "Sign out", onclick: signOut },
+    { label: "Public website home", href: to("landing") }, { label: "Current design", href: "/" }, { kind: "hr" }, { label: "Sign out", onclick: signOut },
   ] : []);
   function onSignedIn() { D.clearLinks(); SU.forgetAll(); S.forget(); session = undefined; const next = page.data?.next; go(next && next !== "#/signin" ? next : to("home")); }
   // Report build (first build and "Refresh with new answers" alike): the current design's contract (ui/assess/report-build.js) —
@@ -348,7 +348,7 @@
   <Status {phone} {theme} kind="preview" inline message="Sample data: a made-up review that shows the design. Nothing here is saved." back={to("home")} backLabel="Home" />
   <C {phone} {theme} state={route.query.get("state") ?? undefined} />
 {:else if page.data.screen === "landing"}
-  <Landing {phone} {theme} />
+  <Landing {phone} {theme} home={session ? to("home") : undefined} />
 {:else if page.data.screen === "about"}
   <About {phone} {theme} />
 {:else if page.data.screen === "sign-in"}

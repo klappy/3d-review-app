@@ -49,6 +49,9 @@
   let showCompleted = $state(false);
   const shown = $derived((data.groups ?? []).filter((g) => !hidden[g.stage]));
   const START = $derived(data.start ?? "#setup");
+  // The public website home stays one visible link away once signed in (the logo and Home go to this page): 3d-review-cookbook
+  // work/active/2026-10-26-3d-logged-in-home. "#landing" is the router's bare name for /welcome (app/router.js parse).
+  const WEBSITE = "#landing";
   if (!STATES.includes(view)) throw new TypeError(`Home: unknown state "${String(view)}" (first | reviews)`);
   if (phone && view === "first") throw new TypeError("Home: the phone board draws the with-reviews state only (HomePhone.dc.html)");
   const ARROW = "M5 12h14M13 6l6 6-6 6", SEARCH = "M11 4a7 7 0 1 0 0 14a7 7 0 1 0 0-14M20 20l-4-4", PLAY = "M8 5v14l11-7z";
@@ -74,6 +77,7 @@
 <AppShell {phone} {theme} screen {top} {bar}>
   {#if phone}
     <Row split gap={3}><h1 class="title-phone">Your reviews</h1><a class="link small" href="#explore">Explore all</a></Row>
+    <p class="small" data-website-home>Signed in. <a class="link" href={WEBSITE}>See the public website home</a></p>
     {#if data.invitation}<Card href="#invitations" gap={2}><Row gap={3}><span class="icn" data-lens="church"><Icon d={I.mail} /></span><span class="small"><b>1 invitation</b> · {data.invitation.phone}</span></Row></Card>{/if}
     <Row wrap gap={2}><span class="chip">{data.workspace}</span><span class="chip">Mine</span><a class="link small" href="#explore">+ filter</a></Row>
     {#each phoneGroups as g}
@@ -96,6 +100,7 @@
         <h1 class="title-page">Your reviews</h1>
         <Row gap={2}><Button label="Explore all reviews" variant="quiet" href="#explore" lead={search} /><Button label="Start a 3D Review" variant="primary" href={START} lead={plus} /></Row>
       </Row>
+      <p class="small" data-website-home>This is your signed-in home. <a class="link" href={WEBSITE}>See the public website home</a> — what visitors see before they sign in.</p>
       {#if view === "first"}
         <Card hi gap={5} label="Welcome">
           <Stack gap={3}>

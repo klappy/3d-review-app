@@ -56,6 +56,22 @@ describe("Home renders each state", () => {
   });
 });
 
+describe("signed-in home keeps the public website home one visible link away (cookbook work/active/2026-10-26-3d-logged-in-home)", () => {
+  it.each(STATES)("%s: a visible link to the public website home (#landing, the router's /welcome)", (_, props) => {
+    const a = home(props);
+    const link = a.querySelector("[data-website-home] a.link") as HTMLAnchorElement;
+    expect(link).not.toBeNull();
+    expect(link.getAttribute("href")).toBe("#landing");
+    expect(link.textContent).toBe("See the public website home");
+  });
+  it("the router resolves #landing to the public website home, and Home stays the signed-in root", async () => {
+    // @ts-expect-error -- plain .js module, no type declarations
+    const { parse } = await import("../ui-next/src/app/router.js");
+    expect(parse("#landing").name).toBe("landing");
+    expect(parse("#/").name).toBe("home");
+  });
+});
+
 describe("nesting rule (8.1) and one primary per page", () => {
   for (const [name, props] of STATES) {
     it(`${name}: AppShell > Page > Section > Card > Stack/Row/Grid; no inline style; exactly one .btn-primary`, () => {
