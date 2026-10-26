@@ -705,6 +705,9 @@ describe("results round 5: a live payload renders; counts read right", () => {
     expect(text(d)).not.toMatch(/null|undefined|NaN/);
     const r = mount(Report, { report: live });
     expect(r.querySelectorAll(".paper .solid[data-lens]").length).toBe(3);
+    // CHECK-0940 P3: the paper head carries the coverage cue (drops + count) on each lens, not the bare count.
+    expect(all(r, ".paper .solid[data-lens][data-pad=bar] > [data-coverage]")).toEqual(["Filling up · 4 responses", "Well filled · 6 responses", "A few drops · 2 responses"]);
+    expect(all(d, ".paper .solid[data-lens][data-pad=bar] > [data-coverage]")).toEqual(["Filling up · 4 responses", "Well filled · 6 responses", "A few drops · 2 responses"]);
     expect(r.querySelectorAll("svg[data-part=band-barbell]").length).toBe(3);
   });
   it("R5-2: one response, singular, on the cards and the report heads", () => {

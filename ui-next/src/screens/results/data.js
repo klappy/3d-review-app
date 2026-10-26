@@ -50,11 +50,11 @@ export const MIN_RESPONSES = V3_BAND_CUTOFFS.minResponses; // answer splits (com
 // coverage jar (Coverage.svelte, "a few drops"), never by holding the level. The current UI keeps V3_BAND_CUTOFFS unchanged.
 export const LEVEL_MIN = 1;
 export const LEVEL_CUTOFFS = Object.freeze({ ...V3_BAND_CUTOFFS, minResponses: LEVEL_MIN });
-/** Coverage (quantity) beside the level (quality): a jar filled by how many people answered. Provisional tiers, presentation only. */
+/** Coverage (quantity) beside the level (quality): drops filled by how many people answered (no jar: the Level's Jars imagery owns the jar). Provisional tiers, presentation only. */
 export function coverageOf(n) {
   if (n === null || n === undefined || !Number.isFinite(Number(n))) return { fill: 0, word: "" }; // not counted: no jar word on a guess
   const k = Number(n);
-  return k <= 0 ? { fill: 0, word: "Empty jar" } : k < 3 ? { fill: 1, word: "A few drops" } : k < 6 ? { fill: 2, word: "Filling up" } : { fill: 3, word: "Well filled" };
+  return k <= 0 ? { fill: 0, word: "No drops yet" } : k < 3 ? { fill: 1, word: "A few drops" } : k < 6 ? { fill: 2, word: "Filling up" } : { fill: 3, word: "Well filled" };
 }
 
 // Band word (v3ScoreBand) -> Level key (ui-next/src/Level.svelte LEVELS; design-system.md section 4 level words).
