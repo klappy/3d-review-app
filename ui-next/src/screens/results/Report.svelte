@@ -29,10 +29,12 @@
   import { G } from "./icons.js";
   import { href } from "../href.js";
   import { out } from "./links.js";
-  import { REPORT, LEVEL_WORD, lensLabel, lensCards, snapshotTotal, bandRows, withNotes, detailedPages, countWord } from "./data.js";
+  import { REPORT, LEVEL_WORD, lensLabel, lensCards, snapshotTotal, footPrivacy, bandRows, withNotes, detailedPages, countWord } from "./data.js";
 
-  let { phone = false, theme = "light", report } = $props();
-  const D = $derived(report ?? (phone ? REPORT.phone : REPORT.desktop));
+  // state "overview" (phone): the overview reading view (design-system.md Phone report reading); the hub otherwise.
+  let { phone = false, theme = "light", report, state: view } = $props();
+  const reading = $derived(phone && view === "overview");
+  const D = $derived(report ?? (phone && !reading ? REPORT.phone : REPORT.desktop)); // the reading view draws the overview sheet
   const cards = $derived(lensCards(D.payload, D.counts, { sent: D.sent }));
   const pages = $derived(detailedPages(cards));
   const rows = $derived(bandRows(D, D.counts, [...(D.gaps?.biggest ?? []), ...(D.gaps?.agree ?? [])]));
@@ -46,27 +48,37 @@
 
 {#snippet eye()}<Glyph d={G.eye} />{/snippet}
 {#snippet share()}<Glyph d={G.share} />{/snippet}
-{#snippet top()}{#if phone}<PhoneHeader state="nested" title="Reports" parent="Results" back={href("results")} menuHref={out("menu")} />{:else}<DocBar title={`Overview report · 1 page · ${D.review.title}`} other={`Open the detailed report · ${pages} pages`} otherHref={href("report-detailed")} />{/if}{/snippet}
-{#snippet bar()}{#if phone}<PhoneBar label="Download the overview (PDF)" href={live ? undefined : "#download"} disabled={live} ariaDescribedby={live ? "doc-pdf-why" : undefined} />{/if}{/snippet}
+{#snippet top()}{#if reading}<PhoneHeader state="nested" title="Overview" parent="Reports" back={href("report")} menuHref={out("menu")} />{:else if phone}<PhoneHeader state="nested" title="Reports" parent="Results" back={href("results")} menuHref={out("menu")} />{:else}<DocBar title={`Overview report · 1 page · ${D.review.title}`} other={`Open the detailed report · ${pages} pages`} otherHref={href("report-detailed")} />{/if}{/snippet}
+{#snippet bar()}{#if reading}<div class="glass phone-bar" role="group" aria-label="Page actions"><button class="btn btn-primary btn-lg btn-block" type="button" disabled aria-describedby="pdf-why">Download the overview (PDF)</button></div>{:else if phone}<PhoneBar label="Download the overview (PDF)" href={live ? undefined : "#download"} disabled={live} ariaDescribedby={live ? "doc-pdf-why" : undefined} />{/if}{/snippet}
 
 <AppShell {phone} {theme} screen rhythm="report" {top} {bar}><!-- §8.3 Report frame: main.l-main[data-rhythm=report] > .paper sheets (desktop) -->
-  {#if phone}
+  {#if reading}
+    <!-- design-system.md Phone report reading (QA-LIVE N2): the overview sheet scaled to the width, the PDF reason in the page. -->
+    <span class="micro">Overview · 1 page · A4 scaled to the width; pinch to zoom</span>
+    <p class="small" id="pdf-why">PDF export is not in the new design yet; the current design's report page downloads it.</p>
+    <div class="report-sheets"><div class="psheet" data-fit="a4">{@render overview()}</div></div>
+    <a class="link" href={href("report-detailed")}>Open the detailed report <Glyph d={G.arrow} /></a>
+  {:else if phone}
     <a class="link small" href={href("results")}>{D.review.title} · results</a>
     {#if live}<p class="small" id="doc-pdf-why">PDF export is not in the new design yet; the current design's report page downloads it.</p>{/if}
     <h1 class="title-phone">Reports</h1>
     <Card gap={3} label="Overview · 1 page">
       <div class="l-row" data-gap="3" data-align="start"><span class="icn icn-lens" data-lens="team"><Glyph d={G.doc} /></span><Stack gap={1}><span class="h3">Overview · 1 page</span><span class="small">{overviewLine}</span></Stack></div>
-      <Row gap={2}><Button label="Preview" href={href("report")} lead={eye} block /><Button label="Share PDF" href={live ? undefined : "#share-pdf"} disabled={live} ariaDescribedby={live ? "doc-pdf-why" : undefined} lead={share} block /></Row>
+      <Row gap={2}><Button label="Preview" href={href("report", { state: "overview" })} lead={eye} block /><Button label="Share PDF" href={live ? undefined : "#share-pdf"} disabled={live} ariaDescribedby={live ? "doc-pdf-why" : undefined} lead={share} block /></Row>
     </Card>
     <Card gap={3} label={`Detailed · ${pages} pages`}>
       <div class="l-row" data-gap="3" data-align="start"><span class="icn icn-lens" data-lens="community"><Glyph d={G.list} /></span><Stack gap={1}><span class="h3">Detailed · {pages} pages</span><span class="small">Every area with its numbers. Best read on a bigger screen or on paper.</span></Stack></div>
-      <Row gap={2}><Button label="Share PDF" href={live ? undefined : "#share-pdf"} disabled={live} ariaDescribedby={live ? "doc-pdf-why" : undefined} lead={share} block /></Row>
+      <Row gap={2}><Button label="Read" href={href("report-detailed")} lead={eye} block /><Button label="Share PDF" href={live ? undefined : "#share-pdf"} disabled={live} ariaDescribedby={live ? "doc-pdf-why" : undefined} lead={share} block /></Row>
     </Card>
     <Card pad="list" gap={4} label="Preview · overview">
       <span class="micro">Preview · overview</span>
       <div class="l-stack" data-gap="4" data-align="center"><Mark size={40} /><span class="small">A4 page rendered to fit the width; pinch to zoom.</span></div>
     </Card>
   {:else}
+    {@render overview()}
+  {/if}
+</AppShell>
+{#snippet overview()}
     <div class="paper" data-sheet="a4">
       <PaperHead review={D.review} {cards} kind="overview" />
       <Stack gap={2}><h2 class="h3">What stands out</h2><p class="small">{D.standsOut}</p></Stack>
@@ -86,7 +98,7 @@
         <h2 class="h3">Where to look next</h2>
         <ol class="l-stack small" data-gap="1">{#each next as n}<li>{lensLabel(n.lens)} · {n.area} — {LEVEL_WORD[n.level]}</li>{/each}</ol>
       </Stack>
-      <div class="pfoot"><span>Built from {snapshotTotal(cards)} responses on {D.review.builtOn} · levels are bands, not scores · nothing here identifies a person</span><span>1 of 1</span></div>
+      <div class="pfoot"><span>Built from {snapshotTotal(cards)} responses on {D.review.builtOn} · levels are bands, not scores · {footPrivacy()}</span><span>1 of 1</span></div>
     </div>
-  {/if}
-</AppShell>
+{/snippet}
+

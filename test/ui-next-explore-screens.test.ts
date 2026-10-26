@@ -111,8 +111,8 @@ describe("Explore (Explore.dc.html, ExplorePhone.dc.html, ExploreFiltersPhone.dc
     const a = mount(Explore, {});
     expect(text(a.querySelector("h1.title-page")!)).toBe("Explore reviews");
     expect(text(a)).toContain("Every review you can see, as one table. Filter by any cross-section; group or save the view.");
-    expect([...a.querySelectorAll(".seg label")].map(text)).toEqual(["Cards", "Table"]);
-    expect((a.querySelector(".seg input:checked") as HTMLInputElement).value).toBe("table");
+    expect([...a.querySelectorAll("main .seg label")].map(text)).toEqual(["Cards", "Table"]);
+    expect((a.querySelector("main .seg input:checked") as HTMLInputElement).value).toBe("table");
     expect([...a.querySelectorAll(".chip")].map(text)).toEqual(["Workspace · BCS India", "Region · South Asia", "Stage · Collecting, Results ready", "Date · Last 12 months"]);
     expect([...a.querySelectorAll(".chip button")].map((b) => b.getAttribute("aria-label"))).toEqual(["Remove Workspace filter", "Remove Region filter", "Remove Stage filter", "Remove Date filter"]);
     // R3-4: the rows are not grouped, so Group by says None rather than the board's "Stage"

@@ -200,6 +200,15 @@ export function bandRows(report, counts, names) {
   return byName(areas(report), names).map((a) => band(a, responses));
 }
 
+/** design-system.md section 4 report copy by the level minimum in force (Codex P1 4382475714): the footer's privacy clause (after
+ *  "Built from N responses on <date> · <clause> ·") and the last sentence of "How to read the scores". */
+export const footPrivacy = (min = currentLevelMin()) => (min === 1
+  ? "nothing here names a person; where one person from a perspective has answered, its level and scores reflect that person's answers"
+  : `nothing here identifies a person: a perspective shows only with at least ${min} answers`);
+export const readingPrivacy = (min = currentLevelMin()) => (min === 1
+  ? "Nothing in this report names a person, but while only one person from a perspective has answered, its level and scores reflect that person's answers."
+  : `Nothing in this report identifies a person: a perspective's level and scores show only once at least ${min} people from it have answered.`);
+
 /** "Where to look next" for a live built report (live QA Q4; the fixtures carry the board's own): the weakest areas the cards show,
  *  urgent before needs-support, in perspective order, at most `max`, as [lens, area] pairs. Derived from the levels, never stored. */
 export function lookNextOf(cards, max = 3) {

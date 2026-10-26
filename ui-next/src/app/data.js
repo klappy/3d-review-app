@@ -5,7 +5,7 @@ import { api, classify, confirmed, enc, token } from "./api.js";
 import { lensLabel } from "../../../ui/report-lenses.js";
 import { v3ScoreBand, v3ExpectedFor } from "../../../ui/assess/v3-assessment.js";
 import { parsePeriod, collectLine } from "../../../ui/v3/components/active-until.js";
-import { LEVEL_KEY, LEVEL_WORD, levelCutoffs, useLevelMinimum, levelMinimumOf, currentLevelMin, sentLenses, snapshotTotal, bandRows, lensCards, responsesFor } from "../screens/results/data.js";
+import { LEVEL_KEY, LEVEL_WORD, levelCutoffs, useLevelMinimum, levelMinimumOf, currentLevelMin, sentLenses, snapshotTotal, footPrivacy, bandRows, lensCards, responsesFor } from "../screens/results/data.js";
 import { to } from "./router.js";
 import qrcode from "../../../ui/assess/vendor-qrcode.js";
 import { acceptInvitationById } from "../../../ui/v3/components/invite.js";
@@ -453,7 +453,7 @@ export function nextStepModel(m) {
     phone: { title: m.review.title, stage, lead: gaps.length ? "Where the perspectives pull apart, from the built report." : "The built report shows no area two perspectives both scored.", items: gaps.map((g) => ({ kind: "Tension", title: g.area, text: `${g.dots.map((d) => `${NAME[d.lens]} ${LEVEL_WORD[d.level]}`).join(" · ")} — ${g.apart}.`, inPlan: false })) },
     doc: `Next steps · 1 page · ${m.review.title}`,
     meta: [m.review.project, m.review.language, "3D Review next steps", m.review.closed ? `closed ${m.review.closed}` : "", `${m.review.responses} response${m.review.responses === 1 ? "" : "s"}`].filter(Boolean).join(" · "),
-    foot: `Built from ${m.review.responses} response${m.review.responses === 1 ? "" : "s"}${m.review.builtOn ? ` on ${m.review.builtOn}` : ""} · levels are bands, not scores · nothing here identifies a person`,
+    foot: `Built from ${m.review.responses} response${m.review.responses === 1 ? "" : "s"}${m.review.builtOn ? ` on ${m.review.builtOn}` : ""} · levels are bands, not scores · ${footPrivacy()}`,
   };
 }
 

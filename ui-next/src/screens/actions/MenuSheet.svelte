@@ -8,6 +8,7 @@
      one click listener that closes when the tap lands outside the sheet's box). Closing leaves HomePhone's list, which is what the sheet sits on.
      One .btn-primary: the phone-bar's "Start a 3D Review" (inert behind the open sheet, as R13 sheet stacking says). -->
 <script>
+  import ThemeControl from "../../ThemeControl.svelte"; // design-system.md Theme control placement: before the account actions
   import AppShell from "../../AppShell.svelte";
   import Card from "../../Card.svelte";
   import Row from "../../Row.svelte";
@@ -60,7 +61,7 @@
     <Row split gap={2}><p class="micro sheet-title" id="menu-who">{D.who}</p><IconAction d={A.x} ariaLabel="Close" onclick={() => closeDialog(sheet)} /></Row>
     <!-- R14 Focus on open: a sheet of menu rows focuses its first row (./modal.js focuses [data-autofocus]). -->
     <nav aria-label="Workspace and account">
-      {#each D.items as [icon, label, link, onclick], i}{#if typeof onclick === "function"}<button class="mi" data-size="lg" type="button" {onclick} data-autofocus={i === 0 ? "" : undefined}><Ico d={A[icon]} /><span>{label}</span></button>{:else}<a class="mi" data-size="lg" href={link ?? to[i]} data-autofocus={i === 0 ? "" : undefined}><Ico d={A[icon]} /><span>{label}</span></a>{/if}{/each}
+      {#each D.items as [icon, label, link, onclick], i}{#if label === "Use another account"}<ThemeControl uid="sheet" />{/if}{#if typeof onclick === "function"}<button class="mi" data-size="lg" type="button" {onclick} data-autofocus={i === 0 ? "" : undefined}><Ico d={A[icon]} /><span>{label}</span></button>{:else}<a class="mi" data-size="lg" href={link ?? to[i]} data-autofocus={i === 0 ? "" : undefined}><Ico d={A[icon]} /><span>{label}</span></a>{/if}{/each}
     </nav>
   </dialog>
 </AppShell>

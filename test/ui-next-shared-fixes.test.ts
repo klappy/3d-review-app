@@ -144,3 +144,34 @@ describe("live QA Q7: menus (one open at a time, outside dismiss, Escape returns
     expect(css).toContain(".dd[data-menu][open]{z-index:30}");
   });
 });
+
+describe("live QA Q8 (design-system.md Theme control): Light · Dark · System, persisted per viewer, sets .app[data-theme]", () => {
+  it("is a menu row of three radios; choosing sets the theme without closing the menu; System keeps the screen's theme", async () => {
+    const { viewerTheme, setTheme, themeOf } = await import("../ui-next/src/theme.svelte.js");
+    setTheme("system");
+    const sum = createRawSnippet(() => ({ render: () => "<span>Me</span>" }));
+    const d = render(Menu as never, { props: { summary: sum, id: "acct", items: [{ label: "Public website home", href: "#landing" }, { kind: "theme" }, { kind: "hr" }, { label: "Sign out", href: "#out" }] } }).container.querySelector("details")!;
+    const row = d.querySelector(".menu > div.mi-theme[role=group]")!;
+    expect(row.getAttribute("aria-labelledby")).toBe("theme-acct");
+    expect(row.querySelector("span#theme-acct")!.textContent).toBe("Theme");
+    const seg = row.querySelector(".seg[data-size=compact][role=radiogroup]")!;
+    expect([...seg.querySelectorAll("label")].map((l) => l.textContent)).toEqual(["Light", "Dark", "System"]);
+    expect((seg.querySelector("input:checked") as HTMLInputElement).value).toBe("system");
+    expect(row.previousElementSibling!.textContent).toBe("Public website home"); expect(row.nextElementSibling!.matches("hr")).toBe(true);
+    expect(new Set([...seg.querySelectorAll("input")].map((i) => i.getAttribute("name"))).size).toBe(1); // one group: arrow keys move within it
+    d.open = true;
+    const dark = seg.querySelector("input[value=dark]") as HTMLInputElement;
+    dark.checked = true; dark.dispatchEvent(new Event("change", { bubbles: true }));
+    expect([viewerTheme.choice, localStorage.getItem("ui_next_theme"), d.open]).toEqual(["dark", "dark", true]); // persisted; the menu stays open
+    expect([themeOf("light"), themeOf(undefined)]).toEqual(["dark", "dark"]);
+    const page = render(Home as never, { props: { theme: "light" } }).container.querySelector(".app")!;
+    expect(page.getAttribute("data-theme")).toBe("dark"); // the viewer's choice overrides the screen's
+    setTheme("system");
+    expect(themeOf("light")).toBe("light"); // System keeps the screen's own theme (live: the system's prefers-color-scheme)
+    expect(() => setTheme("sepia")).toThrow(TypeError);
+  });
+  it("the paper keeps its light palette in every theme (base.css .paper re-declares the light tokens)", () => {
+    const css = readFileSync(resolve(__dirname, "../ui-next/components/base.css"), "utf8");
+    expect(css).toMatch(/\.paper\{[^}]*--ink:/);
+  });
+});

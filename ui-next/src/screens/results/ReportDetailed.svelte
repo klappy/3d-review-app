@@ -26,9 +26,12 @@
   import PaperLegend from "./PaperLegend.svelte";
   import ScoreBar from "./ScoreBar.svelte";
   import Radar from "./Radar.svelte";
-  import Report from "./Report.svelte";
+  import PhoneHeader from "../../PhoneHeader.svelte";
+  import Glyph from "./Glyph.svelte";
+  import { G } from "./icons.js";
+  import { out } from "./links.js";
   import { href } from "../href.js";
-  import { REPORT, currentLevelMin, snapshotTotal, fmtScore, lensCards, scoreRows, comparedRows, radar, withNotes, gapLead, countWord, evidenceSheets, detailedPages } from "./data.js";
+  import { REPORT, currentLevelMin, snapshotTotal, fmtScore, footPrivacy, readingPrivacy, lensCards, scoreRows, comparedRows, radar, withNotes, gapLead, countWord, evidenceSheets, detailedPages } from "./data.js";
 
   let { phone = false, theme = "light", report } = $props();
   const D = $derived(report ?? REPORT.desktop);
@@ -40,7 +43,7 @@
   // "How to read the scores" names the level minimum in force (served, else the safe 3): at 1 the board's words, "no answers".
   const MIN = currentLevelMin(), fewWords = MIN === 1 ? "no answers" : `fewer than ${MIN} answers`;
   const PAGES = $derived(detailedPages(cards));
-  const FOOT = $derived(`Built from ${snapshotTotal(cards)} responses on ${D.review.builtOn} · Scores are 0–100. Every other page shows levels, which are bands · nothing here identifies a person`);
+  const FOOT = $derived(`Built from ${snapshotTotal(cards)} responses on ${D.review.builtOn} · Scores are 0–100. Every other page shows levels, which are bands · ${footPrivacy()}`);
   const shapeHeading = $derived(shape ? `The ${countWord(shape.legend.length)} perspectives as one shape` : "The perspectives as one shape");
   const tensionsLead = $derived(tensions.length === 0 ? "No area has two perspectives to compare yet." : tensions.length === 1 ? "The area where the perspectives are furthest apart." : `The ${countWord(tensions.length)} areas where the perspectives are furthest apart.`);
 </script>
@@ -69,10 +72,7 @@
 {/snippet}
 {#snippet words()}{#if D.theirWords?.length}<Stack gap={2}><h2 class="h3">In their words</h2><p class="small">{D.theirWords.map((w) => `“${w}”`).join(" · ")}</p></Stack>{/if}{/snippet}
 
-{#if phone}
-<Report phone {theme} {report} />
-{:else}
-<AppShell {theme} screen rhythm="report" {top}><!-- §8.3 Report frame: main.l-main[data-rhythm=report] > .paper[data-sheet] sheets as direct children -->
+{#snippet page1()}
     <div class="paper" data-sheet="page">
       <PaperHead review={D.review} {cards} kind="detailed report" />
       <Stack gap={1}>
@@ -95,6 +95,8 @@
       </Stack>
       {@render foot(1)}
     </div>
+{/snippet}
+{#snippet page2()}
     <div class="paper" data-sheet="page">
       <Stack gap={2}>
         <h2 class="h3">All areas compared across perspectives</h2>
@@ -103,18 +105,38 @@
       </Stack>
       <Stack gap={2}>
         <h2 class="h3">How to read the scores</h2>
-        <p class="small">Scores are the pinned report model's area values (0–100) aggregated from the item answers listed under Evidence. Levels are bands on those scores. A perspective with {fewWords} shows More input needed and no score; the drops beside each perspective show how many answered (a few drops is little evidence, not a low result). Nothing in this report identifies a person.</p>
+        <p class="small">Scores are the pinned report model's area values (0–100) aggregated from the item answers listed under Evidence. Levels are bands on those scores. A perspective with {fewWords} shows More input needed and no score; the drops beside each perspective show how many answered (a few drops is little evidence, not a low result). {readingPrivacy()}</p>
       </Stack>
       {#if !sheets.length}{@render words()}{/if}
       {@render foot(2)}
     </div>
-    {#each sheets as sheet, i}
+{/snippet}
+{#snippet evidenceSheet(sheet, i)}
     <div class="paper" data-sheet="page">
       <h2 class="h3">Every area, with evidence{i ? " (continued)" : ""}</h2>
       {#each sheet as c (c.lens)}{@render evidence(c)}{/each}
       {#if i === sheets.length - 1}{@render words()}{/if}
       {@render foot(3 + i)}
     </div>
-    {/each}
+{/snippet}
+{#snippet ptop()}<PhoneHeader state="nested" title="Detailed report" parent="Overview" back={href("report", { state: "overview" })} menuHref={out("menu")} />{/snippet}
+{#snippet pbar()}<div class="glass phone-bar" role="group" aria-label="Page actions"><button class="btn btn-primary btn-lg btn-block" type="button" disabled aria-describedby="pdf-why">Download this report (PDF)</button></div>{/snippet}
+
+{#if phone}
+<!-- design-system.md Phone report reading (QA-LIVE N2): the detailed view, the same sheets as desktop scaled to the width (.psheet[data-fit=a4]),
+     back to the overview; the PDF reason in the page; the download disabled with it. -->
+<AppShell phone {theme} screen top={ptop} bar={pbar}>
+  <span class="micro">Detailed · {PAGES} pages · A4 scaled to the width; pinch to zoom</span>
+  <p class="small" id="pdf-why">PDF export is not in the new design yet; the current design's report page downloads it.</p>
+  <div class="report-sheets">
+    <div class="psheet" data-fit="a4">{@render page1()}</div>
+    <div class="psheet" data-fit="a4">{@render page2()}</div>
+    {#each sheets as sheet, i}<div class="psheet" data-fit="a4">{@render evidenceSheet(sheet, i)}</div>{/each}
+  </div>
+  <a class="link" href={href("report", { state: "overview" })}>Open the overview <Glyph d={G.arrow} /></a>
+</AppShell>
+{:else}
+<AppShell {theme} screen rhythm="report" {top}><!-- §8.3 Report frame: main.l-main[data-rhythm=report] > .paper[data-sheet] sheets as direct children -->
+{@render page1()}{@render page2()}{#each sheets as sheet, i}{@render evidenceSheet(sheet, i)}{/each}
 </AppShell>
 {/if}

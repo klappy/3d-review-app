@@ -367,7 +367,7 @@ describe("each board renders as a screen", () => {
   });
   it("ResultsAnswers: perspective switch, split, one card per question with answer rows and bars, their words", () => {
     const a = mount(ResultsAnswers);
-    expect((a.querySelector(".seg input:checked")!.parentElement as HTMLElement).textContent).toBe("Community");
+    expect((a.querySelector("main .seg input:checked")!.parentElement as HTMLElement).textContent).toBe("Community");
     expect(a.querySelector(".seg[data-grow][role=radiogroup]")).not.toBeNull(); // F1: the switch takes the row's free width
     expect(all(a, "select.in option")).toEqual(["Everyone", "Split by age range", "Split by gender", "Split by where people met"]);
     expect(text(a.querySelector("main h2.h2"))).toBe("Community · Written · 8 answers");
@@ -602,17 +602,33 @@ describe("each board renders as a screen", () => {
     const P = JSON.parse(JSON.stringify(REPORT.phone));
     P.review.title = "Acts 3";
     P.payload.lenses = P.payload.lenses.filter((l: { lens: string }) => l.lens !== "church");
-    for (const C of [Report, ReportDetailed]) {
-      const a = mount(C, { phone: true, report: P });
-      expect(all(a, "main > a.link")[0]).toBe("Acts 3 · results");
-      expect(all(a, ".glass .h3")).toEqual(["Overview · 1 page", "Detailed · 3 pages"]);
-      expect(a.querySelectorAll("h1").length).toBe(1);
-    }
+    const a = mount(Report, { phone: true, report: P });
+    expect(all(a, "main > a.link")[0]).toBe("Acts 3 · results");
+    expect(all(a, ".glass .h3")).toEqual(["Overview · 1 page", "Detailed · 3 pages"]);
+    expect(a.querySelectorAll("h1").length).toBe(1);
+    // the phone detailed view reads the same prop: its sheets carry the report's own title
+    expect(text(mount(ReportDetailed, { phone: true, report: { ...REPORT.desktop, review: { ...REPORT.desktop.review, title: "Acts 3" } } }).querySelector(".paper h1"))).toBe("Acts 3");
   });
-  it("ReportDetailed on a phone renders the phone's reports list (F6: never a blank page)", () => {
-    const a = mount(ReportDetailed, { phone: true });
-    expect(text(a.querySelector(".phone-title"))).toBe("Reports");
-    expect(all(a, ".glass .h3")).toEqual(["Overview · 1 page", "Detailed · 4 pages"]);
+  it("live QA N2 (design-system.md Phone report reading): hub → overview view → detailed view, each the desktop sheets scaled to the width", () => {
+    const hub = mount(Report, { phone: true });
+    const btn = (el: Element, label: string) => [...el.querySelectorAll("a.btn")].find((b) => text(b) === label)!;
+    expect(btn(hub, "Preview").getAttribute("href")).toBe("?ui_next=on&screen=report&state=overview");
+    expect(btn(hub, "Read").getAttribute("href")).toBe("?ui_next=on&screen=report-detailed");
+    for (const [C, props, micro, sheets, other, back, dl] of [
+      [Report, { phone: true, state: "overview" }, "Overview · 1 page · A4 scaled to the width; pinch to zoom", 1, "Open the detailed report", "Reports", "Download the overview (PDF)"],
+      [ReportDetailed, { phone: true }, "Detailed · 4 pages · A4 scaled to the width; pinch to zoom", 4, "Open the overview", "Overview", "Download this report (PDF)"],
+    ] as const) {
+      const a = mount(C, props as Props);
+      expect(text(a.querySelector("main > span.micro"))).toBe(micro);
+      expect(text(a.querySelector("main > p.small[id=pdf-why]"))).toBe("PDF export is not in the new design yet; the current design's report page downloads it.");
+      const ps = [...a.querySelectorAll("main > .report-sheets > .psheet[data-fit=a4]")];
+      expect(ps.length).toBe(sheets);
+      for (const p of ps) expect(p.firstElementChild!.matches(".paper[data-sheet]")).toBe(true);
+      expect(text([...a.querySelectorAll("main > a.link")].pop()!)).toBe(other);
+      expect(a.querySelector(".phone-top [aria-label^='Back']")!.getAttribute("aria-label")).toContain(back);
+      const bar = a.querySelector(".phone-bar .btn-primary") as HTMLButtonElement;
+      expect([bar.tagName, bar.disabled, bar.getAttribute("aria-describedby"), text(bar), bar.classList.contains("btn-block")]).toEqual(["BUTTON", true, "pdf-why", dl, true]);
+    }
   });
   it("Print prints the report (F7)", async () => {
     const spy = vi.fn();
@@ -901,6 +917,32 @@ describe("results round 5: a live payload renders; counts read right", () => {
       for (const b of btns) expect([b.tagName, (b as HTMLButtonElement).disabled, b.getAttribute("aria-describedby")]).toEqual(["BUTTON", true, "csv-why"]);
       expect(a.querySelector("a[href='#csv']")).toBeNull();
     }
+  });
+  it("live QA Q11 (design-system.md Band-barbell label row): an HTML label row with the four full words under a 40px / 32px track", () => {
+    const card = render(BandBar as never, { props: { row: bandRow(REPORT.desktop, REPORT.desktop.counts, "Clarity / naturalness") } }).container;
+    const axis = card.querySelector("div.band-axis")!;
+    expect([...axis.children].map((k) => k.className)).toEqual(["band-track", "band-labels"]);
+    expect(axis.querySelector(".band-track > svg[data-part=band-barbell]")).not.toBeNull();
+    expect(axis.querySelector(".band-labels")!.getAttribute("aria-hidden")).toBe("true");
+    expect(all(axis, ".band-labels > span")).toEqual(["Needs urgent attention", "Needs support", "Growing", "Strong"]);
+    expect(card.querySelector("svg text")).toBeNull(); // no SVG text ticks, so the words can wrap
+    expect(card.querySelector("[style]")).toBeNull(); // no inline style on the box
+    expect(card.querySelector("svg circle")!.getAttribute("cy")).toBe("20");
+    const paper = render(BandBar as never, { props: { row: bandRow(REPORT.desktop, REPORT.desktop.counts, "Clarity / naturalness"), size: "paper" } }).container;
+    expect(paper.querySelector("svg circle")!.getAttribute("cy")).toBe("16");
+  });
+  it("Codex P1 4382475714: report copy says what the served minimum makes true (footer clause, How to read the scores)", () => {
+    for (const [min, foot, read] of [
+      [1, "nothing here names a person; where one person from a perspective has answered, its level and scores reflect that person's answers", "Nothing in this report names a person, but while only one person from a perspective has answered, its level and scores reflect that person's answers."],
+      [3, "nothing here identifies a person: a perspective shows only with at least 3 answers", "Nothing in this report identifies a person: a perspective's level and scores show only once at least 3 people from it have answered."],
+    ] as const) {
+      useLevelMinimum(min);
+      expect(text(mount(Report).querySelector(".pfoot span"))).toContain(`levels are bands, not scores · ${foot}`);
+      const d = mount(ReportDetailed);
+      expect(text(d.querySelector(".pfoot span"))).toContain(`which are bands · ${foot}`);
+      expect(text(d)).toContain(read);
+    }
+    useLevelMinimum(1);
   });
   it("R5-3 + R5-5: Results counts the detailed report's pages; the phone overview line counts the gaps the sheet draws, no radar", () => {
     expect(text([...mount(Results).querySelectorAll("a.btn")].find((a) => text(a).startsWith("Detailed report")) ?? null)).toBe(`Detailed report · ${detailedPages(lensCards(REPORT.desktop.payload, REPORT.desktop.counts))} pages`);

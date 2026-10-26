@@ -165,6 +165,19 @@ html:has(dialog[open]:modal){overflow:hidden}
 .num[data-size="36"]{font-size:var(--t-36);line-height:40px}/* §1.2 numeral: a stat tile's figure */
 .l-main[data-rhythm=report]{gap:var(--sp-6)}/* §8.3 Report frame (cook-cue-boards-1800, provisional): .l-main 32/56 + sheets --sp-6 apart (28/36/64 inline -> scale, CORRECTIONS row 8 remap); natural height */
 .inv-banner>.small{flex-grow:1;color:var(--ink)}/* §9 phone invitation banner (cook-cue-boards-1800, provisional) */
+/* §2 Theme control (cook-cue-boards-1800, provisional; QA-LIVE Q8): a row in the account menu / MenuPhone sheet — label + compact
+   segmented radio group Light · Dark · System (.seg[data-size=compact]); persisted per viewer; System follows prefers-color-scheme. */
+.mi-theme{display:flex;align-items:center;justify-content:space-between;gap:var(--sp-3);min-height:var(--target);padding:0 12px;color:var(--ink);font-weight:600;font-size:var(--t-15)}
+/* §2 Band-barbell label row (cook-cue-boards-1800, provisional; QA-LIVE Q11): the four level words as HTML under the axis, one per
+   quarter, centred, wrapping (no nowrap, no short forms; overflow-wrap + hyphens for long translated words); --t-12 on screen,
+   --t-11 on paper (§1.0 type: --t-11 "paper and meta only"). The axis keeps its height; the label row sits under it, 2px apart. */
+.band-axis{display:flex;flex-direction:column;gap:2px;min-width:0}.band-axis>.band-track{position:relative;height:40px}.paper .band-axis>.band-track{height:32px}
+.band-labels{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));column-gap:var(--sp-1)}
+.band-labels>span{text-align:center;font-size:var(--t-12);line-height:16px;font-weight:550;color:var(--ink-3);overflow-wrap:anywhere;hyphens:auto}
+.paper .band-labels>span{font-size:var(--t-11);line-height:14px}
+/* §2 Phone report reading (cook-cue-boards-1800, provisional; QA N2): sheets read on a phone are .psheet[data-fit=a4] (§2 Paper preview,
+   scaled to the page width, light paper kept) stacked in .report-sheets; the PDF reason sits in the page (p.small#pdf-why), never in the bar. */
+.report-sheets{display:flex;flex-direction:column;gap:var(--sp-4)}
 .l-main[data-rhythm=center]{justify-content:center;padding:var(--sp-6) var(--gutter)}/* §8.2 a single-card page centred in the viewport (SignInCheck; Invitations) */
 .icn[data-size="28"],.app .icn.icn-lens.su-icn-s{width:28px;height:28px;border-radius:var(--radius-s)}/* §2 lens chip on a project card (36/56/64 are the participant rows) */
 .av[data-size="28"]{width:28px;height:28px;font-size:var(--t-11);border-radius:var(--radius-s)}.av[data-logo]{border:1.5px dashed var(--field-edge);background:var(--field);color:var(--ink-3);letter-spacing:.04em;text-transform:uppercase}/* §2 organisation mark: the logo slot, else the initial */
@@ -383,6 +396,7 @@ def topbar(crumb=None, menu_open=False, who='Bincy', right=True):
             + f'<a class="mi" href="About.dc.html" role="menuitem">{ic("sparkle")} Why 3D Review exists</a>'
             + f'<a class="mi" href="Feedback.dc.html" role="menuitem">{ic("pen")} Send app feedback</a>'
             + f'<a class="mi" href="Landing.dc.html" role="menuitem">{ic("globe")} Public website home</a>'
+            + theme_control('acct')
             + '<hr class="hr" style="margin: 4px 0">'
             + f'<a class="mi" href="Main.dc.html" role="menuitem">{ic("people")} Use another account</a>'
             + f'<a class="mi" href="Main.dc.html" role="menuitem">{ic("out")} Sign out</a></div>')
@@ -498,6 +512,13 @@ def coverage(n, variant='full'):
 def newer_line(k):  # app results/data.js newerText: Results cards only, never the printed report
     return f'<span class="small" data-newer>{k} newer {"response" if k == 1 else "responses"} not in this report yet</span>' if k > 0 else ''
 
+def theme_control(uid):
+    """§2 Theme control (provisional): Light · Dark · System radios in a compact segmented group; System is a new viewer's default."""
+    return (f'<div class="mi-theme" role="group" aria-labelledby="theme-{uid}"><span id="theme-{uid}">Theme</span>'
+            f'<div class="seg" data-size="compact" role="radiogroup" aria-labelledby="theme-{uid}">'
+            + ''.join(f'<label><input type="radio" name="theme-{uid}"{" checked" if v == "System" else ""}>{v}</label>' for v in ('Light', 'Dark', 'System'))
+            + '</div></div>')
+
 def prov_panel(entries, w):
     # R45: review overlay drops .glass-hi's --sh-2 drop shadow (inline box-shadow keeps only --hl) so it never dims content under it
     if not entries: return ''
@@ -557,10 +578,12 @@ def band_barbell(area, who, scores, paper=False, phone=False):
     verdict = 'same band' if apart == 0 else ('1 band apart' if apart == 1 else f'{apart} bands apart — talk about this')
     ink = 'var(--ink)'; line = 'var(--line-2)'; soft = 'var(--line)'
     dots = ''.join(f'<span class="pt" data-lens="{k}" style="left: {pos[k]}%; top: {"11px" if paper else "18px"};{" width: 18px; height: 18px; margin-left: -9px; border: 3px solid #fff; box-shadow: 0 0 0 1px #c9d2da;" if paper else ""}" role="img" aria-label="{dict(LENS_NAMES)[k]} · {b}" title="{dict(LENS_NAMES)[k]} · {b}"></span>' for k, b in pts)
-    ticks = ''.join(f'<span class="micro" style="position: absolute; left: {12.5 + 25 * i}%; bottom: -6px; transform: translateX(-50%); white-space: nowrap; font-size: var(--t-11)">{b.replace("Needs urgent attention", "Urgent").replace("Needs support", "Support")}</span>' for i, b in enumerate(BANDS))
+    # §2 Band-barbell label row (cook-cue-boards-1800, provisional; QA-LIVE Q11): HTML, not SVG text, under the axis; the full
+    # glossary level words in four equal quarters, wrapping to as many lines as a word needs (longest and translated lengths)
+    labels = '<div class="band-labels" aria-hidden="true">' + ''.join(f'<span>{b}</span>' for b in BANDS) + '</div>'
     seps = ''.join(f'<span style="position: absolute; left: {25 * i}%; top: {"14px" if paper else "22px"}; width: 1px; height: {"12px" if paper else "14px"}; background: {line}"></span>' for i in range(1, 4))
     band = f'<span style="position: absolute; top: {"17px" if paper else "27px"}; height: 6px; border-radius: var(--radius-hair); left: {12.5 + 25 * lo}%; width: {25 * (hi - lo)}%; background: {"var(--b-urgent)" if apart >= 2 else line}; opacity: .8"></span>' if apart else ''
-    axis = (f'<div style="position: relative; height: {"46px" if paper else "60px"}"><span style="position: absolute; left: 0; right: 0; top: {"19px" if paper else "29px"}; height: 2px; background: {soft}; border-radius: var(--radius-hair)"></span>{seps}{band}{dots}{ticks}</div>')
+    axis = (f'<div class="band-axis"><div class="band-track"><span style="position: absolute; left: 0; right: 0; top: {"19px" if paper else "29px"}; height: 2px; background: {soft}; border-radius: var(--radius-hair)"></span>{seps}{band}{dots}</div>{labels}</div>')
     notasked = [dict(LENS_NAMES)[k] for k, v in scores.items() if v is None]
     na = (f'<span class="small" style="color: var(--ink-3)"> · {", ".join(notasked)} not asked</span>' if notasked else '')
     if phone:  # R37: axis full card width, verdict below it (no desktop 220px columns)

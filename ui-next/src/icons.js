@@ -69,6 +69,7 @@ export const accountItems = (from = globalThis.location?.search ?? "") => Object
   { label: "Help and FAQ", href: "#help", icon: I.help },
   { label: "Why 3D Review exists", href: href("about", {}, from), icon: I.sparkle },
   { label: "Send app feedback", href: "#feedback", icon: I.pen },
+  { kind: "theme" }, // design-system.md section 2 Theme control placement: its own row before the hr and the account actions
   { kind: "hr" },
   { label: "Use another account", href: "#main", icon: I.people },
   { label: "Sign out", href: "#main", icon: I.out },

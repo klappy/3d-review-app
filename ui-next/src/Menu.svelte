@@ -6,6 +6,7 @@
      summary; choosing a link item closes it. Layering: an open menu (and the top bar that holds two) sits above the page (topbar.css). -->
 <script>
   import Icon from "./Icon.svelte";
+  import ThemeControl from "./ThemeControl.svelte";
   let { summary, summaryClass = "menu-btn", label, title, items = [], align = "end", open = false, id = "menu" } = $props();
   if (!summary) throw new TypeError("Menu: a summary snippet is required");
   for (const it of items) {
@@ -33,6 +34,7 @@
     {#each items as it, i}
       {#if it.kind === "hr"}<hr class="hr" />
       {:else if it.kind === "head"}<div class="mi-head"><div class="h3">{it.label}</div>{#if it.sub}<div class="small">{it.sub}</div>{/if}</div>
+      {:else if it.kind === "theme"}<ThemeControl uid={id} />
       {:else if it.kind === "micro"}<div class="micro mi-head">{it.label}</div>
       {:else if it.refused}
         <button class={it.danger ? "mi danger" : "mi"} type="button" aria-disabled="true" aria-describedby={`${id}-${i}-why`}>{#if it.icon}<Icon d={it.icon} />{/if}{it.label}</button>

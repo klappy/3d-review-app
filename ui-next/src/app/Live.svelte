@@ -31,13 +31,18 @@
   import Card from "../Card.svelte";
   import Row from "../Row.svelte";
   import * as R from "../screens/results/data.js";
+  import { systemTheme } from "../theme.svelte.js";
   import NotBuilt from "./NotBuilt.svelte";
   import { buildConfirmText } from "../../../ui/assess/report-build.js";
 
   let hash = $state(globalThis.location?.hash ?? "");
   let phone = $state(typeof matchMedia === "function" ? matchMedia(PHONE_QUERY).matches : false);
   const route = $derived(parse(hash));
-  const theme = $derived(route.query.get("theme") === "dark" ? "dark" : "light");
+  // The screen theme: the link's ?theme= when it carries one, else the system's (prefers-color-scheme, followed live); the viewer's own
+  // Light or Dark choice in the account menu overrides both (AppShell themeOf).
+  let systemDark = $state(systemTheme() === "dark");
+  $effect(() => { const mq = globalThis.matchMedia?.("(prefers-color-scheme: dark)"); if (!mq?.addEventListener) return; const f = () => { systemDark = mq.matches; }; mq.addEventListener("change", f); return () => mq.removeEventListener("change", f); });
+  const theme = $derived(route.query.get("theme") === "dark" ? "dark" : route.query.get("theme") === "light" ? "light" : systemDark ? "dark" : "light");
   let session = $state(undefined); // undefined = not read yet; null = signed out
   let page = $state({ status: "loading", key: "", data: null, error: null });
   let pstate = $state(P.snapshot()); // participant journey snapshot
@@ -236,7 +241,7 @@
   const accountItems = $derived(session ? [
     { kind: "head", label: session.principal?.display_name || "Signed in", sub: session.principal?.id ? "Facilitator" : "" }, { kind: "hr" },
     { label: "Help and FAQ", href: to("help") }, { label: "Why 3D Review exists", href: to("about") }, { label: "Send app feedback", href: to("feedback", {}, { from: route.name, review: page.data?.data?.review?.title ?? page.data?.results?.review?.title ?? "" }) },
-    { label: "Public website home", href: to("landing") }, { label: "Current design", href: "/" }, { kind: "hr" }, { label: "Sign out", onclick: signOut },
+    { label: "Public website home", href: to("landing") }, { kind: "theme" }, { label: "Current design", href: "/" }, { kind: "hr" }, { label: "Sign out", onclick: signOut },
   ] : []);
   function onSignedIn() { D.clearLinks(); SU.forgetAll(); S.forget(); session = undefined; const next = page.data?.next; go(next && next !== "#/signin" ? next : to("home")); }
   // Report build (first build and "Refresh with new answers" alike): the current design's contract (ui/assess/report-build.js) —
@@ -436,7 +441,7 @@
     <C {phone} {theme} report={rep} onrefresh={refreshResults} refreshed={building ? "Building the results…" : page.data.refreshed ?? ""}>{#if build}{@render buildConfirm(false)}{/if}</C>
   {:else}
     {@const C = REGISTRY[page.data.screen]}
-    <C {phone} {theme} report={rep} />
+    <C {phone} {theme} report={rep} state={route.query.get("state") ?? undefined} />
   {/if}
 {:else if page.data.screen === "explore"}
   {@const C = REGISTRY.explore}
