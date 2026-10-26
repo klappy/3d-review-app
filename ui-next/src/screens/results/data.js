@@ -258,8 +258,20 @@ export function radar(report, names, counts) {
       return { name, x: x.toFixed(1), y: y.toFixed(1), lx: lx.toFixed(1), ly: (ly - ((lines.length - 1) * 13) / 2).toFixed(1), anchor, lines };
     }),
     lenses: model.lenses.map(({ lens, scores }) => {
-      const marks = scores.map((v, i) => (v === null ? null : { area: model.spokes[i], score: v, xy: at(i, (R * v) / 100).map((c) => c.toFixed(1)) })).filter(Boolean);
-      return { lens, label: lensLabel(lens), points: marks.map((m) => m.xy.join(",")).join(" "), marks };
+      const pts = scores.map((v, i) => (v === null ? null : { area: model.spokes[i], score: v, xy: at(i, (R * v) / 100).map((c) => c.toFixed(1)) }));
+      const marks = pts.filter(Boolean);
+      // design-system.md "The skipped spoke" (V-29): closed only when every spoke is scored; otherwise one open line per run of adjacent
+      // scored spokes, wrapping past the last spoke, so nothing crosses a skipped spoke; a lone scored spoke stays a marker only.
+      const closed = marks.length === k;
+      const runs = [];
+      if (!closed && marks.length) {
+        const start = pts.findIndex((p) => p === null); // begin just after a skip, so a run that wraps past the last spoke stays whole
+        let run = [];
+        for (let j = 1; j <= k; j++) { const p = pts[(start + j) % k]; if (p) run.push(p.xy.join(",")); else { if (run.length > 1) runs.push(run.join(" ")); run = []; } }
+        if (run.length > 1) runs.push(run.join(" "));
+      }
+      const skipped = model.spokes.filter((_, i) => pts[i] === null);
+      return { lens, label: lensLabel(lens), closed, points: closed ? marks.map((m) => m.xy.join(",")).join(" ") : "", runs, marks, skipped };
     }),
     legend: drawn.map((lens) => ({ lens, label: lensLabel(lens) })),
     notes,

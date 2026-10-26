@@ -83,6 +83,7 @@
           <Stack gap={3}>
             <Row wrap gap={4}>{#each shape.legend as l}<Row gap={2}><LensDot lens={l.lens} decorative /><span class="small">{l.label}</span></Row>{/each}{#if shape.notes.length}<span class="small">{shape.notes.join(" · ")}</span>{/if}</Row>
             <p class="small">Each ring is 25 on the 0–100 scale.{!shape.notes.length && D.shapeReading ? ` ${D.shapeReading}` : ""} Where a perspective is not asked about an area, its shape skips that spoke.</p>
+            {#each shape.lenses.filter((l) => l.skipped.length) as l (l.lens)}<p class="small" data-skip={l.lens}>{l.label} has no score for {l.skipped.join(", ")}.</p>{/each}
           </Stack>
         </Row>
         {:else}<p class="small">Too few shared areas to draw the shape.</p>{/if}

@@ -875,6 +875,22 @@ describe("results round 5: a live payload renders; counts read right", () => {
     expect(text(det)).not.toMatch(/\d\.\d{2}/);
     expect(det.querySelector("svg[data-part=score-barbell] circle[cx='87.6667%']")).not.toBeNull(); // geometry keeps the raw value
   });
+  it("live QA Q3 (design-system.md V-29): a perspective that skips a spoke is open lines per adjacent run, never a shape across the skip", () => {
+    const shape = radar(REPORT.desktop, (REPORT.desktop as { radar: string[] }).radar, REPORT.desktop.counts);
+    const com = shape.lenses.find((l: { lens: string }) => l.lens === "community");
+    const team = shape.lenses.find((l: { lens: string }) => l.lens === "team");
+    expect([team.closed, team.runs, com.closed, com.points]).toEqual([true, [], false, ""]);
+    expect(com.skipped.length + com.marks.length).toBe(shape.spokes.length);
+    for (const r of com.runs) expect(r.split(" ").length).toBeGreaterThan(1);
+    // the runs join only adjacent scored spokes (wrapping past the last); a lone scored spoke is a marker only
+    const idx = (xy: string) => com.marks.findIndex((m: { xy: string[] }) => m.xy.join(",") === xy);
+    for (const r of com.runs) { const at = r.split(" ").map(idx).map((i: number) => shape.spokes.findIndex((sp: { name: string }) => sp.name === com.marks[i].area)); for (let j = 1; j < at.length; j++) expect((at[j] - at[j - 1] + shape.spokes.length) % shape.spokes.length).toBe(1); }
+    const d = mount(ReportDetailed);
+    const svg = d.querySelector("svg[role=img][aria-label^='Radar']")!;
+    expect([svg.querySelectorAll("polygon[data-lens=community]").length, svg.querySelectorAll("polyline[data-lens=community]").length]).toEqual([0, com.runs.length]);
+    expect(svg.querySelectorAll("polygon[data-lens=team]").length).toBe(1);
+    expect(text(d.querySelector("p[data-skip=community]"))).toBe(`Community has no score for ${com.skipped.join(", ")}.`);
+  });
   it("R5-3 + R5-5: Results counts the detailed report's pages; the phone overview line counts the gaps the sheet draws, no radar", () => {
     expect(text([...mount(Results).querySelectorAll("a.btn")].find((a) => text(a).startsWith("Detailed report")) ?? null)).toBe(`Detailed report · ${detailedPages(lensCards(REPORT.desktop.payload, REPORT.desktop.counts))} pages`);
     expect(mount(Report, { phone: true }).textContent).toContain("Levels, the three biggest gaps.");

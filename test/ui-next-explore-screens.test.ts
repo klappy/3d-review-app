@@ -147,7 +147,10 @@ describe("Explore (Explore.dc.html, ExplorePhone.dc.html, ExploreFiltersPhone.dc
     expect(text(a)).toContain("Save this view");
     expect(text(a)).toContain("Download CSV");
     expect(a.querySelector("dialog")).toBeNull();
-    expect(a.querySelector(".phone-bar .btn-primary")!.getAttribute("href")).toBe("?ui_next=on&screen=explore&w=phone&state=filters");
+    // live QA Q5: the filters cannot be served yet, so the primary is a disabled button named by the visible reason, never a no-op link
+    const prim = a.querySelector(".phone-bar .btn-primary") as HTMLButtonElement;
+    expect([prim.tagName, prim.disabled, prim.getAttribute("aria-describedby")]).toEqual(["BUTTON", true, "explore-why"]);
+    expect(a.querySelector("#explore-why")!.textContent).toContain("not in the new design yet");
     expect(rows.map((r) => r.getAttribute("href"))).toEqual(Array(5).fill("?ui_next=on&screen=results&w=phone"));
   });
   it("filters (ExploreFiltersPhone): the sheet is an open native <dialog>, titled by its micro line, with the ten filter rows", () => {
@@ -191,7 +194,6 @@ describe("Explore (Explore.dc.html, ExplorePhone.dc.html, ExploreFiltersPhone.dc
       fire("click"); // a press that starts and ends on the backdrop
       expect(d.open).toBe(false);
       expect(window.location.search).toBe(closed);
-      expect(a.querySelector(".phone-bar .btn-primary")!.getAttribute("href")).toBe(`${closed}&state=filters`); // a real navigation again
       window.history.replaceState(null, "", sheetUrl);
       d.dispatchEvent(new Event("close")); // Escape: the native cancel closes the dialog, which fires close
       expect(window.location.search).toBe(closed);
@@ -224,7 +226,6 @@ describe("Explore (Explore.dc.html, ExplorePhone.dc.html, ExploreFiltersPhone.dc
     window.history.replaceState(null, "", "/next/?ui_next=on&screen=explore&w=phone&theme=dark");
     try {
       const a = mount(Explore, { phone: true, theme: "dark" });
-      expect(a.querySelector(".phone-bar .btn-primary")!.getAttribute("href")).toBe("?ui_next=on&screen=explore&w=phone&theme=dark&state=filters");
       expect(a.querySelector("a.list-row")!.getAttribute("href")).toBe("?ui_next=on&screen=results&w=phone&theme=dark");
     } finally { window.history.replaceState(null, "", "/"); }
   });
@@ -391,6 +392,15 @@ describe("the pinned 8.7 Explore-lane rows (ui-next/design-source/PIN a594830, b
   const css = readFileSync(resolve(__dirname, "../ui-next/components/base.css"), "utf8");
   it("base.css at the PIN has every row the lane composes with", () => {
     for (const r of [".l-grid[data-tpl=aside-end]{grid-template-columns:minmax(0,1fr) 300px", ".l-grid[data-tpl=aside-start]{grid-template-columns:260px minmax(0,1fr)", ".l-measure{max-width:720px}", ".side-nav{position:sticky", ".l-card[data-pad=table]{", ".tbl-wrap{overflow-x:auto}", ".tbl-foot{", ".l-card[data-pad=bar]{", ".l-card[data-pad=rows]{", ".list-row{", ".list-title{", ".menu[data-flow]{", ".mi-end{margin-left:auto}", ".chip[data-on]{", ".sel[data-size=compact]{", ".seg[data-inline]{", ".l-media[data-dir=row]{", ".app .t-24", "dialog.glass-hi{", "dialog.glass-hi::backdrop{", "dialog.glass-hi.sheet{", ".sheet[data-pad=menu],dialog.glass-hi.sheet[data-pad=menu]{", ".sheet-handle{", ".mi[data-size=lg]{"]) expect(css, r).toContain(r);
+  });
+  it("live QA Q5: every control the explore model cannot serve is disabled and names the visible reason; the table stays live", () => {
+    const a = mount(Explore, {});
+    const why = a.querySelector("#explore-why")!;
+    expect(why.textContent).toContain("not in the new design yet");
+    const ctl = [...a.querySelectorAll("button, select, input[value=cards]")].filter((e) => !e.closest("header"));
+    expect(ctl.length).toBeGreaterThan(5);
+    for (const c of ctl) expect([(c as HTMLButtonElement).disabled, c.getAttribute("aria-describedby") ?? c.closest("[aria-describedby]")?.getAttribute("aria-describedby")]).toEqual([true, "explore-why"]);
+    expect(a.querySelectorAll("table.tbl tbody tr").length).toBeGreaterThan(0);
   });
   it("Explore desktop: table + 300px aside grid; the bar and table cards; the table scrolls inside its card (.tbl-wrap), its foot inside it", () => {
     const a = mount(Explore, {});
