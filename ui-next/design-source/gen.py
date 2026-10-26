@@ -178,6 +178,11 @@ html:has(dialog[open]:modal){overflow:hidden}
 /* §2 Phone report reading (cook-cue-boards-1800, provisional; QA N2): sheets read on a phone are .psheet[data-fit=a4] (§2 Paper preview,
    scaled to the page width, light paper kept) stacked in .report-sheets; the PDF reason sits in the page (p.small#pdf-why), never in the bar. */
 .report-sheets{display:flex;flex-direction:column;gap:var(--sp-4)}
+/* §8 Barbell row (cook-cue-boards-1800, provisional; were gen.band_barbell / boards_report.barbell inlines): label · track · verdict.
+   Screen: 220px 1fr 220px, gap 20 (the glass card: --radius-l, 18/24/24). Paper: 180px 1fr 150px, gap 14, min-height 56 (48 for the
+   numeric score row, data-kind=score) so the band labels keep a ~300px track on the 794 sheet. */
+.barbell-row{display:grid;grid-template-columns:220px minmax(0,1fr) 220px;gap:20px;align-items:center}.glass.barbell-row{border-radius:var(--radius-l);padding:18px 24px 24px}
+.paper .barbell-row{grid-template-columns:180px minmax(0,1fr) 150px;gap:14px;min-height:56px}.paper .barbell-row[data-kind=score]{min-height:48px}
 .l-main[data-rhythm=center]{justify-content:center;padding:var(--sp-6) var(--gutter)}/* §8.2 a single-card page centred in the viewport (SignInCheck; Invitations) */
 .icn[data-size="28"],.app .icn.icn-lens.su-icn-s{width:28px;height:28px;border-radius:var(--radius-s)}/* §2 lens chip on a project card (36/56/64 are the participant rows) */
 .av[data-size="28"]{width:28px;height:28px;font-size:var(--t-11);border-radius:var(--radius-s)}.av[data-logo]{border:1.5px dashed var(--field-edge);background:var(--field);color:var(--ink-3);letter-spacing:.04em;text-transform:uppercase}/* §2 organisation mark: the logo slot, else the initial */
@@ -372,6 +377,12 @@ def btn(label, href=None, kind='', icon=None, lead=None, extra='', lg=False, blo
     if href:
         return f'<a class="{cls}" href="{href}"{a}{(" style=%s" % json.dumps(extra)) if extra else ""}>{inner}</a>'
     return f'<button class="{cls}" type="button"{a}{(" style=%s" % json.dumps(extra)) if extra else ""}>{inner}</button>'
+
+def dbtn(label, why, kind='', lead=None, block=False, lg=False, aria=None, icon_only=None):
+    """A control the model cannot serve yet (provisional): a disabled <button> described by one visible reason line (#<why>)."""
+    cls = 'btn' + (' ' + kind if kind else '') + (' btn-lg' if lg else '') + (' btn-block' if block else '') + (' btn-icon' if icon_only else '')
+    inner = ic(icon_only, 20) if icon_only else (ic(lead) + ' ' if lead else '') + label
+    return f'<button class="{cls}" type="button" disabled aria-describedby="{why}"{f' aria-label="{aria}"' if aria else ''}>{inner}</button>'
 
 def iconbtn(n, aria, href=None):
     if href: return f'<a class="btn btn-quiet btn-icon" href="{href}" aria-label="{aria}">{ic(n,20)}</a>'
@@ -589,8 +600,8 @@ def band_barbell(area, who, scores, paper=False, phone=False):
     if phone:  # R37: axis full card width, verdict below it (no desktop 220px columns)
         return (f'<div style="display: flex; flex-direction: column; gap: 4px">{axis}<span class="small"><strong style="color: var(--ink)">{verdict}</strong></span><span class="small">{" · ".join(dict(LENS_NAMES)[k] + " " + b for k, b in pts)}{na}</span></div>')
     if paper:
-        return (f'<div style="display: grid; grid-template-columns: 180px 1fr 150px; gap: 14px; align-items: center; min-height: 56px"><span style="font-size: var(--t-13); font-weight: 600">{area}</span>{axis}<span style="font-size: var(--t-12); color: #555">{verdict}{na}</span></div>')
-    return (f'<div class="glass" style="border-radius: var(--radius-l); padding: 18px 24px 24px; display: grid; grid-template-columns: 220px 1fr 220px; gap: 20px; align-items: center">'
+        return (f'<div class="barbell-row"><span style="font-size: var(--t-13); font-weight: 600">{area}</span>{axis}<span style="font-size: var(--t-12); color: #555">{verdict}{na}</span></div>')
+    return (f'<div class="glass barbell-row">'
             f'<div><div class="h3">{area}</div><span class="small">{who}</span></div>{axis}'
             f'<div style="display: flex; flex-direction: column; gap: 4px"><span class="small"><strong style="color: var(--ink)">{verdict}</strong></span><span class="small">{" · ".join(dict(LENS_NAMES)[k] + " " + b for k, b in pts)}{na}</span></div></div>')
 LENS_NAMES = [('team', 'Translation team'), ('community', 'Community'), ('church', 'Church')]
