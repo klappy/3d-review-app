@@ -1,7 +1,7 @@
 /* The pinned board CSS positions chrome inside a fixed drawing. Live pages
    scroll: keep phone actions in the viewport and respect the device safe area. */
 .app.l-screen{overflow:clip}
-.phone-bar{position:sticky;padding-bottom:calc(28px + env(safe-area-inset-bottom))}
+.phone-bar{position:fixed;padding-bottom:calc(28px + env(safe-area-inset-bottom))}/* design-system.md §9 phone-bar: fixed to the viewport foot (left/right/bottom 0 from base.css); main.l-phone's 120px bottom padding (§8.3) keeps the last content clear of it */
 /* Short phone pages: .l-shell's height:100% cannot resolve against .app's min-height, so the shell was only as tall as its content
    and the in-flow sticky bar sat mid-screen. The phone screen is a flex column at least one dynamic viewport tall, the shell
    grows to fill it, and main.l-phone (flex-grow:1) pushes the bar to the viewport foot; a long page scrolls and the bar sticks.

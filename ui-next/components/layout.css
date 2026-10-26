@@ -1,6 +1,5 @@
 
-/* Additions (not yet in the generator; contract design-system.md 8.1 Card and Grid rows): Card radius + inner padding, Grid data-cols and the named barbell template. */
-.l-card:not([data-pad]){border-radius:var(--radius-l);padding:var(--sp-5)}.app[data-w=phone] .l-card:not([data-pad]){padding:var(--sp-4)}
+/* Additions (not yet in the generator; contract design-system.md 8.1 Grid row): Grid data-cols and the named barbell template. Card radius + inner padding now come from base.css (.l-card:not([data-pad])). */
 .l-grid[data-cols="2"]{grid-template-columns:repeat(2,minmax(0,1fr))}.l-grid[data-cols="3"]{grid-template-columns:repeat(3,minmax(0,1fr))}.l-grid[data-cols="4"]{grid-template-columns:repeat(4,minmax(0,1fr))}.l-grid[data-tpl=barbell]{grid-template-columns:220px 1fr 220px}
 /* Page gap (design-system.md 8.1 Page row: gap between Sections, --sp-5 by default, the setup Page --sp-6; 8.2 steps): Page gap={n} sets data-gap, which the [data-gap] rows map to --g; .l-page reads it. Rule-11 back-fill candidate for the generator. */
 .l-page[data-gap]{gap:var(--g)}

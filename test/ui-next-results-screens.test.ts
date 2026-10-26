@@ -466,13 +466,21 @@ describe("each board renders as a screen", () => {
     expect(text(a)).not.toMatch(/\S· /);
   });
   it("ReportDetailed: four sheets, radar, numeric barbells, evidence tables", () => {
+    { // §8.11 evidence table: .ev-card > .ev-head + table.ev-table; Score and Evidence end-aligned, Score .tab-n, Evidence .ev-muted
+      const ev = mount(ReportDetailed).querySelector(".ev-card[data-lens=team]")!;
+      expect([...ev.children].map((k) => k.className)).toEqual(["ev-head", "ev-table"]);
+      expect([...ev.querySelectorAll("thead th")].map((th) => `${text(th)}:${th.getAttribute("data-align") ?? ""}`)).toEqual(["Area:", "Level:", "Score:end", "Evidence:end", "Observation:"]);
+      const td = ev.querySelector("tbody tr")!.children;
+      expect([td[2].className, td[2].getAttribute("data-align"), td[3].className, td[3].getAttribute("data-align")]).toEqual(["tab-n", "end", "ev-muted", "end"]);
+      expect(mount(ReportDetailed).querySelector(".ev-card .tbl, .ev-card .th, .ev-card .td")).toBeNull();
+    }
     const a = mount(ReportDetailed);
     expect(all(a, ".pfoot span:last-child")).toEqual(["1 of 4", "2 of 4", "3 of 4", "4 of 4"]);
     expect(a.querySelectorAll(".paper[data-sheet=page]").length).toBe(4);
     expect(a.querySelector("svg[role=img][aria-label^='Radar']")).not.toBeNull();
     expect(a.querySelectorAll("svg[data-part=score-barbell]").length).toBe(3 + 7);
     expect(all(a, "table").length).toBe(3);
-    expect(all(a, "th.th")).toContain("Observation");
+    expect(all(a, ".ev-table th")).toContain("Observation");
     // N2: the notes after "gap n" keep the space before the middot
     expect(all(a, ".paper .l-grid > span.small:last-child").filter((t) => /not asked/.test(t))).toEqual([
       "gap 14 · Community not asked", "gap 4 · Community not asked", "gap 14 · Community not asked", "gap 9 · Translation team not asked", "gap 4 · Community not asked"]);
@@ -489,7 +497,7 @@ describe("each board renders as a screen", () => {
     expect(text(a)).not.toContain("church stay wide"); // the fixture's three-shape reading needs every perspective drawn
     const sheets = [...a.querySelectorAll(".paper[data-sheet=page]")];
     expect(all(sheets[0], ".l-grid > span.small:first-child")).toEqual(["Clarity / naturalness", "Impact / use", "Trust / readiness"]);
-    const churchTable = a.querySelector(".solid[data-lens=church] table")!;
+    const churchTable = a.querySelector(".ev-card[data-lens=church] table.ev-table")!;
     expect([...churchTable.querySelectorAll("tbody tr")].map((tr) => text(tr.children[2]))).toEqual(Array(6).fill("—"));
     const leads = all(a, ".paper .l-grid > span.small:last-child");
     expect(leads).toContain("too few perspectives to compare · Church more input needed · Community not asked");
@@ -515,7 +523,7 @@ describe("each board renders as a screen", () => {
     expect(all(d, ".paper h2")[0]).toBe("The two perspectives as one shape");
     expect(emptyHeadings(d)).toEqual([]);
     expect(text(r.querySelector("header[data-variant=document]"))).toContain("Open the detailed report · 3 pages");
-    expect(all(d, ".solid[data-lens] > .l-row strong")).toEqual(["Translation team", "Community"]);
+    expect(all(d, ".ev-card[data-lens] > .ev-head strong")).toEqual(["Translation team", "Community"]);
     expect(text(d)).toContain("Church not asked");
     for (const el of [r, d]) {
       expect(text(el)).not.toMatch(/gap null|undefined|NaN/);
@@ -537,11 +545,11 @@ describe("each board renders as a screen", () => {
     }
     const a = mount(ReportDetailed, { report: noCounts(0) });
     expect(a.querySelectorAll("svg[data-part=score-barbell] g[data-lens=church], svg[aria-label^='Radar'] [data-lens=church]").length).toBe(0);
-    expect([...a.querySelector(".solid[data-lens=church] table")!.querySelectorAll("tbody tr")].map((tr) => text(tr.children[2]))).toEqual(Array(6).fill("—"));
+    expect([...a.querySelector(".ev-card[data-lens=church] table.ev-table")!.querySelectorAll("tbody tr")].map((tr) => text(tr.children[2]))).toEqual(Array(6).fill("—"));
     const none = noCounts(1);
     none.payload.evidence = [];
     const z = mount(ReportDetailed, { report: none });
-    expect(all(z, ".solid[data-lens] > .l-row .small")).toEqual(Array(3).fill("responses not counted"));
+    expect(all(z, ".ev-card[data-lens] > .ev-head .small")).toEqual(Array(3).fill("responses not counted"));
     expect(text(z)).not.toMatch(/null|undefined|NaN/);
   });
   it("Report and ReportDetailed render malformed entries; blank and numeric names list in All areas compared (R4-3)", () => {
@@ -741,7 +749,7 @@ describe("results round 5: a live payload renders; counts read right", () => {
     const names = ctx.cross_lens_multi.map((a) => a.construct_name);
     const live = { ...REPORT.desktop, payload: ctx, counts: undefined, gaps: { biggest: names.slice(0, 3), agree: [] }, radar: names, lookNext: [] };
     const d = mount(ReportDetailed, { report: live });
-    expect(all(d, ".paper .solid[data-lens] > .l-row .small")).toEqual(["Filling up · 4 responses", "Well filled · 6 responses", "A few drops · 2 responses"]);
+    expect(all(d, ".paper .ev-card[data-lens] > .ev-head .small")).toEqual(["Filling up · 4 responses", "Well filled · 6 responses", "A few drops · 2 responses"]);
     expect(text(d)).not.toMatch(/null|undefined|NaN/);
     const r = mount(Report, { report: live });
     expect(r.querySelectorAll(".paper .solid[data-lens]").length).toBe(3);

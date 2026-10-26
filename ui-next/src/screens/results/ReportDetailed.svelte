@@ -2,7 +2,7 @@
      Board: ReportDetailed.dc.html (desktop only). On a phone (&w=phone) it renders the phone's reports list (ReportPhone, ./Report.svelte),
      where the phone shares the PDF; any ?state= renders the default. Four .paper[data-sheet=page] sheets (8.11 contract row; Paper is
      Card level), stacked in the shell's main: 1 head + radar + biggest tensions; 2 all areas compared + how to read; 3-4 every area with
-     evidence (.th/.td tables) + their words. Scores are exact as returned (ui/report-lenses.js lensSpreadRows exact); levels v3ScoreBand;
+     evidence (§8.11 .ev-card / table.ev-table) + their words. Scores are exact as returned (ui/report-lenses.js lensSpreadRows exact); levels v3ScoreBand;
      radar ui/report-radar.js radarModel. One .btn-primary: "Download this report (PDF)" (document bar). Copy: the board.
      A perspective under the minimum responses adds nothing a reader could work back to its score (validator R3-1): no barbell dot,
      no part in a gap or the tensions order, no radar shape, "—" in its evidence Score cells; an area with fewer than two placed
@@ -56,11 +56,12 @@
   <PaperLegend />
 {/snippet}
 {#snippet evidence(c)}
-  <div class="solid l-card l-stack" data-lens={c.lens} data-gap="2">
-    <Row gap={3}><strong>{c.label}</strong><Coverage n={c.n} /></Row>
-    <table>
-      <thead><tr><th class="th">Area</th><th class="th">Level</th><th class="th">Score</th><th class="th">Evidence</th><th class="th">Observation</th></tr></thead>
-      <tbody>{#each c.rows as r}<tr><td class="td">{r.name}</td><td class="td"><Level level={r.level} /></td><td class="td tab-n">{r.level === "more" || r.score === null ? "—" : r.score}</td><td class="td">{r.items} items</td><td class="td">{r.note}</td></tr>{/each}</tbody>
+  <!-- design-system.md §8.11 Evidence table (paper): .ev-card > .ev-head (name + coverage cue) + table.ev-table; not the screen .tbl -->
+  <div class="ev-card" data-lens={c.lens}>
+    <div class="ev-head"><strong>{c.label}</strong><Coverage n={c.n} /></div>
+    <table class="ev-table">
+      <thead><tr><th>Area</th><th>Level</th><th data-align="end">Score</th><th data-align="end">Evidence</th><th>Observation</th></tr></thead>
+      <tbody>{#each c.rows as r}<tr><td>{r.name}</td><td><Level level={r.level} /></td><td class="tab-n" data-align="end">{r.level === "more" || r.score === null ? "—" : r.score}</td><td class="ev-muted" data-align="end">{r.items} items</td><td>{r.note}</td></tr>{/each}</tbody>
     </table>
   </div>
 {/snippet}

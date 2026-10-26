@@ -35,6 +35,12 @@ describe("Home renders each state", () => {
     expect([...a.querySelectorAll("section.l-section > h2.h2")].map((h) => h.textContent)).toEqual(["Results ready", "Collecting", "Setting up", "Completed"]);
     expect([...a.querySelectorAll(".pill")].map((p) => p.getAttribute("data-stage"))).toEqual(["results", "collecting", "setup"]);
     expect([...a.querySelectorAll("a.card-link.glass")].map((c) => c.querySelector(".btn")!.textContent)).toEqual(["Read the results", "Share the survey", "Continue setup"]);
+    // every action link ends in the arrow glyph, desktop (.btn) and phone (.link), as the boards draw "Share the survey →" (parity R60)
+    const ph = home({ state: "reviews", phone: true });
+    const links = [...ph.querySelectorAll("a.card-link span.link")];
+    expect(links.length).toBeGreaterThan(0);
+    for (const l of links) expect(l.lastElementChild?.querySelector("path")?.getAttribute("d")).toBe("M5 12h14M13 6l6 6-6 6");
+    for (const b of a.querySelectorAll("a.card-link.glass .btn")) expect(b.lastElementChild?.tagName.toLowerCase()).toBe("svg");
     expect([...a.querySelectorAll(".lvl-name")].map((l) => l.textContent)).toEqual(["Growing", "Needs support", "Growing"]);
     // Codex P2 on 992b610: each level carries its respondent count, so a low-evidence level never shows bare
     expect([...a.querySelectorAll(".lvl-pair [data-coverage] [data-short]")].map((c) => (c.textContent ?? "").replace(/\s+/g, " ").trim())).toEqual(["Well filled · 9", "Well filled · 10", "Filling up · 5"]);

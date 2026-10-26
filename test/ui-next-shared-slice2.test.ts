@@ -20,9 +20,9 @@ describe("B2. the phone bar stays in the thumb zone on every phone screen (secti
   // The position rule is main's (638275c: phone.css .phone-bar sticky + .app.l-screen overflow clip, asserted in
   // test/ui-next-about-landing.test.ts); slice 2's position:fixed rule was dropped in the main sync. Sticky bottom:0 holds the bar
   // at the viewport foot only while it is the last in-flow child after the scrolling content, so the shell structure is pinned here.
-  it("phone.css carries no position:fixed rule (main's sticky bar is the one live rule)", () => {
-    expect(rules(read("components/phone.css")).filter(([, d]) => /position:\s*fixed/.test(d))).toEqual([]);
-    expect(rules(read("components/phone.css")).filter(([, d]) => /position:\s*sticky/.test(d)).map(([s]) => s)).toEqual([".phone-bar"]);
+  it("phone.css fixes .phone-bar and nothing else (design-system.md §9 phone-bar: fixed; no sticky rule left)", () => {
+    expect(rules(read("components/phone.css")).filter(([, d]) => /position:\s*fixed/.test(d)).map(([s]) => s)).toEqual([".phone-bar"]);
+    expect(rules(read("components/phone.css")).filter(([, d]) => /position:\s*sticky/.test(d))).toEqual([]);
     const main = read("src/main.js");
     expect(main.indexOf(`"../components/phone.css"`)).toBeGreaterThan(main.indexOf(`"../components/base.css"`));
   });

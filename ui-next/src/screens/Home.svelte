@@ -87,7 +87,7 @@
           <span class="micro">{r.project}</span>
           <Row wrap gap={2}><span class="h2">{r.title}</span><Pill stage={g.stage} /></Row>
           <span class="small">{r.phoneMeta ?? r.meta}</span>
-          <span class="link">{r.action}</span>
+          <span class="link l-row" data-gap="2">{r.action}<Icon d={ARROW} /></span><!-- the boards' "Share the survey →" (parity R60) -->
         </Card>
       {/each}
     {/each}

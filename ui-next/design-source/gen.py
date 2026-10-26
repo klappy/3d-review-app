@@ -259,6 +259,17 @@ html:has(dialog[open]:modal){overflow:hidden}
 .lvl-legend{border-radius:var(--radius-l);padding:12px 18px;display:flex;align-items:center;gap:22px;flex-wrap:wrap}
 .seg[data-size=compact]{padding:3px}.seg[data-size=compact] label{min-height:36px;padding:0 10px;font-size:var(--t-13)}
 .crumb-hit{min-height:var(--target);display:inline-flex;align-items:center;align-self:flex-start}
+/* §9 facilitator phone header (DS :498, :643 — 56px = 6 + 44 + 6; was the fa_header() inline, cook-cue-boards-1800 rule 16) */
+.phone-top[data-shell=facilitator]{padding:6px 12px 6px 16px;gap:8px}
+/* §8 Card row (DS :691): a card with no named pad — --sp-5 desktop, --sp-4 phone (= app ui-next/components/layout.css:3) */
+.l-card:not([data-pad]){border-radius:var(--radius-l);padding:var(--sp-5)}.app[data-w=phone] .l-card:not([data-pad]){padding:var(--sp-4)}
+/* §8.11 Evidence table (detailed report pp 3–4; cook-cue-boards-1800, provisional): compact paper table, paper tokens only (V-34) */
+.ev-card{border:1px solid var(--line-2);border-radius:var(--radius-m);break-inside:avoid;border-top:var(--accent-bar) solid var(--lens)}
+.ev-head{display:flex;align-items:center;gap:10px;padding:10px 14px;background:color-mix(in srgb,var(--line) 40%,transparent)}
+.ev-table{width:100%;border-collapse:collapse;font-size:var(--t-12)}
+.ev-table th{padding:6px 14px;font-weight:600;color:var(--ink-2);text-align:left}
+.ev-table td{padding:8px 14px;border-top:1px solid var(--line);color:var(--ink)}
+.ev-table [data-align=end]{text-align:right}.ev-table td.ev-muted{color:var(--ink-2)}
 /* §9 phone frame (cook-cue-boards-1800, provisional; DS §9 fixed bottom bar, §8.3 120px clearance): the board is the 390×844 viewport.
    The page scrolls inside the frame under the header; the bar stays at the viewport's bottom; .l-phone's 120px bottom padding is
    the clearance, so the last content scrolls clear of the bar. App: the document scrolls and .phone-bar is position:fixed. */
@@ -366,6 +377,7 @@ def topbar(crumb=None, menu_open=False, who='Bincy', right=True):
             + f'<a class="mi" href="Help.dc.html" role="menuitem">{ic("help")} Help and FAQ</a>'
             + f'<a class="mi" href="About.dc.html" role="menuitem">{ic("sparkle")} Why 3D Review exists</a>'
             + f'<a class="mi" href="Feedback.dc.html" role="menuitem">{ic("pen")} Send app feedback</a>'
+            + f'<a class="mi" href="Landing.dc.html" role="menuitem">{ic("globe")} Public website home</a>'
             + '<hr class="hr" style="margin: 4px 0">'
             + f'<a class="mi" href="Main.dc.html" role="menuitem">{ic("people")} Use another account</a>'
             + f'<a class="mi" href="Main.dc.html" role="menuitem">{ic("out")} Sign out</a></div>')
