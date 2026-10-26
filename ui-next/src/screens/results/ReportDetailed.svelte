@@ -28,7 +28,7 @@
   import Radar from "./Radar.svelte";
   import Report from "./Report.svelte";
   import { href } from "../href.js";
-  import { REPORT, currentLevelMin, lensCards, scoreRows, comparedRows, radar, withNotes, gapLead, countWord, evidenceSheets, detailedPages } from "./data.js";
+  import { REPORT, currentLevelMin, snapshotTotal, lensCards, scoreRows, comparedRows, radar, withNotes, gapLead, countWord, evidenceSheets, detailedPages } from "./data.js";
 
   let { phone = false, theme = "light", report } = $props();
   const D = $derived(report ?? REPORT.desktop);
@@ -40,7 +40,7 @@
   // "How to read the scores" names the level minimum in force (served, else the safe 3): at 1 the board's words, "no answers".
   const MIN = currentLevelMin(), fewWords = MIN === 1 ? "no answers" : `fewer than ${MIN} answers`;
   const PAGES = $derived(detailedPages(cards));
-  const FOOT = $derived(`Built from ${D.review.responses} responses on ${D.review.builtOn} · Scores are 0–100. Every other page shows levels, which are bands · nothing here identifies a person`);
+  const FOOT = $derived(`Built from ${snapshotTotal(cards)} responses on ${D.review.builtOn} · Scores are 0–100. Every other page shows levels, which are bands · nothing here identifies a person`);
   const shapeHeading = $derived(shape ? `The ${countWord(shape.legend.length)} perspectives as one shape` : "The perspectives as one shape");
   const tensionsLead = $derived(tensions.length === 0 ? "No area has two perspectives to compare yet." : tensions.length === 1 ? "The area where the perspectives are furthest apart." : `The ${countWord(tensions.length)} areas where the perspectives are furthest apart.`);
 </script>
@@ -72,8 +72,7 @@
 {#if phone}
 <Report phone {theme} {report} />
 {:else}
-<AppShell {theme} screen {top}>
-  <Stack gap={6}>
+<AppShell {theme} screen rhythm="report" {top}><!-- §8.3 Report frame: main.l-main[data-rhythm=report] > .paper[data-sheet] sheets as direct children -->
     <div class="paper" data-sheet="page">
       <PaperHead review={D.review} {cards} kind="detailed report" />
       <Stack gap={1}>
@@ -116,6 +115,5 @@
       {@render foot(3 + i)}
     </div>
     {/each}
-  </Stack>
 </AppShell>
 {/if}

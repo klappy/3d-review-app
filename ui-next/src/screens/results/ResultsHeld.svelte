@@ -34,19 +34,21 @@
   // The held preview shows the collection as it stands (H.counts, the live survey counts), not a built report's snapshot.
   const cards = lensCards(D.payload ?? { lenses: [] }, H.counts, { prefer: "live", sent: report?.sent });
   // Live: the server's own hold (results.ts MinimumHold: responses_in / responses_needed / reason, an assessment-wide gate) is the
-  // condition shown; the per-perspective lines keep only perspectives the review has surveys for (count > 0 or a lens the report names).
+  // condition shown; the per-perspective lines keep exactly the perspectives the review sent out (report.sent, the same set the cards use),
+  // so a sent perspective at 0 is named even with no payload; without a sent list, a count > 0 or a lens the report names.
   const srv = $derived(report?.held && typeof report.held.responses_needed === "number" ? report.held : null);
-  const lines = $derived(report ? heldLines(H.counts).filter((l) => l.n > 0 || (report.payload?.lenses ?? []).some((x) => x.lens === l.lens || x.lens === l.label)) : heldLines(H.counts));
+  const inReview = (l) => (Array.isArray(report?.sent) ? report.sent.includes(l.lens) : l.n > 0 || (report?.payload?.lenses ?? []).some((x) => x.lens === l.lens || x.lens === l.label));
+  const lines = $derived(report ? heldLines(H.counts).filter(inReview) : heldLines(H.counts));
   const short = $derived(lines.filter((l) => l.short > 0));
   if (!report && !heldLines(H.counts).some((l) => l.short > 0)) throw new TypeError("ResultsHeld: the fixture holds no perspective under the minimum");
-  const first = $derived(short[0] ?? lines[0] ?? heldLines(H.counts)[0]);
-  const phoneN = $derived(H.phoneCounts[first.lens]);
+  const first = $derived(short[0] ?? lines[0] ?? null); // only a perspective the review sent out, never an unsent one
+  const phoneN = $derived(first ? H.phoneCounts[first.lens] ?? first.n : 0);
   const crumbs = [{ label: D.review.project, href: out("project") }, { label: D.review.title }];
-  const without = `Show results without the ${first.label.toLowerCase()}`;
+  const without = $derived(first ? `Show results without the ${first.label.toLowerCase()}` : "");
   // Live: a server (assessment-wide) hold cannot be worked around per perspective, so the "without" escape is not offered; while the
   // review is still collecting the primary goes back to Collect (nothing to reopen), otherwise it reopens collection.
   const collecting = $derived(report?.review?.stage === "collecting");
-  const escape = $derived(!report || !srv);
+  const escape = $derived((!report || !srv) && !!first);
   // Reopening sets the stage (owner/member, src/handlers/assessment.ts): a viewer sees the primary disabled with the reason; the
   // response list is owner/member too, so a viewer gets no "See the answers so far" (the fixture: everyone).
   const canReopen = $derived(!report || report.review?.canReopen !== false);
@@ -65,8 +67,8 @@
     <ReviewHead review={{ ...P.review, stage: "closed" }} phone />
     <Card gap={3} label="Results are held">
       <div class="l-row" data-gap="3" data-align="start">
-        <span class="icn icn-lens" data-lens={first.lens}><Glyph d={G.clock} /></span>
-        <Stack gap={1}><span class="h3">Results are held</span><span class="small">{#if srv}{srv.responses_in} of {srv.responses_needed} responses so far; the server holds the report until then.{:else}The {first.label.toLowerCase()} survey has {phoneN} answers; a perspective shows its level from {fromWords}.{/if}</span></Stack>
+        <span class="icn icn-lens" data-lens={first?.lens ?? "team"}><Glyph d={G.clock} /></span>
+        <Stack gap={1}><span class="h3">Results are held</span><span class="small">{#if srv}{srv.responses_in} of {srv.responses_needed} responses so far; the server holds the report until then.{:else if first}The {first.label.toLowerCase()} survey has {phoneN} answers; a perspective shows its level from {fromWords}.{:else}A perspective shows its level from {fromWords}.{/if}</span></Stack>
       </div>
       {#if escape}<a class="link" href={href("results")}>{without} <Glyph d={G.arrow} /></a>{/if}
       {#if canRead}<a class="link" href={href("results-answers")}>See the answers so far <Glyph d={G.arrow} /></a>{/if}
@@ -80,7 +82,7 @@
         <span class="icn" data-size="64" data-lens="team"><Glyph d={G.lock} size={30} /></span>
         <div class="l-stack" data-gap="2">
           <h2 class="h2 t-24">{srv ? "Results are held until enough answers are in" : "Results are held until every perspective has enough answers"}</h2>
-          <p class="small t-15">{#if srv}The server holds this report: {srv.responses_in} of {srv.responses_needed} responses so far{srv.reason ? ` (${srv.reason})` : ""}. {collecting ? "Collection is still open: share the links and come back." : "Keep collecting."}{:else}Levels need at least {MIN} {MIN === 1 ? "answer" : "answers"} from a perspective. {first.label} has {first.n} of {MIN}. Keep collecting, or go on without the {first.label.toLowerCase()} perspective.{/if}</p>
+          <p class="small t-15">{#if srv}The server holds this report: {srv.responses_in} of {srv.responses_needed} responses so far{srv.reason ? ` (${srv.reason})` : ""}. {collecting ? "Collection is still open: share the links and come back." : "Keep collecting."}{:else}Levels need at least {MIN} {MIN === 1 ? "answer" : "answers"} from a perspective.{#if first}{" "}{first.label} has {first.n} of {MIN}. Keep collecting, or go on without the {first.label.toLowerCase()} perspective.{:else}{" "}Keep collecting.{/if}{/if}</p>
           <div class="l-row held-lines" data-gap="5" data-wrap>{#each lines as l}<span class="small"><LensDot lens={l.lens} decorative /> {l.text}</span>{/each}</div>
         </div>
         <div class="l-stack" data-gap="2">{#if primary.disabled}<Button label={primary.label} lead={qr} disabled ariaDescribedby="primary-why" />{:else}<Button label={primary.label} href={primary.href} lead={qr} />{/if}{#if escape}<Button label={without} variant="quiet" href={href("results")} />{/if}</div>

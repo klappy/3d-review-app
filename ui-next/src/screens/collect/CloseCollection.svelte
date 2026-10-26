@@ -5,8 +5,8 @@
      Close, Escape and the backdrop go back to Collect; the confirm reads "Yes, …" (0.22.7).
      One .btn-primary: the dialog's / sheet's own "Yes, close and see results"; the head Share and the phone bar go secondary behind it.
      "Every perspective has an answer, so its level can show" is said only when it is true (0.27.0 held line): there is at least one
-     perspective and each has results/data.js currentLevelMin (the server's level minimum, else the safe 3) (never vacuously, with none); the drops and the answer-split floor
-     (MIN_RESPONSES) are said beside it, so one answer never reads as plenty. Counts read "1 response is in" / "N responses are in".
+     perspective and each has results/data.js currentLevelMin (the server's level minimum, else the safe 3) (never vacuously, with none); the drops are said beside it, so one answer never
+     reads as plenty, and answer-by-answer splits are said to be not shown (design-system.md section 4 Close collection row). Counts read "1 response is in" / "N responses are in".
      The boards draw one state (the open confirm): any ?state= renders it. -->
 <script>
   import Button from "../../Button.svelte";
@@ -16,7 +16,7 @@
   import Dialog from "./Dialog.svelte";
   import Glyph from "./Glyph.svelte";
   import { collectModel, plural } from "./model.js";
-  import { currentLevelMin, MIN_RESPONSES } from "../results/data.js";
+  import { currentLevelMin } from "../results/data.js";
   import { href } from "../href.js";
   import fixture from "../../../fixtures/collect/collect.json";
 
@@ -46,7 +46,7 @@
     <SurveyGroups groups={m.groups} />
     <Dialog labelledby="close-title" cancel={href("collect")} titleTop title={deskTitle}>
       <p class="small t-15">Links and codes stop working and the review moves to <strong>Understand</strong>. {m.countsUnavailable ? "Some response counts could not be read just now — reload before closing on a number." : `${plural(m.answered, "response is", "responses are")} in.`} You can reopen collection later — results refresh when you do.</p>
-      {#if m.groups.length && !m.countsUnavailable}<div class="solid l-card l-stack"><span class="small">{m.byLens}.{#if enough}{" "}{ready}; the drops beside each level show how much evidence it rests on. Answer-by-answer splits wait for {MIN_RESPONSES}.{/if}</span></div>{/if}
+      {#if m.groups.length && !m.countsUnavailable}<div class="solid l-card l-stack"><span class="small">{m.byLens}.{#if enough}{" "}{ready}; the drops beside each level show how much evidence it rests on. Answer-by-answer splits are not shown.{/if}</span></div>{/if}
       <div class="l-row" data-gap="2" data-justify="end">
         <!-- svelte-ignore a11y_autofocus -->
         <a class="btn btn-quiet" href={href("collect")} autofocus>Keep collecting</a>

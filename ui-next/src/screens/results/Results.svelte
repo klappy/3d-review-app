@@ -24,7 +24,7 @@
   import { G } from "./icons.js";
   import { href } from "../href.js";
   import { out } from "./links.js";
-  import { REPORT, lensCards, detailedPages, bandRows, LEVEL_WORD } from "./data.js";
+  import { REPORT, lensCards, detailedPages, bandRows, LEVEL_WORD, snapshotTotal } from "./data.js";
 
   // report (live): { review, counts, payload } from app/data.js resultsModel; default the fixture. onrefresh (live): rebuilds from new answers.
   let { phone = false, theme = "light", state: view, report, onrefresh, refreshed = "" } = $props(); // state renamed: a binding named state would shadow the $state rune
@@ -35,7 +35,8 @@
   // The disagreement line: the board's sentence for the fixture; for a live report, the widest cross-perspective gap in its own words.
   const gap = $derived(report ? bandRows(D, D.counts, D.gaps?.biggest ?? []).find((r) => r.dots.length >= 2) : null);
   const disagree = $derived(!report ? "The team feels strong about the brief and consistency; the community finds the text hard to follow and not yet part of daily life. That gap is the most useful thing in this review." : gap ? `${gap.name}: ${gap.dots.map((d) => `${d.label} ${LEVEL_WORD[d.level].toLowerCase()}`).join(", ")} — ${gap.verdict}. That gap is the most useful thing in this review.` : "No area has two perspectives to compare yet; levels above are per perspective.");
-  const built = $derived(report ? `Report built ${review.builtOn} from ${review.responses} responses.` : `Report built ${review.closed} from ${review.responses} responses.`);
+  // The report's own total: the sum of the snapshot counts the cards show (data.js snapshotTotal), never the live survey total.
+  const built = $derived(`Report built ${report ? review.builtOn : review.closed} from ${snapshotTotal(cards)} responses.`);
   const crumbs = $derived([{ label: review.project, href: out("project") }, { label: review.title }]);
   let checked = $state(false);
   const NO_NEW = "No new answers since this report was built.";

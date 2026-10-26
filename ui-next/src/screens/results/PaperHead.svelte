@@ -8,13 +8,14 @@
   import Level from "../../Level.svelte";
   import Mark from "../../Mark.svelte";
   import Coverage from "./Coverage.svelte";
+  import { snapshotTotal } from "./data.js";
   let { review, cards, kind } = $props();
 </script>
 
 <div class="l-row" data-gap="4" data-split data-align="start">
   <Stack gap={1}>
     <h1 class="title-page ptitle">{review.title}</h1>
-    <p class="small">{review.project} · {review.language} · 3D Review {kind} · {review.closedLong ? `closed ${review.closedLong}` : "collection closed"} · {review.responses} responses</p>
+    <p class="small">{review.project} · {review.language} · 3D Review {kind} · {review.closedLong ? `closed ${review.closedLong}` : "collection closed"} · {snapshotTotal(cards)} responses</p><!-- the report's own total: the sum of the counts below -->
   </Stack>
   <Mark size={40} />
 </div>

@@ -19,7 +19,7 @@ import { levelOf, stagePill, responsesText, exploreRows, phoneRows, matchCounts,
 // @ts-expect-error -- plain .js module, no type declarations
 import { modal, backdropClose, closeTo } from "../ui-next/src/screens/explore/dialog.js";
 // @ts-expect-error -- plain .js module, no type declarations
-import { TOPICS, FAQ, INTRO, faqFor } from "../ui-next/src/screens/explore/help-copy.js";
+import { TOPICS, FAQ, INTRO, faqFor, topicsFor } from "../ui-next/src/screens/explore/help-copy.js";
 // @ts-expect-error -- plain .js module, no type declarations
 import { v3ScoreBand } from "../ui/assess/v3-assessment.js";
 // @ts-expect-error -- plain .js module, no type declarations
@@ -341,15 +341,27 @@ describe("Help (Help.dc.html, HelpPhone.dc.html)", () => {
     // The answers-needed FAQ follows the served level minimum: absent (this test) is the safe 3; DEV 1 reads "its first answer";
     // no "nobody can be picked out" promise either way
     const need = (rows: string[][]) => rows.find(([q]) => q === "How many answers do we need?")![1];
-    const TAIL = " The drops beside each level show how much evidence it rests on: a few drops is little evidence, not a low result. Answer-by-answer splits still wait for at least 3 answers in every group.";
-    expect(need(FAQ)).toBe(`A perspective shows its level from 3 answers.${TAIL}`);
-    expect(need(faqFor(3))).toBe(`A perspective shows its level from 3 answers.${TAIL}`);
+    const TAIL = " The drops beside each level show how much evidence it rests on: a few drops is little evidence, not a low result. Answer-by-answer splits are not shown.";
+    expect(need(FAQ)).toBe(`A perspective shows its level once it has at least 3 answers.${TAIL}`);
+    expect(need(faqFor(3))).toBe(`A perspective shows its level once it has at least 3 answers.${TAIL}`);
+    expect(need(faqFor(5))).toBe(`A perspective shows its level once it has at least 5 answers.${TAIL}`);
     expect(need(faqFor(1))).toBe(`A perspective shows its level from its first answer.${TAIL}`);
     useLevelMinimum(1);
     const dev = [...mount(Help, {}).querySelectorAll("#h8 details.disc")].map((d) => text(d.querySelector(".disc-body")!));
     expect(dev).toContain(`A perspective shows its level from its first answer.${TAIL}`);
     useLevelMinimum(undefined);
     expect(FAQ.flat().join(" ")).not.toMatch(/At least 3 from each perspective|picked out/);
+    // design-system.md section 4 Privacy topic: the minimum-1 and minimum >= 3 variants, by the served minimum (Codex P1 4381711859)
+    const priv = (rows: unknown[][]) => (rows.find((t) => t[0] === "h6")![3] as string);
+    expect(priv(topicsFor(1))).toBe("Your answers are confidential. Results never show names. A perspective's level shows from its first answer, so while only one person from a perspective has answered, its level and the detailed report's scores reflect that one person's answers. Printed surveys and QR codes carry nothing personal.");
+    expect(priv(topicsFor(3))).toBe("Your answers are confidential. When fewer than 3 people from one perspective have answered, their results are hidden and the page says so; no number is shown that could point to someone. Printed surveys and QR codes carry nothing personal.");
+    expect(priv(TOPICS as unknown[][])).toBe(priv(topicsFor(3)));
+    expect([...faqFor(1), ...faqFor(3)].flat().join(" ")).not.toMatch(/splits (still )?wait|splits with|unlock/);
+    useLevelMinimum(1);
+    const hm = mount(Help, {});
+    const h6 = [...hm.querySelectorAll("section")].find((x) => x.id === "h6")?.querySelector("p") ?? null;
+    useLevelMinimum(undefined);
+    expect(h6 && text(h6)).toBe(priv(topicsFor(1)));
     expect(qs.every((d) => !(d as HTMLDetailsElement).open)).toBe(true);
     expect(text(a)).toContain("Still stuck? Send app feedback, or read why 3D Review exists.");
     const hrefs = [...a.querySelectorAll("main a.link")].map((l) => l.getAttribute("href"));

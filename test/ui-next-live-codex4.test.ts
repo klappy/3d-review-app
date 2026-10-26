@@ -12,6 +12,7 @@ import { exploreModel } from "../ui-next/src/app/data.js";
 import { exploreRows } from "../ui-next/src/screens/explore/explore-data.js";
 import Help from "../ui-next/src/screens/explore/Help.svelte";
 import ReportDetailed from "../ui-next/src/screens/results/ReportDetailed.svelte";
+import Report from "../ui-next/src/screens/results/Report.svelte";
 // @ts-expect-error -- plain .js module, no type declarations
 import { to } from "../ui-next/src/app/router.js";
 import Live from "../ui-next/src/app/Live.svelte";
@@ -293,7 +294,7 @@ describe("the served level minimum reaches Help, Explore and the detailed report
     forget(); serve({ "GET /v2/me": { principal: { id: "p1", display_name: "Kay" }, grants: [] } });
     await sessionMe();
     expect(currentLevelMin()).toBe(3);
-    expect(faqNeed(render(Help as never, { props: {} }).container)).toContain("from 3 answers");
+    expect(faqNeed(render(Help as never, { props: {} }).container)).toContain("once it has at least 3 answers");
   });
   it("Explore bands with the served cut-off, as Results and Project do: 2 responses show a level on DEV, are held at 3 or unread", async () => {
     const snap = { lenses: [{ lens: "Translation Team", score: 80, sub_dimensions: [] }], cross_lens_multi: [], evidence: [{ label: "Translation Team — Translators", n: 2 }] };
@@ -316,6 +317,39 @@ describe("the served level minimum reaches Help, Explore and the detailed report
     expect(render(ReportDetailed as never, { props: {} }).container.textContent).toContain("A perspective with no answers shows More input needed and no score; the drops beside each perspective show how many answered");
     useLevelMinimum(3);
     expect(render(ReportDetailed as never, { props: {} }).container.textContent).toContain("A perspective with fewer than 3 answers shows More input needed and no score; the drops beside each perspective show how many answered");
+    useLevelMinimum(undefined);
+  });
+});
+
+describe("final batch: report totals from the snapshot, held lines from the sent set (Codex P1 4381767661, P2 4381767676)", () => {
+  it("resultsModel: a built report's total is the sum of its snapshot counts; the live total is kept apart for the newer notice", async () => {
+    // the report used 2 team + 1 community responses; the live surveys now hold 4 responses each
+    const snap = { ...payload, evidence: [{ label: "Translation Team — Translators", n: 2 }, { label: "Community — Community", n: 1 }] };
+    serve(base({ "GET /v2/reports/rep_11": { report: { id: "rep_11", created_at: "2026-10-20T00:00:00Z", payload: snap } } }));
+    const m = await resultsModel(AID);
+    expect([m.review.responses, m.review.liveResponses]).toEqual([3, 8]);
+    const R = { ...m, gaps: { biggest: [], agree: [] }, radar: [], lookNext: [] };
+    const res = render(Results as never, { props: { report: R } }).container;
+    expect(res.textContent).toContain("from 3 responses.");
+    expect(res.textContent).toContain("newer response"); // the live total only drives the newer notice
+    for (const C of [Report, ReportDetailed]) {
+      const t = render(C as never, { props: { report: R } }).container.textContent ?? "";
+      expect(t).toContain("· 3 responses"); expect(t).toContain("Built from 3 responses"); expect(t).not.toMatch(/\b8 responses/);
+    }
+  });
+  it("ResultsHeld: the held lines and the phone's first perspective come from report.sent, so a sent perspective at 0 shows with no payload; never an unsent one", () => {
+    const review = { ...REPORT.desktop.review, closed: "", canReadResponses: true, canReopen: true, responses: 3 };
+    const held = { review, counts: { team: 3, community: 0, church: 0 }, sent: ["team", "church"], payload: { lenses: [] }, held: null };
+    useLevelMinimum(1);
+    const d = render(ResultsHeld as never, { props: { report: held } }).container;
+    const lines = [...d.querySelectorAll(".held-lines .small")].map((x) => (x.textContent ?? "").replace(/\s+/g, " ").trim());
+    expect(lines).toEqual(["Translation team 3 — ready", "Church 0 — needs 1 more"]);
+    expect(d.textContent).toContain("Church has 0 of 1."); expect(d.textContent).not.toContain("Community");
+    const p = render(ResultsHeld as never, { props: { report: held, phone: true } }).container;
+    expect(p.textContent).toContain("The church survey has 0 answers");
+    // only team sent and ready: the first is team, never the unsent community or church
+    const ready = render(ResultsHeld as never, { props: { report: { ...held, sent: ["team"] }, phone: true } }).container;
+    expect(ready.textContent).toContain("The translation team survey has 3 answers"); expect(ready.textContent).not.toMatch(/church|community/i);
     useLevelMinimum(undefined);
   });
 });

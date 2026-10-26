@@ -30,7 +30,7 @@
     ...(collecting ? [{ label: "Close collection now", href: out("closeCollection"), icon: G.lock }] : []),
     { label: "Meeting offline? Print and paper", href: out("collect", {}, "offline"), icon: G.print },
     { kind: "hr" },
-    { label: "Delete this review", icon: I.x, danger: true, refused: `Reviews with responses can't be deleted. This one has ${n}.` },
+    { label: "Delete this review", icon: I.x, danger: true, refused: `Reviews with responses can't be deleted. This one has ${review.liveResponses ?? n}.` },
   ]);
 </script>
 

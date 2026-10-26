@@ -77,9 +77,10 @@
 
 <AppShell {phone} {theme} screen {top} {bar}>
   {#if phone}
-    <Row split gap={3}><h1 class="title-phone">Your reviews</h1><a class="link small" href="#explore">Explore all</a></Row>
+    <Row split gap={3}><h1 class="title-phone">Your reviews</h1><a class="link small l-row" data-gap="1" href="#explore">Explore all<Icon d={ARROW} /></a></Row><!-- design-system.md link to another page: trailing arrow -->
     <p class="small" data-website-home>Signed in. <a class="link" href={WEBSITE}>See the public website home</a></p>
-    {#if data.invitation}<Card href="#invitations" gap={2}><Row gap={3}><span class="icn" data-lens="church"><Icon d={I.mail} /></span><span class="small"><b>1 invitation</b> · {data.invitation.phone}</span></Row></Card>{/if}
+    <!-- design-system.md phone invitation banner: a.card-link.glass.l-card.l-row.inv-banner[data-pad=bar][data-gap=3] > 32px church chip (mail) · text · chevron -->
+    {#if data.invitation}<a class="card-link glass l-card l-row inv-banner" data-pad="bar" data-gap="3" href="#invitations"><span class="icn" data-size="32" data-lens="church"><Icon d={I.mail} /></span><span class="small"><b>1 invitation</b> · {data.invitation.phone}</span><Icon d={I.chev} /></a>{/if}
     <Row wrap gap={2}><span class="chip">{data.workspace}</span><span class="chip">Mine</span><a class="link small" href="#explore">+ filter</a></Row>
     {#each phoneGroups as g}
       {#each g.reviews as r}

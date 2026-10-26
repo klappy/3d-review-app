@@ -41,6 +41,12 @@ describe("Home renders each state", () => {
     expect(links.length).toBeGreaterThan(0);
     for (const l of links) expect(l.lastElementChild?.querySelector("path")?.getAttribute("d")).toBe("M5 12h14M13 6l6 6-6 6");
     for (const b of a.querySelectorAll("a.card-link.glass .btn")) expect(b.lastElementChild?.tagName.toLowerCase()).toBe("svg");
+    // design-system.md phone invitation banner and "Explore all →"
+    const inv = ph.querySelector("a.card-link.glass.l-card.l-row.inv-banner[data-pad=bar][data-gap='3']")!;
+    expect([...inv.children].map((k) => k.tagName.toLowerCase() + (k.className && typeof k.className === "string" ? `.${k.className.split(" ").join(".")}` : ""))).toEqual(["span.icn", "span.small", "svg"]);
+    expect([inv.children[0].getAttribute("data-size"), inv.children[0].getAttribute("data-lens"), inv.children[2].querySelector("path")!.getAttribute("d")]).toEqual(["32", "church", "M6 9l6 6 6-6"]);
+    const all = [...ph.querySelectorAll("a.link")].find((l) => (l.textContent ?? "").trim() === "Explore all")!;
+    expect(all.lastElementChild?.querySelector("path")?.getAttribute("d")).toBe("M5 12h14M13 6l6 6-6 6");
     expect([...a.querySelectorAll(".lvl-name")].map((l) => l.textContent)).toEqual(["Growing", "Needs support", "Growing"]);
     // Codex P2 on 992b610: each level carries its respondent count, so a low-evidence level never shows bare
     expect([...a.querySelectorAll(".lvl-pair [data-coverage] [data-short]")].map((c) => (c.textContent ?? "").replace(/\s+/g, " ").trim())).toEqual(["Well filled · 9", "Well filled · 10", "Filling up · 5"]);

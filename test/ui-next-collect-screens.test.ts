@@ -281,7 +281,7 @@ describe("CloseCollection (CloseCollection, CloseCollectionPhone)", () => {
     expect(text(a.querySelector(`#${d.getAttribute("aria-labelledby")}`))).toBe("Close collection now?");
     expect(d.querySelector("[aria-label=Close]")!.getAttribute("href")).toBe("?ui_next=on&screen=collect");
     expect(text(d.querySelector("p.small"))).toBe("Links and codes stop working and the review moves to Understand. 18 responses are in. You can reopen collection later — results refresh when you do.");
-    expect(text(d.querySelector(".solid"))).toBe("Translation team 6 · Community 8 · Church 4. Every perspective has an answer, so its level can show; the drops beside each level show how much evidence it rests on. Answer-by-answer splits wait for 3.");
+    expect(text(d.querySelector(".solid"))).toBe("Translation team 6 · Community 8 · Church 4. Every perspective has an answer, so its level can show; the drops beside each level show how much evidence it rests on. Answer-by-answer splits are not shown.");
     expect(all(d, ".btn:not(.btn-icon)")).toEqual(["Keep collecting", "Yes, close and see results"]);
     expect(document.activeElement?.textContent).toBe("Keep collecting");
     expect(a.querySelectorAll(".btn-primary").length).toBe(1);
@@ -294,15 +294,15 @@ describe("CloseCollection (CloseCollection, CloseCollectionPhone)", () => {
     const two = structuredClone(fixture);
     two.groups[2].surveys.forEach((x: { answered: number }, i: number) => { x.answered = i ? 0 : 2; });
     expect(text(shot(CloseCollection, { data: two }).querySelector("dialog .solid"))).toBe("Translation team 6 · Community 8 · Church 2.");
-    expect(text(shot(CloseCollection).querySelector("dialog .solid"))).toBe("Translation team 6 · Community 8 · Church 4. Every perspective has at least 3 answers, so its level can show; the drops beside each level show how much evidence it rests on. Answer-by-answer splits wait for 3.");
+    expect(text(shot(CloseCollection).querySelector("dialog .solid"))).toBe("Translation team 6 · Community 8 · Church 4. Every perspective has at least 3 answers, so its level can show; the drops beside each level show how much evidence it rests on. Answer-by-answer splits are not shown.");
     useLevelMinimum(undefined); // absent: the safe 3
     expect(text(shot(CloseCollection, { data: two }).querySelector("dialog .solid"))).toBe("Translation team 6 · Community 8 · Church 2.");
     useLevelMinimum(1);
     const one = structuredClone(fixture);
     one.groups[2].surveys.forEach((x: { answered: number }, i: number) => { x.answered = i ? 0 : 1; });
     const a = shot(CloseCollection, { data: one });
-    expect(text(a.querySelector("dialog .solid"))).toBe("Translation team 6 · Community 8 · Church 1. Every perspective has an answer, so its level can show; the drops beside each level show how much evidence it rests on. Answer-by-answer splits wait for 3.");
-    expect(text(a)).not.toMatch(/at least 3 answers|results can show/);
+    expect(text(a.querySelector("dialog .solid"))).toBe("Translation team 6 · Community 8 · Church 1. Every perspective has an answer, so its level can show; the drops beside each level show how much evidence it rests on. Answer-by-answer splits are not shown.");
+    expect(text(a)).not.toMatch(/at least 3 answers|results can show|splits wait/);
     const empty = structuredClone(fixture);
     empty.groups[2].surveys.forEach((x: { answered: number }) => { x.answered = 0; });
     expect(text(shot(CloseCollection, { data: empty }).querySelector("dialog .solid"))).toBe("Translation team 6 · Community 8 · Church 0.");

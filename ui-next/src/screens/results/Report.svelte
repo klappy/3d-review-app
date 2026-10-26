@@ -29,7 +29,7 @@
   import { G } from "./icons.js";
   import { href } from "../href.js";
   import { out } from "./links.js";
-  import { REPORT, LEVEL_WORD, lensLabel, lensCards, bandRows, withNotes, detailedPages, countWord } from "./data.js";
+  import { REPORT, LEVEL_WORD, lensLabel, lensCards, snapshotTotal, bandRows, withNotes, detailedPages, countWord } from "./data.js";
 
   let { phone = false, theme = "light", report } = $props();
   const D = $derived(report ?? (phone ? REPORT.phone : REPORT.desktop));
@@ -49,7 +49,7 @@
 {#snippet top()}{#if phone}<PhoneHeader state="nested" title="Reports" parent="Results" back={href("results")} menuHref={out("menu")} />{:else}<DocBar title={`Overview report · 1 page · ${D.review.title}`} other={`Open the detailed report · ${pages} pages`} otherHref={href("report-detailed")} />{/if}{/snippet}
 {#snippet bar()}{#if phone}<PhoneBar label="Download the overview (PDF)" href={live ? undefined : "#download"} disabled={live} ariaDescribedby={live ? "doc-pdf-why" : undefined} />{/if}{/snippet}
 
-<AppShell {phone} {theme} screen {top} {bar}>
+<AppShell {phone} {theme} screen rhythm="report" {top} {bar}><!-- §8.3 Report frame: main.l-main[data-rhythm=report] > .paper sheets (desktop) -->
   {#if phone}
     <a class="link small" href={href("results")}>{D.review.title} · results</a>
     {#if live}<p class="small" id="doc-pdf-why">PDF export is not in the new design yet; the current design's report page downloads it.</p>{/if}
@@ -86,7 +86,7 @@
         <h2 class="h3">Where to look next</h2>
         <ol class="l-stack small" data-gap="1">{#each next as n}<li>{lensLabel(n.lens)} · {n.area} — {LEVEL_WORD[n.level]}</li>{/each}</ol>
       </Stack>
-      <div class="pfoot"><span>Built from {D.review.responses} responses on {D.review.builtOn} · levels are bands, not scores · nothing here identifies a person</span><span>1 of 1</span></div>
+      <div class="pfoot"><span>Built from {snapshotTotal(cards)} responses on {D.review.builtOn} · levels are bands, not scores · nothing here identifies a person</span><span>1 of 1</span></div>
     </div>
   {/if}
 </AppShell>

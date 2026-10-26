@@ -844,6 +844,15 @@ describe("results round 5: a live payload renders; counts read right", () => {
     expect(lensCards(R.payload, R.counts).map((c: { lens: string }) => c.lens)).toEqual(["team"]);
     expect(sentLenses([{ perspective: "Translation Team", state: "selected" }, { perspective: "Community", state: "selected", archived_at: "2026-10-01" }, { perspective: "Church", state: "proposed" }])).toEqual(["team"]);
   });
+  it("design-system.md §8.3 report frame: main.l-main[data-rhythm=report] holds the paper sheets as direct children (no Stack)", () => {
+    for (const C of [Report, ReportDetailed]) {
+      const main = mount(C).querySelector("main.l-main[data-rhythm=report]")!;
+      const kids = [...main.children];
+      expect(kids.length).toBeGreaterThan(0);
+      expect(kids.every((k) => k.matches(".paper[data-sheet]"))).toBe(true);
+    }
+    expect(mount(Report, { phone: true }).querySelector("[data-rhythm=report]")).toBeNull(); // the phone Reports page is not paper
+  });
   it("R5-3 + R5-5: Results counts the detailed report's pages; the phone overview line counts the gaps the sheet draws, no radar", () => {
     expect(text([...mount(Results).querySelectorAll("a.btn")].find((a) => text(a).startsWith("Detailed report")) ?? null)).toBe(`Detailed report · ${detailedPages(lensCards(REPORT.desktop.payload, REPORT.desktop.counts))} pages`);
     expect(mount(Report, { phone: true }).textContent).toContain("Levels, the three biggest gaps.");

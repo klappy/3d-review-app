@@ -248,7 +248,7 @@
     if (building || build) return;
     if (uncertainBuild === aid) { say("A report build's outcome is unknown. Reload this page to see the report list before building again."); return; }
     build = null; say("");
-    try { const out = await D.previewBuild(aid); if (out.held) { say("The results can’t be built yet: more answers are needed. Nothing was built."); return; } build = { aid, text: buildConfirmText(m?.review?.responses), token: out.token, expires: out.expires }; }
+    try { const out = await D.previewBuild(aid); if (out.held) { say("The results can’t be built yet: more answers are needed. Nothing was built."); return; } build = { aid, text: buildConfirmText(m?.review?.liveResponses ?? m?.review?.responses), token: out.token, expires: out.expires }; }
     catch (e) { say(`The preview could not be loaded. Nothing was built; ${e?.message || "try again"}.`); }
   }
   function cancelBuild() { build = null; say("Cancelled. Nothing was built."); }

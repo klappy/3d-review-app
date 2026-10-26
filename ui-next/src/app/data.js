@@ -5,7 +5,7 @@ import { api, classify, confirmed, enc, token } from "./api.js";
 import { lensLabel } from "../../../ui/report-lenses.js";
 import { v3ScoreBand, v3ExpectedFor } from "../../../ui/assess/v3-assessment.js";
 import { parsePeriod, collectLine } from "../../../ui/v3/components/active-until.js";
-import { LEVEL_KEY, LEVEL_WORD, levelCutoffs, useLevelMinimum, levelMinimumOf, currentLevelMin, sentLenses, bandRows, lensCards, responsesFor } from "../screens/results/data.js";
+import { LEVEL_KEY, LEVEL_WORD, levelCutoffs, useLevelMinimum, levelMinimumOf, currentLevelMin, sentLenses, snapshotTotal, bandRows, lensCards, responsesFor } from "../screens/results/data.js";
 import { to } from "./router.js";
 import qrcode from "../../../ui/assess/vendor-qrcode.js";
 import { acceptInvitationById } from "../../../ui/v3/components/invite.js";
@@ -300,7 +300,7 @@ export async function resultsModel(aid, { build = false } = {}) {
   const counts = { team: 0, community: 0, church: 0 };
   const per = await Promise.all(live.map((s) => surveyCounts(aid, s.id)));
   live.forEach((s, i) => { const k = lensKeyOf(s.perspective); if (k) counts[k] += Number(per[i]?.counts?.respondents ?? 0); });
-  const responses = per.reduce((n, c) => n + Number(c?.counts?.responses ?? 0), 0);
+  const liveResponses = per.reduce((n, c) => n + Number(c?.counts?.responses ?? 0), 0); // the live survey total: the newer-responses notice and a new build only
   let list = Array.isArray(rep?.reports) ? rep.reports.filter((x) => x?.id) : [];
   let built = null, held = null;
   // Loading a route never writes: a missing report is reported as not built (the screen offers an explicit "Build the report",
@@ -311,10 +311,12 @@ export async function resultsModel(aid, { build = false } = {}) {
   }
   const newest = newestReport(list);
   if (newest) built = newest.payload ? newest : await report(newest.id);
+  // A built report's total comes from its own evidence snapshot (the sum of the counts its cards show), never the live survey total.
+  const responses = built ? snapshotTotal(lensCards(built.payload, counts, { sent: sentLenses(live) })) : liveResponses;
   const member = ["owner", "member"].includes(a.role);
   // No closure timestamp exists on the contract (created_at is when the review was made, not when collection closed): the date is
   // left out rather than mislabelled. Language resolves as Collect does (language_name, else language_id via the project's languages).
-  const review = { id: a.id, project: p.name, projectId: a.project_id, language: await languageOf(a), modality: a.format ? a.format[0].toUpperCase() + a.format.slice(1) : "", title: a.name, stage: a.stage === "collect" ? "collecting" : built ? "results" : "closed", closed: "", closedLong: "", builtOn: built ? shortDate(built.created_at) : "", responses, canReadResponses: member, canReopen: member }; // results lane StagePill: the review's real state — collecting | closed (no report yet) | results
+  const review = { id: a.id, project: p.name, projectId: a.project_id, language: await languageOf(a), modality: a.format ? a.format[0].toUpperCase() + a.format.slice(1) : "", title: a.name, stage: a.stage === "collect" ? "collecting" : built ? "results" : "closed", closed: "", closedLong: "", builtOn: built ? shortDate(built.created_at) : "", responses, liveResponses, canReadResponses: member, canReopen: member }; // results lane StagePill: the review's real state — collecting | closed (no report yet) | results
   // Role flags (src/handlers: report build, stage and the response list need owner/member; viewers read results and reports only).
   return { aid, review, counts, sent: sentLenses(live), payload: built?.payload ?? null, reportId: built?.id ?? null, held: held ?? (res?.status === "held" && !member && !built ? res : null), results: res, serverStage: a.stage, canBuild: member, canReadResponses: member, canReopen: member }; // D7: /results is held for everyone until a report exists; a member's first Build must not be hidden behind it (Codex P1 on 26a86937)
 }

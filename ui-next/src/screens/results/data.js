@@ -108,6 +108,9 @@ export const bandCentre = (band) => 12.5 + 25 * BANDS.indexOf(band);
  *  report's own evidence count, responsesFor; newer: live responses after it, newerFor); a perspective
  *  missing from the payload has no card (callers iterate, never index). An area at "more" (under the minimum responses, or no
  *  score) carries score null, so no table or label can print a score the level hides (R3-1). */
+/** A built report's total responses: the sum of the snapshot counts its cards display (lensCards n, the report's own evidence;
+ *  0 for a perspective that had none). Never the live survey total, which is only for the "newer responses" notice. */
+export const snapshotTotal = (cards) => list(cards).reduce((t, c) => t + (Number.isFinite(Number(c?.n)) && c.n !== null ? Number(c.n) : 0), 0);
 /** The perspectives a review sent out: its selected, non-archived surveys, as lens keys in LENS_ORDER (a survey without a state, as
  *  older reads return it, counts as selected). A perspective never sent out is not in the list, so it stays hidden. */
 export const sentLenses = (surveys) => LENS_ORDER.filter((k) => list(surveys).some((s) => s && !s.archived_at && (s.state ?? "selected") === "selected" && lensKey(s.perspective) === k));
