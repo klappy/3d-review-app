@@ -203,7 +203,9 @@ export function bandRows(report, counts, names) {
 /** The words after a row's lead ("same band", "gap 14", the levels): " · "-joined, so no separator is lost in markup. */
 export const withNotes = (lead, row) => [lead, ...row.notes].filter(Boolean).join(" · ");
 /** A numeric row's lead: "gap 14", or, with fewer than two placed perspectives, the band row's words (never "gap null"). */
-export const gapLead = (row) => (row.spread === null || row.spread === undefined ? "too few perspectives to compare" : `gap ${row.spread}`);
+export const gapLead = (row) => (row.spread === null || row.spread === undefined ? "too few perspectives to compare" : `gap ${fmtScore(row.spread)}`);
+/** A score or spread as shown: a whole number (display only; geometry, bands, ordering and exports keep the raw value). */
+export const fmtScore = (v) => (v === null || v === undefined || !Number.isFinite(Number(v)) ? "—" : String(Math.round(Number(v))));
 
 /** Numeric barbell rows (detailed report): exact scores on 0-100, red span at two bands apart or more, else a quiet span.
  *  Only the perspectives band() places get a dot, a spread or a place in the order (under the minimum: no score shown, named

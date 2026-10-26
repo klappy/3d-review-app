@@ -8,6 +8,7 @@
      Geometry from ./data.js radar() over ui/report-radar.js radarModel + wrap; colours are tokens (paper scope). Only placed
      scores reach the model: a perspective under the minimum responses has no polygon, point or <title> (validator R3-1). -->
 <script>
+  import { fmtScore } from "./data.js";
   let { model } = $props();
 </script>
 
@@ -16,7 +17,7 @@
   {#each model.spokes as s}<line x1="210" y1="185" x2={s.x} y2={s.y} stroke="var(--line)" />{/each}
   {#each model.lenses as l}
     <polygon data-lens={l.lens} points={l.points} fill="var(--lens)" fill-opacity=".12" stroke="var(--lens)" stroke-width="2" stroke-linejoin="round" />
-    {#each l.marks as m}<circle data-lens={l.lens} cx={m.xy[0]} cy={m.xy[1]} r="4.5" fill="var(--lens)" stroke="var(--field)" stroke-width="2"><title>{l.label} · {m.area} · {m.score}</title></circle>{/each}
+    {#each l.marks as m}<circle data-lens={l.lens} cx={m.xy[0]} cy={m.xy[1]} r="4.5" fill="var(--lens)" stroke="var(--field)" stroke-width="2"><title>{l.label} · {m.area} · {fmtScore(m.score)}</title></circle>{/each}
   {/each}
   {#each model.spokes as s}
     <text x={s.lx} y={s.ly} font-size="var(--t-11)" fill="var(--ink-2)" text-anchor={s.anchor} dominant-baseline="middle">{#each s.lines as line, i}<tspan x={s.lx} dy={i === 0 ? 0 : 13}>{line}</tspan>{/each}</text>

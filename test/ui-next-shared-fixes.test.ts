@@ -118,3 +118,29 @@ describe("e. the shared Pill still leaves closed out: whether closed is a stage 
     expect(read("src/Pill.svelte")).not.toMatch(/closed:/);
   });
 });
+
+describe("live QA Q7: menus (one open at a time, outside dismiss, Escape returns focus, a chosen link closes)", () => {
+  it("behaves as a dismissable disclosure and lifts above the page", async () => {
+    const sum = createRawSnippet(() => ({ render: () => "<span>More</span>" }));
+    const items = [{ label: "Edit", href: "#edit" }, { label: "People", href: "#people" }];
+    const a = render(Menu as never, { props: { summary: sum, items, id: "m1", title: "One" } }).container.querySelector("details")!;
+    const b = render(Menu as never, { props: { summary: sum, items, id: "m2", title: "Two" } }).container.querySelector("details")!;
+    expect(a.hasAttribute("data-menu")).toBe(true);
+    a.open = true; a.dispatchEvent(new Event("toggle"));
+    b.open = true; b.dispatchEvent(new Event("toggle"));
+    expect([a.open, b.open]).toEqual([false, true]); // one at a time
+    document.body.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true }));
+    expect(b.open).toBe(false); // outside click
+    b.open = true;
+    b.querySelector(".menu")!.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true }));
+    expect(b.open).toBe(true); // a press inside keeps it
+    b.querySelector("a.mi")!.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+    expect([b.open, document.activeElement === b.querySelector("summary")]).toEqual([false, true]); // Escape + focus return
+    b.open = true;
+    (b.querySelector("a.mi") as HTMLAnchorElement).dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
+    expect(b.open).toBe(false); // choosing a link closes
+    const css = readFileSync(resolve(__dirname, "../ui-next/components/topbar.css"), "utf8");
+    expect(css).toContain(".app .top{position:relative;z-index:30}");
+    expect(css).toContain(".dd[data-menu][open]{z-index:30}");
+  });
+});

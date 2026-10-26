@@ -14,7 +14,7 @@ import { OUT } from "../ui-next/src/screens/results/links.js";
 // @ts-expect-error -- plain .js module, no type declarations
 import results from "../ui-next/src/screens/results/index.js";
 // @ts-expect-error -- plain .js module, no type declarations
-import { REPORT, lensCards, bandRow, bandRows, scoreRows, comparedRows, radar, heldLines, levelOf, pct, answerView, withNotes, gapLead, responsesFor, countWord, detailedPages, lensKey, canonicalPayload, responsesText, LENS_ORDER, sentLenses, useLevelMinimum, currentLevelMin, levelMinimumOf } from "../ui-next/src/screens/results/data.js";
+import { REPORT, lensCards, bandRow, bandRows, scoreRows, comparedRows, radar, heldLines, levelOf, pct, answerView, withNotes, gapLead, responsesFor, countWord, detailedPages, lensKey, canonicalPayload, responsesText, LENS_ORDER, sentLenses, fmtScore, useLevelMinimum, currentLevelMin, levelMinimumOf } from "../ui-next/src/screens/results/data.js";
 // The fixtures are DEV-like reviews: they band at the DEV level minimum of 1, set explicitly (the live app reads the served value).
 beforeEach(() => { useLevelMinimum(1); });
 import { LENSES } from "../ui/lens-surveys.js";
@@ -852,6 +852,28 @@ describe("results round 5: a live payload renders; counts read right", () => {
       expect(kids.every((k) => k.matches(".paper[data-sheet]"))).toBe(true);
     }
     expect(mount(Report, { phone: true }).querySelector("[data-rhythm=report]")).toBeNull(); // the phone Reports page is not paper
+  });
+  it("live QA Q1: the legend's radios set one shared imagery state on .app[data-imagery], persisted per viewer", async () => {
+    const { imagery, setImagery } = await import("../ui-next/src/imagery.svelte.js");
+    setImagery("bars");
+    const a = mount(Results);
+    expect(a.getAttribute("data-imagery")).toBe("bars");
+    const faces = a.querySelector(".lvl-legend input[value=faces]") as HTMLInputElement;
+    await fireEvent.change(faces, { target: { checked: true } });
+    expect([imagery.skin, localStorage.getItem("ui_next_imagery")]).toEqual(["faces", "faces"]);
+    await Promise.resolve();
+    expect(a.getAttribute("data-imagery")).toBe("faces");
+    expect(mount(ReportDetailed).getAttribute("data-imagery")).toBe("faces"); // one state for every screen
+    expect(() => setImagery("dots")).toThrow(TypeError);
+    setImagery("bars");
+  });
+  it("live QA Q2: scores and spreads show as whole numbers; the raw values keep the geometry", () => {
+    expect([fmtScore(71.4286), fmtScore(70.5), fmtScore(0), fmtScore(null), fmtScore("x")]).toEqual(["71", "71", "0", "—", "—"]);
+    const D = copy() as Built & { payload: { cross_lens_multi: { lens_scores: { lens: string; score: number }[] }[]; lenses: { sub_dimensions: { score: number }[] }[] } };
+    D.payload.cross_lens_multi[0].lens_scores[0].score = 87.6667; D.payload.lenses[0].sub_dimensions[0].score = 83.25;
+    const det = mount(ReportDetailed, { report: D });
+    expect(text(det)).not.toMatch(/\d\.\d{2}/);
+    expect(det.querySelector("svg[data-part=score-barbell] circle[cx='87.6667%']")).not.toBeNull(); // geometry keeps the raw value
   });
   it("R5-3 + R5-5: Results counts the detailed report's pages; the phone overview line counts the gaps the sheet draws, no radar", () => {
     expect(text([...mount(Results).querySelectorAll("a.btn")].find((a) => text(a).startsWith("Detailed report")) ?? null)).toBe(`Detailed report · ${detailedPages(lensCards(REPORT.desktop.payload, REPORT.desktop.counts))} pages`);

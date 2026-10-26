@@ -28,7 +28,7 @@
   import Radar from "./Radar.svelte";
   import Report from "./Report.svelte";
   import { href } from "../href.js";
-  import { REPORT, currentLevelMin, snapshotTotal, lensCards, scoreRows, comparedRows, radar, withNotes, gapLead, countWord, evidenceSheets, detailedPages } from "./data.js";
+  import { REPORT, currentLevelMin, snapshotTotal, fmtScore, lensCards, scoreRows, comparedRows, radar, withNotes, gapLead, countWord, evidenceSheets, detailedPages } from "./data.js";
 
   let { phone = false, theme = "light", report } = $props();
   const D = $derived(report ?? REPORT.desktop);
@@ -63,7 +63,7 @@
     <div class="ev-head"><strong>{c.label}</strong><Coverage n={c.n} /></div>
     <table class="ev-table">
       <thead><tr><th>Area</th><th>Level</th><th data-align="end">Score</th><th data-align="end">Evidence</th><th>Observation</th></tr></thead>
-      <tbody>{#each c.rows as r}<tr><td>{r.name}</td><td><Level level={r.level} /></td><td class="tab-n" data-align="end">{r.level === "more" || r.score === null ? "—" : r.score}</td><td class="ev-muted" data-align="end">{r.items} items</td><td>{r.note}</td></tr>{/each}</tbody>
+      <tbody>{#each c.rows as r}<tr><td>{r.name}</td><td><Level level={r.level} /></td><td class="tab-n" data-align="end">{r.level === "more" || r.score === null ? "—" : fmtScore(r.score)}</td><td class="ev-muted" data-align="end">{r.items} items</td><td>{r.note}</td></tr>{/each}</tbody>
     </table>
   </div>
 {/snippet}
