@@ -30,7 +30,7 @@
   let { phone = false, theme = "light", state: view, report, onrefresh, refreshed = "" } = $props(); // state renamed: a binding named state would shadow the $state rune
   const fixture = (f) => (view === "newer" ? { ...f, counts: { ...f.counts, church: f.counts.church + 3 } } : f); // live counts past the report's own
   const D = $derived(report ?? fixture(phone ? REPORT.phone : REPORT.desktop));
-  const cards = $derived(lensCards(D.payload, D.counts));
+  const cards = $derived(lensCards(D.payload, D.counts, { sent: D.sent }));
   const review = $derived(D.review);
   // The disagreement line: the board's sentence for the fixture; for a live report, the widest cross-perspective gap in its own words.
   const gap = $derived(report ? bandRows(D, D.counts, D.gaps?.biggest ?? []).find((r) => r.dots.length >= 2) : null);

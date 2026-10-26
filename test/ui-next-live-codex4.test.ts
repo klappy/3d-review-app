@@ -169,6 +169,15 @@ describe("projectModel (P2: workspace, trend gaps, surfaced failures)", () => {
     expect([...first.querySelectorAll(".lvl-pair [data-coverage] [data-short]")].map((c) => (c.textContent ?? "").replace(/\s+/g, " ").trim())).toEqual(["A few drops · 1", "A few drops · 2"]);
     expect(first.querySelector("[data-coverage]")!.getAttribute("title")).toBe("A few drops · 1 response");
   });
+  it("Codex P2 4381562605: a perspective the review sent out but the built report has no lens for shows at More input needed with 0", async () => {
+    useLevelMinimum(1);
+    const dev = { "GET /v2/assessments/a1/results": { status: "held", level_minimum_responses: 1 }, "GET /v2/assessments/a2/results": { status: "held", level_minimum_responses: 1 } };
+    const teamOnly = { lenses: [payload.lenses[0]], cross_lens_multi: [], evidence: [{ label: "Translation Team — Translators", n: 1 }] };
+    serve(routes({ ...dev, "GET /v2/reports/r1": { report: { id: "r1", created_at: "2026-08-02T00:00:00Z", payload: teamOnly } } }));
+    const m = await projectModel(PID);
+    expect(m.reviews.find((r: { id: string }) => r.id === "a1").levels).toEqual([["team", "strong", 1], ["community", "more", 0]]); // a1 sent team + community
+    expect(m.reviews.find((r: { id: string }) => r.id === "a2").levels).toEqual([["team", "strong", 6]]); // a2 sent team only: nothing added
+  });
   it("level minimum from the server: production-like (3) holds a level at 1 or 2 responses; DEV (1) shows it; absent is the safe 3", async () => {
     const snap = { ...payload, evidence: [{ label: "Translation Team — Translators", n: 1 }, { label: "Community — Community", n: 2 }] };
     const at = (min: unknown) => ({ "GET /v2/assessments/a1/results": { status: "held", ...(min === undefined ? {} : { level_minimum_responses: min }) }, "GET /v2/assessments/a2/results": { status: "held", ...(min === undefined ? {} : { level_minimum_responses: min }) }, "GET /v2/reports/r1": { report: { id: "r1", created_at: "2026-08-02T00:00:00Z", payload: snap } } });

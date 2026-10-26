@@ -327,7 +327,7 @@
   };
   const suGroups = { ongroup: (tid, version, on) => { SU.setGroup(suSt, tid, version, on); suError = ""; bump(); }, onexpected: (tid, v) => { SU.setExpected(suSt, tid, v); bump(); } };
   const suContext = { oncontext: (key, field, v) => { const tid = SU.tidOfKey(suSt, key); if (tid) SU.setContext(suSt, tid, field, v); }, ondemographics: (on) => { suSt.draft.demographics = on; bump(); } };
-  const reportFor = (m) => (m.payload ? { review: m.review, counts: m.counts, payload: phone ? phonePayload(m.payload) : m.payload, gaps: D.gapsOf(m.payload), radar: D.radarOf(m.payload), lookNext: [] } : null);
+  const reportFor = (m) => (m.payload ? { review: m.review, counts: m.counts, sent: m.sent, payload: phone ? phonePayload(m.payload) : m.payload, gaps: D.gapsOf(m.payload), radar: D.radarOf(m.payload), lookNext: [] } : null);
 </script>
 
 <!-- The build confirm (report-build.js: one plain sentence with the response count, confirm "Build the results", cancel "Not now").
@@ -413,7 +413,7 @@
     {#if m.canBuild}<div class="l-page">{#if build}{@render buildConfirm(true)}{:else}<button class="btn btn-primary btn-lg" type="button" onclick={refreshResults} disabled={building || undefined}>{building ? "Building the results…" : "Build the report"}</button>{/if}</div>{/if}
   {:else if !rep || page.data.screen === "results-held"}
     {@const Held = REGISTRY["results-held"]}
-    <Held {phone} {theme} report={{ review: m.review, counts: m.counts, payload: m.payload ?? { lenses: [] }, held: m.held }} onreopen={reopenCollection} />
+    <Held {phone} {theme} report={{ review: m.review, counts: m.counts, sent: m.sent, payload: m.payload ?? { lenses: [] }, held: m.held }} onreopen={reopenCollection} />
   {:else if page.data.screen === "results-answers"}
     {@const C = REGISTRY["results-answers"]}
     {#if page.data.answers?.suppressed}

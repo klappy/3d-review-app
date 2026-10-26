@@ -32,7 +32,7 @@
   let { onreopen, phone = false, theme = "light", report } = $props();
   const D = report ?? REPORT.desktop, H = report ? { counts: report.counts, phoneCounts: report.counts, preview: REPORT.held.preview, review: { closedResponses: report.review.responses } } : REPORT.held, P = report ?? REPORT.phone;
   // The held preview shows the collection as it stands (H.counts, the live survey counts), not a built report's snapshot.
-  const cards = lensCards(D.payload ?? { lenses: [] }, H.counts, { prefer: "live" });
+  const cards = lensCards(D.payload ?? { lenses: [] }, H.counts, { prefer: "live", sent: report?.sent });
   // Live: the server's own hold (results.ts MinimumHold: responses_in / responses_needed / reason, an assessment-wide gate) is the
   // condition shown; the per-perspective lines keep only perspectives the review has surveys for (count > 0 or a lens the report names).
   const srv = $derived(report?.held && typeof report.held.responses_needed === "number" ? report.held : null);

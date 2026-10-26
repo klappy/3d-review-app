@@ -33,7 +33,7 @@
 
   let { phone = false, theme = "light", report } = $props();
   const D = $derived(report ?? (phone ? REPORT.phone : REPORT.desktop));
-  const cards = $derived(lensCards(D.payload, D.counts));
+  const cards = $derived(lensCards(D.payload, D.counts, { sent: D.sent }));
   const pages = $derived(detailedPages(cards));
   const rows = $derived(bandRows(D, D.counts, [...(D.gaps?.biggest ?? []), ...(D.gaps?.agree ?? [])]));
   // The phone list's line names what the overview sheet draws, counted (R5-5): its levels and the biggest gaps it resolves.

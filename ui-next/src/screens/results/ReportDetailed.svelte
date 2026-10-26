@@ -32,7 +32,7 @@
 
   let { phone = false, theme = "light", report } = $props();
   const D = $derived(report ?? REPORT.desktop);
-  const cards = $derived(lensCards(D.payload, D.counts));
+  const cards = $derived(lensCards(D.payload, D.counts, { sent: D.sent }));
   const tensions = $derived(scoreRows(D, D.counts).filter((r) => r.spread !== null).slice(0, 3));
   const all = $derived(comparedRows(D, D.counts));
   const shape = $derived(radar(D, D.radar, D.counts));

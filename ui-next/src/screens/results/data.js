@@ -108,11 +108,22 @@ export const bandCentre = (band) => 12.5 + 25 * BANDS.indexOf(band);
  *  report's own evidence count, responsesFor; newer: live responses after it, newerFor); a perspective
  *  missing from the payload has no card (callers iterate, never index). An area at "more" (under the minimum responses, or no
  *  score) carries score null, so no table or label can print a score the level hides (R3-1). */
-export function lensCards(raw, counts, { prefer = "report" } = {}) {
+/** The perspectives a review sent out: its selected, non-archived surveys, as lens keys in LENS_ORDER (a survey without a state, as
+ *  older reads return it, counts as selected). A perspective never sent out is not in the list, so it stays hidden. */
+export const sentLenses = (surveys) => LENS_ORDER.filter((k) => list(surveys).some((s) => s && !s.archived_at && (s.state ?? "selected") === "selected" && lensKey(s.perspective) === k));
+/** sent (sentLenses): a perspective the review sent out but the built payload has no lens for had no response when the report was
+ *  built (the capture keeps response-backed perspectives only), so it gets a card at More input needed with n 0 and no rows or score;
+ *  any live answers since then are its "newer" count. Without sent (fixtures, a printed report with no survey list) nothing is added. */
+export function lensCards(raw, counts, { prefer = "report", sent } = {}) {
   const payload = canonicalPayload(raw);
   const lenses = Array.isArray(payload?.lenses) ? payload.lenses : [], responses = responsesFor(payload, counts, { prefer });
   const newer = prefer === "live" ? () => 0 : newerFor(payload, counts);
-  return LENS_ORDER.map((lens) => lenses.find((l) => l && l.lens === lens)).filter(Boolean).map((l) => {
+  const absent = (lens) => {
+    const live = Number(counts?.[lens]), k = Number.isFinite(live) && live > 0 ? live : 0;
+    return { lens, label: lensLabel(lens), n: prefer === "live" ? k : 0, newer: prefer === "live" ? 0 : k, level: "more", rows: [], absent: true };
+  };
+  return LENS_ORDER.map((lens) => lenses.find((l) => l && l.lens === lens) ?? (list(sent).includes(lens) ? absent(lens) : null)).filter(Boolean).map((l) => {
+    if (l.absent) return l;
     const n = responses(l.lens);
     return {
       lens: l.lens, label: lensLabel(l.lens), n, newer: newer(l.lens), level: levelOf(l.score, n),
@@ -250,7 +261,7 @@ export function radar(report, names, counts) {
 export const countWord = (n) => ["no", "one", "two", "three", "four", "five", "six"][n] ?? String(n);
 /** Detailed report sheets: 1 head + radar + tensions, 2 all areas, then the evidence two perspectives a sheet; no sheet is
  *  empty, so a report with two perspectives has three pages, not an empty "(continued)" one (R4-5). */
-export const evidenceSheets = (cards) => list(cards).flatMap((c, i, a) => (i % 2 ? [] : [a.slice(i, i + 2)]));
+export const evidenceSheets = (cards) => list(cards).filter((c) => list(c.rows).length).flatMap((c, i, a) => (i % 2 ? [] : [a.slice(i, i + 2)])); // a perspective with no areas (none at build time) has no evidence table
 export const detailedPages = (cards) => 2 + evidenceSheets(cards).length;
 
 /** Held state: who is below the minimum, in the board's words ("Church 1 — needs 2 more"). */

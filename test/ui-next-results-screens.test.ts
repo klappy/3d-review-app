@@ -14,7 +14,7 @@ import { OUT } from "../ui-next/src/screens/results/links.js";
 // @ts-expect-error -- plain .js module, no type declarations
 import results from "../ui-next/src/screens/results/index.js";
 // @ts-expect-error -- plain .js module, no type declarations
-import { REPORT, lensCards, bandRow, bandRows, scoreRows, comparedRows, radar, heldLines, levelOf, pct, answerView, withNotes, gapLead, responsesFor, countWord, detailedPages, lensKey, canonicalPayload, responsesText, LENS_ORDER, useLevelMinimum, currentLevelMin, levelMinimumOf } from "../ui-next/src/screens/results/data.js";
+import { REPORT, lensCards, bandRow, bandRows, scoreRows, comparedRows, radar, heldLines, levelOf, pct, answerView, withNotes, gapLead, responsesFor, countWord, detailedPages, lensKey, canonicalPayload, responsesText, LENS_ORDER, sentLenses, useLevelMinimum, currentLevelMin, levelMinimumOf } from "../ui-next/src/screens/results/data.js";
 // The fixtures are DEV-like reviews: they band at the DEV level minimum of 1, set explicitly (the live app reads the served value).
 beforeEach(() => { useLevelMinimum(1); });
 import { LENSES } from "../ui/lens-surveys.js";
@@ -227,8 +227,10 @@ describe("data adapter: levels through the current UI's pure modules (board valu
   });
   it("count words and detailed pages follow the report (R4-5)", () => {
     expect([countWord(2), countWord(3), countWord(9)]).toEqual(["two", "three", "9"]);
-    const cards = (n: number) => Array.from({ length: n }, (_, i) => ({ lens: String(i) }));
+    const cards = (n: number) => Array.from({ length: n }, (_, i) => ({ lens: String(i), rows: [{ name: "Area" }] }));
     expect([0, 1, 2, 3].map((n) => detailedPages(cards(n)))).toEqual([2, 3, 3, 4]);
+    // a perspective with no areas (sent out, no response at build time) has no evidence table, so no sheet
+    expect(detailedPages([...cards(2), { lens: "x", rows: [] }])).toBe(3);
   });
   it("a payload without a perspective or an area: cards iterate, unknown areas are skipped, never thrown (R3-3)", () => {
     const D = withoutChurch();
@@ -817,6 +819,30 @@ describe("results round 5: a live payload renders; counts read right", () => {
     useLevelMinimum(1);
     expect([currentLevelMin(), levelOf(80, 1), levelOf(80, 0)]).toEqual([1, "strong", "more"]);
     expect(levelMinimumOf(undefined)).toBe(3);
+  });
+  it("Codex P2 4381562605: DEV, one response, three perspectives sent, two at zero: all three show; never-sent ones stay hidden", () => {
+    // the built payload carries the one response-backed perspective only (the capture keeps response-backed members)
+    const D = copy();
+    D.payload.lenses = D.payload.lenses.filter((l) => l.lens === "team");
+    D.payload.evidence = D.payload.evidence.filter((e) => e.label.startsWith("team")).map((e) => ({ ...e, n: 1 }));
+    D.payload.cross_lens_multi = [];
+    const R = { ...D, counts: { team: 1, community: 0, church: 0 }, sent: ["team", "community", "church"] };
+    const cards = lensCards(R.payload, R.counts, { sent: R.sent });
+    expect(cards.map((c: { lens: string; n: number; level: string; rows: unknown[] }) => `${c.lens}:${c.n}:${c.level}:${c.rows.length}`)).toEqual(["team:1:growing:5", "community:0:more:0", "church:0:more:0"]);
+    // Results cards, the overview and detailed paper heads: the two at zero read More input needed beside "No drops yet · 0 responses"
+    const res = mount(Results, { report: R });
+    expect(all(res, ".glass[data-lens] [data-coverage]")).toEqual(["A few drops · 1 response", "No drops yet · 0 responses", "No drops yet · 0 responses"]);
+    expect(all(res, ".glass[data-lens=church] .lvl-name")).toEqual(["More input needed"]);
+    for (const C of [Report, ReportDetailed]) expect(all(mount(C, { report: R }), ".paper .solid[data-lens][data-pad=bar] > [data-coverage]")).toEqual(["A few drops · 1 response", "No drops yet · 0 responses", "No drops yet · 0 responses"]);
+    // no score anywhere for them; the detailed report draws no empty evidence table
+    const det = mount(ReportDetailed, { report: R });
+    expect(det.querySelectorAll(".ev-card").length).toBe(1);
+    // answers since the build are said apart on the Results card only
+    expect(lensCards(R.payload, { team: 1, community: 2, church: 0 }, { sent: R.sent }).map((c: { newer: number }) => c.newer)).toEqual([0, 2, 0]);
+    // a perspective never sent out stays hidden; without a survey list (fixtures, a static report) nothing is added
+    expect(lensCards(R.payload, R.counts, { sent: ["team", "community"] }).map((c: { lens: string }) => c.lens)).toEqual(["team", "community"]);
+    expect(lensCards(R.payload, R.counts).map((c: { lens: string }) => c.lens)).toEqual(["team"]);
+    expect(sentLenses([{ perspective: "Translation Team", state: "selected" }, { perspective: "Community", state: "selected", archived_at: "2026-10-01" }, { perspective: "Church", state: "proposed" }])).toEqual(["team"]);
   });
   it("R5-3 + R5-5: Results counts the detailed report's pages; the phone overview line counts the gaps the sheet draws, no radar", () => {
     expect(text([...mount(Results).querySelectorAll("a.btn")].find((a) => text(a).startsWith("Detailed report")) ?? null)).toBe(`Detailed report · ${detailedPages(lensCards(REPORT.desktop.payload, REPORT.desktop.counts))} pages`);
