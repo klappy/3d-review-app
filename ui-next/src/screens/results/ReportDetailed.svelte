@@ -133,7 +133,7 @@
     <div class="psheet" data-fit="a4">{@render page2()}</div>
     {#each sheets as sheet, i}<div class="psheet" data-fit="a4">{@render evidenceSheet(sheet, i)}</div>{/each}
   </div>
-  <a class="link" href={href("report", { state: "overview" })}>Open the overview <Glyph d={G.arrow} /></a>
+  <a class="link" href={href("report", { state: "overview" })}>Back to the overview <Glyph d={G.arrow} /></a>
 </AppShell>
 {:else}
 <AppShell {theme} screen rhythm="report" {top}><!-- §8.3 Report frame: main.l-main[data-rhythm=report] > .paper[data-sheet] sheets as direct children -->

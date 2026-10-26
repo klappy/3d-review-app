@@ -618,7 +618,7 @@ describe("each board renders as a screen", () => {
     expect(btn(hub, "Read").getAttribute("href")).toBe("?ui_next=on&screen=report-detailed");
     for (const [C, props, micro, sheets, other, back, dl] of [
       [Report, { phone: true, state: "overview" }, "Overview · 1 page · A4 scaled to the width; pinch to zoom", 1, "Open the detailed report", "Reports", "Download the overview (PDF)"],
-      [ReportDetailed, { phone: true }, "Detailed · 4 pages · A4 scaled to the width; pinch to zoom", 4, "Open the overview", "Overview", "Download this report (PDF)"],
+      [ReportDetailed, { phone: true }, "Detailed · 4 pages · A4 scaled to the width; pinch to zoom", 4, "Back to the overview", "Overview", "Download this report (PDF)"],
     ] as const) {
       const a = mount(C, props as Props);
       expect(text(a.querySelector("main > span.micro"))).toBe(micro);
