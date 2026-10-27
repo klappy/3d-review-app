@@ -12,7 +12,7 @@ import type {Ctx} from '../src/handlers/types';
 // how many responses are in, how many are needed, scores held — and no report is scored from too few answers.
 const mf=new Miniflare(convertV4MiniflareOptions({workers:[{name:'s28-results-agree',modules:true,script:"export default {fetch(){return new Response('x')}}",d1Databases:{DB:'s28-fixture'}}]}));
 let db:D1Database;
-const src='assess_syn_earning-trust-2026-01', one='assess_s28_one', full='assess_s28_full', zero='assess_s28_zero';
+const src='assess_syn_earning-trust-2026-01', one='assess_s28_one', full='assess_s28_full', zero='assess_s28_zero', three='assess_s28_three';
 // production (reports enabled) keeps the five-response floor; DEV's floor is one response (report-admission.ts participantReportMinimum).
 const ctx=(ENVIRONMENT='dev'):Ctx=>({env:{DB:db,SESSION_SECRET:'s28-test',ENVIRONMENT,PARTICIPANT_REPORTS:'enabled'} as unknown as Ctx['env'],db,principal:{id:'person_mara',kind:'user'},traceId:'tr_s28',now:()=>new Date('2026-09-30T16:00:00.000Z'),log:()=>{}});
 const run=(sql:string,...a:unknown[])=>db.prepare(sql).bind(...a).run();
@@ -28,7 +28,7 @@ beforeAll(async()=>{
   const sql=readFileSync(new URL('../'+file,import.meta.url),'utf8').split('\n').filter(l=>!l.trimStart().startsWith('--')).join('\n');
   const statements=sql.split(';\n').map(s=>s.trim()).filter(Boolean);for(let i=0;i<statements.length;i+=50)await db.batch(statements.slice(i,i+50).map(s=>db.prepare(s)));
  }
- await clone(one,1);await clone(full,50);await clone(zero,0);
+ await clone(one,1);await clone(full,50);await clone(zero,0);await clone(three,3);
 },60000);
 afterAll(()=>mf.dispose());
 const reports=async(aid:string)=>Number((await db.prepare('SELECT count(*) AS n FROM synthetic_report WHERE assessment_id=?').bind(aid).first<{n:number}>())?.n);
@@ -62,6 +62,24 @@ describe('S28: Results, responses list and report agree below the D7 minimum',()
   // and the synthetic capture really builds there, the production participant floor (5) unchanged
   const made:any=(await build(off('production'),{aid:src})).result;expect(made.suppressed).toBe(false);expect(made.report?.id).toMatch(/^sreport_/);
   expect(SUPPRESSION_THRESHOLD).toBe(5);
+ },60000);
+ it('Codex P2 4383751986: report_hold_reason is the same decision\'s reason; environment never reads as a count to collect',async()=>{
+  const off=(ENVIRONMENT:string):Ctx=>{const c=ctx(ENVIRONMENT);return {...c,env:{...c.env,PARTICIPANT_REPORTS:undefined}} as Ctx;};
+  const cases:[string,Ctx,string,boolean,string|null][]=[
+   ['production, flag off, 3 participant responses',off('production'),three,false,'environment'],
+   ['production, flag off, 50 participant responses',off('production'),full,false,'environment'],
+   ['unknown environment, 3 participant responses',off('staging'),three,false,'environment'],
+   ['production, flag on, 3 participant responses',ctx('production'),three,false,'count'],
+   ['DEV, 0 responses',ctx('dev'),zero,false,'count'],
+   ['DEV, 1 participant response',ctx('dev'),one,true,null],
+   ['production, flag off, trusted synthetic capture',off('production'),src,true,null]];
+  for(const [name,c,aid,allowed,why] of cases){
+   const r:any=(await summary(c,{aid})).result, dry:any=(await build(c,{aid},{dryRun:true} as any)).result;
+   expect([r.report_build_allowed,r.report_hold_reason],name).toEqual([allowed,why]);
+   expect(dry.status,name).toBe(allowed?'ready':'held');
+  }
+  // the count fields stay on the response (the UI ignores them under "environment")
+  expect((await summary(off('production'),{aid:three})).result).toMatchObject({responses_in:3,responses_needed:SUPPRESSION_THRESHOLD,report_hold_reason:'environment'});
  },60000);
  it('DEV: one response is enough to build; zero responses hold and name a floor of one',async()=>{
   // 3d-review-cookbook work/active/2026-10-26-3d-report-threshold-coverage: >=1 response in each included lens builds the report.

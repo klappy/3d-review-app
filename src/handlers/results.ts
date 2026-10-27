@@ -2,7 +2,7 @@ import type { Ctx, Handler } from "./types";
 import { notVisible } from "./errors";
 import { gate, reqStr, responseCountForAssessment, roleAt } from "./common";
 import { participantReportMinimum, perspectiveLevelMinimum } from "../report-admission";
-import { observeBuildEligibility } from "../synthetic-report-store";
+import { observeBuildDecision } from "../synthetic-report-store";
 import { demographicsEnabled, demographicsProjection } from "../context-fields";
 
 /** Below the D7 minimum (report-admission.ts participantReportMinimum: SUPPRESSION_THRESHOLD, a held working default; 1 on DEV,
@@ -29,7 +29,10 @@ export const summary: Handler = async (ctx, params) => {
   const { results } = await ctx.db.prepare("SELECT context_json FROM assessment_survey WHERE assessment_id = ? AND state = 'selected'")
     .bind(aid).all<{ context_json?: string }>().catch(() => ({ results: [] as { context_json?: string }[] }));
   const low = await minimumHold(ctx, aid);
-  const allowed = await observeBuildEligibility(ctx, aid, "viewer").then((r) => r.ok && r.marker.eligible).catch(() => false);
+  // The store's one decision: eligible, and if not, why (environment / count / capture). Any failure reads not allowed, no reason.
+  const decision = await observeBuildDecision(ctx, aid, "viewer").catch(() => null);
+  const allowed = !!decision && decision.result.ok && decision.result.marker.eligible;
+  const holdReason = decision && decision.result.ok ? decision.hold : null;
   return { result: {
     ...demographicsProjection((results || []).some((r) => demographicsEnabled(r.context_json))),
     assessment_id: aid,
@@ -46,6 +49,8 @@ export const summary: Handler = async (ctx, params) => {
     // build dry run reads), so participant admission, the floor and trusted synthetic captures can never disagree with build.
     // Read-only: build re-checks everything; any failure reads false.
     report_build_allowed: allowed,
+    // Additive (Codex P2 4383751986): the decisive reason beside it, from the same decision. "environment" means no count will lift it.
+    report_hold_reason: holdReason,
     ...(low ?? {}),
   }, scope: { type: "assessment", id: aid } };
 };

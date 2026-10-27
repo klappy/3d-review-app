@@ -298,10 +298,20 @@ export const buildAllowed = (res) => res?.report_build_allowed === true;
 export const REPORTS_OFF = "Reports aren’t available here: this environment doesn’t build reports from participant answers, so more answers won’t change that.";
 export const REPORTS_UNCONFIRMED = "Reports aren’t available here right now: the server didn’t confirm that a report can be built.";
 export const admissionHold = (res) => !!res && typeof res.responses_needed === "number" && typeof res.responses_in === "number";
-/** The hold an unbuilt review reads: null when the server allows a build; the count hold when it names one; else not available. */
-export const buildHold = (res) => (buildAllowed(res) ? null : admissionHold(res) ? res : { unavailable: true, reason: res?.report_build_allowed === false ? REPORTS_OFF : REPORTS_UNCONFIRMED });
-/** A held build preview or execute, in words: the count when the server names one, else that reports aren't available here. */
-export const heldBuildText = (preview, tail) => (admissionHold(preview) ? `The results can’t be built yet: more answers are needed. ${tail}` : `The results can’t be built here: reports aren’t available in this environment. ${tail}`);
+/** The hold an unbuilt review reads, by the server's decisive reason (results report_hold_reason, the store's one decision; Codex
+ *  P2 4383751986): "environment" is reports aren't available here, never a count ask, even when the count fields are present;
+ *  "count" is the count copy with the server's numbers; anything else (a capture that does not attest, an older server without
+ *  the reason, a failed read) is the unconfirmed line unless the server names a count hold. null when the server allows a build. */
+export function buildHold(res) {
+  if (buildAllowed(res)) return null;
+  const why = res?.report_hold_reason;
+  if (why === "environment") return { unavailable: true, reason: REPORTS_OFF };
+  if ((why === "count" || why === undefined) && admissionHold(res)) return res;
+  return { unavailable: true, reason: REPORTS_UNCONFIRMED };
+}
+/** A held build preview or execute, in words. The Results reason decides first: "environment" never asks for more answers, even
+ *  though the preview may carry count fields; otherwise the count when the server names one. */
+export const heldBuildText = (preview, tail, reason) => (reason !== "environment" && admissionHold(preview) ? `The results can’t be built yet: more answers are needed. ${tail}` : `The results can’t be built here: reports aren’t available in this environment. ${tail}`);
 // Results: the newest built report (or build one) in the shape results/data.js reads: { review, counts, payload } plus a held reason.
 export async function resultsModel(aid, { build = false } = {}) {
   // The report list and every survey count must load: a failed read is the shell's retryable error, never an empty list (which

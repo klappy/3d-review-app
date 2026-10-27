@@ -1,6 +1,6 @@
 /** Internal C2a store–renderer integration. No public handler or authorization shortcut. */
 import type { Ctx } from './handlers/types.js';
-import { REPORT_CAPTURE_CTE, attestPackedCapture, type CapturedAssessment } from './report-capture.js';
+import { REPORT_CAPTURE_CTE, attestPackedCapture, decodePackedCapture, type CapturedAssessment } from './report-capture.js';
 import { canonicalJson, parseBoundedJson, sha256Bytes } from './report-canonical-json.js';
 import { ATTESTATION_TRUST } from './synthetic-attestation-trust.js';
 import { renderAttestedCapture, REPORT_SCHEMA, REPORT_VERSIONS } from './synthetic-report-renderer.js';
@@ -62,7 +62,13 @@ const APPROVED_RENDERER: RendererDescriptor = REAL_RENDERER;
 export type Report = Readonly<{id:string;assessmentId:string;reportKey:string;captureDigest:string;createdAt:string;payload:unknown}>;
 export type ReportSummary = Omit<Report,'payload'>;
 export type EligibilityMarker = Readonly<{assessment_id:string;eligible:boolean;policy_version:string}>;
+/** Why a visible assessment cannot build (Codex P2 4383751986), decided beside the boolean so the two cannot disagree:
+ * 'environment' = this environment admits no participant report (only a trusted synthetic capture could build, and none did);
+ * 'count' = participant reports are admitted but the capture is under the server floor; 'capture' = admitted and at the floor,
+ * yet the capture does not attest or render (mixed sources, malformed rows); null = eligible. */
+export type HoldReason='environment'|'count'|'capture'|null;
 export type EligibilityResult = {ok:true;marker:EligibilityMarker}|{ok:false;reason:'NOT_VISIBLE'|'UNAVAILABLE'};
+export type BuildDecision = {result:EligibilityResult;hold:HoldReason};
 export type StoreResult<T> = {ok:true;value:T}|{ok:false;reason:'HELD';marker:EligibilityMarker}|{ok:false;reason:'NOT_VISIBLE'|'UNAVAILABLE'|'CONFLICT'|'DETERMINISM'};
 export type ReportPage = {reports:readonly ReportSummary[];afterId:string|null};
 const NOT_VISIBLE = Object.freeze({ok:false as const,reason:'NOT_VISIBLE' as const});
@@ -152,7 +158,7 @@ export const REPORT_OBSERVE_SQL=REPORT_CAPTURE_CTE+`
 SELECT t.id AS assessment_id,c.capture_json AS current_capture
 FROM target t LEFT JOIN captured c ON c.assessment_id=t.id;`;
 type Observation={assessment_id:string;current_capture:string|null};
-type BuildObservation={ok:true;aid:string;capture:CapturedAssessment|null}|{ok:false;reason:'NOT_VISIBLE'|'UNAVAILABLE'};
+type BuildObservation={ok:true;aid:string;capture:CapturedAssessment|null;responses:number}|{ok:false;reason:'NOT_VISIBLE'|'UNAVAILABLE'};
 /** One authorized SELECT; subsequent attestation uses only its immutable bytes. role: the grant floor of that SELECT ('member' for
  * build and preview; 'viewer' only for the read-only eligibility answer on Results, which never builds). */
 async function observeBuild(ctx:StoreContext,assessmentId:string,attest:Attest=attestPackedCapture,role:'member'|'viewer'='member'):Promise<BuildObservation>{
@@ -166,17 +172,29 @@ async function observeBuild(ctx:StoreContext,assessmentId:string,attest:Attest=a
   if(row.assessment_id!==aid)return UNAVAILABLE;
   const current=await attest(aid,row.current_capture??'',participantAdmission(ctx),participantMinimum(ctx));
   stageSpan(ctx,'attest_observe',t);
-  return {ok:true,aid,capture:current.eligible?current.capture:null};
+  // The captured response count (no capture = none; an undecodable one is not a count problem): only for the hold reason.
+  let responses=0;if(row.current_capture){try{responses=decodePackedCapture(aid,row.current_capture).length;}catch{responses=Number.POSITIVE_INFINITY;}}
+  return {ok:true,aid,capture:current.eligible?current.capture:null,responses};
 }
-/** Preview exposes no captured token, count, digest or report identity. The one build-eligibility decision: the build dry run
- * (role 'member') and Results' report_build_allowed (role 'viewer', read-only; Codex P2 4383599307) both read it, so the field and
- * the build cannot disagree: participant admission, the floor and trusted synthetic captures are decided here, not re-derived. */
-export async function observeBuildEligibility(ctx:StoreContext,assessmentId:string,role:'member'|'viewer'='member'):Promise<EligibilityResult>{
-  const observation=await observeBuild(ctx,assessmentId,attestPackedCapture,role);if(!observation.ok)return observation;
-  if(!observation.capture)return {ok:true,marker:marker(observation.aid,false)};
+function holdReason(ctx:StoreContext,eligible:boolean,responses:number):HoldReason{
+  if(eligible)return null;
+  if(!participantAdmission(ctx))return 'environment';
+  return responses<participantMinimum(ctx)?'count':'capture';
+}
+/** The one build-eligibility decision and its reason (Codex P2s 4383599307, 4383751986). The build dry run (role 'member') reads
+ * only its result, unchanged; Results (role 'viewer', read-only) reads both, so report_build_allowed, report_hold_reason and the
+ * build cannot disagree: participant admission, the floor and trusted synthetic captures are decided here, not re-derived. */
+export async function observeBuildDecision(ctx:StoreContext,assessmentId:string,role:'member'|'viewer'='member'):Promise<BuildDecision>{
+  const observation=await observeBuild(ctx,assessmentId,attestPackedCapture,role);if(!observation.ok)return {result:observation,hold:null};
+  const decided=(eligible:boolean):BuildDecision=>({result:{ok:true,marker:marker(observation.aid,eligible)},hold:holdReason(ctx,eligible,observation.responses)});
+  if(!observation.capture)return decided(false);
   const t=clock();
-  try{await descriptor().render(observation.capture);stageSpan(ctx,'render_preview',t);return {ok:true,marker:marker(observation.aid,true)};}
-  catch{stageSpan(ctx,'render_preview',t);return {ok:true,marker:marker(observation.aid,false)};}
+  try{await descriptor().render(observation.capture);stageSpan(ctx,'render_preview',t);return decided(true);}
+  catch{stageSpan(ctx,'render_preview',t);return decided(false);}
+}
+/** Preview exposes no captured token, count, digest or report identity. */
+export async function observeBuildEligibility(ctx:StoreContext,assessmentId:string,role:'member'|'viewer'='member'):Promise<EligibilityResult>{
+  return (await observeBuildDecision(ctx,assessmentId,role)).result;
 }
 export async function buildMaterialized(ctx:StoreContext,assessmentId:string):Promise<StoreResult<Report>>{
   // One memo for the whole build: observe, commit, current and stored attest the same packed bytes once.

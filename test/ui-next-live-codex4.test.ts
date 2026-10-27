@@ -473,7 +473,7 @@ describe("Codex P2 4383266687: Build is offered only on the server's report_buil
   const buildButton = (el: Element) => [...el.querySelectorAll("button")].find((b) => b.textContent === "Build the report");
   it("flag off with 5 or more responses: no Build, and the hold says reports aren't available here, not 'more answers'", async () => {
     // production without PARTICIPANT_REPORTS (or an unknown environment): no low-count fields, and the server says no build
-    serve(base({ ...noReports, [`GET /v2/assessments/${AID}/results`]: { status: "held", suppressed: true, level_minimum_responses: 3, report_build_allowed: false } }));
+    serve(base({ ...noReports, [`GET /v2/assessments/${AID}/results`]: { status: "held", suppressed: true, level_minimum_responses: 3, report_build_allowed: false, report_hold_reason: "environment" } }));
     const m = await resultsModel(AID);
     expect(m.review.responses).toBeGreaterThanOrEqual(5);
     expect(m.held).toMatchObject({ unavailable: true });
@@ -516,5 +516,47 @@ describe("Codex P2 4383599311: the phone cards' strongest and weakest are scored
     // a blank or non-numeric score is unscored too; a numeric string still counts
     f.payload.lenses[0].sub_dimensions[2].score = " "; f.payload.lenses[0].sub_dimensions[3].score = "41";
     expect(pick(f.payload)[0]).toEqual(["team", ["Translation process & brief", "Consistency"]]);
+  });
+});
+
+describe("Codex P2 4383751986: the hold copy follows the server's report_hold_reason", () => {
+  const noReports = { [`GET /v2/assessments/${AID}/reports`]: { reports: [], next_cursor: null } };
+  const buildButton = (el: Element) => [...el.querySelectorAll("button")].find((b) => b.textContent === "Build the report");
+  const open = async (results: unknown, role = "owner") => {
+    serve(base({ ...noReports, [`GET /v2/assessments/${AID}/results`]: results, [`GET /v2/assessments/${AID}`]: assessment({ role }) }));
+    globalThis.location.hash = to("results", { aid: AID });
+    return render(Live as never, { props: {} }).container;
+  };
+  it("environment: reports aren't available here, never the count ask, even with the count fields present", async () => {
+    const res = { status: "held", report_build_allowed: false, report_hold_reason: "environment", responses_in: 3, responses_needed: 5, reason: "3 responses so far; at least 5 are needed before any score is shown. Scores are held until then." };
+    serve(base({ ...noReports, [`GET /v2/assessments/${AID}/results`]: res }));
+    expect((await resultsModel(AID)).held).toMatchObject({ unavailable: true });
+    const a = await open(res);
+    await waitFor(() => expect(a.textContent).toContain("Reports aren’t available here"));
+    expect(a.textContent).toContain("more answers won’t change that");
+    expect(a.textContent).not.toMatch(/3 of 5|at least 5|more answers are needed|responses so far/);
+    expect(buildButton(a)).toBeUndefined();
+  });
+  it("count: the count copy with the server's numbers, no Build", async () => {
+    const a = await open({ status: "held", report_build_allowed: false, report_hold_reason: "count", responses_in: 0, responses_needed: 1, reason: "0 responses so far; at least 1 is needed before any score is shown. Scores are held until then." });
+    await waitFor(() => expect(a.textContent).toContain("0 of 1 responses so far"));
+    expect(a.textContent).not.toContain("Reports aren’t available here");
+    expect(buildButton(a)).toBeUndefined();
+  });
+  it("null with allowed: Build for a member; the not-built line for a viewer", async () => {
+    const ok = { status: "held", report_build_allowed: true, report_hold_reason: null, level_minimum_responses: 1 };
+    const m = await open(ok, "member");
+    await waitFor(() => expect(m.textContent).toContain("Not built yet"));
+    expect(buildButton(m)).toBeDefined();
+    const v = await open(ok, "viewer");
+    await waitFor(() => expect(v.textContent).toContain("An owner or member of the review builds it."));
+    expect(buildButton(v)).toBeUndefined();
+  });
+  it("a held preview under the environment reason never asks for more answers", async () => {
+    // @ts-expect-error -- plain .js module
+    const { heldBuildText } = await import("../ui-next/src/app/data.js");
+    const preview = { suppressed: true, status: "held", responses_in: 3, responses_needed: 5 };
+    expect(heldBuildText(preview, "Nothing was built.", "environment")).toBe("The results can’t be built here: reports aren’t available in this environment. Nothing was built.");
+    expect(heldBuildText(preview, "Nothing was built.", "count")).toBe("The results can’t be built yet: more answers are needed. Nothing was built.");
   });
 });
