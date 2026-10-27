@@ -1134,5 +1134,8 @@ describe("document top bar fit (design-system.md Top bar variants · document ba
     expect(base).toContain(".top[data-variant=document]>.h3{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}");
     expect(base).toContain(".top[data-variant=document] .top-end>*{flex:none;white-space:nowrap}");
     expect(base).not.toMatch(/(^|\})\.top>\.h3\{|(^|\})\.top \.h3\{[^}]*ellipsis/m); // scoped to the document variant only
+    // narrow sub-clause (root ruling PR576 4392679952): below 1200px only, the document bar grows and wraps its controls to a second row
+    expect(base).toContain("@media (max-width: 1199.98px){.top[data-variant=document]{height:auto;min-height:64px;flex-wrap:wrap;row-gap:8px;padding-top:10px;padding-bottom:10px}.top[data-variant=document] .top-end{margin-left:auto}}");
+    expect(base).toMatch(/\.top\{height:64px;/); // the generic top bar and the document bar at 1200px+ keep the fixed 64px
   });
 });

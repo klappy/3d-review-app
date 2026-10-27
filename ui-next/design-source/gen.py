@@ -99,6 +99,8 @@ details.dd{position:relative}details.dd>summary{list-style:none;cursor:pointer}d
 .top[data-variant=document]>.h3{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .top[data-variant=document] .top-end{flex:none}
 .top[data-variant=document] .top-end>*{flex:none;white-space:nowrap}
+/* Document bar fit, narrow (lens-design-1410: 1280 and up stay as accepted): below 1200px the bar grows from 64px and wraps, so the controls group (status, switch, PDF, Print) takes its own row under the title instead of running past the viewport */
+@media (max-width: 1199.98px){.top[data-variant=document]{height:auto;min-height:64px;flex-wrap:wrap;row-gap:8px;padding-top:10px;padding-bottom:10px}.top[data-variant=document] .top-end{margin-left:auto}}
 .psheet{overflow:hidden;box-shadow:0 1px 2px rgba(0,0,0,.1),0 24px 48px -24px rgba(19,38,58,.4)}
 .psheet>.paper{width:794px;transform-origin:top left;box-shadow:none}
 /* §2 Paper preview (V-20, CORRECTIONS 31): .psheet[data-fit=a4|letter] scales the whole sheet to the width of its box (box ÷ sheet, no script, no inline transform);
