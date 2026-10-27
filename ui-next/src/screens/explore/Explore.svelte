@@ -35,7 +35,8 @@
   import { I } from "../../icons.js";
   import { E } from "./icons.js";
   import { href } from "../href.js";
-  import { exploreRows, phoneRows, matchCounts, LENS_KEYS } from "./explore-data.js";
+  import { exploreRows, phoneRows, matchCounts, LENS_KEYS, tableAssurance } from "./explore-data.js";
+  import { currentLevelMin } from "../results/data.js";
   import { modal, backdropClose, closeTo } from "./dialog.js";
   import fixture from "../../../fixtures/explore/explore.json";
 
@@ -142,7 +143,7 @@
             </table>
             <div class="l-row tbl-foot" data-split data-gap="3">
               <span class="small">{match.reviews} of {data.visible} reviews match · {many(match.projects, "project")} · {many(match.languages, "language")}</span>
-              <span class="small">Nothing here identifies a participant.</span>
+              <span class="small">{tableAssurance(data.levelMinimum ?? currentLevelMin())}</span>
             </div>
           </section>
         </Stack>

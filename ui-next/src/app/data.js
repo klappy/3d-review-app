@@ -27,11 +27,13 @@ export const assessment = async (aid) => api(`/v2/assessments/${enc(aid)}`); // 
 export const surveyCounts = async (aid, sid) => api(`/v2/assessments/${enc(aid)}/surveys/${enc(sid)}`); // { survey, counts, expected_count? }
 export const setStage = async (aid, stage) => api(`/v2/assessments/${enc(aid)}/stage`, { method: "POST", body: { stage } });
 export const results = async (aid) => api(`/v2/assessments/${enc(aid)}/results`);
-// The server's per-perspective level minimum (results level_minimum_responses; src/report-admission.ts). Each read below records
-// the strictest value its reviews serve; a failed or absent read is undefined, which useLevelMinimum turns into the session's /v2/me value, else the safe 3.
+// The server's per-perspective level minimum (results level_minimum_responses; src/report-admission.ts), for ONE review's own read
+// (CloseCollection); a failed or absent read is undefined, which useLevelMinimum turns into the session's /v2/me value, else the safe 3.
 const servedMinimum = (aid) => results(aid).then((r) => r?.level_minimum_responses).catch(() => undefined);
-// No review to read leaves the value in force (the /v2/me read or the safe 3); any unread or unknown value among them gives the safe 3.
-const useStrictest = (served) => (served.length ? useLevelMinimum(served.every((v) => levelMinimumOf(v) === v) ? Math.max(...served) : undefined) : currentLevelMin());
+// Roll-ups (Project, Workspace, Explore) never read /results per review to learn the minimum (Codex P2 4384112233: each read
+// observes and renders a capture): it is an environment policy the authenticated loader already applied from GET /v2/me
+// (session.js me() -> useSessionLevelMinimum). This re-applies that session value over any earlier per-review read, else the safe 3.
+const useSessionPolicy = () => useLevelMinimum(undefined);
 // Answer-by-answer rows: the server answers with a typed suppression for everyone (src/handlers/response.ts list: D7 disclosure
 // policy unresolved, no row-level disclosure even to owners). The screen shows that real state, never sample rows.
 export const responsesList = async (aid) => api(`/v2/assessments/${enc(aid)}/responses`);
@@ -133,7 +135,7 @@ export async function projectModel(pid) {
   const live = as.filter((a) => !a.archived_at).sort((x, y) => String(y.created_at).localeCompare(String(x.created_at)));
   // A project outside any workspace (workspace_id null) is said so, never shown under the first workspace in the list.
   const w = (p.workspace_id && ws.find((x) => x.id === p.workspace_id)) ?? (p.workspace_id ? { name: "Your workspace" } : { name: "No workspace" });
-  useStrictest(await Promise.all(live.filter((a) => ["understand", "improve"].includes(a.stage)).map((a) => servedMinimum(a.id))));
+  useSessionPolicy();
   // A review's report list or counts failing to read is the shell's retryable error (never a review silently shown without levels).
   const lvl = await Promise.all(live.map(async (a) => {
     if (!["understand", "improve"].includes(a.stage)) return null;
@@ -372,7 +374,7 @@ export const radarOf = (payload) => areasOf(payload).map((a) => a.construct_name
 // An unscored area (null, blank or non-numeric score) is never the strongest or weakest: it is rejected before numeric coercion,
 // since Number(null) and Number("") are 0 (Codex P2 4383599311).
 const scoreOf = (v) => (typeof v === "number" ? v : typeof v === "string" && v.trim() !== "" ? Number(v) : NaN);
-export const phonePayload = (payload) => ({ ...payload, lenses: (payload.lenses ?? []).map((l) => { const sd = [...(l.sub_dimensions ?? [])].filter((x) => Number.isFinite(scoreOf(x?.score))).sort((a, b) => scoreOf(b.score) - scoreOf(a.score)); return { ...l, sub_dimensions: sd.length > 2 ? [sd[0], sd[sd.length - 1]] : l.sub_dimensions }; }) });
+export const phonePayload = (payload) => ({ ...payload, lenses: (payload.lenses ?? []).map((l) => { const sd = [...(l.sub_dimensions ?? [])].filter((x) => Number.isFinite(scoreOf(x?.score))).sort((a, b) => scoreOf(b.score) - scoreOf(a.score)); return { ...l, sub_dimensions: sd.length > 2 ? [sd[0], sd[sd.length - 1]] : sd }; }) }); // two or fewer scored: the filtered rows, never the unscored ones back (Codex P2 4384112238)
 /** The built report a live results screen reads, from resultsModel's m. The report readers (overview, detailed, both widths) get the
  *  full snapshot; only the phone Results screen gets phonePayload (Codex P2 4383033516). lookNext and standsOut (live QA Q4) come from
  *  the full snapshot at every width; standsOut's widest gap is gapRows' all-area order after suppression, so a perspective under the
@@ -605,7 +607,7 @@ export async function workspaceModel(wid, me) {
   const live = (wps ?? []).filter((p) => !p.archived_at);
   const lists = await Promise.all(live.map((p) => assessmentsOf(p.id).then((as) => as.filter((a) => !a.archived_at).sort((x, y) => String(y.created_at).localeCompare(String(x.created_at))))));
   const all = lists.flat();
-  useStrictest(await Promise.all(lists.map((as) => as.find((a) => ["understand", "improve"].includes(a.stage))).filter(Boolean).map((a) => servedMinimum(a.id))));
+  useSessionPolicy();
   const cards = await Promise.all(live.map(async (p, i) => {
     const as = lists[i];
     const langs = [...new Set(as.map((a) => a.language_name).filter(Boolean))];
@@ -650,8 +652,8 @@ export async function invitationsModel(me) {
 // no list/roll-up capability for them), so none is claimed: the chips, group-by options and add-filter rows are empty.
 export async function exploreModel(me) {
   const home = await homeModel(me);
-  // Explore bands with the results lane's cut-off (explore-data.js levelOf): the strictest level minimum its reported reviews serve.
-  const levelMinimum = useStrictest(await Promise.all(home.rows.filter(({ a }) => ["understand", "improve"].includes(a.stage)).map(({ a }) => servedMinimum(a.id))));
+  // Explore bands with the results lane's cut-off (explore-data.js levelOf): the session's served policy, never a per-review read.
+  const levelMinimum = useSessionPolicy();
   const rows = await Promise.all(home.rows.map(async ({ a, p }) => ({
     id: a.id, title: a.name, project: p.name, language: a.language_name || "", region: "", orgs: p.organization || "",
     stage: Object.hasOwn(PILL_OF, a.stage) ? a.stage : "prepare", responses: { n: Number(a.response_count ?? 0) }, lenses: await reviewLenses(a),

@@ -21,7 +21,7 @@ import ResultsHeld from "../ui-next/src/screens/results/ResultsHeld.svelte";
 import Setup5 from "../ui-next/src/screens/setup/Setup5.svelte";
 import Project from "../ui-next/src/screens/setup/Project.svelte";
 // @ts-expect-error -- plain .js module, no type declarations
-import { REPORT, useLevelMinimum, currentLevelMin } from "../ui-next/src/screens/results/data.js";
+import { REPORT, useLevelMinimum, useSessionLevelMinimum, currentLevelMin } from "../ui-next/src/screens/results/data.js";
 import projectFixture from "../ui-next/fixtures/setup/project.json";
 import setupFixture from "../ui-next/fixtures/setup/setup.json";
 
@@ -152,16 +152,14 @@ describe("projectModel (P2: workspace, trend gaps, surfaced failures)", () => {
     expect(g.querySelectorAll('circle[data-lens="church"]').length).toBe(4); // three points plus the legend dot;
   });
   it("Codex P1/P2 on 992b610: levels rest on the report's own evidence counts, and each summary level carries its count beside it", async () => {
-    useLevelMinimum(1); // DEV: the direct levelsOf calls below band at the DEV level minimum
+    useSessionLevelMinimum(1); // DEV: the session's /v2/me policy (the loader applies it); the direct levelsOf calls band at it too
     // a report built from 1 team and 2 community responses; the live surveys now read 6 each
     const snap = { ...payload, evidence: [{ label: "Translation Team — Translators", n: 1 }, { label: "Community — Community", n: 2 }] };
     expect(respondentsOf(snap, { team: 6, community: 6 })).toEqual({ team: 1, community: 2 });
     expect(respondentsOf(payload, { team: 6, community: 6 })).toEqual({ team: 6, community: 6 }); // no evidence n: the live count stands in
     expect(levelsOf({ ...snap, evidence: [{ label: "Translation Team — Translators", n: 0 }, { label: "Community — Community", n: 2 }] }, { team: 6, community: 6 })).toEqual({ team: "more", community: "support" });
     expect(levelTriples({ team: { score: 80, responses: 2 }, church: { score: 50, responses: 0 } })).toEqual([["team", "strong", 2], ["church", "more", 0]]);
-    // DEV serves level_minimum_responses 1 on each reported review's results read
-    const dev = { "GET /v2/assessments/a1/results": { status: "held", level_minimum_responses: 1 }, "GET /v2/assessments/a2/results": { status: "held", level_minimum_responses: 1 } };
-    serve(routes({ ...dev, "GET /v2/reports/r1": { report: { id: "r1", created_at: "2026-08-02T00:00:00Z", payload: snap } } }));
+    serve(routes({ "GET /v2/reports/r1": { report: { id: "r1", created_at: "2026-08-02T00:00:00Z", payload: snap } } }));
     const m = await projectModel(PID);
     expect(m.reviews.find((r: { id: string }) => r.id === "a1").levels).toEqual([["team", "strong", 1], ["community", "support", 2]]);
     expect(m.reviews.find((r: { id: string }) => r.id === "a2").levels).toEqual([["team", "strong", 6]]);
@@ -171,28 +169,26 @@ describe("projectModel (P2: workspace, trend gaps, surfaced failures)", () => {
     expect(first.querySelector("[data-coverage]")!.getAttribute("title")).toBe("A few drops · 1 response");
   });
   it("Codex P2 4381562605: a perspective the review sent out but the built report has no lens for shows at More input needed with 0", async () => {
-    useLevelMinimum(1);
-    const dev = { "GET /v2/assessments/a1/results": { status: "held", level_minimum_responses: 1 }, "GET /v2/assessments/a2/results": { status: "held", level_minimum_responses: 1 } };
+    useSessionLevelMinimum(1);
     const teamOnly = { lenses: [payload.lenses[0]], cross_lens_multi: [], evidence: [{ label: "Translation Team — Translators", n: 1 }] };
-    serve(routes({ ...dev, "GET /v2/reports/r1": { report: { id: "r1", created_at: "2026-08-02T00:00:00Z", payload: teamOnly } } }));
+    serve(routes({ "GET /v2/reports/r1": { report: { id: "r1", created_at: "2026-08-02T00:00:00Z", payload: teamOnly } } }));
     const m = await projectModel(PID);
     expect(m.reviews.find((r: { id: string }) => r.id === "a1").levels).toEqual([["team", "strong", 1], ["community", "more", 0]]); // a1 sent team + community
     expect(m.reviews.find((r: { id: string }) => r.id === "a2").levels).toEqual([["team", "strong", 6]]); // a2 sent team only: nothing added
   });
-  it("level minimum from the server: production-like (3) holds a level at 1 or 2 responses; DEV (1) shows it; absent is the safe 3", async () => {
+  it("level minimum from the session (Codex P2 4384112233): production-like (3) holds a level at 1 or 2 responses; DEV (1) shows it; none served is the safe 3; no per-review /results read", async () => {
     const snap = { ...payload, evidence: [{ label: "Translation Team — Translators", n: 1 }, { label: "Community — Community", n: 2 }] };
-    const at = (min: unknown) => ({ "GET /v2/assessments/a1/results": { status: "held", ...(min === undefined ? {} : { level_minimum_responses: min }) }, "GET /v2/assessments/a2/results": { status: "held", ...(min === undefined ? {} : { level_minimum_responses: min }) }, "GET /v2/reports/r1": { report: { id: "r1", created_at: "2026-08-02T00:00:00Z", payload: snap } } });
-    const first = async () => (await projectModel(PID)).reviews.find((r: { id: string }) => r.id === "a1").levels;
-    serve(routes(at(3)));
-    expect(await first()).toEqual([["team", "more", 1], ["community", "more", 2]]);
-    serve(routes(at(1)));
-    expect(await first()).toEqual([["team", "strong", 1], ["community", "support", 2]]);
-    serve(routes(at(undefined)));
-    expect(await first()).toEqual([["team", "more", 1], ["community", "more", 2]]);
-    serve(routes(at("1"))); // not a whole number: the safe 3
-    expect(await first()).toEqual([["team", "more", 1], ["community", "more", 2]]);
-    serve(routes({ ...at(1), "GET /v2/assessments/a2/results": new Error("results down") })); // one review unread: the strictest, 3
-    expect(await first()).toEqual([["team", "more", 1], ["community", "more", 2]]);
+    const first = async (min: unknown) => {
+      forget(); useSessionLevelMinimum(min as number); useLevelMinimum(min === 1 ? 3 : 1); // an earlier per-review read never stands in for the session
+      serve(routes({ "GET /v2/reports/r1": { report: { id: "r1", created_at: "2026-08-02T00:00:00Z", payload: snap } } }));
+      const levels = (await projectModel(PID)).reviews.find((r: { id: string }) => r.id === "a1").levels;
+      expect(calls.filter((c) => /\/results$/.test(c.url.split("?")[0]))).toEqual([]);
+      return levels;
+    };
+    expect(await first(3)).toEqual([["team", "more", 1], ["community", "more", 2]]);
+    expect(await first(1)).toEqual([["team", "strong", 1], ["community", "support", 2]]);
+    expect(await first(undefined)).toEqual([["team", "more", 1], ["community", "more", 2]]);
+    expect(await first("1")).toEqual([["team", "more", 1], ["community", "more", 2]]); // not a whole number: the safe 3
   });
   it("a review's report list or count failing to read rejects the model (the shell's retryable error), never a review without levels", async () => {
     serve(routes({ "GET /v2/assessments/a2/reports": new Error("list down") }));
@@ -315,21 +311,56 @@ describe("the served level minimum reaches Help, Explore and the detailed report
     useLevelMinimum(undefined);
     expect(currentLevelMin()).toBe(3);
   });
-  it("Explore bands with the served cut-off, as Results and Project do: 2 responses show a level on DEV, are held at 3 or unread", async () => {
+  it("Explore bands with the session's served cut-off, as Project does: 2 responses show a level on DEV, are held at 3 or unread", async () => {
     const snap = { lenses: [{ lens: "Translation Team", score: 80, sub_dimensions: [] }], cross_lens_multi: [], evidence: [{ label: "Translation Team — Translators", n: 2 }] };
     const routes = (min: unknown) => ({
       "GET /v2/projects": { projects: [{ id: PID, name: "Kikuyu" }] }, "GET /v2/workspaces": { workspaces: [] },
       [`GET /v2/projects/${PID}/assessments`]: { assessments: [{ id: "a1", name: "First", stage: "understand", created_at: "2026-08-01T00:00:00Z", language_name: "Kikuyu" }] },
       "GET /v2/assessments/a1": { assessment: { id: "a1", project_id: PID, stage: "understand", role: "owner" }, surveys: [{ id: "s1", perspective: "Translation Team" }] },
       "GET /v2/assessments/a1/surveys/s1": { survey: {}, counts: { responses: 2, respondents: 2 } },
-      "GET /v2/assessments/a1/results": { status: "held", ...(min === undefined ? {} : { level_minimum_responses: min }) },
       "GET /v2/assessments/a1/reports": { reports: [{ id: "r1", created_at: "2026-08-02T00:00:00Z" }], next_cursor: null },
       "GET /v2/reports/r1": { report: { id: "r1", created_at: "2026-08-02T00:00:00Z", payload: snap } },
     });
-    const team = async (min: unknown) => { serve(routes(min)); const m = await exploreModel({ principal: { id: "p1", display_name: "Kay" }, grants: [] }); return [m.levelMinimum, exploreRows(m.reviews)[0].levels.team]; };
+    // the session's served policy (Codex P2 4384112233): never a per-review /results read
+    const team = async (min: unknown) => { forget(); useSessionLevelMinimum(min as number); serve(routes(min)); const m = await exploreModel({ principal: { id: "p1", display_name: "Kay" }, grants: [] }); expect(calls.filter((c) => /\/results$/.test(c.url.split("?")[0]))).toEqual([]); return [m.levelMinimum, exploreRows(m.reviews)[0].levels.team]; };
     expect(await team(1)).toEqual([1, "strong"]);
     expect(await team(3)).toEqual([3, "more"]);
     expect(await team(undefined)).toEqual([3, "more"]);
+  });
+  it("Codex P2 4384112233: the Workspace roll-up bands with the session's policy and reads no review's /results", async () => {
+    const snap = { lenses: [{ lens: "Translation Team", score: 80, sub_dimensions: [] }], cross_lens_multi: [], evidence: [{ label: "Translation Team — Translators", n: 2 }] };
+    const routes = {
+      "GET /v2/workspaces/w1": { workspace: { id: "w1", name: "WS", role: "owner" }, projects: [{ id: PID, name: "Kikuyu" }] }, "GET /v2/projects": { projects: [] },
+      [`GET /v2/projects/${PID}/assessments`]: { assessments: [{ id: "a1", name: "First", stage: "understand", created_at: "2026-08-01T00:00:00Z", language_name: "Kikuyu" }, { id: "a2", name: "Second", stage: "improve", created_at: "2026-07-01T00:00:00Z" }] },
+      "GET /v2/assessments/a1": { assessment: { id: "a1", project_id: PID, stage: "understand", role: "owner" }, surveys: [{ id: "s1", perspective: "Translation Team" }] },
+      "GET /v2/assessments/a1/surveys/s1": { survey: {}, counts: { responses: 2, respondents: 2 } },
+      "GET /v2/assessments/a1/reports": { reports: [{ id: "r1", created_at: "2026-08-02T00:00:00Z" }], next_cursor: null },
+      "GET /v2/reports/r1": { report: { id: "r1", created_at: "2026-08-02T00:00:00Z", payload: snap } },
+    };
+    // @ts-expect-error -- plain .js module
+    const { workspaceModel } = await import("../ui-next/src/app/data.js");
+    for (const [min, want] of [[1, "strong"], [3, "more"]] as const) {
+      forget(); useSessionLevelMinimum(min); serve(routes);
+      const m = await workspaceModel("w1", { principal: { id: "p1", display_name: "Kay" }, grants: [] });
+      expect(m.projects[0].levels, String(min)).toEqual([["team", want, 2]]);
+      expect(calls.filter((c) => /\/results$/.test(c.url.split("?")[0]))).toEqual([]);
+    }
+  });
+  it("Codex P2 4384112215: a fresh signed-in DEV load at #/help waits for /v2/me, so its copy says the served 1, never the safe 3", async () => {
+    forget(); useLevelMinimum(undefined);
+    let release: () => void = () => {};
+    const gate = new Promise<void>((r) => { release = r; });
+    serve({ "GET /v2/me": { principal: { id: "p1", display_name: "Kay" }, grants: [], level_minimum_responses: 1 } });
+    // /v2/me answers only once released
+    const real = globalThis.fetch; globalThis.fetch = (async (u: string, i?: RequestInit) => { if (String(u).endsWith("/v2/me")) await gate; return real(u, i); }) as typeof fetch;
+    // Live's load() awaits S.me() before any non-participant route's loader (Live.svelte:166), so Help mounts on the served policy
+    globalThis.location.hash = to("help");
+    const a = render(Live as never, { props: {} }).container;
+    await new Promise((r) => setTimeout(r, 30));
+    expect(faqNeed(a)).toBe(""); // nothing built before the policy lands
+    release();
+    await waitFor(() => expect(faqNeed(a)).toContain("from its first answer"));
+    expect(faqNeed(a)).not.toContain("at least 3");
   });
   it("detailed report: \"How to read the scores\" names the minimum in force (DEV 1: no answers; otherwise fewer than 3); the drops … show", () => {
     useLevelMinimum(1);
@@ -535,6 +566,11 @@ describe("Codex P2 4383599311: the phone cards' strongest and weakest are scored
     // a blank or non-numeric score is unscored too; a numeric string still counts
     f.payload.lenses[0].sub_dimensions[2].score = " "; f.payload.lenses[0].sub_dimensions[3].score = "41";
     expect(pick(f.payload)[0]).toEqual(["team", ["Translation process & brief", "Consistency"]]);
+    // Codex P2 4384112238: with two or fewer scored areas left after the filter, the filtered rows, never the unscored ones back
+    const two = { lenses: [{ lens: "team", score: 70, sub_dimensions: [{ sub_dimension: "A", score: 80 }, { sub_dimension: "B", score: null }, { sub_dimension: "C", score: 40 }] },
+      { lens: "community", score: 60, sub_dimensions: [{ sub_dimension: "D", score: "" }, { sub_dimension: "E", score: 55 }, { sub_dimension: "F", score: "x" }] },
+      { lens: "church", score: 50, sub_dimensions: [{ sub_dimension: "G", score: null }] }] };
+    expect(pick(two)).toEqual([["team", ["A", "C"]], ["community", ["E"]], ["church", []]]);
   });
 });
 

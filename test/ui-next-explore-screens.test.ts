@@ -15,7 +15,7 @@ import Help from "../ui-next/src/screens/explore/Help.svelte";
 // @ts-expect-error -- plain .js module, no type declarations
 import lane from "../ui-next/src/screens/explore/index.js";
 // @ts-expect-error -- plain .js module, no type declarations
-import { levelOf, stagePill, responsesText, exploreRows, phoneRows, matchCounts, LENS_KEYS, STAGE_PILL } from "../ui-next/src/screens/explore/explore-data.js";
+import { levelOf, stagePill, responsesText, exploreRows, phoneRows, matchCounts, tableAssurance, LENS_KEYS, STAGE_PILL } from "../ui-next/src/screens/explore/explore-data.js";
 // @ts-expect-error -- plain .js module, no type declarations
 import { modal, backdropClose, closeTo } from "../ui-next/src/screens/explore/dialog.js";
 // @ts-expect-error -- plain .js module, no type declarations
@@ -138,7 +138,7 @@ describe("Explore (Explore.dc.html, ExplorePhone.dc.html, ExploreFiltersPhone.dc
     }
     expect(rows.map((r) => r[10])).toEqual(["today", "12 Sep", "3 days ago", "3 days ago", "28 Sep", "26 Sep"]);
     expect(text(a)).toContain("6 of 23 reviews match · 4 projects · 5 languages"); // counted from the six rows (N4), not the board's literal
-    expect(text(a)).toContain("Nothing here identifies a participant.");
+    expect(text(a)).toContain("Nothing here identifies a participant: a level shows only with at least 3 responses."); // the safe 3 in the gallery (design-system.md:609 @c4bd0164)
     expect([...a.querySelectorAll("button.mi")].map((b) => text(b.firstElementChild!))).toEqual(["Project", "Language", "Cluster", "Organisation involved", "Translation format", "Facilitator"]);
     expect(text(a.querySelector("aside h2.h3")!)).toBe("Add a filter");
     expect(text(a)).toContain("Workspace and project are filters like any other. The Workspace and Project pages are the same table with those filters saved.");
@@ -258,6 +258,15 @@ describe("Explore data adapts through the current UI's level function (ui/assess
       const l = (r.lenses as Record<string, { score: number; responses: number }> | null)?.[k];
       if (l) expect({ strong: "Strong", growing: "Growing", support: "Needs support", urgent: "Needs urgent attention", more: "More input needed" }[levelOf(l) as string]).toBe(v3ScoreBand(l.score, l.responses));
     }
+  });
+  it("Codex P1 4384112230: the table footer's assurance follows the served level minimum (design-system.md:609 @c4bd0164)", () => {
+    const ONE = "Nothing here names a participant; a level shown with one response reflects that person's answers.";
+    expect([tableAssurance(1), tableAssurance(3), tableAssurance(5)]).toEqual([ONE, "Nothing here identifies a participant: a level shows only with at least 3 responses.", "Nothing here identifies a participant: a level shows only with at least 5 responses."]);
+    const foot = (m: number) => { useLevelMinimum(m); const a = mount(Explore, {}); return text(a.querySelector(".tbl-foot > span:last-child")!); };
+    expect(foot(1)).toBe(ONE); // DEV: never "nothing identifies" beside a one-response level
+    expect(foot(3)).toBe(tableAssurance(3));
+    expect(text(mount(Explore, { data: { ...explore, levelMinimum: 1 } }).querySelector(".tbl-foot > span:last-child")!)).toBe(ONE); // a live model's own value
+    useLevelMinimum(undefined);
   });
   it("phoneRows: the cue beside a phone row's team level counts the team, never another perspective; none carried is null", () => {
     // 9 team, 10 community, 5 church: the team level sits beside the team's 9, not the church's 5 (Codex P2 4383879651)
@@ -433,7 +442,7 @@ describe("the pinned 8.7 Explore-lane rows (ui-next/design-source/PIN a594830, b
     const card = grid.querySelector("section.glass.l-card.tbl-wrap[data-pad=table]")!;
     expect(card.getAttribute("tabindex")).toBe("0");
     expect(card.querySelector(":scope > table.tbl")).not.toBeNull();
-    expect(text(card.querySelector(":scope > .l-row.tbl-foot")!)).toContain("Nothing here identifies a participant.");
+    expect(text(card.querySelector(":scope > .l-row.tbl-foot")!)).toContain("Nothing here identifies a participant: a level shows only with at least 3 responses.");
     expect(a.querySelectorAll(".chip[data-on]").length).toBe(4);
     expect(a.querySelector(".seg[data-inline]")).not.toBeNull();
     expect(a.querySelector(".sel[data-size=compact] select")).not.toBeNull();

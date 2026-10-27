@@ -15,7 +15,7 @@
 //     FeedbackPhone.dc.html (phone page); "from" is the page and review the dialog names.
 import { v3ScoreBand, V3_STAGES } from "../../../../ui/assess/v3-assessment.js";
 import { LEVELS } from "../../Level.svelte";
-import { levelOf as bandLevel } from "../results/data.js";
+import { levelOf as bandLevel, currentLevelMin } from "../results/data.js";
 
 // Band word (v3ScoreBand) -> Level key (Level.svelte, design-system.md section 2 Level row).
 const BAND_TO_LEVEL = Object.freeze(Object.fromEntries(Object.entries(LEVELS).map(([key, word]) => [word, key])));
@@ -63,6 +63,12 @@ export function matchCounts(rows) {
   return { reviews: rows.length, projects: distinct("project"), languages: distinct("language") };
 }
 
+/** The Explore table footer's assurance by the served level minimum (Codex P1 4384112230; design-system.md:609 @c4bd0164, the same
+ *  policy as Help's Privacy topic and the report footer): at 1 a level shown with one response is that person's answers, so the
+ *  footer never claims nothing identifies a participant; at N or more, the level shows only with at least N responses. */
+export const tableAssurance = (min = currentLevelMin()) => (min === 1
+  ? "Nothing here names a participant; a level shown with one response reflects that person's answers."
+  : `Nothing here identifies a participant: a level shows only with at least ${min} responses.`);
 /** A perspective's response count, or null when none is carried (the cue then reads "responses not counted"). */
 const countOf = (lens) => (Number.isInteger(lens?.responses) && lens.responses >= 0 ? lens.responses : null);
 /** Phone list rows: one level per row (the boards draw the translation-team level) and, under it, that same perspective's count
