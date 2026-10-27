@@ -1064,7 +1064,7 @@ function resetIdentity() {
   accountBusy = false; accountControls(false); accountStatus();
   document.getElementById('account-switch-dialog')?.close(); document.getElementById('account-name-dialog')?.close();
   document.getElementById('feedback-dialog')?.remove(); // S54/rev444: the in-place feedback dialog belongs to the old identity
-  state.share = null; state.collectLinks.clear(); state.principal = null; state.accountEmail = ''; state.projects = []; state.current = null; state.templates = null;
+  state.share = null; state.collectLinks.clear(); state.principal = null; state.levelMinimum = undefined; state.accountEmail = ''; state.projects = []; state.current = null; state.templates = null;
   state.openProjects.clear(); state.lists.clear(); state.workspaces.clear(); state.inflight.clear(); state.seq.clear();
   state.counts.clear(); state.countInflight.clear(); state.dirty.clear(); state.message = null; state.print = null; state.busy = false; state.myInvitations = null; printLangs.clear();
   if (kit) syncShell(); else if (app) app.innerHTML = ''; if (note) note.textContent = ''; if (who) who.textContent = 'Checking session…';
@@ -1115,7 +1115,7 @@ async function boot() {
   placeDemoNotice();
   const identity = identityGeneration;
   const linksKnown = loadEmailLinks();
-  try { const me = await api('/v2/me'); if (identity !== identityGeneration) return; state.principal = me.principal; syncAccessSwitch(me.principal); if (!demo) state.collectLinks = share.tabLinks(tabStorage, me.principal?.id, state.collectLinks); } // gate 0.23.0 E: this tab's active links survive a reload
+  try { const me = await api('/v2/me'); if (identity !== identityGeneration) return; state.principal = me.principal; state.levelMinimum = me.level_minimum_responses; syncAccessSwitch(me.principal); if (!demo) state.collectLinks = share.tabLinks(tabStorage, me.principal?.id, state.collectLinks); } // gate 0.23.0 E: this tab's active links survive a reload
   catch {
     if (identity !== identityGeneration) return;
     landAfterSignIn = false; // B04: no session observed, nothing to land

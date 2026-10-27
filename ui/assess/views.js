@@ -8,7 +8,7 @@ import { reportBuildMarkup, bindReportBuild } from './report-build.js';
 import { renderReport } from '../report-view.js';
 import { lensesAgreeMarkup } from '../report-lenses.js'; // lenses agree / disagree block, overview + full report
 import { learnMore } from '../v3/components/learn-more.js'; // lane 9 L9-24: shared closed-by-default disclosure
-import { v3CountLine, v3BandsMarkup, v3ReportScores, v3EvidenceRows, v3EvidenceMarkup, v3StageWord, V3_FLAGS, v3css, v3ReviewGateMarkup, v3SetStage, V3_SET_STAGE, V3_NEXT, v3HeldText, V3_REPORTS_HELD, V3_REPORT_HELD, V3_BAND_CUTOFFS, V3_SUGGEST, v3SuggestedAreas, v3NextParse, v3NextSerialize, askStageMove } from './v3-assessment.js'; // v3 lane 3 (rulings a/b/c) // relative: resolves at /report-view.js in the browser and under node --test
+import { v3CountLine, v3BandsMarkup, v3ReportScores, v3EvidenceRows, v3EvidenceMarkup, v3StageWord, V3_FLAGS, v3css, v3ReviewGateMarkup, v3SetStage, V3_SET_STAGE, V3_NEXT, v3HeldText, V3_REPORTS_HELD, V3_REPORT_HELD, V3_BAND_CUTOFFS, v3LevelMinimum, V3_SUGGEST, v3SuggestedAreas, v3NextParse, v3NextSerialize, askStageMove } from './v3-assessment.js'; // v3 lane 3 (rulings a/b/c) // relative: resolves at /report-view.js in the browser and under node --test
 
 export const LENSES = ['Translation Team', 'Church', 'Community'];
 const OTHER = 'Other perspective';
@@ -60,14 +60,21 @@ const isEditor = role => role === 'owner' || role === 'member';
 // B35 (lanes-1321): bands come from a built report. While none is built and some perspective already has enough responses
 // (the provisional minimum), the band block itself offers the one next action; it opens the SAME preview → confirm as
 // "Preview report build" (closed behind Technical details, U32), shown right here in the band block (never builds without the confirm).
-export function buildResultsCta(m, lensGroups, esc) {
+// Codex P2 4384990149: the minimum is the server's served level minimum (levelMinimumFor), else the safe 3.
+export function buildResultsCta(m, lensGroups, esc, min = V3_BAND_CUTOFFS.minResponses) {
   if (m.bandScores || m.resultsBuilt || !isEditor(m.role)) return '';
   // Bugbot 4108654385: offered only when the report list is known and empty; an existing report (or an unknown list) never
   // invites a second immutable build.
   const rv = m.reports?.status === 'loaded' ? m.reports.value : null;
   if (!rv || rv.suppressed || rv.status === 'held' || !Array.isArray(rv.reports) || rv.reports.length) return '';
-  const min = V3_BAND_CUTOFFS.minResponses, ready = Object.values(lensGroups || {}).some(g => (g?.responses || 0) >= min);
+  const ready = Object.values(lensGroups || {}).some(g => (g?.responses || 0) >= min);
   return ready ? `<div data-results-build-wrap><p class="actions"><button type="button" class="primary" data-results-build>Build the results</button></p><div data-results-preview></div></div>` : '';
+}
+// Codex P2 4384990149: the per-perspective level minimum the server serves (DEV 1, otherwise 3), read from the /results payload
+// this view already loads, else the session's GET /v2/me value (assess.js boot), else the safe 3. Mirrors ui-next useLevelMinimum.
+export function levelMinimumFor(results, ctx) {
+  const served = results?.status === 'loaded' ? results.value?.level_minimum_responses : undefined;
+  return Number.isInteger(served) && served >= 1 ? served : v3LevelMinimum(ctx?.state?.levelMinimum);
 }
 const activeSurveys = surveys => (surveys || []).filter(s => s.state === 'selected' && !s.archived_at);
 const lensFor = s => LENSES.includes(s.perspective) ? s.perspective : OTHER;
@@ -133,9 +140,9 @@ const understand = {
     // v3 U2: per-perspective server counts on each band card (Bincy screen 10 group counts) + evidence toggle and table.
     const lensGroups = Object.fromEntries(LENSES.map(lens => { const ss = m.surveys.filter(s => lensFor(s) === lens), ld = ss.filter(s => m.counts.get(s.id)?.status === 'loaded');
       return [lens, { surveys: ss.length, loaded: ld.length, responses: ld.reduce((n, s) => n + m.counts.get(s.id).responses, 0) }]; }));
-    const ev = v3EvidenceMarkup(v3EvidenceRows(m.results.value, LENSES, lensGroups, m.bandScores), !!m.showEvidence, esc);
-    const cta = buildResultsCta(m, lensGroups, esc); // U41: while offered, "Build the results" is the one primary; the gate steps back
-    const bands = V3_FLAGS.bandResults && (m.results.status === 'loaded' || m.bandScores) ? `<section class="panel v3-summary" data-v3-results><style>${v3css}</style><div class="row"><div><p class="eyebrow">Results</p><h2>What the perspectives say</h2></div><span class="badge" data-v3-state>${esc(v3StageWord(ctx.current?.assessment?.stage))}</span>${ev.btn}</div>${lensesAgreeMarkup(m.bandReport, esc)}${v3BandsMarkup(m.results.value, LENSES, esc, lensGroups, m.bandScores)}${cta}<p class="status" role="status" aria-live="polite" data-results-status></p>${ev.table}${v3ReviewGateMarkup(ctx.current?.assessment?.stage, m.role, esc, { primary: !cta })}</section>` : '';
+    const min = levelMinimumFor(m.results, ctx), ev = v3EvidenceMarkup(v3EvidenceRows(m.results.value, LENSES, lensGroups, m.bandScores, min), !!m.showEvidence, esc);
+    const cta = buildResultsCta(m, lensGroups, esc, min); // U41: while offered, "Build the results" is the one primary; the gate steps back
+    const bands = V3_FLAGS.bandResults && (m.results.status === 'loaded' || m.bandScores) ? `<section class="panel v3-summary" data-v3-results><style>${v3css}</style><div class="row"><div><p class="eyebrow">Results</p><h2>What the perspectives say</h2></div><span class="badge" data-v3-state>${esc(v3StageWord(ctx.current?.assessment?.stage))}</span>${ev.btn}</div>${lensesAgreeMarkup(m.bandReport, esc)}${v3BandsMarkup(m.results.value, LENSES, esc, lensGroups, m.bandScores, min)}${cta}<p class="status" role="status" aria-live="polite" data-results-status></p>${ev.table}${v3ReviewGateMarkup(ctx.current?.assessment?.stage, m.role, esc, { primary: !cta })}</section>` : '';
     // (3) Reports: server-owned eligibility and provenance; preview never writes a report.
     let reports;
     if (m.reports.status === 'loaded') {
@@ -255,7 +262,7 @@ async function suggestedAreas(ctx, aid) {
   const counts = await Promise.all(surveys.map(s => settle(ctx.api(`/v2/assessments/${ctx.enc(aid)}/surveys/${ctx.enc(s.id)}`)).then(r => [s, r])));
   const groups = Object.fromEntries(LENSES.map(lens => { const cs = counts.filter(([s]) => lensFor(s) === lens), ld = cs.filter(([, r]) => r.status === 'loaded');
     return [lens, { surveys: cs.length, loaded: ld.length, responses: ld.reduce((n, [, r]) => n + Number(r.value?.counts?.responses ?? 0), 0) }]; }));
-  const areas = v3SuggestedAreas(scores, LENSES, groups);
+  const areas = v3SuggestedAreas(scores, LENSES, groups, levelMinimumFor(null, ctx)); // the session's /v2/me minimum; no extra /results read
   return { status: areas.length ? 'loaded' : 'none', areas };
 }
 // Ticks, Other and the complete mark are saved with the notes (one PATCH): the trailer lives in notes_next_steps.
