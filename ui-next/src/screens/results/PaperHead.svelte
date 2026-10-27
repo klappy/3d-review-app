@@ -1,10 +1,9 @@
-<!-- UI Next (v4) results lane: report sheet head (Report.dc.html, ReportDetailed.dc.html page 1): title and meta line with the 40px
-     brand mark at the top right (.l-row[data-split][data-align=start], 8.1 + 8.7 rows: the board's flex space-between, flex-start), then
-     one bordered perspective box per lens (accent bar from .l-card[data-lens]; .l-card[data-pad=bar] 12/16, the nearest contract pad to
-     the board's 14px inline) with its coverage cue (drops + count, Coverage.svelte) and level. Paper scope (design-system.md 1.3). Status: provisional. -->
+<!-- UI Next (v4) results lane: report sheet head (Report.dc.html, ReportDetailed.dc.html page 1). Paper sheet contents (design-system.md
+     §8.11 row, provisional): .paper-title-row (flex, space-between, start) > the title and meta (.paper-title, .sheet-meta) with the 40px
+     brand mark at the top right; then .sheet-tiles (three columns, gap 14) > one .sheet-tile[data-lens] per perspective: its name
+     (.sheet-tile-name), the coverage cue (drops + count, Coverage.svelte) and its level (.sheet-tile-level). The title keeps its heading
+     role (role=heading, level 1) on the board's div. No inline type or spacing. Paper scope (design-system.md 1.3). Status: provisional. -->
 <script>
-  import Stack from "../../Stack.svelte";
-  import Grid from "../../Grid.svelte";
   import Level from "../../Level.svelte";
   import Mark from "../../Mark.svelte";
   import Coverage from "./Coverage.svelte";
@@ -12,13 +11,13 @@
   let { review, cards, kind } = $props();
 </script>
 
-<div class="l-row" data-gap="4" data-split data-align="start">
-  <Stack gap={1}>
-    <h1 class="title-page ptitle">{review.title}</h1>
-    <p class="small">{review.project} · {review.language} · 3D Review {kind} · {review.closedLong ? `closed ${review.closedLong}` : "collection closed"} · {snapshotTotal(cards)} responses</p><!-- the report's own total: the sum of the counts below -->
-  </Stack>
+<div class="paper-title-row">
+  <div>
+    <div class="paper-title" role="heading" aria-level="1">{review.title}</div>
+    <div class="sheet-meta">{review.project} · {review.language} · 3D Review {kind} · {review.closedLong ? `closed ${review.closedLong}` : "collection closed"} · {snapshotTotal(cards)} responses</div><!-- the report's own total: the sum of the counts below -->
+  </div>
   <Mark size={40} />
 </div>
-<Grid cols={3} gap={3}>
-  {#each cards as c (c.lens)}<div class="solid l-card l-stack" data-pad="bar" data-lens={c.lens} data-gap="2"><span class="h3">{c.label}</span><Coverage n={c.n} /><Level level={c.level} /></div>{/each}
-</Grid>
+<div class="sheet-tiles">
+  {#each cards as c (c.lens)}<div class="sheet-tile" data-lens={c.lens}><div class="sheet-tile-name">{c.label}</div><Coverage n={c.n} /><div class="sheet-tile-level"><Level level={c.level} /></div></div>{/each}
+</div>

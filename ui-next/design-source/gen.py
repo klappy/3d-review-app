@@ -184,6 +184,60 @@ html:has(dialog[open]:modal){overflow:hidden}
 .barbell-row{display:grid;grid-template-columns:220px minmax(0,1fr) 220px;gap:20px;align-items:center}.glass.barbell-row{border-radius:var(--radius-l);padding:18px 24px 24px}
 .paper .barbell-row>.bb-label{font-size:var(--t-13);font-weight:600;color:var(--ink)}.paper .barbell-row>.bb-verdict{font-size:var(--t-12);color:var(--ink-2)}/* paper barbell label and verdict (cook-cue-boards-1800; V-34 tokens, was #555) */
 .paper .barbell-row{grid-template-columns:180px minmax(0,1fr) 150px;gap:14px;min-height:56px}.paper .barbell-row[data-kind=score]{min-height:48px}
+/* §2 Paper sheet classes (cook-cue-boards-1800, provisional; rule 16 sweep of every inline type/spacing style inside .paper on Report,
+   ReportDetailed, the phone report views and ActionPlan; values are the boards' own, unchanged). Only value-driven left/width % stay inline. */
+.paper .paper-title-row{display:flex;justify-content:space-between;align-items:flex-start}
+.paper .paper-title{font-family:Newsreader, ui-serif, serif;font-size:var(--t-36);line-height:36px}
+.paper .sheet-meta{font-size:var(--t-13);color:var(--ink-2);margin-top:6px}
+.paper .sheet-tiles{display:grid;grid-template-columns:repeat(3, minmax(0, 1fr));gap:14px}
+.paper .sheet-tile{border:1px solid #ddd;border-radius:var(--radius-m);padding:14px;border-top:var(--accent-bar) solid var(--lens)}
+.paper .sheet-tile-name{font-weight:650}
+.paper .sheet-tile-level{margin-top:8px}
+.paper .nowrap{white-space:nowrap}
+.paper .score-track{position:relative;height:40px}
+.paper .score-line{position:absolute;left:0;right:0;top:19px;height:2px;background:#e3e8ec;border-radius:var(--radius-hair)}
+.paper .bb-legend{display:flex;gap:14px;margin-top:6px}
+.paper .legend-item{display:inline-flex;align-items:center;gap:6px;font-size:var(--t-12)}
+.paper .bb-legend-dot{width:12px;height:12px;border-radius:50%;background:var(--lens);border:2px solid #fff;box-shadow:0 0 0 1px #c9d2da}
+.paper .bb-legend-note{font-size:var(--t-12);color:var(--ink-2);margin-left:auto}
+.paper .radar-label{font-size:var(--t-11)}
+.paper .radar-dot{width:10px;height:10px;border-radius:50%;background:var(--lens)}
+.paper .radar-row{display:grid;grid-template-columns:420px 1fr;gap:16px;align-items:center}
+.paper .svg-visible{overflow:visible}
+.paper .radar-side{display:flex;flex-direction:column;gap:10px}
+.paper .radar-legend{display:flex;gap:14px;flex-wrap:wrap}
+.paper .sheet-text{font-size:var(--t-13);line-height:20px;color:var(--ink)}
+.paper .sheet-head{font-weight:650;font-size:var(--t-15);margin-bottom:6px}
+.paper .sheet-text[data-v="14"]{font-size:var(--t-14);line-height:22px}
+.paper .sheet-head[data-v="2"]{font-weight:650;font-size:var(--t-15);margin-bottom:2px}
+.paper .sheet-head[data-v="4"]{font-weight:650;font-size:var(--t-15);margin-bottom:4px}
+.paper .sheet-head[data-v="8"]{font-weight:650;font-size:var(--t-15);margin-bottom:8px}
+.paper .sheet-head[data-v="0"]{font-weight:650;font-size:var(--t-15);margin-bottom:0}
+.paper .sheet-lead{font-size:var(--t-12);color:var(--ink-2);margin-bottom:8px}
+.paper .sheet-list{margin:0;padding-left:20px;font-size:var(--t-14);line-height:22px}
+.paper .plan-row{display:grid;grid-template-columns:24px 1fr 90px;gap:12px;align-items:center;min-height:36px;border-top:1px solid #eee;font-size:var(--t-13)}
+.paper .plan-check{display:inline-grid;place-content:center;width:18px;height:18px;border:1.5px solid #333;border-radius:var(--radius-s);font-size:var(--t-12)}
+.paper .plan-gap{text-align:right;color:var(--ink-2)}
+.paper .plan-cols{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.paper .plan-tile{border:1px solid #ddd;border-radius:var(--radius-m);padding:12px 14px;border-top:var(--accent-bar) solid var(--lens)}
+.paper .plan-tile-name{font-weight:650;font-size:var(--t-13)}
+.paper .plan-tile-level{margin-top:6px}
+.paper .plan-notes{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+.paper .plan-note{font-size:var(--t-13);line-height:20px;border:1px solid #ddd;border-radius:var(--radius-m);padding:12px 14px;min-height:90px}
+.paper .plan-dates{display:grid;grid-template-columns:repeat(3, minmax(0, 1fr));gap:14px;font-size:var(--t-13)}
+.paper .plan-dt{color:#666;font-size:var(--t-11);text-transform:uppercase;letter-spacing:.04em}
+.paper .plan-dd{font-weight:650;margin-top:2px}
+.paper .mono{font-family:ui-monospace, Menlo, monospace}
+.paper .plan-share{border:1px solid #ddd;border-radius:var(--radius-m);padding:12px 14px;display:grid;grid-template-columns:1fr 72px;gap:12px;align-items:center;font-size:var(--t-12);color:var(--ink)}
+.paper .score-val{position:absolute;top:-5px;transform:translateX(-50%);font-size:var(--t-11);font-weight:650;color:var(--ink)}
+.paper .score-track>.pt{top:11px;width:18px;height:18px;margin-left:-9px;border:3px solid #fff;box-shadow:0 0 0 1px #c9d2da}
+.paper .score-band{position:absolute;top:17px;height:6px;border-radius:var(--radius-hair);background:#c9d2da}.paper .score-band[data-wide]{background:var(--b-urgent)}
+.paper .band-track>.pt{top:11px;width:18px;height:18px;margin-left:-9px;border:3px solid #fff;box-shadow:0 0 0 1px #c9d2da}
+.paper .band-sep{position:absolute;top:14px;width:1px;height:12px;background:var(--line-2)}
+.paper .band-span{position:absolute;top:17px;height:6px;border-radius:var(--radius-hair);background:var(--line-2);opacity:.8}.paper .band-span[data-wide]{background:var(--b-urgent)}
+.paper .band-line{position:absolute;left:0;right:0;top:19px;height:2px;background:var(--line);border-radius:var(--radius-hair)}
+.paper .bb-na{color:var(--ink-3)}
+.lvl>.lvl-word{color:var(--ink)}/* the level word beside its glyph (was meter() inline, cook-cue-boards-1800) */
 .l-main[data-rhythm=center]{justify-content:center;padding:var(--sp-6) var(--gutter)}/* §8.2 a single-card page centred in the viewport (SignInCheck; Invitations) */
 .icn[data-size="28"],.app .icn.icn-lens.su-icn-s{width:28px;height:28px;border-radius:var(--radius-s)}/* §2 lens chip on a project card (36/56/64 are the participant rows) */
 .av[data-size="28"]{width:28px;height:28px;font-size:var(--t-11);border-radius:var(--radius-s)}.av[data-logo]{border:1.5px dashed var(--field-edge);background:var(--field);color:var(--ink-3);letter-spacing:.04em;text-transform:uppercase}/* §2 organisation mark: the logo slot, else the initial */
@@ -501,7 +555,7 @@ def meter(level):
     cls = 'meter gap' if on == 0 else 'meter'
     bars = ''.join(f'<b{" class=on" if i < on else ""}></b>' for i in range(4))
     return (f'<span class="lvl" data-level="{LEVEL_KEY[level]}"><span class="g g-bars {cls}" aria-hidden="true">{bars}</span><span class="g g-faces" aria-hidden="true">{glyph_face(on)}</span>'
-            f'<span class="g g-jars" aria-hidden="true">{glyph_jar(on)}</span><span class="g g-plants" aria-hidden="true">{glyph_plant(on)}</span><span style="color: var(--ink)">{level}</span></span>')
+            f'<span class="g g-jars" aria-hidden="true">{glyph_jar(on)}</span><span class="g g-plants" aria-hidden="true">{glyph_plant(on)}</span><span class="lvl-word">{level}</span></span>')
 
 # §2 Coverage cue (status: provisional): drawn exactly as app ui-next/src/screens/results/Coverage.svelte @24af049 with the tiers of
 # results/data.js coverageOf (0 No drops yet · 1-2 A few drops · 3-5 Filling up · 6+ Well filled · None not counted, no word).
@@ -589,15 +643,15 @@ def band_barbell(area, who, scores, paper=False, phone=False):
     apart = hi - lo
     verdict = 'same band' if apart == 0 else ('1 band apart' if apart == 1 else f'{apart} bands apart — talk about this')
     ink = 'var(--ink)'; line = 'var(--line-2)'; soft = 'var(--line)'
-    dots = ''.join(f'<span class="pt" data-lens="{k}" style="left: {pos[k]}%; top: {"11px" if paper else "18px"};{" width: 18px; height: 18px; margin-left: -9px; border: 3px solid #fff; box-shadow: 0 0 0 1px #c9d2da;" if paper else ""}" role="img" aria-label="{dict(LENS_NAMES)[k]} · {b}" title="{dict(LENS_NAMES)[k]} · {b}"></span>' for k, b in pts)
+    dots = ''.join(f'<span class="pt" data-lens="{k}" style="left: {pos[k]}%{"" if paper else "; top: 18px;"}" role="img" aria-label="{dict(LENS_NAMES)[k]} · {b}" title="{dict(LENS_NAMES)[k]} · {b}"></span>' for k, b in pts)
     # §2 Band-barbell label row (cook-cue-boards-1800, provisional; QA-LIVE Q11): HTML, not SVG text, under the axis; the full
     # glossary level words in four equal quarters, wrapping to as many lines as a word needs (longest and translated lengths)
     labels = '<div class="band-labels" aria-hidden="true">' + ''.join(f'<span>{b}</span>' for b in BANDS) + '</div>'
-    seps = ''.join(f'<span style="position: absolute; left: {25 * i}%; top: {"14px" if paper else "22px"}; width: 1px; height: {"12px" if paper else "14px"}; background: {line}"></span>' for i in range(1, 4))
-    band = f'<span style="position: absolute; top: {"17px" if paper else "27px"}; height: 6px; border-radius: var(--radius-hair); left: {12.5 + 25 * lo}%; width: {25 * (hi - lo)}%; background: {"var(--b-urgent)" if apart >= 2 else line}; opacity: .8"></span>' if apart else ''
-    axis = (f'<div class="band-axis"><div class="band-track"><span style="position: absolute; left: 0; right: 0; top: {"19px" if paper else "29px"}; height: 2px; background: {soft}; border-radius: var(--radius-hair)"></span>{seps}{band}{dots}</div>{labels}</div>')
+    seps = ''.join((f'<span class="band-sep" style="left: {25 * i}%"></span>' if paper else f'<span style="position: absolute; left: {25 * i}%; top: 22px; width: 1px; height: 14px; background: {line}"></span>') for i in range(1, 4))
+    band = ((f'<span class="band-span"{" data-wide" if apart >= 2 else ""} style="left: {12.5 + 25 * lo}%; width: {25 * (hi - lo)}%"></span>' if paper else f'<span style="position: absolute; top: 27px; height: 6px; border-radius: var(--radius-hair); left: {12.5 + 25 * lo}%; width: {25 * (hi - lo)}%; background: {"var(--b-urgent)" if apart >= 2 else line}; opacity: .8"></span>') if apart else '')
+    axis = (f'<div class="band-axis"><div class="band-track">{'<span class="band-line"></span>' if paper else f'<span style="position: absolute; left: 0; right: 0; top: 29px; height: 2px; background: {soft}; border-radius: var(--radius-hair)"></span>'}{seps}{band}{dots}</div>{labels}</div>')
     notasked = [dict(LENS_NAMES)[k] for k, v in scores.items() if v is None]
-    na = (f'<span class="small" style="color: var(--ink-3)"> · {", ".join(notasked)} not asked</span>' if notasked else '')
+    na = ((f'<span class="small bb-na"> · {", ".join(notasked)} not asked</span>' if paper else f'<span class="small" style="color: var(--ink-3)"> · {", ".join(notasked)} not asked</span>') if notasked else '')
     if phone:  # R37: axis full card width, verdict below it (no desktop 220px columns)
         return (f'<div style="display: flex; flex-direction: column; gap: 4px">{axis}<span class="small"><strong style="color: var(--ink)">{verdict}</strong></span><span class="small">{" · ".join(dict(LENS_NAMES)[k] + " " + b for k, b in pts)}{na}</span></div>')
     if paper:

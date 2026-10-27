@@ -79,8 +79,12 @@ const oddReport = () => {
     { construct_name: 42, lens_scores: [{ lens: "team", score: 60 }, { lens: "church", score: 68 }] }];
   return D;
 };
+// Paper sheet contents (design-system.md §8.11 row @697c974d): a sheet's title and section heads are the board's divs carrying the
+// heading role (level 1 / 2), so a level-1 heading is an h1 or [role=heading][aria-level="1"].
+const H1 = "h1, [role=heading][aria-level='1']";
+const SHEET_H2 = ".paper [role=heading][aria-level='2']";
 // R4-5: a sheet heading followed by nothing (or only the page foot) is an empty section.
-const emptyHeadings = (a: Element) => [...a.querySelectorAll(".paper h2")].filter((h) => !h.nextElementSibling || h.nextElementSibling.matches(".pfoot")).map(text);
+const emptyHeadings = (a: Element) => [...a.querySelectorAll(SHEET_H2)].filter((h) => !h.nextElementSibling || h.nextElementSibling.matches(".pfoot")).map(text);
 const attrs = (a: Element) => [...a.querySelectorAll("*")].flatMap((el) => [...el.attributes].map((x) => x.value)).join(" ");
 const store = () => { const m = new Map<string, string>(); return { getItem: (k: string) => m.get(k) ?? null, setItem: (k: string, v: string) => void m.set(k, v), removeItem: (k: string) => void m.delete(k) }; };
 
@@ -286,7 +290,7 @@ describe("each board renders as a screen", () => {
     expect(all(a, ".tab")).toEqual(["Prepare", "Collect", "3UnderstandNow", "4Improve"]);
     expect(text(a.querySelector(".tab[aria-current=page]"))).toBe("3UnderstandNow");
     expect(all(a, ".glass[data-lens] .h2")).toEqual(["Translation team", "Community", "Church"]);
-    expect(all(a, ".glass[data-lens=church] .lvl-name")).toEqual(["Growing", "Growing", "Needs support", "Strong", "Strong", "Growing", "More input needed"]);
+    expect(all(a, ".glass[data-lens=church] .lvl-word")).toEqual(["Growing", "Growing", "Needs support", "Strong", "Strong", "Growing", "More input needed"]);
     expect(text(a)).toContain("Where the perspectives disagree");
     expect(all(a, "a.btn")).toEqual(expect.arrayContaining(["Overview report · 1 page", "Detailed report · 4 pages", "Share results with someone"]));
     const del = a.querySelector(".menu button.mi.danger")!;
@@ -453,7 +457,7 @@ describe("each board renders as a screen", () => {
     expect(text(a)).toContain("Results are held until every perspective has enough answers");
     expect(text(a)).toContain("Church has 0 of 1.");
     expect(all(a, ".glass-hi .small").filter((t) => / — /.test(t))).toEqual(["Translation team 6 — ready", "Community 8 — ready", "Church 0 — needs 1 more"]);
-    expect(all(a, ".glass[data-lens=church] .lvl-name")).toEqual(["More input needed", "More input needed", "More input needed", "More input needed"]);
+    expect(all(a, ".glass[data-lens=church] .lvl-word")).toEqual(["More input needed", "More input needed", "More input needed", "More input needed"]);
     expect(text(a.querySelector(".btn-primary"))).toBe("Reopen collection");
     const grid = a.querySelector(".l-grid[data-state=held]")!; // F4: dimmed by the contract row, and inert
     expect(grid.hasAttribute("inert")).toBe(true);
@@ -478,8 +482,8 @@ describe("each board renders as a screen", () => {
     const a = mount(Report);
     expect(a.querySelector("header.top[data-variant=document]")).not.toBeNull();
     expect(a.querySelectorAll("main > .paper[data-sheet=a4]").length).toBe(1); // 8.11 sheet row, no .l-card padding
-    expect(a.querySelector(".paper .l-row[data-split][data-align=start] > svg.mk[width='40']")).not.toBeNull(); // F3: the 40px mark top right
-    expect(all(a, ".paper .solid[data-lens] .lvl-name")).toEqual(["Growing", "Needs support", "Growing"]);
+    expect(a.querySelector(".paper .paper-title-row > svg.mk[width='40']")).not.toBeNull(); // F3: the 40px mark top right (.paper-title-row, §8.11)
+    expect(all(a, ".paper .sheet-tile[data-lens] .sheet-tile-level .lvl-word")).toEqual(["Growing", "Needs support", "Growing"]);
     expect(all(a, ".paper ol li")).toEqual(["Community · Impactful — Needs urgent attention", "Community · Understandable — Needs urgent attention", "Translation team · External review — Needs support"]);
     expect(text(a.querySelector(".pfoot"))).toContain("1 of 1");
     // N2: a space on both sides of the middot before "not asked"
@@ -489,7 +493,9 @@ describe("each board renders as a screen", () => {
     expect(a.querySelector(".paper .l-grid[data-tpl=barbell]")).toBeNull();
     // its label and verdict are span.bb-label / span.bb-verdict (13px 600 / 12px, design-system.md:747 @c9dfe1ff): never .small on paper
     expect([...a.querySelectorAll(".paper .barbell-row")].every((r) => r.children[0].matches("span.bb-label") && r.children[2].matches("span.bb-verdict"))).toBe(true);
-    expect(a.querySelectorAll(".paper .barbell-row .small").length).toBe(0);
+    // the only .small in a paper row is the board's not-asked note, span.small.bb-na inside the verdict (design-system.md:861 @697c974d)
+    expect(a.querySelectorAll(".paper .barbell-row .small:not(.bb-na)").length).toBe(0);
+    expect([...a.querySelectorAll(".paper .bb-na")].map((n) => [n.tagName, n.parentElement!.className, text(n)])).toEqual([["SPAN", "bb-verdict", "· Community not asked"]]);
     expect(text(a)).not.toMatch(/\S· /);
   });
   it("ReportDetailed: four sheets, radar, numeric barbells, evidence tables", () => {
@@ -505,7 +511,7 @@ describe("each board renders as a screen", () => {
     expect(all(a, ".pfoot span:last-child")).toEqual(["1 of 4", "2 of 4", "3 of 4", "4 of 4"]);
     expect(a.querySelectorAll(".paper[data-sheet=page]").length).toBe(4);
     expect(a.querySelector("svg[role=img][aria-label^='Radar']")).not.toBeNull();
-    expect(a.querySelectorAll("svg[data-part=score-barbell]").length).toBe(3 + 7);
+    expect(a.querySelectorAll(".paper .score-track").length).toBe(3 + 7);
     expect(all(a, "table").length).toBe(3);
     expect(all(a, ".ev-table th")).toContain("Observation");
     // N2: the notes after "gap n" keep the space before the middot
@@ -515,7 +521,7 @@ describe("each board renders as a screen", () => {
   });
   it("ReportDetailed with held counts: church's score reaches no gap, tensions order, radar or table cell (R3-1)", () => {
     const a = mount(ReportDetailed, { report: heldReport() });
-    expect(a.querySelectorAll("svg[data-part=score-barbell] g[data-lens=church]").length).toBe(0);
+    expect(a.querySelectorAll(".score-track > .pt[data-lens=church]").length).toBe(0);
     const radarSvg = a.querySelector("svg[role=img][aria-label^='Radar']")!;
     expect(radarSvg.getAttribute("aria-label")).toBe("Radar of Translation team, Community across 3 shared areas");
     expect(radarSvg.querySelectorAll("[data-lens=church]").length).toBe(0);
@@ -530,24 +536,24 @@ describe("each board renders as a screen", () => {
     expect(leads).toContain("too few perspectives to compare · Church more input needed · Community not asked");
     expect(text(a)).not.toMatch(/gap null|undefined|NaN/);
     expect(attrs(a)).not.toMatch(/gap null|undefined|NaN/);
-    expect(a.querySelectorAll("h1").length).toBe(1);
+    expect(a.querySelectorAll(H1).length).toBe(1);
   });
   it("Report and ReportDetailed render a payload without a perspective or area (R3-3: never a blank page)", () => {
     const D = withoutChurch();
     const r = mount(Report, { report: D });
-    expect(r.querySelectorAll("h1").length).toBe(1);
-    expect(all(r, ".paper .solid[data-lens] .h3")).toEqual(["Translation team", "Community"]);
+    expect(r.querySelectorAll(H1).length).toBe(1);
+    expect(all(r, ".paper .sheet-tile[data-lens] > .sheet-tile-name")).toEqual(["Translation team", "Community"]);
     expect(all(r, ".paper ol li")).toEqual(["Community · Impactful — Needs urgent attention", "Community · Understandable — Needs urgent attention", "Translation team · External review — Needs support"]);
-    expect(r.querySelectorAll("svg[data-part=band-barbell]").length).toBe(4);
+    expect(r.querySelectorAll(".paper .band-track").length).toBe(4);
     const d = mount(ReportDetailed, { report: D });
-    expect(d.querySelectorAll("h1").length).toBe(1);
+    expect(d.querySelectorAll(H1).length).toBe(1);
     // two perspectives: three sheets, no empty "(continued)" page; their words close page 3 (R4-5)
     expect(d.querySelectorAll(".paper[data-sheet=page]").length).toBe(3);
     expect(all(d, ".pfoot span:last-child")).toEqual(["1 of 3", "2 of 3", "3 of 3"]);
     expect(text(d.querySelector("header[data-variant=document]"))).toContain("Detailed report · 3 pages");
     expect(text(d)).not.toContain("(continued)");
-    expect(all(d, ".paper[data-sheet=page]:last-child h2")).toEqual(["Every area, with evidence", "In their words"]);
-    expect(all(d, ".paper h2")[0]).toBe("The two perspectives as one shape");
+    expect(all(d, ".paper[data-sheet=page]:last-child [role=heading][aria-level='2']")).toEqual(["Every area, with evidence", "In their words"]);
+    expect(all(d, SHEET_H2)[0]).toBe("The two perspectives as one shape");
     expect(emptyHeadings(d)).toEqual([]);
     expect(text(r.querySelector("header[data-variant=document]"))).toContain("Open the detailed report · 3 pages");
     expect(all(d, ".ev-card[data-lens] > .ev-head strong")).toEqual(["Translation team", "Community"]);
@@ -571,7 +577,7 @@ describe("each board renders as a screen", () => {
       expect(mount(C, { report: noCounts(4) }).innerHTML).toBe(mount(C).innerHTML);
     }
     const a = mount(ReportDetailed, { report: noCounts(0) });
-    expect(a.querySelectorAll("svg[data-part=score-barbell] g[data-lens=church], svg[aria-label^='Radar'] [data-lens=church]").length).toBe(0);
+    expect(a.querySelectorAll(".score-track > .pt[data-lens=church], svg[aria-label^='Radar'] [data-lens=church]").length).toBe(0);
     expect([...a.querySelector(".ev-card[data-lens=church] table.ev-table")!.querySelectorAll("tbody tr")].map((tr) => text(tr.children[2]))).toEqual(Array(6).fill("—"));
     const none = noCounts(1);
     none.payload.evidence = [];
@@ -582,31 +588,31 @@ describe("each board renders as a screen", () => {
   it("Report and ReportDetailed render malformed entries; blank and numeric names list in All areas compared (R4-3)", () => {
     const D = oddReport();
     const r = mount(Report, { report: D });
-    expect(r.querySelectorAll("h1").length).toBe(1);
-    expect(r.querySelectorAll("svg[data-part=band-barbell]").length).toBe(mount(Report).querySelectorAll("svg[data-part=band-barbell]").length);
+    expect(r.querySelectorAll(H1).length).toBe(1);
+    expect(r.querySelectorAll(".paper .band-track").length).toBe(mount(Report).querySelectorAll(".paper .band-track").length);
     const d = mount(ReportDetailed, { report: D });
-    expect(d.querySelectorAll("h1").length).toBe(1);
+    expect(d.querySelectorAll(H1).length).toBe(1);
     const page2 = d.querySelectorAll(".paper[data-sheet=page]")[1];
     expect(all(page2, ".barbell-row > span.bb-label").slice(-2)).toEqual(["—", "42"]);
     expect([...page2.querySelectorAll(".barbell-row")].every((r) => r.getAttribute("data-kind") === "score")).toBe(true);
     expect(all(page2, ".barbell-row > span.bb-verdict").slice(-2)).toEqual(["gap 6 · Church not asked", "gap 8 · Community not asked"]);
-    expect(d.querySelectorAll("svg[data-part=score-barbell]").length).toBe(3 + 9);
+    expect(d.querySelectorAll(".paper .score-track").length).toBe(3 + 9);
     expect(text(d)).not.toMatch(/gap null|undefined|NaN/);
   });
   it("ReportDetailed copy counts what it draws; no sheet has a heading without content (R4-5)", () => {
     const def = mount(ReportDetailed), held = mount(ReportDetailed, { report: heldReport() });
-    expect(all(def, ".paper h2")[0]).toBe("The three perspectives as one shape");
+    expect(all(def, SHEET_H2)[0]).toBe("The three perspectives as one shape");
     expect(text(def)).toContain("The three areas where the perspectives are furthest apart.");
-    expect(all(held, ".paper h2")[0]).toBe("The two perspectives as one shape");
+    expect(all(held, SHEET_H2)[0]).toBe("The two perspectives as one shape");
     expect(text(held)).toContain("The three areas where the perspectives are furthest apart.");
     const one = copy();
     one.payload.cross_lens_multi = one.payload.cross_lens_multi.slice(0, 1);
     const o = mount(ReportDetailed, { report: one });
-    expect(all(o, ".paper h2")[0]).toBe("The perspectives as one shape");
+    expect(all(o, SHEET_H2)[0]).toBe("The perspectives as one shape");
     expect(text(o)).toContain("The area where the perspectives are furthest apart. Every area");
     for (const el of [def, held, o, mount(ReportDetailed, { report: withoutChurch() }), mount(ReportDetailed, { report: noCounts(1) }), mount(ReportDetailed, { report: oddReport() })]) {
       expect(emptyHeadings(el)).toEqual([]);
-      expect(el.querySelectorAll("h1").length).toBe(1);
+      expect(el.querySelectorAll(H1).length).toBe(1);
     }
   });
   it("ReportPhone reads the report prop; the fixture is only the default (R4-4)", () => {
@@ -617,9 +623,9 @@ describe("each board renders as a screen", () => {
     const a = mount(Report, { phone: true, report: P });
     expect(all(a, "main > a.link")[0]).toBe("Acts 3 · results");
     expect(all(a, ".glass .h3")).toEqual(["Overview · 1 page", "Detailed · 3 pages"]);
-    expect(a.querySelectorAll("h1").length).toBe(1);
+    expect(a.querySelectorAll(H1).length).toBe(1);
     // the phone detailed view reads the same prop: its sheets carry the report's own title
-    expect(text(mount(ReportDetailed, { phone: true, report: { ...REPORT.desktop, review: { ...REPORT.desktop.review, title: "Acts 3" } } }).querySelector(".paper h1"))).toBe("Acts 3");
+    expect(text(mount(ReportDetailed, { phone: true, report: { ...REPORT.desktop, review: { ...REPORT.desktop.review, title: "Acts 3" } } }).querySelector(".paper .paper-title[role=heading][aria-level='1']"))).toBe("Acts 3");
   });
   it("live QA N2 (design-system.md Phone report reading): hub → overview view → detailed view, each the desktop sheets scaled to the width", () => {
     const hub = mount(Report, { phone: true });
@@ -671,7 +677,12 @@ describe("nesting (8.1), no inline style, one .btn-primary, dark theme", () => {
       if (!props.phone && !doc) expect(main.querySelector(":scope > .l-page")).not.toBeNull();
       const roots = doc ? ".l-card, .l-page, .l-phone, .l-section, details.disc, .psheet, main.l-main" : ".l-card, .l-page, .l-phone, .l-section, details.disc";
       for (const el of a.querySelectorAll(".l-stack, .l-row, .l-grid, .l-card")) expect(el.parentElement!.closest(roots), el.className).not.toBeNull();
-      expect(a.querySelector("[style]")).toBeNull();
+      // §8.11 Data geometry (Paper sheet contents @697c974d): the only inline styles are value-driven left/width percentages on the
+      // paper barbells' spans, and nothing else anywhere
+      for (const el of a.querySelectorAll("[style]")) {
+        expect(el.closest(".paper .band-track, .paper .score-track"), el.outerHTML).not.toBeNull();
+        expect(el.getAttribute("style"), el.outerHTML).toMatch(/^(?:(?:left|width): -?\d+(?:\.\d+)?%;\s?)+$/);
+      }
       const p = a.querySelectorAll(".btn-primary");
       expect(p.length).toBe(1);
       expect(text(p[0])).toBe(primary);
@@ -686,9 +697,38 @@ describe("nesting (8.1), no inline style, one .btn-primary, dark theme", () => {
       }
     }
   });
+  it("Paper sheet contents (design-system.md:861 @697c974d): no .small, .h3 or inline type inside a sheet; the board's classes", () => {
+    const views = [mount(Report), mount(Report, { phone: true, state: "overview" }), mount(ReportDetailed), mount(ReportDetailed, { phone: true })];
+    for (const v of views) {
+      const sheets = [...v.querySelectorAll(".paper")];
+      expect(sheets.length).toBeGreaterThan(0);
+      for (const sh of sheets) {
+        // the coverage cue (.lvl-pair.small, §2 Coverage cue) and the not-asked note (span.small.bb-na) are the board's own .small
+        expect([...sh.querySelectorAll(".small")].filter((e) => !e.matches(".lvl-pair, .bb-na")).map((e) => e.outerHTML)).toEqual([]);
+        expect(sh.querySelectorAll(".h3, h2, h3, .title-page").length).toBe(0);
+        for (const el of sh.querySelectorAll("[style]")) expect(el.getAttribute("style")).toMatch(/^(?:(?:left|width): -?\d+(?:\.\d+)?%;\s?)+$/);
+        for (const l of sh.querySelectorAll(".lvl")) expect(l.querySelector(":scope > .lvl-word")).not.toBeNull();
+      }
+    }
+    const [o, , d] = views;
+    expect([...o.querySelectorAll(".paper > .paper-title-row > div > *")].map((e) => e.className)).toEqual(["paper-title", "sheet-meta"]);
+    expect([...o.querySelectorAll(".sheet-tiles > .sheet-tile[data-lens]")].map((t) => [...t.children].map((c) => c.matches("[data-coverage]") ? "cue" : c.className))).toEqual(Array(3).fill(["sheet-tile-name", "cue", "sheet-tile-level"]));
+    expect(o.querySelectorAll(".paper p.sheet-text[data-v='14'], .paper p.sheet-lead, .paper ol.sheet-list").length).toBe(3);
+    expect([...o.querySelectorAll(".paper .bb-legend > *")].map((e) => e.className)).toEqual(["legend-item", "legend-item", "legend-item", "bb-legend-note"]);
+    expect(o.querySelectorAll(".bb-legend .legend-item > i.bb-legend-dot[data-lens]").length).toBe(3);
+    const radarRow = d.querySelector(".paper .radar-row")!;
+    expect([...radarRow.children].map((e) => e.tagName.toLowerCase() + "." + e.getAttribute("class"))).toEqual(["svg.svg-visible", "div.radar-side"]);
+    expect(radarRow.querySelectorAll("text.radar-label").length).toBe(5);
+    expect(radarRow.querySelectorAll("text:not(.radar-label), [font-size]").length).toBe(0);
+    expect(radarRow.querySelectorAll(".radar-side > .radar-legend > .legend-item > i.radar-dot[data-lens]").length).toBe(3);
+    const score = d.querySelector(".paper .score-track")!;
+    expect([...new Set([...score.children].map((e) => e.className))]).toEqual(["score-line", "score-band", "score-val", "pt"]);
+    expect(d.querySelectorAll(".paper .bb-verdict > span.nowrap").length).toBe(5);
+    expect([...d.querySelectorAll(".paper .sheet-head")].map((h) => h.getAttribute("data-v"))).toEqual(["4", "2", "2", "8", "0", "0", null]); // the board's 4/2 · 2/8 · 0 · 0 + In their words
+  });
   it("every route has exactly one h1", () => {
-    for (const [board, , C, props] of BOARDS) expect(mount(C, props).querySelectorAll("h1").length, board).toBe(1);
-    expect(mount(ReportDetailed, { phone: true }).querySelectorAll("h1").length).toBe(1);
+    for (const [board, , C, props] of BOARDS) expect(mount(C, props).querySelectorAll(H1).length, board).toBe(1);
+    expect(mount(ReportDetailed, { phone: true }).querySelectorAll(H1).length).toBe(1);
   });
 });
 
@@ -796,11 +836,11 @@ describe("results round 5: a live payload renders; counts read right", () => {
     expect(all(d, ".paper .ev-card[data-lens] > .ev-head .small")).toEqual(["Filling up · 4 responses", "Well filled · 6 responses", "A few drops · 2 responses"]);
     expect(text(d)).not.toMatch(/null|undefined|NaN/);
     const r = mount(Report, { report: live });
-    expect(r.querySelectorAll(".paper .solid[data-lens]").length).toBe(3);
+    expect(r.querySelectorAll(".paper .sheet-tile[data-lens]").length).toBe(3);
     // CHECK-0940 P3: the paper head carries the coverage cue (drops + count) on each lens, not the bare count.
-    expect(all(r, ".paper .solid[data-lens][data-pad=bar] > [data-coverage]")).toEqual(["Filling up · 4 responses", "Well filled · 6 responses", "A few drops · 2 responses"]);
-    expect(all(d, ".paper .solid[data-lens][data-pad=bar] > [data-coverage]")).toEqual(["Filling up · 4 responses", "Well filled · 6 responses", "A few drops · 2 responses"]);
-    expect(r.querySelectorAll("svg[data-part=band-barbell]").length).toBe(3);
+    expect(all(r, ".paper .sheet-tile[data-lens] > [data-coverage]")).toEqual(["Filling up · 4 responses", "Well filled · 6 responses", "A few drops · 2 responses"]);
+    expect(all(d, ".paper .sheet-tile[data-lens] > [data-coverage]")).toEqual(["Filling up · 4 responses", "Well filled · 6 responses", "A few drops · 2 responses"]);
+    expect(r.querySelectorAll(".paper .band-track").length).toBe(3);
   });
   it("R5-2: one response, singular, on the cards and the report heads", () => {
     expect([responsesText(1), responsesText(6), responsesText(null)]).toEqual(["1 response", "6 responses", "responses not counted"]);
@@ -827,7 +867,7 @@ describe("results round 5: a live payload renders; counts read right", () => {
     expect(all(res, ".glass[data-lens=church] [data-newer]")).toEqual(["3 newer responses not in this report yet"]);
     // the printed report is the snapshot: its paper head counts what it used and never names the newer answers
     const rep = mount(Report, { report: D });
-    expect(all(rep, ".paper .solid[data-lens=church] [data-coverage]")).toEqual(["Filling up · 4 responses"]);
+    expect(all(rep, ".paper .sheet-tile[data-lens=church] [data-coverage]")).toEqual(["Filling up · 4 responses"]);
     expect(text(rep)).not.toContain("newer response");
     // a live count no larger than the report's: nothing to say
     expect(lensCards(D.payload, REPORT.desktop.counts).every((c: { newer: number }) => c.newer === 0)).toBe(true);
@@ -860,8 +900,8 @@ describe("results round 5: a live payload renders; counts read right", () => {
     // Results cards, the overview and detailed paper heads: the two at zero read More input needed beside "No drops yet · 0 responses"
     const res = mount(Results, { report: R });
     expect(all(res, ".glass[data-lens] [data-coverage]")).toEqual(["A few drops · 1 response", "No drops yet · 0 responses", "No drops yet · 0 responses"]);
-    expect(all(res, ".glass[data-lens=church] .lvl-name")).toEqual(["More input needed"]);
-    for (const C of [Report, ReportDetailed]) expect(all(mount(C, { report: R }), ".paper .solid[data-lens][data-pad=bar] > [data-coverage]")).toEqual(["A few drops · 1 response", "No drops yet · 0 responses", "No drops yet · 0 responses"]);
+    expect(all(res, ".glass[data-lens=church] .lvl-word")).toEqual(["More input needed"]);
+    for (const C of [Report, ReportDetailed]) expect(all(mount(C, { report: R }), ".paper .sheet-tile[data-lens] > [data-coverage]")).toEqual(["A few drops · 1 response", "No drops yet · 0 responses", "No drops yet · 0 responses"]);
     // no score anywhere for them; the detailed report draws no empty evidence table
     const det = mount(ReportDetailed, { report: R });
     expect(det.querySelectorAll(".ev-card").length).toBe(1);
@@ -901,7 +941,7 @@ describe("results round 5: a live payload renders; counts read right", () => {
     D.payload.cross_lens_multi[0].lens_scores[0].score = 87.6667; D.payload.lenses[0].sub_dimensions[0].score = 83.25;
     const det = mount(ReportDetailed, { report: D });
     expect(text(det)).not.toMatch(/\d\.\d{2}/);
-    expect(det.querySelector("svg[data-part=score-barbell] circle[cx='87.6667%']")).not.toBeNull(); // geometry keeps the raw value
+    expect(det.querySelector(".score-track > .pt[style='left: 87.6667%;']")).not.toBeNull(); // geometry keeps the raw value
   });
   it("live QA Q3 (design-system.md V-29): a perspective that skips a spoke is open lines per adjacent run, never a shape across the skip", () => {
     const shape = radar(REPORT.desktop, (REPORT.desktop as { radar: string[] }).radar, REPORT.desktop.counts);
@@ -941,7 +981,11 @@ describe("results round 5: a live payload renders; counts read right", () => {
     expect(card.querySelector("[style]")).toBeNull(); // no inline style on the box
     expect(card.querySelector("svg circle")!.getAttribute("cy")).toBe("20");
     const paper = render(BandBar as never, { props: { row: bandRow(REPORT.desktop, REPORT.desktop.counts, "Clarity / naturalness"), size: "paper" } }).container;
-    expect(paper.querySelector("svg circle")!.getAttribute("cy")).toBe("16");
+    // paper: the board's spans (design-system.md:861 @697c974d), .band-track > .band-line, three .band-sep, the .band-span, a .pt per placed perspective
+    const track = paper.querySelector(".band-axis > .band-track")!;
+    expect([...track.children].map((k) => k.className)).toEqual(["band-line", "band-sep", "band-sep", "band-sep", "band-span", "pt", "pt", "pt"]);
+    expect([...track.querySelectorAll(".band-sep")].map((k) => k.getAttribute("style"))).toEqual(["left: 25%;", "left: 50%;", "left: 75%;"]);
+    expect(paper.querySelector("svg")).toBeNull();
   });
   it("Codex P1 4382475714: report copy says what the served minimum makes true (footer clause, How to read the scores)", () => {
     for (const [min, foot, read] of [

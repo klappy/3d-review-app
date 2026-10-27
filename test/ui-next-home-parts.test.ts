@@ -129,7 +129,7 @@ describe("Level", () => {
       expect(gs.every((g) => g.getAttribute("aria-hidden") === "true")).toBe(true);
       expect(l.querySelectorAll(".g-bars b.on").length).toBe(ON[level]);
       expect(l.querySelector(".g-bars")!.classList.contains("gap")).toBe(level === "more");
-      expect(l.querySelector(".lvl-name")!.textContent).toBe(name);
+      expect(l.querySelector(".lvl-word")!.textContent).toBe(name);
     });
   }
   it("refuses unknown levels and caller labels", () => {

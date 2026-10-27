@@ -28,7 +28,7 @@
   import { G } from "./icons.js";
   import { href } from "../href.js";
   import { out } from "./links.js";
-  import { REPORT, LEVEL_WORD, lensLabel, lensCards, snapshotTotal, footPrivacy, bandRows, withNotes, detailedPages, countWord } from "./data.js";
+  import { REPORT, LEVEL_WORD, lensLabel, lensCards, snapshotTotal, footPrivacy, bandRows, detailedPages, countWord } from "./data.js";
 
   // state "overview" (phone): the overview reading view (design-system.md Phone report reading); the hub otherwise.
   let { phone = false, theme = "light", report, state: view } = $props();
@@ -78,26 +78,29 @@
   {/if}
 </AppShell>
 {#snippet overview()}
+    <!-- Paper sheet contents (design-system.md §8.11 row, provisional): each section a plain div > div.sheet-head (role heading, level 2;
+         [data-v] the space under) + p.sheet-lead / p.sheet-text / ol.sheet-list, as the board draws them; no .small, .h3 or inline type
+         inside the sheet. The not-asked and more-input notes after a verdict are span.small.bb-na, the board's own. -->
     <div class="paper" data-sheet="a4">
       <PaperHead review={D.review} {cards} kind="overview" />
-      <Stack gap={2}><h2 class="h3">What stands out</h2><p class="small">{D.standsOut}</p></Stack>
-      <Stack gap={2}>
-        <h2 class="h3">Where the perspectives disagree</h2>
-        <p class="small">Each dot is one perspective on the same area, placed in its band; a red line means two bands apart or more.</p>
+      <div><div class="sheet-head" role="heading" aria-level="2">What stands out</div><p class="sheet-text" data-v="14">{D.standsOut}</p></div>
+      <div>
+        <div class="sheet-head" data-v="2" role="heading" aria-level="2">Where the perspectives disagree</div>
+        <p class="sheet-lead">Each dot is one perspective on the same area, placed in its band; a red line means two bands apart or more.</p>
         {#each rows as row}
-          <div class="barbell-row"><!-- design-system.md barbell rows: .paper .barbell-row 180px minmax(0,1fr) 150px, gap 14; bb-label / bb-verdict, never .small on paper -->
+          <div class="barbell-row"><!-- design-system.md barbell rows: .paper .barbell-row 180px minmax(0,1fr) 150px, gap 14; bb-label / bb-verdict -->
             <span class="bb-label">{row.name}</span>
             <BandBar {row} size="paper" />
-            <span class="bb-verdict">{withNotes(row.verdict, row)}</span>
+            <span class="bb-verdict">{row.verdict}{#if row.notes.length}<span class="small bb-na">{` · ${row.notes.join(" · ")}`}</span>{/if}</span>
           </div>
         {/each}
         <PaperLegend />
-      </Stack>
-      <Stack gap={2}>
-        <h2 class="h3">Where to look next</h2>
-        {#if next.length}<ol class="l-stack small" data-gap="1">{#each next as n}<li>{lensLabel(n.lens)} · {n.area} — {LEVEL_WORD[n.level]}</li>{/each}</ol>
-        {:else}<p class="small">No area reads Needs support or Needs urgent attention.</p>{/if}
-      </Stack>
+      </div>
+      <div>
+        <div class="sheet-head" role="heading" aria-level="2">Where to look next</div>
+        {#if next.length}<ol class="sheet-list">{#each next as n}<li>{lensLabel(n.lens)} · {n.area} — {LEVEL_WORD[n.level]}</li>{/each}</ol>
+        {:else}<p class="sheet-text" data-v="14">No area reads Needs support or Needs urgent attention.</p>{/if}
+      </div>
       <div class="pfoot"><span>Built from {snapshotTotal(cards)} responses on {D.review.builtOn} · levels are bands, not scores · {footPrivacy()}</span><span>1 of 1</span></div>
     </div>
 {/snippet}

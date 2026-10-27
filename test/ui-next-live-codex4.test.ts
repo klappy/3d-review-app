@@ -382,7 +382,7 @@ describe("live QA Q4: a live report's Where to look next and What stands out com
     await waitFor(() => expect(a.textContent).toContain("Where to look next"));
     const items = [...a.querySelectorAll(".paper ol li")].map((l) => (l.textContent ?? "").trim());
     expect(items).toEqual(["Translation team · External review — Needs urgent attention", "Community · Understandable — Needs urgent attention"]); // urgent first, perspective order
-    const stands = [...a.querySelectorAll(".paper h2")].find((h) => h.textContent === "What stands out")!.nextElementSibling!.textContent;
+    const stands = [...a.querySelectorAll(".paper [role=heading][aria-level='2']")].find((h) => h.textContent === "What stands out")!.nextElementSibling!.textContent;
     expect(stands).toBe("Overall: Translation team strong, Community needs support. The perspectives are furthest apart on Clarity (Translation team strong, Community needs urgent attention).");
     // no weak area: the section says so instead of an empty list
     const strong = { ...snap, lenses: snap.lenses.map((l) => ({ ...l, sub_dimensions: l.sub_dimensions.map((x) => ({ ...x, score: 90 })) })) };

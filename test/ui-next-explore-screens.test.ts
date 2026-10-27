@@ -126,14 +126,14 @@ describe("Explore (Explore.dc.html, ExplorePhone.dc.html, ExploreFiltersPhone.dc
     expect(rows.map((r) => r[6])).toEqual(["18 / 30", "24", "9 / 24", "11 / 24", "15", "—"]);
     // each level cell: the Level, then the Coverage cue's count variant under it in .l-stack[data-gap="1"] (Codex P2 4383334399;
     // design-system.md §2 Coverage cue, Explore placement @5edfbfab); no report is the board's dash with no cue
-    const cell = (td: Element) => (td.querySelector(".lvl-name") ? text(td.querySelector(".lvl-name")!) : text(td));
+    const cell = (td: Element) => (td.querySelector(".lvl-word") ? text(td.querySelector(".lvl-word")!) : text(td));
     const lvl = [...a.querySelectorAll("tbody tr")].map((tr) => [...tr.querySelectorAll("td")].slice(7, 10));
     expect(lvl.map((r) => r.map(cell))).toEqual([["—", "—", "—"], ["Growing", "Needs support", "Growing"], ["—", "—", "—"], ["—", "—", "—"], ["Strong", "Growing", "More input needed"], ["—", "—", "—"]]);
     expect(lvl.map((r) => r.map((td) => td.querySelector("[data-coverage] [data-short]")?.textContent ?? null))).toEqual([[null, null, null], ["9", "10", "5"], [null, null, null], [null, null, null], ["8", "7", "0"], [null, null, null]]);
-    for (const td of lvl.flat().filter((td) => td.querySelector(".lvl-name"))) {
+    for (const td of lvl.flat().filter((td) => td.querySelector(".lvl-word"))) {
       const stack = td.firstElementChild!;
       expect([stack.tagName, stack.className, stack.getAttribute("data-gap")]).toEqual(["SPAN", "l-stack", "1"]);
-      expect([...stack.children].map((c) => c.matches("[data-coverage]") ? "cue" : c.querySelector(".lvl-name") || c.matches(".lvl, [data-level]") ? "level" : c.className)).toEqual(["level", "cue"]);
+      expect([...stack.children].map((c) => c.matches("[data-coverage]") ? "cue" : c.querySelector(".lvl-word") || c.matches(".lvl, [data-level]") ? "level" : c.className)).toEqual(["level", "cue"]);
       expect(td.querySelector("[data-coverage]")!.getAttribute("title")).toMatch(/· \d+ responses?$/);
     }
     expect(rows.map((r) => r[10])).toEqual(["today", "12 Sep", "3 days ago", "3 days ago", "28 Sep", "26 Sep"]);
@@ -153,7 +153,7 @@ describe("Explore (Explore.dc.html, ExplorePhone.dc.html, ExploreFiltersPhone.dc
     expect(a.querySelector("[aria-label='Search reviews']")).not.toBeNull();
     const rows = [...a.querySelectorAll("a.card-link.list-row")];
     expect(rows.map((r) => text(r.querySelector(".list-title")!))).toEqual(["Luke 1–2 community review", "Genesis audio check", "Mark 1–4 draft", "Acts listening review", "Psalms reading group"]);
-    expect(rows.map((r) => text(r.querySelector(".lvl-name")!))).toEqual(["Growing", "Needs support", "More input needed", "Growing", "Strong"]);
+    expect(rows.map((r) => text(r.querySelector(".lvl-word")!))).toEqual(["Growing", "Needs support", "More input needed", "Growing", "Strong"]);
     // one overall level per row, the count under it is the perspective with the fewest responses (provisional, parity R72)
     expect(rows.map((r) => r.querySelector("[data-coverage] [data-short]")?.textContent)).toEqual(["5", "3", "0", "2", "6"]);
     expect(rows.map((r) => r.querySelector(".l-stack[data-gap='1'] > [data-coverage]") !== null)).toEqual(Array(5).fill(true));

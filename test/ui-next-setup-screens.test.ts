@@ -267,7 +267,7 @@ describe("key copy and data, per board", () => {
     expect(a.querySelector("header.top[data-variant=signed-in]")).not.toBeNull();
     expect(text(a, ".su-rev .h3")).toEqual(["Mark 1–4 draft", "Luke 1–2 community review", "Acts listening review", "Workshop 1 · Mark 1"]);
     expect([...a.querySelectorAll(".su-rev .pill")].map((p) => p.getAttribute("data-stage"))).toEqual(["collecting", "results", "done", "done"]);
-    expect(text(a, ".su-rev .lvl-name")).toEqual(["Growing", "Needs support", "Growing", "Growing", "Needs support", "Needs support", "Needs support", "More input needed", "Needs support"]);
+    expect(text(a, ".su-rev .lvl-word")).toEqual(["Growing", "Needs support", "Growing", "Growing", "Needs support", "Needs support", "Needs support", "More input needed", "Needs support"]);
     expect(a.querySelectorAll("aside svg[role=img] polyline").length).toBe(3);
     // F11: the chart takes the aside's width (viewBox 420x190, no fixed px width) and its y labels end before the plot starts.
     const svg = a.querySelector("aside svg[role=img]")!;

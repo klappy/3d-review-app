@@ -100,7 +100,7 @@ describe("actions lane: every route keeps one h1 and ignores an unknown ?state="
     for (const [v, props] of views) {
       it(`${name} ${v}: exactly one h1, and state "nope" renders the default view`, () => {
         const a = mount(Comp, props);
-        expect(a.querySelectorAll("h1").length, `${name} ${v} h1`).toBe(1);
+        expect(a.querySelectorAll("h1, [role=heading][aria-level='1']").length, `${name} ${v} h1`).toBe(1); // the plan sheet's title is the board's div.paper-title with the heading role (§8.11)
         const plain = text(a);
         const odd = mount(Comp, { ...props, state: "nope" });
         expect(text(odd)).toBe(plain);
@@ -439,7 +439,18 @@ describe("actions lane controls act, and the ones that cannot yet are named debt
     await fireEvent.click(dc);
     await vi.waitFor(() => expect(text(dc)).toBe("Copy failed"));
     expect(d.querySelector("input[readonly]")).toBeNull();
-    expect(text(d.querySelector(".paper .kbd") as HTMLElement)).toBe(PLAN.share.url);
+    expect(text(d.querySelector(".paper .plan-share .mono") as HTMLElement)).toBe(PLAN.share.url);
+    const all = (a: Element, q: string) => [...a.querySelectorAll(q)].map((e) => text(e as HTMLElement));
+    // Paper sheet contents (design-system.md:861 @697c974d): the next-steps sheet on the board's classes, no .small/.h3/inline type
+    const sheet = d.querySelector(".paper")!;
+    expect([...sheet.children].map((e) => e.className || e.tagName)).toEqual(["paper-title-row", "plan-cols", "DIV", "plan-notes", "plan-dates", "plan-share", "pfoot"]);
+    expect([...sheet.querySelectorAll(".plan-row")].map((r) => [...r.children].map((c) => c.className))).toEqual(Array(PLAN.talk.length).fill(["plan-check", "", "plan-gap"]));
+    expect(all(sheet, ".plan-gap")).toEqual(PLAN.talk.map(([, g]) => g));
+    expect(all(sheet, ".plan-notes p.plan-note")).toEqual([PLAN.noticed, PLAN.next]);
+    expect(all(sheet, ".plan-dates .plan-dt")).toEqual(PLAN.facts.map(([k]) => k));
+    expect(all(sheet, ".plan-dates .plan-dd")).toEqual(PLAN.facts.map(([, v]) => v));
+    expect(sheet.querySelectorAll(".small, .h3, h1, h2, .kbd, [style]").length).toBe(0);
+    expect(sheet.querySelector(".paper-title-row > svg.mk[width='40']")).not.toBeNull();
   });
   it("share phone: the share-out icon hands the row's link to the share sheet, else copies it", async () => {
     const s = R.surveys[0];

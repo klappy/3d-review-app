@@ -2,7 +2,7 @@
      Mock data: ui-next/fixtures/actions/action-plan.json + review.json. Boards (cookbook design/2026-10-15-glass-redesign/canvas):
      ActionPlan.dc.html (desktop: document top bar + the paper sheet), ActionPlanPhone.dc.html (phone, ?w=phone).
      Desktop paper: the pinned base.css .paper[data-sheet] row (the 794px page, 56/64 padding, --sp-5 gap; the results lane's report
-     sheet row) in the paper scope (.pfoot); the board's 36px Newsreader title has no type row (generator line). Links: ../href.js href()
+     sheet row) in the paper scope (.pfoot); its contents on the Paper sheet contents row (design-system.md §8.11). Links: ../href.js href()
      with this screen's w/theme. One .btn-primary per page: desktop "Download PDF" (top bar), phone "Share the PDF" (phone-bar).
      Controls: "Copy share link" / "Copy link" copy the plan link (./CopyButton.svelte); "Email it" goes to people (both widths); "Print"
      opens the browser's print (./ActButton.svelte). A refused copy says "Copy failed" (a short label, so the phone row keeps its width)
@@ -13,7 +13,6 @@
   import Card from "../../Card.svelte";
   import Stack from "../../Stack.svelte";
   import Row from "../../Row.svelte";
-  import Grid from "../../Grid.svelte";
   import Mark from "../../Mark.svelte";
   import PhoneHeader from "../../PhoneHeader.svelte";
   import PhoneBar from "../../PhoneBar.svelte";
@@ -68,20 +67,25 @@
       {:else}<p class="small">{NO_SHARE}</p><Row wrap gap={2}><Button label="Email it" href={href("people", at)} lead={mail} block /></Row>{/if}
     </Card>
   {:else}
+    <!-- Paper sheet contents (design-system.md §8.11 row, provisional; the next-steps sheet): .paper-title-row (title + .sheet-meta, the
+         40px mark), .plan-cols (the board's tile row, which draws no tiles), then each section a plain div > div.sheet-head (role heading)
+         + .plan-row (.plan-check · text · .plan-gap); .plan-notes > p.plan-note; .plan-dates > .plan-dt + .plan-dd; .plan-share > .mono.
+         No .small, .h3 or inline type inside the sheet. -->
     <article class="paper" data-sheet="page" aria-label={`Next steps, ${R.review.title}`}>
-        <Row split gap={4}><Stack gap={1}><h1 class="title-page">{R.review.title}</h1><p class="small">{D.meta}</p></Stack><Mark size={48} /></Row>
-        <Stack gap={2}>
-          <h2 class="h3 t-15">What we will talk about</h2>
-          {#each D.talk as [t, apart]}<hr class="hr" /><Row split gap={3}><Row gap={3}><Ico d={A.check} /><span class="small">{t}</span></Row><span class="small">{apart}</span></Row>{/each}
-        </Stack>
-        <Grid cols={2} gap={5}>
-          <Stack gap={2}><h2 class="h3 t-15">What we noticed</h2><p class="in small">{D.noticed || NO_NOTES}</p></Stack>
-          <Stack gap={2}><h2 class="h3 t-15">The next step</h2><p class="in small">{D.next || NO_NOTES}</p></Stack>
-        </Grid>
-        <Grid cols={3} gap={3}>{#each D.facts as [k, v]}<Stack gap={1}><span class="micro">{k}</span><b class="small">{v}</b></Stack>{/each}</Grid>
-        <div class="solid l-card l-row" data-split data-gap="3">
-          {#if D.share}<p class="small"><strong>Share this plan.</strong> Anyone with this link can read the plan and the overview report — no account, nothing editable. <span class="kbd">{D.share.url}</span> · {D.share.line}</p>
-          <Qr bits={R.qr.plan} size={72} />{:else}<p class="small"><strong>Share this plan.</strong> {NO_SHARE}</p>{/if}
+        <div class="paper-title-row"><div><div class="paper-title" role="heading" aria-level="1">{R.review.title}</div><div class="sheet-meta">{D.meta}</div></div><Mark size={40} /></div>
+        <div class="plan-cols"></div>
+        <div>
+          <div class="sheet-head" role="heading" aria-level="2">What we will talk about</div>
+          {#each D.talk as [t, apart]}<div class="plan-row"><span class="plan-check" aria-hidden="true">✓</span><span>{t}</span><span class="plan-gap">{apart}</span></div>{/each}
+        </div>
+        <div class="plan-notes">
+          <div><div class="sheet-head" role="heading" aria-level="2">What we noticed</div><p class="plan-note">{D.noticed || NO_NOTES}</p></div>
+          <div><div class="sheet-head" role="heading" aria-level="2">The next step</div><p class="plan-note">{D.next || NO_NOTES}</p></div>
+        </div>
+        <div class="plan-dates">{#each D.facts as [k, v]}<div><div class="plan-dt">{k}</div><div class="plan-dd">{v}</div></div>{/each}</div>
+        <div class="plan-share">
+          {#if D.share}<div><strong>Share this plan.</strong> Anyone with this link can read the plan and the overview report — no account, nothing editable. <span class="mono">{D.share.url}</span> · {D.share.line}</div>
+          <Qr bits={R.qr.plan} size={72} />{:else}<div><strong>Share this plan.</strong> {NO_SHARE}</div>{/if}
         </div>
         <div class="pfoot"><span>{D.foot}</span><span>1 of 1</span></div>
     </article>

@@ -1,19 +1,16 @@
 <!-- UI Next (v4) results lane: numeric barbell, detailed report only (design-system.md section 2 "Lens dot / barbell": 0-100 axis +
-     value labels; R18: --b-urgent span at two bands apart or more, else a quiet --line-2 span). Status: provisional.
-     Board: ReportDetailed.dc.html ("The biggest tensions", "All areas compared"); inline left/width there, SVG attributes here.
-     Dots, span and gap come from ./data.js scoreRows: placed perspectives only (a perspective under the minimum has none, R3-1). -->
+     value labels; R18: --b-urgent span at two bands apart or more, else the quiet span). Status: provisional.
+     Board: ReportDetailed.dc.html ("The biggest tensions", "All areas compared"). Paper sheet contents (design-system.md §8.11 row):
+     .score-track > span.score-line, span.score-band[data-wide], span.score-val per value, span.pt per perspective; only the
+     value-driven left/width % are inline (§8.11 Data geometry). Dots, span and gap come from ./data.js scoreRows: placed perspectives
+     only (a perspective under the minimum has none, R3-1); positions are the exact scores. -->
 <script>
   import { withNotes, gapLead, fmtScore } from "./data.js";
   let { row } = $props();
 </script>
 
-<svg data-part="score-barbell" width="100%" height="40" overflow="visible" role="group" aria-label={`${row.name}: ${withNotes(gapLead(row), row)}`}>
-  <rect x={`${row.from}%`} y="17" width={`${row.to - row.from}%`} height="6" rx="3" fill={row.alarm ? "var(--b-urgent)" : "var(--line-2)"} />
-  {#each row.dots as d}<text x={`${d.score}%`} y="6" text-anchor="middle" font-size="var(--t-11)" font-weight="650" fill="var(--ink)" aria-hidden="true">{fmtScore(d.score)}</text>{/each}
-  {#each row.dots as d}
-    <g role="img" aria-label={`${d.label} ${fmtScore(d.score)}`} data-lens={d.lens}>
-      <circle cx={`${d.score}%`} cy="20" r="9.5" fill="none" stroke="var(--line-2)" stroke-width="1" />
-      <circle cx={`${d.score}%`} cy="20" r="7.5" fill="var(--lens)" stroke="var(--field)" stroke-width="3" />
-    </g>
-  {/each}
-</svg>
+<div class="score-track" role="group" aria-label={`${row.name}: ${withNotes(gapLead(row), row)}`}>
+  <span class="score-line"></span><span class="score-band" data-wide={row.alarm ? "" : undefined} style:left={`${row.from}%`} style:width={`${row.to - row.from}%`}></span>
+  {#each row.dots as d}<span aria-hidden="true" class="score-val" style:left={`${d.score}%`}>{fmtScore(d.score)}</span>{/each}
+  {#each row.dots as d}<span class="pt" data-lens={d.lens} style:left={`${d.score}%`} role="img" aria-label={`${d.label} ${fmtScore(d.score)}`} title={`${d.label} ${fmtScore(d.score)}`}></span>{/each}
+</div>

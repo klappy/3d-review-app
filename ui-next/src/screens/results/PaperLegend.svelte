@@ -1,11 +1,7 @@
-<!-- UI Next (v4) results lane: the report barbell key ("red line = two bands apart or more"; Report.dc.html, ReportDetailed.dc.html). -->
+<!-- UI Next (v4) results lane: the report barbell key (Report.dc.html, ReportDetailed.dc.html). Paper sheet contents (design-system.md
+     §8.11 row, provisional): .bb-legend > one .legend-item per perspective (i.bb-legend-dot[data-lens] + name), then .bb-legend-note. -->
 <script>
-  import Row from "../../Row.svelte";
-  import PtDot from "./PtDot.svelte";
   import { LENS_ORDER, lensLabel } from "./data.js";
 </script>
 
-<Row split gap={4}>
-  <Row gap={4}>{#each LENS_ORDER as lens}<Row gap={2}><PtDot {lens} size={12} /><span class="small">{lensLabel(lens)}</span></Row>{/each}</Row>
-  <span class="small">red line = two bands apart or more</span>
-</Row>
+<div class="bb-legend">{#each LENS_ORDER as lens}<span class="legend-item"><i class="bb-legend-dot" aria-hidden="true" data-lens={lens}></i>{lensLabel(lens)}</span>{/each}<span class="bb-legend-note">red line = two bands apart or more</span></div>

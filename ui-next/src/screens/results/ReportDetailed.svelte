@@ -12,14 +12,14 @@
      their words" closes page 3 (R4-5). Headings that count say the count drawn ("The two perspectives as one shape", "The two areas
      where…"), never a fixed three. All areas compared lists every cross_lens_multi area in payload order, malformed entries
      skipped, blank names as "—" (R4-3). report: the built report (default the fixture; the route passes none; a phone gets the
-     phone list, ./Report.svelte, with the same prop, R4-4). -->
+     phone list, ./Report.svelte, with the same prop, R4-4). Paper sheet contents (design-system.md §8.11 row, provisional): sections
+     are plain divs > div.sheet-head (role heading, level 2; [data-v] the space under) + p.sheet-lead / p.sheet-text; the radar sits in
+     .radar-row > svg + .radar-side > .radar-legend (.legend-item > i.radar-dot); a score row's notes are span.nowrap. No .small,
+     .h3 or inline type inside a sheet; only value-driven left/width % (ScoreBar). -->
 <script>
   import AppShell from "../../AppShell.svelte";
-  import Stack from "../../Stack.svelte";
-  import Row from "../../Row.svelte";
   import Level from "../../Level.svelte";
   import Coverage from "./Coverage.svelte";
-  import LensDot from "../../LensDot.svelte";
   import DocBar from "./DocBar.svelte";
   import PaperHead from "./PaperHead.svelte";
   import PaperLegend from "./PaperLegend.svelte";
@@ -30,7 +30,7 @@
   import { G } from "./icons.js";
   import { out } from "./links.js";
   import { href } from "../href.js";
-  import { REPORT, currentLevelMin, snapshotTotal, fmtScore, footPrivacy, readingPrivacy, lensCards, scoreRows, comparedRows, radar, withNotes, gapLead, countWord, evidenceSheets, detailedPages } from "./data.js";
+  import { REPORT, currentLevelMin, snapshotTotal, fmtScore, footPrivacy, readingPrivacy, lensCards, scoreRows, comparedRows, radar, gapLead, countWord, evidenceSheets, detailedPages } from "./data.js";
 
   let { phone = false, theme = "light", report } = $props();
   const D = $derived(report ?? REPORT.desktop);
@@ -54,7 +54,7 @@
     <div class="barbell-row" data-kind="score"><!-- the numeric paper row (.paper .barbell-row[data-kind=score]); bb-label / bb-verdict -->
       <span class="bb-label">{row.name}</span>
       <ScoreBar {row} />
-      <span class="bb-verdict">{withNotes(gapLead(row), row)}</span>
+      <span class="bb-verdict">{gapLead(row)}{#if row.notes.length}{" · "}<span class="nowrap">{row.notes.join(" · ")}</span>{/if}</span>
     </div>
   {/each}
   <PaperLegend />
@@ -69,50 +69,50 @@
     </table>
   </div>
 {/snippet}
-{#snippet words()}{#if D.theirWords?.length}<Stack gap={2}><h2 class="h3">In their words</h2><p class="small">{D.theirWords.map((w) => `“${w}”`).join(" · ")}</p></Stack>{/if}{/snippet}
+{#snippet words()}{#if D.theirWords?.length}<div><div class="sheet-head" role="heading" aria-level="2">In their words</div><p class="sheet-text">{D.theirWords.map((w) => `“${w}”`).join(" · ")}</p></div>{/if}{/snippet}
 
 {#snippet page1()}
     <div class="paper" data-sheet="page">
       <PaperHead review={D.review} {cards} kind="detailed report" />
-      <Stack gap={1}>
-        <h2 class="h3">{shapeHeading}</h2>
+      <div>
+        <div class="sheet-head" data-v="4" role="heading" aria-level="2">{shapeHeading}</div>
         {#if shape}
-        <Row gap={4}>
+        <div class="radar-row">
           <Radar model={shape} />
-          <Stack gap={3}>
-            <Row wrap gap={4}>{#each shape.legend as l}<Row gap={2}><LensDot lens={l.lens} decorative /><span class="small">{l.label}</span></Row>{/each}{#if shape.notes.length}<span class="small">{shape.notes.join(" · ")}</span>{/if}</Row>
-            <p class="small">Each ring is 25 on the 0–100 scale.{!shape.notes.length && D.shapeReading ? ` ${D.shapeReading}` : ""} Where a perspective is not asked about an area, its shape skips that spoke.</p>
-            {#each shape.lenses.filter((l) => l.skipped.length) as l (l.lens)}<p class="small" data-skip={l.lens}>{l.label} has no score for {l.skipped.join(", ")}.</p>{/each}
-          </Stack>
-        </Row>
-        {:else}<p class="small">Too few shared areas to draw the shape.</p>{/if}
-      </Stack>
-      <Stack gap={2}>
-        <h2 class="h3">The biggest tensions</h2>
-        <p class="small">{tensionsLead} Every area is compared on the next page.</p>
+          <div class="radar-side">
+            <div class="radar-legend">{#each shape.legend as l}<span class="legend-item"><i class="radar-dot" aria-hidden="true" data-lens={l.lens}></i>{l.label}</span>{/each}{#if shape.notes.length}<span class="legend-item">{shape.notes.join(" · ")}</span>{/if}</div>
+            <p class="sheet-text">Each ring is 25 on the 0–100 scale.{!shape.notes.length && D.shapeReading ? ` ${D.shapeReading}` : ""} Where a perspective is not asked about an area, its shape skips that spoke.</p>
+            {#each shape.lenses.filter((l) => l.skipped.length) as l (l.lens)}<p class="sheet-text" data-skip={l.lens}>{l.label} has no score for {l.skipped.join(", ")}.</p>{/each}
+          </div>
+        </div>
+        {:else}<p class="sheet-text">Too few shared areas to draw the shape.</p>{/if}
+      </div>
+      <div>
+        <div class="sheet-head" data-v="2" role="heading" aria-level="2">The biggest tensions</div>
+        <p class="sheet-lead">{tensionsLead} Every area is compared on the next page.</p>
         {@render scores(tensions)}
-      </Stack>
+      </div>
       {@render foot(1)}
     </div>
 {/snippet}
 {#snippet page2()}
     <div class="paper" data-sheet="page">
-      <Stack gap={2}>
-        <h2 class="h3">All areas compared across perspectives</h2>
-        <p class="small">0–100 area scores; the band shows the spread between the perspectives asked. Only shared areas can be compared.</p>
+      <div>
+        <div class="sheet-head" data-v="2" role="heading" aria-level="2">All areas compared across perspectives</div>
+        <p class="sheet-lead">0–100 area scores; the band shows the spread between the perspectives asked. Only shared areas can be compared.</p>
         {@render scores(all)}
-      </Stack>
-      <Stack gap={2}>
-        <h2 class="h3">How to read the scores</h2>
-        <p class="small">Scores are the pinned report model's area values (0–100) aggregated from the item answers listed under Evidence. Levels are bands on those scores. A perspective with {fewWords} shows More input needed and no score; the drops beside each perspective show how many answered (a few drops is little evidence, not a low result). {readingPrivacy()}</p>
-      </Stack>
+      </div>
+      <div>
+        <div class="sheet-head" data-v="8" role="heading" aria-level="2">How to read the scores</div>
+        <p class="sheet-text">Scores are the pinned report model's area values (0–100) aggregated from the item answers listed under Evidence. Levels are bands on those scores. A perspective with {fewWords} shows More input needed and no score; the drops beside each perspective show how many answered (a few drops is little evidence, not a low result). {readingPrivacy()}</p>
+      </div>
       {#if !sheets.length}{@render words()}{/if}
       {@render foot(2)}
     </div>
 {/snippet}
 {#snippet evidenceSheet(sheet, i)}
     <div class="paper" data-sheet="page">
-      <h2 class="h3">Every area, with evidence{i ? " (continued)" : ""}</h2>
+      <div class="sheet-head" data-v="0" role="heading" aria-level="2">Every area, with evidence{i ? " (continued)" : ""}</div>
       {#each sheet as c (c.lens)}{@render evidence(c)}{/each}
       {#if i === sheets.length - 1}{@render words()}{/if}
       {@render foot(3 + i)}

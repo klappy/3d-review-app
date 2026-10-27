@@ -41,6 +41,7 @@ export const primaries = (body) => findAll(CLASS_ATTR, body).reduce((n, m) => n 
 const LAYOUT_PROPS = "gap|row-gap|column-gap|padding(?:-[a-z]+)?|margin(?:-[a-z]+)?|(?:max-|min-)?width|(?:max-|min-)?height|grid-template-columns|grid-template-rows|flex(?:-[a-z]+)?|display";
 export const LAYOUT_STYLE = new RegExp(`(?<![\\w-])style\\s*=\\s*(?:"[^"]*?(?<![\\w-])(${LAYOUT_PROPS})\\s*:|'[^']*?(?<![\\w-])(${LAYOUT_PROPS})\\s*:|\\{[^}]*?(${LAYOUT_PROPS})\\b)|\\bstyle:(${LAYOUT_PROPS})\\b`, "g");
 
+export const DATA_GEOMETRY = /\bstyle:(?:left|width)=\{`\$\{[^`{}]+\}%`\}/g;
 export function lintText(name, text) {
   const v = [];
   const body = text.includes("</helmet>") ? text.split("</helmet>")[1] : text;
@@ -58,7 +59,9 @@ export function lintText(name, text) {
   if (/<label[^>]*>(?:(?!<\/label>).)*<label/s.test(body)) v.push("nested <label>");
   if (body.includes("[CONTACT")) v.push("placeholder text on screen");
   // Svelte guard (PLAN-6b tripwire T3): light DOM, external CSS, no styles-in-JS.
-  const code = body.replace(/<!--[\s\S]*?-->/g, "");
+  // design-system.md §8.11 Data geometry (Paper sheet contents @697c974d): a value-driven percentage position stays inline, and only
+  // that: a Svelte style:left / style:width whose value is one template literal ending in "%". Everything else below still applies.
+  const code = body.replace(/<!--[\s\S]*?-->/g, "").replace(DATA_GEOMETRY, "");
   if (name.endsWith(".svelte") && /<style[\s>]/i.test(code)) v.push("<style> block in .svelte (use the external contract CSS)");
   if (/\bcustomElement\b/.test(code)) v.push("customElement (light DOM only)");
   if (/\battachShadow\b/.test(code)) v.push("attachShadow (light DOM only)");
