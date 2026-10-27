@@ -1117,3 +1117,22 @@ describe("Q13–Q15: agreement, counted gaps, the paper counter", () => {
     }
   });
 });
+
+// lens-design-1332 HOLD (PR576 comment 6449509139): the document bar keeps a long title, the full status line and every control on
+// one line inside the bar; only the title gives way (ellipsis), and its full text stays in its title attribute.
+describe("document top bar fit (design-system.md Top bar variants · document bar fit)", () => {
+  it("the title carries its full text as a title attribute; the status, switch, PDF and Print sit in .top-end; the contract CSS is in base.css", () => {
+    const long = "Overview report · 1 page · Strong Team, Unconvinced Community — cycle 2026-09";
+    const a = mount(Report, { report: { ...REPORT.desktop, review: { ...REPORT.desktop.review, title: "Strong Team, Unconvinced Community — cycle 2026-09" } } });
+    const bar = a.querySelector("header.top[data-variant=document]")!;
+    const h3 = bar.querySelector(":scope > .h3")!;
+    expect(text(h3)).toBe(long);
+    expect(h3.getAttribute("title")).toBe(long);
+    expect(all(bar, ".top-end > span.small")).toEqual(["Two reports, built from the same answers."]);
+    expect(all(bar, ".top-end .btn")).toEqual(["Open the detailed report · 4 pages", "Download this report (PDF)", "Print"]);
+    const base = readFileSync(resolve(__dirname, "../ui-next/components/base.css"), "utf8");
+    expect(base).toContain(".top[data-variant=document]>.h3{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}");
+    expect(base).toContain(".top[data-variant=document] .top-end>*{flex:none;white-space:nowrap}");
+    expect(base).not.toMatch(/(^|\})\.top>\.h3\{|(^|\})\.top \.h3\{[^}]*ellipsis/m); // scoped to the document variant only
+  });
+});

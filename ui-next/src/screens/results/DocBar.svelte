@@ -25,7 +25,7 @@
 <header class="top" data-variant="document">
   <a class="brand" href={href("results")}><Mark /><span>3D Review</span></a>
   <span class="small" aria-hidden="true">/</span>
-  <span class="h3">{title}</span>
+  <span class="h3" {title}>{title}</span>
   <div class="top-end">
     <span class="small">Two reports, built from the same answers.</span>
     <Button label={other} variant="quiet" href={otherHref} trail={arrow} />

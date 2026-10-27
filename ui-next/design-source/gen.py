@@ -94,6 +94,11 @@ details.dd{position:relative}details.dd>summary{list-style:none;cursor:pointer}d
 /* §8.11 Paper footer counter (QA-LIVE Q14, provisional): the attestation line wraps in its own flexible column and keeps its full text; the page counter is one unbroken line */
 .paper .pfoot .pf-text{flex:1 1 0;min-width:0}
 .paper .pfoot .pn{flex:none;white-space:nowrap}
+/* Top bar variants · document bar fit (lens-design-1332, provisional): only the title gives way (ellipsis, full text in its title attribute); brand, status, switch, PDF and Print never shrink or wrap */
+.top[data-variant=document]>.brand,.top[data-variant=document]>.small{flex:none}
+.top[data-variant=document]>.h3{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.top[data-variant=document] .top-end{flex:none}
+.top[data-variant=document] .top-end>*{flex:none;white-space:nowrap}
 .psheet{overflow:hidden;box-shadow:0 1px 2px rgba(0,0,0,.1),0 24px 48px -24px rgba(19,38,58,.4)}
 .psheet>.paper{width:794px;transform-origin:top left;box-shadow:none}
 /* §2 Paper preview (V-20, CORRECTIONS 31): .psheet[data-fit=a4|letter] scales the whole sheet to the width of its box (box ÷ sheet, no script, no inline transform);
