@@ -17,10 +17,13 @@ describe("live data helpers", () => {
     expect(cells.length).toBe(n * n);
   });
   it("names the widest gaps and the narrowest agreement from cross_lens_multi", () => {
-    const payload = { cross_lens_multi: [{ construct_name: "A", agreement_range: 5 }, { construct_name: "B", agreement_range: 25 }, { construct_name: "C", agreement_range: 17 }, { construct_name: "D", agreement_range: 1 }, { construct_name: "E", agreement_range: 9 }] };
-    expect(gapsOf(payload)).toEqual({ biggest: ["B", "C", "E"], agree: ["D"] });
+    // Codex P2 4383879670: from the placed scores (post-suppression), not agreement_range: biggest = gapRows' first three (a band or
+    // more apart, widest placed spread first), agree = the narrowest placed spread
+    const area = (name: string, team: number, community: number) => ({ construct_name: name, agreement_range: Math.abs(team - community), lens_scores: [{ lens: "team", score: team }, { lens: "community", score: community }] });
+    const payload = { cross_lens_multi: [area("A", 60, 65), area("B", 80, 55), area("C", 77, 60), area("D", 62, 63), area("E", 70, 79)] };
+    expect(gapsOf(payload, { team: 5, community: 5, church: 0 })).toEqual({ biggest: ["B", "C", "E"], agree: ["D"] });
     expect(radarOf(payload)).toEqual(["A", "B", "C", "D", "E"]);
-    expect(gapsOf(null)).toEqual({ biggest: [], agree: [] });
+    expect(gapsOf(null, {})).toEqual({ biggest: [], agree: [] });
   });
   it("maps server stages and perspectives to the lanes' words", () => {
     expect(STAGE_OF.prepare).toBe("setup"); expect(STAGE_OF.collect).toBe("collecting"); expect(STAGE_OF.understand).toBe("results");

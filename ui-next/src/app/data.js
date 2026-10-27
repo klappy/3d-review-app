@@ -5,7 +5,7 @@ import { api, classify, confirmed, enc, token } from "./api.js";
 import { lensLabel } from "../../../ui/report-lenses.js";
 import { v3ScoreBand, v3ExpectedFor } from "../../../ui/assess/v3-assessment.js";
 import { parsePeriod, collectLine } from "../../../ui/v3/components/active-until.js";
-import { LEVEL_KEY, LEVEL_WORD, levelCutoffs, useLevelMinimum, levelMinimumOf, currentLevelMin, sentLenses, snapshotTotal, footPrivacy, gapRows, bandRows, lensCards, responsesFor, lookNextOf, standsOutOf } from "../screens/results/data.js";
+import { LEVEL_KEY, LEVEL_WORD, levelCutoffs, useLevelMinimum, levelMinimumOf, currentLevelMin, sentLenses, snapshotTotal, footPrivacy, gapRows, scoreRows, bandRows, lensCards, responsesFor, lookNextOf, standsOutOf } from "../screens/results/data.js";
 import { to } from "./router.js";
 import qrcode from "../../../ui/assess/vendor-qrcode.js";
 import { acceptInvitationById } from "../../../ui/v3/components/invite.js";
@@ -289,8 +289,8 @@ export function qrModules(text) {
   return { n, cells };
 }
 
-// A build is offered only on the server's own answer (results report_build_allowed, src/handlers/results.ts; Codex P2 4383266687):
-// true only where the environment admits participant reports and the count floor is met, the gates the build itself applies.
+// A build is offered only on the server's own answer (results report_build_allowed, src/handlers/results.ts; Codex P2s 4383266687,
+// 4383879675): this caller can build now, the store's own build decision (an eligible capture AND an owner/member grant).
 // Absent (an older server, a failed read) or false is never an enabled Build. The hold then says why: the low-count numbers when
 // the server names them (minimumHold: responses_in / responses_needed), else that reports aren't available here, never "needs more
 // answers" for a hold more answers cannot lift. A real hold applies to every role (Codex P2 4382607192).
@@ -307,11 +307,22 @@ export function buildHold(res) {
   const why = res?.report_hold_reason;
   if (why === "environment") return { unavailable: true, reason: REPORTS_OFF };
   if ((why === "count" || why === undefined) && admissionHold(res)) return res;
+  // null: the capture is eligible but this caller cannot build (a viewer, or no owner/member grant; Codex P2 4383879675). No hold:
+  // the not-built line says who builds it, and resultsModel offers no Build (canBuild needs report_build_allowed).
+  if (why === null) return null;
   return { unavailable: true, reason: REPORTS_UNCONFIRMED };
 }
-/** A held build preview or execute, in words. The Results reason decides first: "environment" never asks for more answers, even
- *  though the preview may carry count fields; otherwise the count when the server names one. */
-export const heldBuildText = (preview, tail, reason) => (reason !== "environment" && admissionHold(preview) ? `The results can’t be built yet: more answers are needed. ${tail}` : `The results can’t be built here: reports aren’t available in this environment. ${tail}`);
+export const BUILD_UNCONFIRMED = "the report couldn’t be confirmed.";
+/** A held build preview or execute, in words (Codex P2 4383879661). The environment line only for the Results reason "environment"
+ *  (count fields on the preview never turn it into a count ask); otherwise the count when the preview names one; otherwise the
+ *  preview's own reason (a capture that mixes synthetic and participant answers says so), else that the report couldn't be confirmed.
+ *  A build that turns held after Results allowed it (reason null) is never told reports aren't available in this environment. */
+export const heldBuildText = (preview, tail, reason) => {
+  if (reason === "environment") return `The results can’t be built here: reports aren’t available in this environment. ${tail}`;
+  if (admissionHold(preview)) return `The results can’t be built yet: more answers are needed. ${tail}`;
+  const own = typeof preview?.reason === "string" && preview.reason.trim() ? preview.reason.trim() : BUILD_UNCONFIRMED;
+  return `The results can’t be built: ${own} ${tail}`;
+};
 // Results: the newest built report (or build one) in the shape results/data.js reads: { review, counts, payload } plus a held reason.
 export async function resultsModel(aid, { build = false } = {}) {
   // The report list and every survey count must load: a failed read is the shell's retryable error, never an empty list (which
@@ -341,15 +352,18 @@ export async function resultsModel(aid, { build = false } = {}) {
   // left out rather than mislabelled. Language resolves as Collect does (language_name, else language_id via the project's languages).
   const review = { id: a.id, project: p.name, projectId: a.project_id, language: await languageOf(a), modality: a.format ? a.format[0].toUpperCase() + a.format.slice(1) : "", title: a.name, stage: a.stage === "collect" ? "collecting" : built ? "results" : "closed", closed: "", closedLong: "", builtOn: built ? shortDate(built.created_at) : "", responses, liveResponses, canReadResponses: member, canReopen: member }; // results lane StagePill: the review's real state — collecting | closed (no report yet) | results
   // Role flags (src/handlers: report build, stage and the response list need owner/member; viewers read results and reports only).
-  return { aid, review, counts, sent: sentLenses(live), payload: built?.payload ?? null, reportId: built?.id ?? null, held: held ?? (built ? null : buildHold(res)), results: res, serverStage: a.stage, canBuild: member, canReadResponses: member, canReopen: member }; // D7: /results is held for everyone until a report exists; a member's first Build must not be hidden behind it (Codex P1 on 26a86937)
+  return { aid, review, counts, sent: sentLenses(live), payload: built?.payload ?? null, reportId: built?.id ?? null, held: held ?? (built ? null : buildHold(res)), results: res, serverStage: a.stage, canBuild: member && buildAllowed(res), canReadResponses: member, canReopen: member }; // D7: /results is held for everyone until a report exists; a member's first Build must not be hidden behind it (Codex P1 on 26a86937)
 }
 
-// Gap names for ResultsGaps/Report (results/data.js bandRows reads the payload's cross-perspective areas by construct name):
-// biggest = the three widest agreement ranges, agree = the narrowest one; radar = every multi-perspective area.
+// Gap names for ResultsGaps/Report (results/data.js bandRows reads the payload's cross-perspective areas by construct name), after
+// suppression (Codex P2 4383879670): never from the raw agreement_range, which a hidden low-count perspective can set. biggest = the
+// first three of gapRows (the one gap order: placed spread, at least one band apart); agree = the narrowest placed spread (scoreRows'
+// same post-suppression order) when more than three areas have two placed perspectives. radar = every multi-perspective area.
 const areasOf = (payload) => (Array.isArray(payload?.cross_lens_multi) ? payload.cross_lens_multi.filter((a) => a?.construct_name) : []);
-export function gapsOf(payload) {
-  const a = areasOf(payload).slice().sort((x, y) => Number(y.agreement_range ?? 0) - Number(x.agreement_range ?? 0));
-  return { biggest: a.slice(0, 3).map((x) => x.construct_name), agree: a.length > 3 ? [a[a.length - 1].construct_name] : [] };
+export function gapsOf(payload, counts) {
+  const report = { payload }, placed = scoreRows(report, counts).filter((r) => r.spread !== null).map((r) => r.name);
+  const biggest = gapRows(report, counts).slice(0, 3).map((r) => r.name), last = placed[placed.length - 1];
+  return { biggest, agree: placed.length > 3 && !biggest.includes(last) ? [last] : [] };
 }
 export const radarOf = (payload) => areasOf(payload).map((a) => a.construct_name).slice(0, 8);
 
@@ -367,7 +381,7 @@ export function liveReport(m, { phone = false, screen = "" } = {}) {
   if (!m?.payload) return null;
   const full = m.payload, cards = lensCards(full, m.counts, { sent: m.sent }), rows = gapRows({ payload: full }, m.counts);
   return { review: m.review, counts: m.counts, sent: m.sent, payload: phone && screen === "results" ? phonePayload(full) : full,
-    gaps: gapsOf(full), radar: radarOf(full), lookNext: lookNextOf(cards), standsOut: standsOutOf(cards, rows) };
+    gaps: gapsOf(full, m.counts), radar: radarOf(full), lookNext: lookNextOf(cards), standsOut: standsOutOf(cards, rows) };
 }
 
 // Setup step 5 ("Ready to launch") for a review still in preparation: fixtures/setup/setup.json's summary/phoneSummary/groups/context from

@@ -15,7 +15,7 @@ import Help from "../ui-next/src/screens/explore/Help.svelte";
 // @ts-expect-error -- plain .js module, no type declarations
 import lane from "../ui-next/src/screens/explore/index.js";
 // @ts-expect-error -- plain .js module, no type declarations
-import { levelOf, stagePill, responsesText, exploreRows, phoneRows, fewestOf, matchCounts, LENS_KEYS, STAGE_PILL } from "../ui-next/src/screens/explore/explore-data.js";
+import { levelOf, stagePill, responsesText, exploreRows, phoneRows, matchCounts, LENS_KEYS, STAGE_PILL } from "../ui-next/src/screens/explore/explore-data.js";
 // @ts-expect-error -- plain .js module, no type declarations
 import { modal, backdropClose, closeTo } from "../ui-next/src/screens/explore/dialog.js";
 // @ts-expect-error -- plain .js module, no type declarations
@@ -154,8 +154,8 @@ describe("Explore (Explore.dc.html, ExplorePhone.dc.html, ExploreFiltersPhone.dc
     const rows = [...a.querySelectorAll("a.card-link.list-row")];
     expect(rows.map((r) => text(r.querySelector(".list-title")!))).toEqual(["Luke 1–2 community review", "Genesis audio check", "Mark 1–4 draft", "Acts listening review", "Psalms reading group"]);
     expect(rows.map((r) => text(r.querySelector(".lvl-word")!))).toEqual(["Growing", "Needs support", "More input needed", "Growing", "Strong"]);
-    // one overall level per row, the count under it is the perspective with the fewest responses (provisional, parity R72)
-    expect(rows.map((r) => r.querySelector("[data-coverage] [data-short]")?.textContent)).toEqual(["5", "3", "0", "2", "6"]);
+    // one overall level per row (the team's), and the count under it is that same perspective's (Codex P2 4383879651; R72 corrected)
+    expect(rows.map((r) => r.querySelector("[data-coverage] [data-short]")?.textContent)).toEqual(["9", "5", "2", "9", "6"]);
     expect(rows.map((r) => r.querySelector(".l-stack[data-gap='1'] > [data-coverage]") !== null)).toEqual(Array(5).fill(true));
     expect(rows.map((r) => text(r.querySelector(".small")!))).toEqual(["Hindi NT · Sep 2026", "Lao OT · Sep 2026", "Hindi NT · Oct 2026", "Hindi NT · Aug 2026", "Lao OT · Jul 2026"]);
     expect(text(a)).toContain("Save this view");
@@ -259,12 +259,14 @@ describe("Explore data adapts through the current UI's level function (ui/assess
       if (l) expect({ strong: "Strong", growing: "Growing", support: "Needs support", urgent: "Needs urgent attention", more: "More input needed" }[levelOf(l) as string]).toBe(v3ScoreBand(l.score, l.responses));
     }
   });
-  it("fewestOf: a phone row's cue counts the perspective with the fewest responses; none carried is null", () => {
-    expect(fewestOf({ team: { score: 68, responses: 9 }, community: { responses: 10 }, church: { responses: 5 } })).toBe(5);
-    expect(fewestOf({ team: { score: null, responses: 2 }, church: { responses: 0 } })).toBe(0);
-    expect(fewestOf({ team: { score: 60 } })).toBeNull();
-    expect(fewestOf(null)).toBeNull();
-    expect(phoneRows([{ title: "x", team: { score: 70, responses: 4 } }])[0].n).toBe(4); // a row with only team still counts it
+  it("phoneRows: the cue beside a phone row's team level counts the team, never another perspective; none carried is null", () => {
+    // 9 team, 10 community, 5 church: the team level sits beside the team's 9, not the church's 5 (Codex P2 4383879651)
+    const [r] = phoneRows([{ title: "x", team: { score: 68, responses: 9 }, lenses: { team: { score: 68, responses: 9 }, community: { responses: 10 }, church: { responses: 5 } } }]);
+    expect([r.level, r.n]).toEqual([levelOf({ score: 68, responses: 9 }), 9]);
+    expect(phoneRows([{ title: "x", team: { score: null, responses: 2 }, lenses: { team: { score: null, responses: 2 }, church: { responses: 0 } } }])[0].n).toBe(2);
+    expect(phoneRows([{ title: "x", team: { score: 60 } }])[0].n).toBeNull();
+    expect(phoneRows([{ title: "x", team: null, lenses: null }])[0]).toMatchObject({ level: "more", n: null });
+    expect(phoneRows([{ title: "x", lenses: { team: { score: 70, responses: 4 }, church: { responses: 1 } } }])[0].n).toBe(4); // lenses only: still the team
   });
   it("app stage ids map onto the Stage pill; responses read n / expected only when an expected count exists", () => {
     expect(STAGE_PILL).toEqual({ prepare: "setup", collect: "collecting", understand: "results", improve: "reviewed" });

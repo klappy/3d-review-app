@@ -29,10 +29,15 @@ export const summary: Handler = async (ctx, params) => {
   const { results } = await ctx.db.prepare("SELECT context_json FROM assessment_survey WHERE assessment_id = ? AND state = 'selected'")
     .bind(aid).all<{ context_json?: string }>().catch(() => ({ results: [] as { context_json?: string }[] }));
   const low = await minimumHold(ctx, aid);
-  // The store's one decision: eligible, and if not, why (environment / count / capture). Any failure reads not allowed, no reason.
-  const decision = await observeBuildDecision(ctx, aid, "viewer").catch(() => null);
-  const allowed = !!decision && decision.result.ok && decision.result.marker.eligible;
-  const holdReason = decision && decision.result.ok ? decision.hold : null;
+  // The store's one decision: eligible, and if not, why (environment / count / capture). Allowed means "this caller can build now"
+  // (Codex P2 4383879675): the decision read at the build's own grant floor ('member', the observation preview and build use, so a
+  // viewer or global support without an owner/member grant reads not visible there), eligible. The hold reason is the capture's
+  // decision whatever the caller's role: the member observation's when the caller holds it, else the read-only viewer one, so
+  // null means the capture is eligible. Any failure reads not allowed and leaves the reason out (unknown, never "eligible").
+  const asBuilder = await observeBuildDecision(ctx, aid, "member").catch(() => null);
+  const decision = asBuilder?.result.ok ? asBuilder : await observeBuildDecision(ctx, aid, "viewer").catch(() => null);
+  const allowed = !!asBuilder && asBuilder.result.ok && asBuilder.result.marker.eligible;
+  const holdReason = decision && decision.result.ok ? { report_hold_reason: decision.hold } : {};
   return { result: {
     ...demographicsProjection((results || []).some((r) => demographicsEnabled(r.context_json))),
     assessment_id: aid,
@@ -45,12 +50,13 @@ export const summary: Handler = async (ctx, params) => {
     policy_version: "D7-held",
     // One additive field: the per-perspective level minimum clients band with (report-admission.ts; DEV 1, otherwise 3).
     level_minimum_responses: perspectiveLevelMinimum(ctx.env),
-    // One additive field (Codex P2s 4383266687, 4383599307): the report store's own build-eligibility answer (the same function the
-    // build dry run reads), so participant admission, the floor and trusted synthetic captures can never disagree with build.
-    // Read-only: build re-checks everything; any failure reads false.
+    // One additive field (Codex P2s 4383266687, 4383599307, 4383879675): this caller can build now, the report store's own build
+    // decision (the same function and grant floor the build dry run reads), so participant admission, the floor, trusted synthetic
+    // captures and the builder role can never disagree with build. Read-only: build re-checks everything; any failure reads false.
     report_build_allowed: allowed,
-    // Additive (Codex P2 4383751986): the decisive reason beside it, from the same decision. "environment" means no count will lift it.
-    report_hold_reason: holdReason,
+    // Additive (Codex P2 4383751986): the capture's decisive reason from the same decision, for every role: "environment" (no count
+    // will lift it), "count", "capture" (mixed or malformed), or null (eligible). Absent only when the decision could not be read.
+    ...holdReason,
     ...(low ?? {}),
   }, scope: { type: "assessment", id: aid } };
 };

@@ -81,6 +81,28 @@ describe('S28: Results, responses list and report agree below the D7 minimum',()
   // the count fields stay on the response (the UI ignores them under "environment")
   expect((await summary(off('production'),{aid:three})).result).toMatchObject({responses_in:3,responses_needed:SUPPRESSION_THRESHOLD,report_hold_reason:'environment'});
  },60000);
+ it('Codex P2 4383879675: report_build_allowed is "this caller can build now"; the hold reason is the capture\'s, whatever the role',async()=>{
+  // an eligible capture (DEV, one participant response): an owner/member can build; a viewer, and global support without an
+  // assessment grant, read the same null reason (the capture is eligible) but not allowed, and their dry run is refused as the store
+  // refuses them; a held capture names its reason to a viewer too.
+  await run(`INSERT INTO principal (id,email_hash,provisioned,support,created_at) VALUES ('person_s28_viewer','s28_viewer',0,0,'2026-09-30T00:00:00.000Z'),('person_s28_member','s28_member',0,0,'2026-09-30T00:00:00.000Z'),('person_s28_support','s28_support',0,1,'2026-09-30T00:00:00.000Z')`);
+  for(const aid of [one,zero])await run(`INSERT INTO "grant" (id,principal_id,scope_type,scope_id,role,created_at) VALUES (?1||'_v','person_s28_viewer','assessment',?1,'viewer','2026-09-30T00:00:00.000Z'),(?1||'_m','person_s28_member','assessment',?1,'member','2026-09-30T00:00:00.000Z')`,aid);
+  const as=(id:string,kind:'user'|'support'='user'):Ctx=>({...ctx('dev'),principal:{id,kind} as Ctx['principal']});
+  const cases:[string,Ctx,string,boolean,string|null][]=[
+   ['owner, eligible capture',ctx('dev'),one,true,null],
+   ['member, eligible capture',as('person_s28_member'),one,true,null],
+   ['viewer, eligible capture',as('person_s28_viewer'),one,false,null],
+   ['support without an assessment grant, eligible capture',as('person_s28_support','support'),one,false,null],
+   ['viewer, 0 responses',as('person_s28_viewer'),zero,false,'count'],
+   ['member, 0 responses',as('person_s28_member'),zero,false,'count']];
+  for(const [name,c,aid,allowed,why] of cases){
+   const r:any=(await summary(c,{aid})).result;
+   expect([r.report_build_allowed,r.report_hold_reason],name).toEqual([allowed,why]);
+   const dry=await build(c,{aid},{dryRun:true} as any).then((x:any)=>x.result.status,()=>'refused');
+   // the dry run itself needs the builder grant: refused for a viewer or support whatever the capture, else ready or held as allowed says
+   expect(dry,name).toBe(/^(viewer|support)/.test(name)?'refused':allowed?'ready':'held');
+  }
+ },60000);
  it('DEV: one response is enough to build; zero responses hold and name a floor of one',async()=>{
   // 3d-review-cookbook work/active/2026-10-26-3d-report-threshold-coverage: >=1 response in each included lens builds the report.
   const z:any=(await summary(ctx(),{aid:zero})).result, zb:any=(await build(ctx(),{aid:zero},{dryRun:true} as any)).result;

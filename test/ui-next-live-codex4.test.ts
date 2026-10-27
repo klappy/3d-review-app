@@ -456,14 +456,33 @@ describe("Codex P2s on ed291878: the report readers' payload and the stands-out 
     const m: M = { review: { title: "R" }, counts: { team: 6, community: 8, church: 1 }, payload: {
       lenses: [{ lens: "team", score: 70, sub_dimensions: [] }, { lens: "community", score: 60, sub_dimensions: [] }, { lens: "church", score: 20, sub_dimensions: [] }],
       cross_lens_multi: [area("Hidden swing", 70, 72, 5), area("Raw two", 60, 62, 10), area("Raw three", 50, 52, 95), area("Visible gap", 80, 45, 50), area("Quiet", 66, 68, 64)] } };
-    // the raw agreement_range top three are all chosen by the hidden church score, and miss the gap the shown perspectives have
-    expect(gapsOf(m.payload).biggest).toEqual(["Hidden swing", "Raw two", "Raw three"]);
+    // the raw agreement_range top three would all be chosen by the hidden church score; the gap names come after suppression
+    // (Codex P2 4383879670): only the gap the shown perspectives have
+    expect(gapsOf(m.payload, m.counts).biggest).toEqual(["Visible gap"]);
     const said = liveReport(m, { phone: false, screen: "report" }).standsOut as string;
     const gap = said.slice(said.indexOf("furthest apart"));
     expect(said).toContain("furthest apart on Visible gap (Translation team strong, Community needs support).");
     expect(gap).not.toMatch(/church|hidden swing|raw two|raw three|\b(5|10|95|50)\b/i);
     expect(said).not.toMatch(/hidden swing|raw two|raw three/i);
     expect(liveReport(m, { phone: true, screen: "report" }).standsOut).toBe(said);
+    useLevelMinimum(undefined);
+  });
+  it("4383879670: both gap name lists come after suppression; a hidden low-count perspective displaces neither the widest nor the narrowest", () => {
+    useLevelMinimum(3); // outside DEV: church has 1 answer, so its scores are suppressed
+    const area = (name: string, team: number, community: number, church: number) => ({ construct_name: name, question: `${name}?`,
+      agreement_range: Math.max(team, community, church) - Math.min(team, community, church),
+      lens_scores: [{ lens: "team", score: team }, { lens: "community", score: community }, { lens: "church", score: church }] });
+    const m: M = { review: { title: "R" }, counts: { team: 6, community: 8, church: 1 }, payload: {
+      lenses: [{ lens: "team", score: 70, sub_dimensions: [] }, { lens: "community", score: 60, sub_dimensions: [] }, { lens: "church", score: 20, sub_dimensions: [] }],
+      cross_lens_multi: [area("Visible gap", 80, 45, 50), area("Hidden swing", 70, 72, 5), area("Hidden calm", 61, 71, 66), area("Hidden narrow", 64, 65, 20), area("Raw second", 50, 78, 60)] } };
+    // by raw agreement_range the hidden church score would pick Hidden swing and Hidden narrow as gaps and Hidden calm as agreeing
+    const live = liveReport(m, { phone: false, screen: "report" });
+    expect(live.gaps).toEqual({ biggest: ["Visible gap", "Raw second"], agree: ["Hidden narrow"] });
+    expect(liveReport(m, { phone: true, screen: "results-gaps" }).gaps).toEqual(live.gaps);
+    // the overview draws exactly those rows, and no row names or places the hidden perspective
+    const r = render(Report as never, { props: { report: live } }).container;
+    expect([...r.querySelectorAll(".paper .barbell-row > .bb-label")].map((e) => e.textContent)).toEqual(["Visible gap", "Raw second", "Hidden narrow"]);
+    expect(r.querySelectorAll(".paper .band-track > .pt[data-lens=church]").length).toBe(0);
     useLevelMinimum(undefined);
   });
 });
@@ -551,6 +570,30 @@ describe("Codex P2 4383751986: the hold copy follows the server's report_hold_re
     const v = await open(ok, "viewer");
     await waitFor(() => expect(v.textContent).toContain("An owner or member of the review builds it."));
     expect(buildButton(v)).toBeUndefined();
+  });
+  it("Codex P2 4383879675: an eligible capture the caller cannot build (allowed false, reason null): the not-built line, no Build", async () => {
+    for (const role of ["owner", "member", "viewer"]) {
+      const a = await open({ status: "held", report_build_allowed: false, report_hold_reason: null, level_minimum_responses: 1 }, role);
+      await waitFor(() => expect(a.textContent).toContain("An owner or member of the review builds it."));
+      expect(a.textContent).not.toMatch(/Reports aren’t available here|more answers are needed/);
+      expect(buildButton(a)).toBeUndefined();
+    }
+  });
+  it("Codex P2 4383879661: DEV, Results allowed a build but the preview holds a mixed capture: its own reason, never the environment line", async () => {
+    const MIXED = "This assessment mixes synthetic and participant responses; a report can only be built from one kind.";
+    serve(base({ ...noReports, [`GET /v2/assessments/${AID}/results`]: { status: "held", report_build_allowed: true, report_hold_reason: null, level_minimum_responses: 1 },
+      [`POST /v2/assessments/${AID}/reports`]: () => ({ assessment_id: AID, suppressed: true, status: "held", reason: MIXED }) }));
+    globalThis.location.hash = to("results", { aid: AID });
+    const a = render(Live as never, { props: {} }).container;
+    await waitFor(() => expect(buildButton(a)).toBeDefined());
+    await fireEvent.click(buildButton(a)!);
+    await waitFor(() => expect(a.textContent).toContain(`The results can’t be built: ${MIXED} Nothing was built.`));
+    expect(a.textContent).not.toMatch(/reports aren’t available in this environment|more answers are needed/);
+    // @ts-expect-error -- plain .js module
+    const { heldBuildText } = await import("../ui-next/src/app/data.js");
+    // no reason on the preview and no count fields: the generic line; other Results reasons never read as the environment
+    for (const why of [null, undefined, "capture", "count"]) expect(heldBuildText({ suppressed: true, status: "held" }, "No report was built.", why)).toBe("The results can’t be built: the report couldn’t be confirmed. No report was built.");
+    expect(heldBuildText({ suppressed: true, status: "held", reason: MIXED }, "Nothing was built.", "capture")).toBe(`The results can’t be built: ${MIXED} Nothing was built.`);
   });
   it("a held preview under the environment reason never asks for more answers", async () => {
     // @ts-expect-error -- plain .js module

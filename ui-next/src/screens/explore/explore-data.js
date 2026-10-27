@@ -65,13 +65,9 @@ export function matchCounts(rows) {
 
 /** A perspective's response count, or null when none is carried (the cue then reads "responses not counted"). */
 const countOf = (lens) => (Number.isInteger(lens?.responses) && lens.responses >= 0 ? lens.responses : null);
-/** The coverage count a phone row shows beside its one overall level: the perspective with the fewest responses (design-system.md
- *  §2 Coverage cue, Explore placement; provisional, parity R72), null when no perspective carries a count. */
-export function fewestOf(lenses) {
-  const n = LENS_KEYS.map((k) => countOf(lenses?.[k])).filter((v) => v !== null);
-  return n.length ? Math.min(...n) : null;
-}
-/** Phone list rows: one level per row (the boards draw the translation-team level) and the fewest-responses count under it. */
+/** Phone list rows: one level per row (the boards draw the translation-team level) and, under it, that same perspective's count
+ *  (Codex P2 4383879651; design-system.md §2 Coverage cue, Explore placement @5180eb72, R72 as corrected: the count beside a level is that
+ *  same perspective's count), null when the team carries none (the cue then reads "responses not counted"). */
 export function phoneRows(rows) {
-  return rows.map((r) => ({ ...r, level: levelOf(r.team) ?? "more", n: fewestOf(r.lenses ?? (r.team ? { team: r.team } : null)) }));
+  return rows.map((r) => { const team = r.team ?? r.lenses?.team ?? null; return { ...r, level: levelOf(team) ?? "more", n: countOf(team) }; });
 }
