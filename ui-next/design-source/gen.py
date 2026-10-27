@@ -91,6 +91,9 @@ details.dd{position:relative}details.dd>summary{list-style:none;cursor:pointer}d
 .paper .ptitle{font-family:'Newsreader',ui-serif,serif;font-weight:450;color:var(--ink)}
 .paper .pbadge{display:inline-block;border:1.5px solid var(--ink);color:var(--ink);padding:3px 10px;font-size: var(--t-13);line-height:18px;font-weight:650;white-space:nowrap}
 .paper .pfoot{margin-top:auto;display:flex;justify-content:space-between;align-items:center;gap:16px;padding-top:12px;font-size: var(--t-13);color:var(--ink-3)}
+/* §8.11 Paper footer counter (QA-LIVE Q14, provisional): the attestation line wraps in its own flexible column and keeps its full text; the page counter is one unbroken line */
+.paper .pfoot .pf-text{flex:1 1 0;min-width:0}
+.paper .pfoot .pn{flex:none;white-space:nowrap}
 .psheet{overflow:hidden;box-shadow:0 1px 2px rgba(0,0,0,.1),0 24px 48px -24px rgba(19,38,58,.4)}
 .psheet>.paper{width:794px;transform-origin:top left;box-shadow:none}
 /* §2 Paper preview (V-20, CORRECTIONS 31): .psheet[data-fit=a4|letter] scales the whole sheet to the width of its box (box ÷ sheet, no script, no inline transform);

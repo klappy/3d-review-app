@@ -24,7 +24,7 @@
   import { G } from "./icons.js";
   import { href } from "../href.js";
   import { out } from "./links.js";
-  import { REPORT, lensCards, detailedPages, gapRows, scoreRows, LEVEL_WORD, snapshotTotal } from "./data.js";
+  import { REPORT, lensCards, detailedPages, gapRows, scoreRows, LEVEL_WORD, snapshotTotal, gapList, gapLink } from "./data.js";
 
   // report (live): { review, counts, payload } from app/data.js resultsModel; default the fixture. onrefresh (live): rebuilds from new answers.
   // children (live): the report-build confirm, drawn inside this screen's .app (never after it, unstyled and outside the shell).
@@ -33,6 +33,8 @@
   const D = $derived(report ?? fixture(phone ? REPORT.phone : REPORT.desktop));
   const cards = $derived(lensCards(D.payload, D.counts, { sent: D.sent }));
   const review = $derived(D.review);
+  // The gaps link counts what the gaps screen draws (design-system.md §4 "Gap heading and links", Q15); never a fixed "three".
+  const seeGaps = $derived(gapLink(gapList(report ? { ...D, gaps: D.gaps ?? { biggest: gapRows(D, D.counts).slice(0, 3).map((r) => r.name) } } : D).length));
   // The disagreement line: the board's sentence for the fixture; for a live report, the widest cross-perspective gap in its own words.
   // Live QA N4: the widest gap in the one shared order (data.js gapRows); a same-band pair is never called a gap.
   const gap = $derived(report ? gapRows(D, D.counts)[0] ?? null : null);
@@ -69,7 +71,7 @@
     {#if line}<p class="small" role="status">{line}</p>{/if}
     {@render children?.()}
     {#each cards as card (card.lens)}<LensCard {card} phone />{/each}
-    <a class="link" href={href("results-gaps")}>See the three biggest gaps <Glyph d={G.arrow} /></a>
+    <a class="link" href={href("results-gaps")}>{seeGaps} <Glyph d={G.arrow} /></a>
     <a class="link" href={out("people")}>Share results with someone <Glyph d={G.arrow} /></a>
   {:else}
     <Page gap={5}>
@@ -83,7 +85,7 @@
             <h2 class="h2">Where the perspectives disagree</h2>
             <p class="small t-15">{disagree}</p>
           </Stack>
-          <Button label="See the three biggest gaps" href={href("results-gaps")} trail={arrow} />
+          <Button label={seeGaps} href={href("results-gaps")} trail={arrow} />
         </Row>
       </Card>
       <Row split gap={2}>

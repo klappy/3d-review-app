@@ -16,11 +16,13 @@ import { OUT } from "../ui-next/src/screens/results/links.js";
 // @ts-expect-error -- plain .js module, no type declarations
 import results from "../ui-next/src/screens/results/index.js";
 // @ts-expect-error -- plain .js module, no type declarations
-import { REPORT, lensCards, bandRow, bandRows, scoreRows, comparedRows, radar, heldLines, levelOf, pct, answerView, withNotes, gapLead, responsesFor, countWord, detailedPages, lensKey, canonicalPayload, responsesText, LENS_ORDER, sentLenses, fmtScore, gapRows, useLevelMinimum, currentLevelMin, levelMinimumOf } from "../ui-next/src/screens/results/data.js";
+import { REPORT, lensCards, bandRow, bandRows, scoreRows, comparedRows, radar, heldLines, levelOf, pct, answerView, withNotes, gapLead, responsesFor, countWord, detailedPages, lensKey, canonicalPayload, responsesText, LENS_ORDER, sentLenses, fmtScore, gapRows, useLevelMinimum, currentLevelMin, levelMinimumOf, footPrivacy } from "../ui-next/src/screens/results/data.js";
 // The fixtures are DEV-like reviews: they band at the DEV level minimum of 1, set explicitly (the live app reads the served value).
 beforeEach(() => { useLevelMinimum(1); });
 import { LENSES } from "../ui/lens-surveys.js";
 import synthetic from "./fixtures/synthetic-report-renderer-v1.json";
+// @ts-expect-error -- plain .js module, no type declarations
+import { liveReport } from "../ui-next/src/app/data.js";
 import Results from "../ui-next/src/screens/results/Results.svelte";
 import ResultsAnswers from "../ui-next/src/screens/results/ResultsAnswers.svelte";
 import ResultsGaps from "../ui-next/src/screens/results/ResultsGaps.svelte";
@@ -321,7 +323,8 @@ describe("each board renders as a screen", () => {
     expect(text(a.querySelector(".pill[data-stage=results]"))).toBe("Results ready");
     expect(all(a, ".glass[data-lens] .h3")).toEqual(["Translation team", "Community", "Church"]);
     expect(all(a, ".glass[data-lens] [data-coverage]")).toEqual(["Well filled · 9 responses", "Well filled · 10 responses", "Filling up · 5 responses"]);
-    expect(all(a, "main > a.link")).toEqual(["See the three biggest gaps", "Share results with someone"]);
+    // Q15: counted by the gaps drawn; the fixture's third listed area (Brief & perceived fidelity, Strong / Strong) is one band, not a gap
+    expect(all(a, "main > a.link")).toEqual(["See the two biggest gaps", "Share results with someone"]);
   });
   it("phone-bar 'Plan the next step' draws the boards' trailing arrow (ResultsPhone, ResultsAnswersPhone, ResultsGapsPhone; integration N3)", () => {
     for (const C of [Results, ResultsAnswers, ResultsGaps]) {
@@ -434,23 +437,27 @@ describe("each board renders as a screen", () => {
     expect(lens.getAttribute("href")).toBe("?ui_next=on&screen=results-answers&state=church"); // steps to the next perspective
     expect(text(mount(ResultsAnswers, { phone: true, state: "team" }).querySelector("main a.btn.btn-block"))).toBe("Translation team · 6");
   });
-  it("ResultsGaps: who each dot is, three biggest gaps then agreement, band barbells with verdicts", () => {
+  it("ResultsGaps: who each dot is, the gaps (counted) then the areas that share a band, band barbells with verdicts", () => {
     const a = mount(ResultsGaps);
-    expect(all(a, "main h3.h3")).toEqual(["Clarity / naturalness", "Impact / use", "Brief & perceived fidelity", "Trust / readiness"]);
+    // Q13/Q15: the fixture lists Brief & perceived fidelity (Strong / Strong) as a gap; one band is never drawn as a gap
+    expect(all(a, "main h3.h3")).toEqual(["Clarity / naturalness", "Impact / use", "Trust / readiness"]);
     // the screen card is div.glass.barbell-row (design-system.md barbell rows @186fab0a), one per area, named for the group
-    expect([...a.querySelectorAll("main .glass.barbell-row")].map((r) => r.getAttribute("aria-label"))).toEqual(["Clarity / naturalness", "Impact / use", "Brief & perceived fidelity", "Trust / readiness"]);
+    expect([...a.querySelectorAll("main .glass.barbell-row")].map((r) => r.getAttribute("aria-label"))).toEqual(["Clarity / naturalness", "Impact / use", "Trust / readiness"]);
     expect(a.querySelector("main .l-grid[data-tpl=barbell]")).toBeNull();
-    expect(all(a, "main h2.h2")).toEqual(["The three biggest gaps", "Where everyone agrees", "What this does not tell you"]);
-    expect(all(a, "strong").filter((t) => /band/.test(t))).toEqual(["3 bands apart — talk about this", "2 bands apart — talk about this", "same band", "same band"]);
-    expect(a.querySelectorAll("svg[data-part=band-barbell] g[role=img]").length).toBe(11);
+    expect(all(a, "main h2.h2")).toEqual(["The two biggest gaps", "Where the perspectives share a band", "What this does not tell you"]);
+    expect(all(a, "strong").filter((t) => /band/.test(t))).toEqual(["3 bands apart — talk about this", "2 bands apart — talk about this", "same band"]);
+    expect(a.querySelectorAll("svg[data-part=band-barbell] g[role=img]").length).toBe(9);
     expect(a.querySelector("svg[data-part=band-barbell] g[aria-label='Community · Needs urgent attention'] circle")!.getAttribute("cx")).toBe("12.5%");
-    expect(text(a)).toContain("Translation team Strong · Church Strong · Community not asked"); // N2: space before the middot
+    expect(a.querySelector("[data-agree-none]")).toBeNull();
+    expect(text(a)).toContain("Every placed perspective on the area sits in the same band.");
+    expect(text(a)).not.toMatch(/everyone agrees|three biggest/i);
     expect(text(a)).not.toMatch(/\S· /);
   });
-  it("ResultsGapsPhone: three gap cards with perspective counts", () => {
+  it("ResultsGapsPhone: the gap cards with perspective counts, counted intro, count-free header", () => {
     const a = mount(ResultsGaps, { phone: true });
-    expect(all(a, ".glass .l-row > .small").filter((t) => /perspectives/.test(t))).toEqual(["3 perspectives", "3 perspectives", "2 perspectives"]);
-    expect(text(a.querySelector(".phone-title"))).toBe("Biggest gaps");
+    expect(all(a, ".glass .l-row > .small").filter((t) => /perspectives/.test(t))).toEqual(["3 perspectives", "3 perspectives"]);
+    expect(text(a.querySelector("[data-gap-lead]"))).toBe("The two biggest gaps between how the perspectives see the same thing.");
+    expect(text(a.querySelector(".phone-title"))).toBe("Gaps");
   });
   it("ResultsHeld: held card names the short perspective; preview cards show More input needed for it", () => {
     const a = mount(ResultsHeld);
@@ -479,13 +486,20 @@ describe("each board renders as a screen", () => {
     expect(all(a, ".glass a.link")).toEqual(["Show results without the church", "See the answers so far"]);
   });
   it("Report: document bar, one paper sheet with levels, gaps, where to look next and the attestation footer", () => {
-    const a = mount(Report);
+    // the overview draws the gaps then the first area that shares a band; listing Brief & perceived fidelity (Strong / Strong, Community
+    // not asked) first among the agreeing areas puts its not-asked note on the sheet (N2 below)
+    const a = mount(Report, { report: { ...REPORT.desktop, gaps: { ...REPORT.desktop.gaps, agree: ["Brief & perceived fidelity", ...REPORT.desktop.gaps.agree] } } });
+    expect(all(a, ".paper .barbell-row > .bb-label")).toEqual(["Clarity / naturalness", "Impact / use", "Brief & perceived fidelity"]);
     expect(a.querySelector("header.top[data-variant=document]")).not.toBeNull();
     expect(a.querySelectorAll("main > .paper[data-sheet=a4]").length).toBe(1); // 8.11 sheet row, no .l-card padding
     expect(a.querySelector(".paper .paper-title-row > svg.mk[width='40']")).not.toBeNull(); // F3: the 40px mark top right (.paper-title-row, §8.11)
     expect(all(a, ".paper .sheet-tile[data-lens] .sheet-tile-level .lvl-word")).toEqual(["Growing", "Needs support", "Growing"]);
     expect(all(a, ".paper ol li")).toEqual(["Community · Impactful — Needs urgent attention", "Community · Understandable — Needs urgent attention", "Translation team · External review — Needs support"]);
     expect(text(a.querySelector(".pfoot"))).toContain("1 of 1");
+    // Q14: the counter is its own unbroken column; the full privacy clause sits in the flexible wrapping one
+    expect(text(a.querySelector(".pfoot > span.pn"))).toBe("1 of 1");
+    expect(text(a.querySelector(".pfoot > span.pf-text"))).toContain(footPrivacy());
+    expect(a.querySelectorAll(".pfoot > span").length).toBe(2);
     // N2: a space on both sides of the middot before "not asked"
     expect(all(a, ".paper .barbell-row > span.bb-verdict").filter((t) => /not asked/.test(t))).toEqual(["same band · Community not asked"]);
     // design-system.md barbell rows @186fab0a: the paper row is div.barbell-row (label · band-axis · verdict), never the screen Grid template
@@ -544,7 +558,7 @@ describe("each board renders as a screen", () => {
     expect(r.querySelectorAll(H1).length).toBe(1);
     expect(all(r, ".paper .sheet-tile[data-lens] > .sheet-tile-name")).toEqual(["Translation team", "Community"]);
     expect(all(r, ".paper ol li")).toEqual(["Community · Impactful — Needs urgent attention", "Community · Understandable — Needs urgent attention", "Translation team · External review — Needs support"]);
-    expect(r.querySelectorAll(".paper .band-track").length).toBe(4);
+    expect(r.querySelectorAll(".paper .band-track").length).toBe(3); // the two gaps and the first area in one band (Q13)
     const d = mount(ReportDetailed, { report: D });
     expect(d.querySelectorAll(H1).length).toBe(1);
     // two perspectives: three sheets, no empty "(continued)" page; their words close page 3 (R4-5)
@@ -1021,7 +1035,7 @@ describe("results round 5: a live payload renders; counts read right", () => {
   });
   it("R5-3 + R5-5: Results counts the detailed report's pages; the phone overview line counts the gaps the sheet draws, no radar", () => {
     expect(text([...mount(Results).querySelectorAll("a.btn")].find((a) => text(a).startsWith("Detailed report")) ?? null)).toBe(`Detailed report · ${detailedPages(lensCards(REPORT.desktop.payload, REPORT.desktop.counts))} pages`);
-    expect(mount(Report, { phone: true }).textContent).toContain("Levels, the three biggest gaps.");
+    expect(mount(Report, { phone: true }).textContent).toContain("Levels, the two biggest gaps."); // Brief & perceived fidelity is one band (Q15)
     const one = { ...REPORT.phone, gaps: { biggest: REPORT.phone.gaps.biggest.slice(0, 1), agree: [] } };
     expect(mount(Report, { phone: true, report: one }).textContent).toContain("Levels, the biggest gap.");
     const none = { ...REPORT.phone, gaps: { biggest: [], agree: [] } };
@@ -1031,3 +1045,75 @@ describe("results round 5: a live payload renders; counts read right", () => {
   });
 });
 
+
+// PR576 owner comment 6433135477 (QA-LIVE 2026-10-26 Q13, Q14, Q15): agreement is the same band among two or more placed perspectives;
+// the gap headings count the gaps drawn; the paper counter is one unbroken column beside the full privacy clause.
+describe("Q13–Q15: agreement, counted gaps, the paper counter", () => {
+  type Area = { construct_name: string; lens_scores: { lens: string; score: number }[] };
+  const area = (name: string, s: Record<string, number>): Area => ({ construct_name: name, lens_scores: Object.entries(s).map(([lens, score]) => ({ lens, score })) });
+  const live = (cross: Area[], counts: Record<string, number>) => {
+    const payload = { lenses: LENS_ORDER.map((lens) => ({ lens, score: 60, sub_dimensions: [] })), cross_lens_multi: cross };
+    return liveReport({ review: { ...REPORT.desktop.review, title: "R" }, counts, payload }, { phone: false, screen: "results-gaps" });
+  };
+  const steve = (synthetic as unknown as { contexts: Record<string, unknown> }).contexts["assess_syn_strong-team-unconvinced-community-2026-09"];
+  it("the Steve oracle (minimum 1): every compared area disagrees, so no agreement row and the neutral line; no row a band or more apart sits under agreement", () => {
+    const r = liveReport({ review: { ...REPORT.desktop.review }, counts: undefined, payload: steve }, { phone: false, screen: "results-gaps" });
+    expect(r.gaps.agree).toEqual([]);
+    expect(r.gaps.biggest).toEqual(["Trust / Readiness", "Brief Process & Perceived Fidelity", "Clarity / Naturalness"]);
+    const a = mount(ResultsGaps, { report: r });
+    expect(all(a, "main h2.h2")).toEqual(["The three biggest gaps", "Where the perspectives share a band", "What this does not tell you"]);
+    expect(text(a.querySelector("[data-agree-none]"))).toBe("No compared area has every placed perspective in the same band.");
+    expect(a.querySelectorAll("main .glass.barbell-row").length).toBe(3);
+    expect(text(a)).not.toContain("Understanding of the Source"); // 2 bands apart: the fourth gap, never an agreement row
+  });
+  it("mixed: only same-band areas with two or more placed perspectives agree; one band apart is a gap, not agreement; no >3-area minimum", () => {
+    const r = live([area("Wide", { team: 85, community: 30 }), area("One band", { team: 76, community: 70 }), area("Same", { team: 62, community: 70 })], { team: 5, community: 5, church: 0 });
+    expect(r.gaps).toEqual({ biggest: ["Wide", "One band"], agree: ["Same"] });
+    const a = mount(ResultsGaps, { report: r });
+    expect(all(a, "main h2.h2")).toEqual(["The two biggest gaps", "Where the perspectives share a band", "What this does not tell you"]);
+    expect([...a.querySelectorAll("main .glass.barbell-row")].map((x) => x.getAttribute("aria-label"))).toEqual(["Wide", "One band", "Same"]);
+    expect(a.querySelector("[data-agree-none]")).toBeNull();
+  });
+  it("exactly one gap: singular heading, phone intro and Results link; none: a count-free heading and the neutral lines", () => {
+    const one = live([area("Wide", { team: 85, community: 30 }), area("Same", { team: 62, community: 70 })], { team: 5, community: 5, church: 0 });
+    expect(all(mount(ResultsGaps, { report: one }), "main h2.h2")[0]).toBe("The biggest gap");
+    expect(text(mount(ResultsGaps, { report: one, phone: true }).querySelector("[data-gap-lead]"))).toBe("The biggest gap between how the perspectives see the same thing.");
+    expect(all(mount(Results, { report: one, phone: true }), "main > a.link")[0]).toBe("See the biggest gap");
+    expect(text([...mount(Results, { report: one }).querySelectorAll("a.btn")].find((x) => /gap|Compare/.test(text(x))) ?? null)).toBe("See the biggest gap");
+    const none = live([area("Same", { team: 62, community: 70 })], { team: 5, community: 5, church: 0 });
+    const a = mount(ResultsGaps, { report: none });
+    expect(all(a, "main h2.h2")[0]).toBe("Gaps between perspectives");
+    expect(text(a.querySelector("[data-gap-none]"))).toBe("No compared area has two placed perspectives a band or more apart.");
+    expect(a.querySelectorAll("main .glass.barbell-row").length).toBe(1);
+    expect(all(mount(Results, { report: none, phone: true }), "main > a.link")[0]).toBe("Compare the perspectives");
+  });
+  it("held and unasked perspectives are not counted as agreement after suppression", () => {
+    useLevelMinimum(3);
+    try {
+      // church has 1 answer (held): "Held pair" has one placed perspective (team) beside the held church in the same raw band; "Visible"
+      // has team and community in one band with church held two bands away. Only "Visible" agrees, and church is never a dot.
+      const r = live([area("Held pair", { team: 70, church: 72 }), area("Visible", { team: 62, community: 70, church: 10 }), area("Gap", { team: 90, community: 20 })], { team: 5, community: 5, church: 1 });
+      expect(r.gaps).toEqual({ biggest: ["Gap"], agree: ["Visible"] });
+      const a = mount(ResultsGaps, { report: r });
+      const rows = [...a.querySelectorAll("main .glass.barbell-row")];
+      expect(rows.map((x) => x.getAttribute("aria-label"))).toEqual(["Gap", "Visible"]);
+      expect(rows[1].querySelectorAll("g[aria-label^='Church']").length).toBe(0);
+      expect(text(rows[1])).toContain("Church more input needed");
+    } finally { useLevelMinimum(1); }
+  });
+  it("the paper counter has its own nowrap class beside the full privacy text, on the overview and every detailed page", () => {
+    const base = readFileSync(resolve(__dirname, "../ui-next/components/base.css"), "utf8");
+    expect(base).toContain(".paper .pfoot .pn{flex:none;white-space:nowrap}");
+    expect(base).toContain(".paper .pfoot .pf-text{flex:1 1 0;min-width:0}");
+    const r = liveReport({ review: { ...REPORT.desktop.review }, counts: undefined, payload: steve }, { phone: false, screen: "report" });
+    for (const el of [mount(Report, { report: r }), mount(ReportDetailed, { report: r })]) {
+      const feet = [...el.querySelectorAll(".paper .pfoot")];
+      expect(feet.length).toBeGreaterThan(0);
+      for (const f of feet) {
+        expect(f.querySelector(":scope > span.pn")).not.toBeNull();
+        expect(text(f.querySelector(":scope > span.pn"))).toMatch(/^\d+ of \d+$/);
+        expect(text(f.querySelector(":scope > span.pf-text"))).toContain(footPrivacy(1)); // the full minimum-1 clause, never shortened
+      }
+    }
+  });
+});

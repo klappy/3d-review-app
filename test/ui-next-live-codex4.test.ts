@@ -508,11 +508,12 @@ describe("Codex P2s on ed291878: the report readers' payload and the stands-out 
       cross_lens_multi: [area("Visible gap", 80, 45, 50), area("Hidden swing", 70, 72, 5), area("Hidden calm", 61, 71, 66), area("Hidden narrow", 64, 65, 20), area("Raw second", 50, 78, 60)] } };
     // by raw agreement_range the hidden church score would pick Hidden swing and Hidden narrow as gaps and Hidden calm as agreeing
     const live = liveReport(m, { phone: false, screen: "report" });
-    expect(live.gaps).toEqual({ biggest: ["Visible gap", "Raw second"], agree: ["Hidden narrow"] });
+    // agree (QA-LIVE Q13): every area whose placed perspectives (team, community) share a band, in the gap order; church never counts
+    expect(live.gaps).toEqual({ biggest: ["Visible gap", "Raw second"], agree: ["Hidden calm", "Hidden swing", "Hidden narrow"] });
     expect(liveReport(m, { phone: true, screen: "results-gaps" }).gaps).toEqual(live.gaps);
     // the overview draws exactly those rows, and no row names or places the hidden perspective
     const r = render(Report as never, { props: { report: live } }).container;
-    expect([...r.querySelectorAll(".paper .barbell-row > .bb-label")].map((e) => e.textContent)).toEqual(["Visible gap", "Raw second", "Hidden narrow"]);
+    expect([...r.querySelectorAll(".paper .barbell-row > .bb-label")].map((e) => e.textContent)).toEqual(["Visible gap", "Raw second", "Hidden calm"]); // the gaps, then the first area in one band (as the board)
     expect(r.querySelectorAll(".paper .band-track > .pt[data-lens=church]").length).toBe(0);
     useLevelMinimum(undefined);
   });

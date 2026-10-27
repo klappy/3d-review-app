@@ -87,7 +87,7 @@
           {#if D.share}<div><strong>Share this plan.</strong> Anyone with this link can read the plan and the overview report — no account, nothing editable. <span class="mono">{D.share.url}</span> · {D.share.line}</div>
           <Qr bits={R.qr.plan} size={72} />{:else}<div><strong>Share this plan.</strong> {NO_SHARE}</div>{/if}
         </div>
-        <div class="pfoot"><span>{D.foot}</span><span>1 of 1</span></div>
+        <div class="pfoot"><span class="pf-text">{D.foot}</span><span class="pn">1 of 1</span></div>
     </article>
   {/if}
 </AppShell>

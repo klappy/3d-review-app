@@ -28,7 +28,7 @@
   import { G } from "./icons.js";
   import { href } from "../href.js";
   import { out } from "./links.js";
-  import { REPORT, LEVEL_WORD, lensLabel, lensCards, snapshotTotal, footPrivacy, bandRows, detailedPages, countWord } from "./data.js";
+  import { REPORT, LEVEL_WORD, lensLabel, lensCards, snapshotTotal, footPrivacy, detailedPages, countWord, gapList, agreeList } from "./data.js";
 
   // state "overview" (phone): the overview reading view (design-system.md Phone report reading); the hub otherwise.
   let { phone = false, theme = "light", report, state: view } = $props();
@@ -36,10 +36,13 @@
   const D = $derived(report ?? (phone && !reading ? REPORT.phone : REPORT.desktop)); // the reading view draws the overview sheet
   const cards = $derived(lensCards(D.payload, D.counts, { sent: D.sent }));
   const pages = $derived(detailedPages(cards));
-  const rows = $derived(bandRows(D, D.counts, [...(D.gaps?.biggest ?? []), ...(D.gaps?.agree ?? [])]));
+  // The gaps (two placed perspectives a band or more apart) then at most the first area where the placed perspectives share a band,
+  // as the board draws it (design-system.md §4 "Results gaps agreement", Q13): a one-band row is never drawn as agreement.
+  const gapRowsDrawn = $derived(gapList(D));
+  const rows = $derived([...gapRowsDrawn, ...agreeList(D).slice(0, 1)]);
   // The phone list's line names what the overview sheet draws, counted (R5-5): its levels and the biggest gaps it resolves.
   // The sheet draws no radar (that is the detailed report), so the board's "the radar" is not claimed here.
-  const biggest = $derived(bandRows(D, D.counts, D.gaps?.biggest ?? []).length);
+  const biggest = $derived(gapRowsDrawn.length);
   const overviewLine = $derived(`Levels${biggest > 1 ? `, the ${countWord(biggest)} biggest gaps` : biggest === 1 ? ", the biggest gap" : ""}.`);
   const next = $derived((D.lookNext ?? []).map(([lens, area]) => ({ lens, area, row: cards.find((c) => c.lens === lens)?.rows.find((r) => r.name === area) }))
     .filter((n) => n.row).map((n) => ({ lens: n.lens, area: n.area, level: n.row.level })));
@@ -101,7 +104,7 @@
         {#if next.length}<ol class="sheet-list">{#each next as n}<li>{lensLabel(n.lens)} · {n.area} — {LEVEL_WORD[n.level]}</li>{/each}</ol>
         {:else}<p class="sheet-text" data-v="14">No area reads Needs support or Needs urgent attention.</p>{/if}
       </div>
-      <div class="pfoot"><span>Built from {snapshotTotal(cards)} responses on {D.review.builtOn} · levels are bands, not scores · {footPrivacy()}</span><span>1 of 1</span></div>
+      <div class="pfoot"><span class="pf-text">Built from {snapshotTotal(cards)} responses on {D.review.builtOn} · levels are bands, not scores · {footPrivacy()}</span><span class="pn">1 of 1</span></div>
     </div>
 {/snippet}
 

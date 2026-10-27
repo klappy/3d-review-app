@@ -28,6 +28,6 @@
       {#each q.options as o}<div class="o"><i class={q.type === "multi" ? "sq" : undefined}></i>{o}</div>{/each}
       {#each Array(q.lines ?? 0) as _}<div class="rl"></div>{/each}
     {/each}
-    <div class="pfoot">{#if practice}<span class="pbadge">{PRACTICE}</span>{/if}<span>{page}</span></div>
+    <div class="pfoot">{#if practice}<span class="pbadge">{PRACTICE}</span>{/if}<span class="pn">{page}</span></div>
   </div>
 </div>

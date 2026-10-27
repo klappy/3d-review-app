@@ -233,6 +233,24 @@ export const gapLead = (row) => (row.spread === null || row.spread === undefined
 /** A score or spread as shown: a whole number (display only; geometry, bands, ordering and exports keep the raw value). */
 export const fmtScore = (v) => (v === null || v === undefined || !Number.isFinite(Number(v)) ? "—" : String(Math.round(Number(v))));
 
+/** design-system.md §4 "Results gaps agreement" (QA-LIVE Q13): a band row is agreement only when at least two placed perspectives
+ *  sit in the same band; a gap only when two placed perspectives are at least one band apart. Held and unasked perspectives have no
+ *  dot, so they are never counted either way. */
+export const sameBand = (r) => r.dots.length >= 2 && r.apart === 0;
+export const isGap = (r) => r.dots.length >= 2 && r.apart >= 1;
+/** The rows a report's gap names resolve to (at most three) and its agreement rows, re-checked against the band rule (a fixture or
+ *  older list never puts a same-band row under a gap heading, or a gap under the agreement heading). */
+export const gapList = (D) => bandRows(D, D?.counts, D?.gaps?.biggest ?? []).filter(isGap).slice(0, 3);
+export const agreeList = (D) => bandRows(D, D?.counts, D?.gaps?.agree ?? []).filter(sameBand);
+/** design-system.md §4 "Gap heading and links", counted by the gaps drawn (Q15): never a fixed "three". */
+export const gapHeading = (n) => (n > 1 ? `The ${countWord(n)} biggest gaps` : n === 1 ? "The biggest gap" : "Gaps between perspectives");
+export const gapLink = (n) => (n > 1 ? `See the ${countWord(n)} biggest gaps` : n === 1 ? "See the biggest gap" : "Compare the perspectives");
+export const widestLine = (n) => (n > 1 ? `the ${countWord(n)} widest gaps` : n === 1 ? "the widest gap" : "");
+export const GAPS_NONE = "No compared area has two placed perspectives a band or more apart.";
+export const AGREE_HEADING = "Where the perspectives share a band";
+export const AGREE_LEAD = "Every placed perspective on the area sits in the same band.";
+export const AGREE_NONE = "No compared area has every placed perspective in the same band.";
+
 /** Numeric barbell rows (detailed report): exact scores on 0-100, red span at two bands apart or more, else a quiet span.
  *  Only the perspectives band() places get a dot, a spread or a place in the order (under the minimum: no score shown, named
  *  in notes). With names: those areas in that order. Without: biggest placed spread first, areas under two placed last (R3-1);

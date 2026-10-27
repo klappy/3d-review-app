@@ -5,7 +5,7 @@ import { api, classify, confirmed, enc, token } from "./api.js";
 import { lensLabel } from "../../../ui/report-lenses.js";
 import { v3ScoreBand, v3ExpectedFor } from "../../../ui/assess/v3-assessment.js";
 import { parsePeriod, collectLine } from "../../../ui/v3/components/active-until.js";
-import { LEVEL_KEY, LEVEL_WORD, levelCutoffs, useLevelMinimum, levelMinimumOf, currentLevelMin, sentLenses, snapshotTotal, footPrivacy, gapRows, scoreRows, bandRows, lensCards, responsesFor, lookNextOf, standsOutOf } from "../screens/results/data.js";
+import { LEVEL_KEY, LEVEL_WORD, levelCutoffs, useLevelMinimum, levelMinimumOf, currentLevelMin, sentLenses, snapshotTotal, footPrivacy, gapRows, scoreRows, bandRows, lensCards, responsesFor, lookNextOf, standsOutOf, sameBand } from "../screens/results/data.js";
 import { to } from "./router.js";
 import qrcode from "../../../ui/assess/vendor-qrcode.js";
 import { acceptInvitationById } from "../../../ui/v3/components/invite.js";
@@ -359,13 +359,15 @@ export async function resultsModel(aid, { build = false } = {}) {
 
 // Gap names for ResultsGaps/Report (results/data.js bandRows reads the payload's cross-perspective areas by construct name), after
 // suppression (Codex P2 4383879670): never from the raw agreement_range, which a hidden low-count perspective can set. biggest = the
-// first three of gapRows (the one gap order: placed spread, at least one band apart); agree = the narrowest placed spread (scoreRows'
-// same post-suppression order) when more than three areas have two placed perspectives. radar = every multi-perspective area.
+// first three of gapRows (the one gap order: placed spread, at least one band apart); agree = every area whose post-suppression band
+// row has at least two placed perspectives in the same band (dots >= 2, apart 0), in the same order (design-system.md §4 "Results gaps
+// agreement", QA-LIVE Q13): one band apart is not agreement, a held or unasked perspective is not counted, no minimum number of areas.
+// radar = every multi-perspective area.
 const areasOf = (payload) => (Array.isArray(payload?.cross_lens_multi) ? payload.cross_lens_multi.filter((a) => a?.construct_name) : []);
 export function gapsOf(payload, counts) {
   const report = { payload }, placed = scoreRows(report, counts).filter((r) => r.spread !== null).map((r) => r.name);
-  const biggest = gapRows(report, counts).slice(0, 3).map((r) => r.name), last = placed[placed.length - 1];
-  return { biggest, agree: placed.length > 3 && !biggest.includes(last) ? [last] : [] };
+  const biggest = gapRows(report, counts).slice(0, 3).map((r) => r.name);
+  return { biggest, agree: bandRows(report, counts, placed).filter(sameBand).map((r) => r.name) };
 }
 export const radarOf = (payload) => areasOf(payload).map((a) => a.construct_name).slice(0, 8);
 
