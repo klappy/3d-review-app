@@ -40,6 +40,9 @@ installTranslate(app);
 // Passage files and links on an assessment (captain 2026-09-29; Lovable parity). Registered before the capability twins.
 installPassages(app);
 
+// Serve the actual schema before the catalog twin at this same path can return its explanatory JSON note.
+app.get("/v2/openapi.yaml", (c) => c.text(openapiText as unknown as string, 200, { "content-type": "application/yaml" }));
+
 for (const cap of capabilities) for (const twin of [cap.http, ...(cap.http_alt ?? [])]) {
   if (cap.tool === "danger" && twin.method.toUpperCase() === "GET")
     throw new Error(`danger twin cannot be GET: ${cap.id}`);
@@ -271,6 +274,5 @@ app.post("/v2/ops/seed/synthetic", async (c) => {
   const n = await env.DB.prepare("SELECT (SELECT COUNT(*) FROM response WHERE source='synthetic') AS responses, (SELECT COUNT(*) FROM assessment WHERE id LIKE 'assess_syn_%') AS assessments, (SELECT COUNT(*) FROM project WHERE id LIKE 'proj_syn_%') AS projects").first();
   return json(ok("dev.bootstrap.seed_synthetic", { seeded: true, statements: applied, ...(n as object) }, ctx.traceId), 200);
 });
-app.get("/v2/openapi.yaml", (c) => c.text(openapiText as unknown as string, 200, { "content-type": "application/yaml" }));
 app.notFound((c) => json(fail("NOT_FOUND_OR_NOT_VISIBLE", "no such route", "GET /v2/capabilities.json lists every route", "cap.docs.capabilities"), 404));
 export default app;

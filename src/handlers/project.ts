@@ -2,7 +2,7 @@
 import type { Handler, Role } from "./types";
 import { requireConfirmedState } from "../receipt";
 import { CapError } from "./errors";
-import { grantApplies, countScalar, loadProject, newId, nowIso, patchOf, reqStr, requireUser, type ProjectRow } from "./common";
+import { directGrantRoleAt, grantApplies, countScalar, loadProject, newId, nowIso, patchOf, reqStr, requireUser, type ProjectRow } from "./common";
 import { lwcOf, saveLwc, saveLwcOnCreate, takeLwc } from "./lwc";
 
 const view = (p: ProjectRow, role: Role) => ({ id: p.id, workspace_id: p.workspace_id, name: p.name, organization: p.organization, lwc: lwcOf(p), archived_at: p.archived_at, created_at: p.created_at, role });
@@ -41,7 +41,7 @@ export const list: Handler = async (ctx) => {
 export const get: Handler = async (ctx, params) => {
   const id = reqStr(params, "id"), { row, role } = await loadProject(ctx, id);
   const { results } = await ctx.db.prepare("SELECT id, code, name FROM language WHERE project_id = ? ORDER BY name").bind(id).all<{id:string;code:string|null;name:string}>();
-  return { result: { project: view(row, role), languages: results }, scope: { type: "project", id } };
+  return { result: { project: { ...view(row, role), direct_role: await directGrantRoleAt(ctx, "project", id) }, languages: results }, scope: { type: "project", id } };
 };
 export const update: Handler = async (ctx, params) => {
   const id = reqStr(params, "id"), {row} = await loadProject(ctx, id, "owner");

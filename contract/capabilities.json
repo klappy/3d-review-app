@@ -985,7 +985,7 @@
       "slice": "v2.0-bcs",
       "section": "D. Assessment (main page)",
       "ui_surface": "menu",
-      "notes": "same project grant as archive",
+      "notes": "same authority as archive: direct assessment member-or-owner grant plus effective member-or-owner access at the assessment project; inherited workspace access alone cannot unarchive",
       "status": "target",
       "inverse": {
         "kind": "true",
@@ -1607,7 +1607,7 @@
       "slice": "v2.0-bcs",
       "section": "F. Invitations, codes, collaborators",
       "ui_surface": "sign-in landing: \"Accept invitation\" first (B04 step c)",
-      "notes": "pending collaborator invitations addressed to the signed-in person, matched by hashed email: id, scope {type,id,name,path}, role, inviter_display_name (null — no name is stored), invited_at, expires_at; never the token, never the invitee hash; others' invitations are simply absent (captain ruling 2026-09-28 15:27 ET k0015). S19 (captain 2026-09-29): for these own, live invitations only, scope.name is the scope's name and scope.path its names outermost first (assessment: workspace › project › assessment; project: workspace › project; workspace: its name) — names only, no parent ids, no other scope contents; name null and path [] when the scope row is gone. The #invite= token path (cap.grant.accept) still discloses no name",
+      "notes": "pending acceptable collaborator invitations addressed to the signed-in person; child invitations currently blocked by inherited workspace access are omitted; matched by hashed email: id, scope {type, id, name, path}, role, inviter_display_name (null — no name is stored), invited_at, expires_at; never the token, never the invitee hash; others' invitations are simply absent (captain ruling 2026-09-28 15:27 ET k0015). S19 (captain 2026-09-29): for these own, live invitations only, scope.name is the scope's name and scope.path its names outermost first (assessment: workspace › project › assessment; project: workspace › project; workspace: its name) — names only, no parent ids, no other scope contents; name null and path [] when the scope row is gone. The #invite= token path (cap.grant.accept) still discloses no name",
       "status": "target",
       "inverse": { "kind": "n/a" },
       "public": false,

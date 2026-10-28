@@ -44,12 +44,19 @@ beforeAll(async () => {
 afterAll(() => mf.dispose());
 
 describe('authenticated workspace membership reaches contained assessments and reports', () => {
+  it('serves the synchronized OpenAPI permission guidance byte-for-byte', async () => {
+    const response=await worker.fetch(new Request('https://fixture.test/v2/openapi.yaml'),env,{waitUntil(){},passThroughOnException(){}} as any);
+    expect(response.status).toBe(200);
+    expect(await response.text()).toBe(readFileSync(new URL('../contract/openapi.yaml',import.meta.url),'utf8'));
+  });
+
   it('owner and member open and list existing assessments without child grants; counts agree', async () => {
     for (const who of ['owner', 'member', 'support_owner']) {
       const expectedRole = who === 'support_owner' ? 'owner' : who;
       expect((await http('/v2/assessments/' + aid, who)).body).toMatchObject({ ok: true, result: { assessment: { id: aid, role: expectedRole, direct_role:null } } });
       const listed = await http('/v2/projects/' + pid + '/assessments', who);
       expect(listed.body.result.assessments.some((a: any) => a.id === aid && a.role === expectedRole && a.direct_role === null)).toBe(true);
+      expect((await http('/v2/projects/'+pid,who)).body.result.project).toMatchObject({role:expectedRole,direct_role:null});
       const projects = await http('/v2/projects', who);
       expect(projects.body.result.projects.find((p: any) => p.id === pid).assessment_count).toBeGreaterThan(0);
       expect((await http('/v2/assessments/' + aid, who, {name:'Workspace edit '+who}, 'PATCH')).body.ok).toBe(true);
