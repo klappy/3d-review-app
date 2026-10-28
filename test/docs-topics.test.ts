@@ -82,3 +82,9 @@ describe('served child-scope delegation guidance', () => {
     expect(out.result.rules).toContain('at a project or assessment any role change needs a direct owner at that scope');
   });
 });
+
+it('served grant-revoke guidance names direct assessment authority and its write guard', async () => {
+  const out = await docs(stubCtx, {capability:'cap.grant.revoke'});
+  expect(out.result.rules).toContain('requires a direct assessment member-or-owner grant');
+  expect(out.result.rules).toContain('rechecked inside the guarded delete');
+});

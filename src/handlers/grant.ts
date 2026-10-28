@@ -485,9 +485,15 @@ export const update_role: Handler = async (ctx, p, o) => {
   return { result: { grant: gid, role }, scope, impact, priorState: { role: g.role } };
 };
 
+/** Assessment grant revocation must not gain delegation authority through workspace inheritance. */
+async function directAssessmentRevoker(ctx: Ctx, scope: Scope) {
+  if (scope.type === "assessment") await directRoleAt(ctx, "assessment", scope.id, "member");
+}
+
 export const revoke: Handler = async (ctx, p) => {
   const scope = reqScope(p); const gid = reqStr(p, "gid");
   const caller = await callerAt(ctx, scope, "member");
+  await directAssessmentRevoker(ctx, scope);
   const g = await ctx.db.prepare('SELECT id, principal_id, role FROM "grant" WHERE id = ? AND scope_type = ? AND scope_id = ?').bind(gid, scope.type, scope.id).first<any>();
   if (!g) throw notVisible("grant");
   if (g.role === "owner") throw new CapError("NOT_AUTHORIZED_AT_SCOPE", "owners cannot be removed", "D3 — last owner is protected; transfer ownership first");
@@ -501,7 +507,7 @@ export const revoke: Handler = async (ctx, p) => {
   // Refused → no row changed (the sweep runs only when the DELETE removed its row, 0.35.14 DoD (a)), and the typed refusal
   // for the state the re-read finds (refuseGrantWrite).
   const [del, rev] = await ctx.db.batch([ctx.db.prepare(`DELETE FROM "grant" WHERE id = ?1 AND role <> 'owner'`
-    + ` AND ${callerHolds("?2", "?3", "?4", `(CASE WHEN ${roleRank('"grant".role')} > ${ROLE_RANK.member} THEN 'owner' ELSE 'member' END)`)}`)
+    + ` AND ${callerHolds("?2", "?3", "?4", `(CASE WHEN ${roleRank('"grant".role')} > ${ROLE_RANK.member} THEN 'owner' ELSE 'member' END)`)} AND (?3 <> 'assessment' OR ${callerHolds("?2", "?3", "?4", "'member'", true)})`)
     .bind(gid, ctx.principal.id, scope.type, scope.id), revokeOrphaned(ctx, g.principal_id, scope, true)]);
   if ((del.meta.changes ?? 0) !== 1) refuseGrantWrite(await reReadGrantWrite(ctx, scope, gid, "revoke"), "revoke");
   const revoked_invitations = rev.meta.changes ?? 0;
@@ -517,6 +523,7 @@ export const revoke: Handler = async (ctx, p) => {
 async function reReadGrantWrite(ctx: Ctx, scope: Scope, gid: string, op: "update_role" | "revoke", to?: Role): Promise<{ caller: Role; now: Role }> {
   const caller = await callerAt(ctx, scope, op === "update_role" ? "owner" : "member");
   if (op === "update_role") await directOwnerFor(ctx, scope, to);
+  else await directAssessmentRevoker(ctx, scope);
   const now = await ctx.db.prepare('SELECT role FROM "grant" WHERE id = ? AND scope_type = ? AND scope_id = ?').bind(gid, scope.type, scope.id).first<{ role: Role }>();
   if (!now) throw notVisible("grant");
   return { caller, now: now.role };

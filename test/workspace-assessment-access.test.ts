@@ -89,6 +89,35 @@ describe('authenticated workspace membership reaches contained assessments and r
       expect((await http('/v2/reports/' + reportId, who)).body.ok).toBe(false);
     }
   });
+  it('assessment revocation needs a direct grant, including after authority changes before the write', async () => {
+    const path = '/v2/assessment/' + aid + '/grants/revoke_target';
+    await run("INSERT INTO \"grant\"(id,principal_id,scope_type,scope_id,role,created_at) VALUES('revoke_target','outsider','assessment',?,'member','2026-10-27')", aid);
+    await run("INSERT INTO invitation(id,scope_type,scope_id,invitee_hash,token_hash,role,status,created_by,created_at,expires_at) VALUES('revoke_pending','assessment',?,'fixture_invitee','fixture_token','viewer','sent','outsider','2026-10-27','2099-01-01')", aid);
+    for(const who of ['member','owner']) {
+      expect((await http(path,who,undefined,'DELETE')).body).toMatchObject({ok:false,error:{code:'NOT_AUTHORIZED_AT_SCOPE'}});
+    }
+    await run("INSERT INTO \"grant\"(id,principal_id,scope_type,scope_id,role,created_at) VALUES('revoke_caller','member','assessment',?,'member','2026-10-27')", aid);
+    const original = env.DB;
+    for(const change of ['remove','demote']) {
+      await run("INSERT INTO \"grant\"(id,principal_id,scope_type,scope_id,role,created_at) VALUES('revoke_caller','member','assessment',?,'member','2026-10-27') ON CONFLICT(id) DO UPDATE SET role='member'", aid);
+      let prepared=false,intervened=false;
+      env.DB = {prepare(sql:string){if(sql.startsWith('DELETE FROM "grant" WHERE id = ?1'))prepared=true;return db.prepare(sql);},async batch(statements:D1PreparedStatement[]){
+        if(prepared && !intervened){intervened=true;await run(change==='remove'?"DELETE FROM \"grant\" WHERE id='revoke_caller'":"UPDATE \"grant\" SET role='viewer' WHERE id='revoke_caller'");}
+        return db.batch(statements);
+      }} as D1Database;
+      try {
+        expect((await http(path,'member',undefined,'DELETE')).body).toMatchObject({ok:false,error:{code:'NOT_AUTHORIZED_AT_SCOPE'}});
+        expect(intervened).toBe(true);
+        expect(await db.prepare("SELECT id FROM \"grant\" WHERE id='revoke_target'").first()).toBeTruthy();
+        expect((await db.prepare("SELECT status FROM invitation WHERE id='revoke_pending'").first<any>()).status).toBe('sent');
+      } finally {env.DB=original;}
+    }
+    await run("UPDATE \"grant\" SET role='member' WHERE id='revoke_caller'");
+    expect((await http(path,'member',undefined,'DELETE')).body).toMatchObject({ok:true,result:{revoked:true}});
+    expect(await db.prepare("SELECT id FROM \"grant\" WHERE id='revoke_target'").first()).toBeNull();
+    expect((await db.prepare("SELECT status FROM invitation WHERE id='revoke_pending'").first<any>()).status).toBe('revoked');
+    await run("DELETE FROM \"grant\" WHERE id='revoke_caller'");
+  });
   it('workspace revocation and ungrouping immediately end inherited report access', async () => {
     await run('DELETE FROM "grant" WHERE id=?', 'g_member');
     expect((await http('/v2/assessments/' + aid, 'member')).body.ok).toBe(false);

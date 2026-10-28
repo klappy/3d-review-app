@@ -1658,7 +1658,7 @@
       "slice": "v2.0-bcs",
       "section": "F. Invitations, codes, collaborators",
       "ui_surface": "",
-      "notes": "cannot remove owner; last-owner protected; undo=null (what was seen stays seen) — re-invite instead",
+      "notes": "Assessment scope requires a direct assessment member-or-owner grant, rechecked inside the guarded delete; inherited workspace access alone cannot revoke child grants. cannot remove owner; last-owner protected; undo=null (what was seen stays seen) — re-invite instead",
       "status": "target",
       "inverse": {
         "kind": "none",
