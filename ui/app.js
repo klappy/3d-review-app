@@ -271,8 +271,8 @@ async function chooseAssessment() {
   if (!stageCurrent(stageRead)) return;
   state.assessmentRole = result.assessment.role; showReportControls();
   renderAssessmentHeadrow(document, $('assessment-context'), result.assessment);
-  collab.setScope({ type: 'assessment', id: result.assessment.id, role: result.assessment.role });
-  text($('assessment-detail'), `${result.assessment.name} · stage ${result.assessment.stage} · exact role ${result.assessment.role}`);
+  collab.setScope({ type: 'assessment', id: result.assessment.id, role: result.assessment.direct_role ?? null });
+  text($('assessment-detail'), `${result.assessment.name} · stage ${result.assessment.stage} · effective role ${result.assessment.role}`);
   const next = { prepare: 'collect', collect: 'understand', understand: 'improve', improve: 'understand' }[result.assessment.stage];
   if (next) $('stage-target').value = next;
   for (const survey of result.surveys || []) option($('surveys'), survey.id, `${survey.template_name} · ${survey.collection_status}`);
@@ -354,8 +354,8 @@ async function chooseGrantedAssessment() {
   if (!stageCurrent(stageRead)) return;
     state.assessmentRole = result.assessment.role; showReportControls();
     renderAssessmentHeadrow(document, $('assessment-context'), result.assessment);
-    collab.setScope({ type: 'assessment', id: result.assessment.id, role: result.assessment.role });
-    text($('granted-detail'), `${result.assessment.name} · stage ${result.assessment.stage} · exact role ${result.assessment.role}`);
+    collab.setScope({ type: 'assessment', id: result.assessment.id, role: result.assessment.direct_role ?? null });
+    text($('granted-detail'), `${result.assessment.name} · stage ${result.assessment.stage} · effective role ${result.assessment.role}`);
     for (const survey of result.surveys || []) option($('surveys'), survey.id, survey.template_name || survey.id);
     lensSurveys?.set({ aid: result.assessment.id, role: result.assessment.role, stage: result.assessment.stage, surveys: result.surveys || [], templates: state.templates || [], canOpen: !$('survey-card').hidden });
     entityScreen?.render();
