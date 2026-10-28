@@ -1536,7 +1536,7 @@
       "slice": "v2.0-bcs",
       "section": "F. Invitations, codes, collaborators",
       "ui_surface": "collaborators panel",
-      "notes": "compensating control (does not unsend)",
+      "notes": "compensating control (does not unsend); revoking an owner invitation requires a direct owner grant; the direct-role ceiling and invitation state are rechecked inside the guarded update",
       "status": "target",
       "inverse": {
         "kind": "none",

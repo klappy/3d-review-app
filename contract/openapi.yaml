@@ -2963,7 +2963,7 @@ paths:
     delete:
       operationId: cap.grant.revoke_invitation
       summary: "cap.grant.revoke_invitation — write.reversible — roles: O, M(≤M); project and assessment scopes need a direct member-or-owner grant at that scope (an inherited workspace role is refused)"
-      description: "compensating control (does not unsend)"
+      description: "compensating control (does not unsend); revoking an owner invitation requires a direct owner grant; the direct-role ceiling and invitation state are rechecked inside the guarded update"
       x-capability: cap.grant.revoke_invitation
       x-class: write.reversible
       x-tool: write

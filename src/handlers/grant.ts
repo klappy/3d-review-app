@@ -263,17 +263,31 @@ export const invite: Handler = async (ctx, p, o) => {
   return { result: { invitation_id: id, role, status: stored, accepted: true, delivered: delivery.delivered, delivery: { provider: delivery.provider ?? null, state: delivery.state, reason: delivery.reason ?? null, ...(delivery.provider_status !== undefined ? { provider_status: delivery.provider_status } : {}) }, note, ...(ctx.env.ENVIRONMENT === "dev" ? { dev_only_link_token: token } : {}) }, scope, impact };
 };
 
+async function invitationRevoker(ctx: Ctx, scope: Scope, role: Role) {
+  const caller = await callerAt(ctx, scope, "member");
+  ceiling(caller, role, "revoke invitations");
+  await directAtChildScope(ctx, scope);
+  if (role === "owner") await directRoleAt(ctx, scope.type, scope.id, "owner");
+}
 export const revoke_invitation: Handler = async (ctx, p) => {
   const id = reqStr(p, "id");
   const inv = await ctx.db.prepare("SELECT id, scope_type, scope_id, role, status FROM invitation WHERE id = ?").bind(id).first<any>();
   if (!inv) throw notVisible("invitation");
   const scope: Scope = { type: inv.scope_type, id: inv.scope_id };
-  const caller = await callerAt(ctx, scope, "member");
-  ceiling(caller, inv.role as Role, "revoke invitations");
-  await directAtChildScope(ctx, scope);
-  // 'unconfirmed' is revocable: it is the explicit human path out of an uncertain send (revoke, then invite anew).
+  await invitationRevoker(ctx, scope, inv.role);
+  // 'unconfirmed' is revocable: the explicit human path out of an uncertain send.
   if (inv.status === "accepted") throw new CapError("INVALID_PARAMS", "already accepted — revoke the grant instead", undefined, "cap.grant.revoke");
-  await ctx.db.prepare("UPDATE invitation SET status = 'revoked' WHERE id = ?").bind(id).run();
+  const min = inv.role === "owner" ? "owner" : "member";
+  const written = await ctx.db.prepare(`UPDATE invitation SET status = 'revoked' WHERE id = ?1 AND scope_type = ?2 AND scope_id = ?3 AND role = ?4 AND status != 'accepted'
+    AND ${callerHolds("?5", "?2", "?3", `'${min}'`, scope.type === "project" || scope.type === "assessment")}`)
+    .bind(id, scope.type, scope.id, inv.role, ctx.principal.id).run();
+  if (!written.meta.changes) {
+    await invitationRevoker(ctx, scope, inv.role);
+    const live = await ctx.db.prepare("SELECT status FROM invitation WHERE id = ?").bind(id).first<any>();
+    if (!live) throw notVisible("invitation");
+    if (live.status === "accepted") throw new CapError("INVALID_PARAMS", "already accepted — revoke the grant instead", undefined, "cap.grant.revoke");
+    throw new CapError("STAGE_CONFLICT", "invitation changed while revocation was being checked", "refresh invitations before retrying");
+  }
   return { result: { id, status: "revoked" }, scope };
 };
 

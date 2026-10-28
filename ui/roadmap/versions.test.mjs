@@ -19,3 +19,12 @@ test('S11f: absent release/changes/ = zero pending, forecast none, no crash',asy
 test('lane must be numeric: parsed from the lane line or the filename prefix',()=>{assert.equal(parseChange('13-1854.md','bump: patch\nlane: 13 · PR: #372\n- Fixed - x').lane,13);assert.equal(parseLane('7-1200.md','bump: patch\n- Fixed - x'),7);assert.equal(parseLane('x.md','lane:13·PR: #1'),13);});
 test('non-numeric lane is refused loudly, never NaN or a digit prefix',()=>{assert.throws(()=>parseChange('s11f-roadmap-empty-changes-1854.md','bump: patch\nlane: 3d-review S11f · PR: (this PR)\n- Fixed - x'),/lane "3d-review" is not a number/);assert.throws(()=>parseChange('u07-0811.md','bump: patch\nlane: u07 · PR: #341\n- Fixed - x'),/u07-0811\.md: lane "u07"/);assert.throws(()=>parseChange('s9-me-1700.md','bump: patch\n- Fixed - x'),/lane "s9" is not a number/);});
 test('every pending change file in release/changes parses to a numeric lane',()=>{for(const c of readChanges())assert.ok(Number.isInteger(c.lane),c.file);});
+
+test('tracked roadmap version data includes the canonical current release and its notes',async()=>{
+ const {readFile}=await import('node:fs/promises');const {VERSIONS}=await import('./versions-data.js');
+ const canonical=JSON.parse(await readFile(new URL('../../release/cookbook/releases.json',import.meta.url),'utf8'));
+ assert.equal(VERSIONS.current,canonical.current);
+ const shown=VERSIONS.shipped.find(v=>v.version===canonical.current),record=canonical.versions.find(v=>v.version===canonical.current);
+ assert.ok(shown,'roadmap must include current release');
+ assert.deepEqual(shown.fixed,record.sections.fixed??[]);
+});

@@ -217,6 +217,45 @@ describe('authenticated workspace membership reaches contained assessments and r
       expect((await http('/v2/assessments/'+aid,'outsider')).body.ok).toBe(true);
     } finally {env.DB=original;await run('UPDATE project SET workspace_id=? WHERE id=?','ws_inherited',pid);await run('DELETE FROM "grant" WHERE id=?','group_workspace');}
   });
+  it('invitation revocation uses direct-role ceiling and retains it at write time', async () => {
+    const original=env.DB;
+    for(const [scope,id] of [['assessment',aid],['project',pid]]) {
+      const iid='ceiling_'+scope, path='/v2/invitations/'+iid;
+      await run(`INSERT INTO "grant"(id,principal_id,scope_type,scope_id,role,created_at) VALUES('ceiling_caller','owner',?,?,'member','2026-10-27')`,scope,id);
+      await run(`INSERT INTO invitation(id,scope_type,scope_id,invitee_hash,token_hash,role,status,created_by,created_at,expires_at) VALUES(?,?,?,'ceiling_recipient',?,'owner','sent','person_mara','2026-10-27','2099-01-01')`,iid,scope,id,'token_'+iid);
+      const status=async()=>(await db.prepare('SELECT status FROM invitation WHERE id=?').bind(iid).first<any>()).status;
+      try {
+        expect((await http(path,'owner',undefined,'DELETE')).body).toMatchObject({ok:false,error:{code:'NOT_AUTHORIZED_AT_SCOPE'}});
+        expect(await status()).toBe('sent');
+        await run(`UPDATE "grant" SET role='owner' WHERE id='ceiling_caller'`);
+        expect((await http(path,'owner',undefined,'DELETE')).body).toMatchObject({ok:true,result:{status:'revoked'}});
+        for(const change of ['demote','remove','accepted']) {
+          await run(`INSERT INTO "grant"(id,principal_id,scope_type,scope_id,role,created_at) VALUES('ceiling_caller','owner',?,?,'owner','2026-10-27') ON CONFLICT(id) DO UPDATE SET role='owner'`,scope,id);
+          await run(`UPDATE invitation SET status='sent' WHERE id=?`,iid);
+          let intervened=false;
+          const wrap=(st:any):any=>new Proxy(st,{get(target,key){
+            if(key==='bind')return (...args:any[])=>wrap(target.bind(...args));
+            if(key==='run')return async()=>{
+              intervened=true;
+              if(change==='accepted')await run(`UPDATE invitation SET status='accepted' WHERE id=?`,iid);
+              else await run(change==='demote'?`UPDATE "grant" SET role='member' WHERE id='ceiling_caller'`:`DELETE FROM "grant" WHERE id='ceiling_caller'`);
+              return target.run();
+            };
+            const v=target[key];return typeof v==='function'?v.bind(target):v;
+          }});
+          env.DB={prepare(sql:string){const st=db.prepare(sql);return sql.startsWith("UPDATE invitation SET status = 'revoked' WHERE id = ?1")?wrap(st):st;},batch:(st:D1PreparedStatement[])=>db.batch(st)} as any;
+          const refused=await http(path,'owner',undefined,'DELETE');
+          expect(intervened).toBe(true);
+          expect(refused.body.ok).toBe(false);
+          expect(await status()).toBe(change==='accepted'?'accepted':'sent');
+          env.DB=original;
+        }
+        await run(`INSERT INTO "grant"(id,principal_id,scope_type,scope_id,role,created_at) VALUES('ceiling_caller','owner',?,?,'member','2026-10-27') ON CONFLICT(id) DO UPDATE SET role='member'`,scope,id);
+        await run(`UPDATE invitation SET role='member',status='sent' WHERE id=?`,iid);
+        expect((await http(path,'owner',undefined,'DELETE')).body).toMatchObject({ok:true,result:{status:'revoked'}});
+      } finally {env.DB=original;await run('DELETE FROM invitation WHERE id=?',iid);await run(`DELETE FROM "grant" WHERE id='ceiling_caller'`);}
+    }
+  });
   it('workspace revocation and ungrouping immediately end inherited report access', async () => {
     await run('DELETE FROM "grant" WHERE id=?', 'g_member');
     expect((await http('/v2/assessments/' + aid, 'member')).body.ok).toBe(false);
