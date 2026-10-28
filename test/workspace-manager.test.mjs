@@ -90,7 +90,7 @@ test('legacy grouping discloses inherited project assessment and report access b
  const f=fixture({projects:[{id:'owned',name:'Owned',role:'owner',direct_role:'owner'}]});await f.open();
  const shown=text(f.root);
  assert.match(shown,/Grouping gives everyone in this workspace access to the project, its assessments and their available reports at their workspace role/);
- assert.match(shown,/Removing it ends inherited access; existing direct grants remain/);
+ assert.match(shown,/Removing it ends inherited access; people added to a project directly keep their access/);
  assert.doesNotMatch(shown,/Access to each project is separate/);
  const nodes=walk(f.root), notice=nodes.findIndex(n=>n.textContent.startsWith('Grouping gives'));
  const action=nodes.findIndex(n=>n.tagName==='button'&&n.textContent==='Add project to workspace');
