@@ -69,3 +69,16 @@ describe('permissions topic follows the established containment rule', () => {
     expect(out.result.text).not.toContain('an assessment opens only by its own grant');
   });
 });
+
+describe('served child-scope delegation guidance', () => {
+  it.each(['cap.grant.invite','cap.grant.revoke_invitation'])('%s requires a direct grant at either child scope', async capability => {
+    const out = await docs(stubCtx, {capability});
+    expect(out.result.roles).toContain('project and assessment scopes need a direct member-or-owner grant at that scope');
+    expect(out.result.roles).toContain('an inherited workspace role is refused');
+  });
+  it('role changes require direct ownership for both child scopes', async () => {
+    const out = await docs(stubCtx, {capability:'cap.grant.update_role'});
+    expect(out.result.roles).toBe('O');
+    expect(out.result.rules).toContain('at a project or assessment any role change needs a direct owner at that scope');
+  });
+});

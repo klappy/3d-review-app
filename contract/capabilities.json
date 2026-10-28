@@ -1501,7 +1501,7 @@
         "path": "/v2/{scope}/{id}/invitations",
         "path_inferred": false
       },
-      "roles": "O, M(≤M); project scope needs a direct project grant (an inherited workspace role is refused)",
+      "roles": "O, M(≤M); project and assessment scopes need a direct member-or-owner grant at that scope (an inherited workspace role is refused)",
       "slice": "v2.0-bcs",
       "section": "F. Invitations, codes, collaborators",
       "ui_surface": "\"Invite collaborator\" + impact preview → confirm",
@@ -1532,7 +1532,7 @@
         "path": "/v2/invitations/{id}",
         "path_inferred": false
       },
-      "roles": "O, M(≤M); project scope needs a direct project grant (an inherited workspace role is refused)",
+      "roles": "O, M(≤M); project and assessment scopes need a direct member-or-owner grant at that scope (an inherited workspace role is refused)",
       "slice": "v2.0-bcs",
       "section": "F. Invitations, codes, collaborators",
       "ui_surface": "collaborators panel",
@@ -1627,7 +1627,7 @@
       "slice": "v2.0-bcs",
       "section": "F. Invitations, codes, collaborators",
       "ui_surface": "impact preview → confirm",
-      "notes": "elevation = grant release (effect); demotion is the compensating control; member cannot elevate above self (D3 proposed); noop (0.35.16): when the grant already holds the requested role (at first read, or set there by another writer before this write), the result, the dry_run result and impact, and the receipt carry noop: true; the impact then names no effect and no compensating control, and the receipt credits the caller with no change (no undo token, no compensating control); confirm (0.35.17): the dry_run binds the role it read into the confirm token, and an execute that reads another role is refused with CONFIRM_REQUIRED (dry_run again); 0.35.19: the token also binds the revoked_invitations count a downgrade preview showed; 0.35.20: it binds the swept invitation id set (not only the count), and the UPDATE re-checks that set in its own WHERE (a same-count swap of the holder's open invitations between preview, token check and write is refused with CONFIRM_REQUIRED and changes nothing); 0.35.23 (ASK-f4-finding4 default 1): at a project any role change needs a direct project owner; an inherited workspace owner is NOT_AUTHORIZED_AT_SCOPE",
+      "notes": "elevation = grant release (effect); demotion is the compensating control; member cannot elevate above self (D3 proposed); noop (0.35.16): when the grant already holds the requested role (at first read, or set there by another writer before this write), the result, the dry_run result and impact, and the receipt carry noop: true; the impact then names no effect and no compensating control, and the receipt credits the caller with no change (no undo token, no compensating control); confirm (0.35.17): the dry_run binds the role it read into the confirm token, and an execute that reads another role is refused with CONFIRM_REQUIRED (dry_run again); 0.35.19: the token also binds the revoked_invitations count a downgrade preview showed; 0.35.20: it binds the swept invitation id set (not only the count), and the UPDATE re-checks that set in its own WHERE (a same-count swap of the holder's open invitations between preview, token check and write is refused with CONFIRM_REQUIRED and changes nothing); 0.35.23 (ASK-f4-finding4 default 1): at a project or assessment any role change needs a direct owner at that scope; an inherited workspace owner is NOT_AUTHORIZED_AT_SCOPE",
       "status": "target",
       "inverse": {
         "kind": "none",
