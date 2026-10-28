@@ -4,6 +4,7 @@ import { Miniflare, convertV4MiniflareOptions } from 'miniflare';
 import worker from '../src/worker';
 import { mintSession } from '../src/auth';
 import { sha256 } from '../src/handlers/common';
+import { docs } from '../src/handlers/docs';
 
 const mf = new Miniflare(convertV4MiniflareOptions({ workers: [{ name: 'workspace-assessment-access', modules: true,
   script: "export default {fetch(){return new Response('isolated fixture')}}", d1Databases: { DB: 'workspace-assessment-access' }, kvNamespaces: { OAUTH_KV: 'fixture-kv' } }] }));
@@ -124,9 +125,11 @@ describe('authenticated workspace membership reaches contained assessments and r
       const iid='before_workspace_'+scope, token='fixture_'+iid;
       await run("INSERT INTO invitation(id,scope_type,scope_id,invitee_hash,token_hash,role,status,created_by,created_at,expires_at) VALUES(?,?,?,?,?,'member','sent','person_mara','2026-10-27','2099-01-01')",iid,scope,id,await sha256('outsider@example.invalid'),await sha256(token));
       const byId='/v2/me/invitations/'+iid+'/accept', byToken='/v2/invitations/'+token+'/accept';
+      expect((await http('/v2/me/invitations','outsider')).body.result.invitations.some((i:any)=>i.id===iid)).toBe(true);
       const previews = new Map<string,any>();
       for (const endpoint of [byId,byToken]) {const preview=await http(endpoint,'outsider',{mode:'dry_run'});expect(preview.body.ok).toBe(true);previews.set(endpoint,preview.body.result.confirm_token);}
       await run("INSERT INTO \"grant\"(id,principal_id,scope_type,scope_id,role,created_at) VALUES('accept_inherited','outsider','workspace','ws_inherited','viewer','2026-10-27')");
+      expect((await http('/v2/me/invitations','outsider')).body.result.invitations.some((i:any)=>i.id===iid)).toBe(false);
       for(const endpoint of [byId,byToken]) {
         expect((await http(endpoint,'outsider',{mode:'dry_run'})).body).toMatchObject({ok:false,error:{code:'NOT_AUTHORIZED_AT_SCOPE'}});
         expect((await http(endpoint,'outsider',{mode:'execute',confirm_token:previews.get(endpoint)})).body).toMatchObject({ok:false,error:{code:'NOT_AUTHORIZED_AT_SCOPE'}});
@@ -146,12 +149,66 @@ describe('authenticated workspace membership reaches contained assessments and r
         expect(await db.prepare('SELECT role FROM "grant" WHERE principal_id=? AND scope_type=? AND scope_id=?').bind('outsider',scope,id).first()).toBeNull();
         expect((await db.prepare('SELECT status FROM invitation WHERE id=?').bind(iid).first<any>()).status).toBe('sent');
       } finally {env.DB=original;await run("DELETE FROM \"grant\" WHERE id='accept_inherited'");}
+      expect((await http('/v2/me/invitations','outsider')).body.result.invitations.some((i:any)=>i.id===iid)).toBe(true);
       const preview=await http(byId,'outsider',{mode:'dry_run'});
       expect(preview.body.ok).toBe(true);
       expect((await http(byId,'outsider',{mode:'execute',confirm_token:preview.body.result.confirm_token})).body).toMatchObject({ok:true,result:{granted:true,role:'member'}});
       await run('DELETE FROM "grant" WHERE principal_id=? AND scope_type=? AND scope_id=?','outsider',scope,id);
       await run('DELETE FROM invitation WHERE id=?',iid);
     }
+  });
+  it('scoped docs preserve effective content actions but exclude direct-only assessment actions', async () => {
+    const ask = async (who:string,type='assessment',id=aid) => (await docs({db,principal:{kind:'user',id:who}} as any,{scope:{type,id}})).result.can as string[];
+    const restricted=['cap.assessment.delete','cap.assessment.archive','cap.assessment.unarchive','cap.grant.invite','cap.grant.revoke','cap.grant.revoke_invitation','cap.grant.update_role','cap.grant.transfer_owner'];
+    for(const who of ['owner','member']) {
+      const can=await ask(who);
+      for(const id of restricted) expect(can).not.toContain(id);
+      expect(can).toContain('cap.assessment.notes.update');
+      expect(can).toContain('cap.results.summary');
+      const projectCan=await ask(who,'project',pid);
+      for(const id of ['cap.grant.invite','cap.grant.revoke_invitation','cap.grant.update_role','cap.grant.transfer_owner']) expect(projectCan).not.toContain(id);
+    }
+    for(const role of ['member','owner']) {
+      await run(`INSERT INTO "grant"(id,principal_id,scope_type,scope_id,role,created_at) VALUES(?,?,'assessment',?,?,?)`,'docs_direct','owner',aid,role,'2026-10-27');
+      const can=await ask('owner');
+      for(const id of ['cap.grant.invite','cap.grant.revoke','cap.assessment.archive']) expect(can).toContain(id);
+      for(const id of ['cap.assessment.delete','cap.grant.update_role','cap.grant.transfer_owner']) expect(can.includes(id)).toBe(role==='owner');
+      await run('DELETE FROM "grant" WHERE id=?','docs_direct');
+    }
+  });
+  it('grouping rechecks both authorities and expected containment inside the write', async () => {
+    const original=env.DB;
+    const endpoint='/v2/workspaces/ws_other/projects/'+pid;
+    try {
+      for(const change of ['project-remove','project-demote','workspace-remove','workspace-demote','regroup']) {
+        await run('UPDATE project SET workspace_id=NULL WHERE id=?',pid);
+        await run("INSERT INTO \"grant\"(id,principal_id,scope_type,scope_id,role,created_at) VALUES('g_project_only','project_only','project',?,'owner','2026-10-27') ON CONFLICT(id) DO UPDATE SET role='owner'",pid);
+        await run("INSERT INTO \"grant\"(id,principal_id,scope_type,scope_id,role,created_at) VALUES('group_workspace','project_only','workspace','ws_other','member','2026-10-27') ON CONFLICT(id) DO UPDATE SET role='member'");
+        let intervened=false;
+        const wrap=(statement:any):any=>new Proxy(statement,{get(target,key){
+          if(key==='bind')return (...args:any[])=>wrap(target.bind(...args));
+          if(key==='run')return async()=>{
+            intervened=true;
+            if(change==='regroup')await run('UPDATE project SET workspace_id=? WHERE id=?','ws_inherited',pid);
+            else {const id=change.startsWith('project')?'g_project_only':'group_workspace';await run(change.endsWith('remove')?'DELETE FROM "grant" WHERE id=?':`UPDATE "grant" SET role='viewer' WHERE id=?`,id);}
+            return target.run();
+          };
+          const v=target[key];return typeof v==='function'?v.bind(target):v;
+        }});
+        env.DB={prepare(sql:string){const st=db.prepare(sql);return sql.startsWith('UPDATE project SET workspace_id = ?1')?wrap(st):st;},batch:(st:D1PreparedStatement[])=>db.batch(st)} as any;
+        const refused=await http(endpoint,'project_only',{});
+        expect(intervened).toBe(true);
+        expect(refused.body.ok).toBe(false);
+        expect((await db.prepare('SELECT workspace_id FROM project WHERE id=?').bind(pid).first<any>()).workspace_id).not.toBe('ws_other');
+        expect((await http('/v2/assessments/'+aid,'outsider')).body.ok).toBe(false);
+        env.DB=original;
+      }
+      await run('UPDATE project SET workspace_id=NULL WHERE id=?',pid);
+      await run("UPDATE \"grant\" SET role='owner' WHERE id='g_project_only'");
+      await run("UPDATE \"grant\" SET role='member' WHERE id='group_workspace'");
+      expect((await http(endpoint,'project_only',{})).body).toMatchObject({ok:true,result:{grouped:true}});
+      expect((await http('/v2/assessments/'+aid,'outsider')).body.ok).toBe(true);
+    } finally {env.DB=original;await run('UPDATE project SET workspace_id=? WHERE id=?','ws_inherited',pid);await run('DELETE FROM "grant" WHERE id=?','group_workspace');}
   });
   it('workspace revocation and ungrouping immediately end inherited report access', async () => {
     await run('DELETE FROM "grant" WHERE id=?', 'g_member');

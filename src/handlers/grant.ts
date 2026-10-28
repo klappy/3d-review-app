@@ -395,8 +395,9 @@ export const mine: Handler = async (ctx) => {
         LEFT JOIN project p2 ON p2.id = a2.project_id
         LEFT JOIN workspace w2 ON w2.id = p2.workspace_id
       WHERE i.invitee_hash = ? AND i.scope_type IN (${GRANT_SCOPES.map(() => "?").join(",")}) AND i.status IN (${LIVE_STATUSES.map(() => "?").join(",")})
-        AND ${unexpired("i", "?")} AND i.created_by IS NOT ? AND ${inviterStands("i")} ORDER BY i.created_at, i.id`)
-    .bind(me.email_hash, ...GRANT_SCOPES, ...LIVE_STATUSES, nowIso(ctx), ctx.principal.id).all<InvitationRow>();
+        AND ${unexpired("i", "?")} AND i.created_by IS NOT ? AND ${inviterStands("i")}
+        AND NOT ${inheritedWorkspaceAccess("i.scope_type", "i.scope_id", "?")} ORDER BY i.created_at, i.id`)
+    .bind(me.email_hash, ...GRANT_SCOPES, ...LIVE_STATUSES, nowIso(ctx), ctx.principal.id, ctx.principal.id).all<InvitationRow>();
   const invitations = r.results.map((i) => {
     const { name, path } = scopeNames(i);
     return { id: i.id, scope: { type: i.scope_type, id: i.scope_id, name, path }, role: i.role, inviter_display_name: null, invited_at: i.created_at, expires_at: i.expires_at };

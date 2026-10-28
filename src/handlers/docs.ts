@@ -3,6 +3,7 @@ import type { Ctx, Handler, Role, ScopeType } from "./types";
 import { CapError } from "./types";
 import { capabilities, byId, contractName, sourceSha, type Capability } from "../registry";
 import { roleAt, requiredRole, roleMeets } from "../policy";
+import { directGrantRoleAt } from "./common";
 
 const CEILING = "klappy://canon/constraints/mcp-tool-surface-ceiling";
 const TOPICS: Record<string, string> = {
@@ -248,7 +249,16 @@ export const docs: Handler = async (ctx, a) => {
       if (!r) throw new CapError("NOT_FOUND_OR_NOT_VISIBLE", "not found or not visible");
       role = r;
     } else if (ctx.principal.kind === "user" && !a.role) role = "member";
-    const can = allowedFor(role);
+    let can = allowedFor(role);
+    if (ctx.principal.kind === "user" && a.scope?.id && ['project','assessment'].includes(a.scope?.type)) {
+      const direct = await directGrantRoleAt(ctx, a.scope.type, a.scope.id);
+      const memberOnly = new Set(['cap.grant.invite','cap.grant.revoke_invitation',
+        ...(a.scope.type === 'assessment' ? ['cap.grant.revoke','cap.assessment.archive','cap.assessment.unarchive'] : [])]);
+      const ownerOnly = new Set(['cap.grant.update_role','cap.grant.transfer_owner',
+        ...(a.scope.type === 'assessment' ? ['cap.assessment.delete'] : [])]);
+      can = can.filter(id => (!memberOnly.has(id) || (direct !== null && roleMeets(direct,'member')))
+        && (!ownerOnly.has(id) || direct === 'owner'));
+    }
     // next_best never names a verb the role cannot call (U16): stages whose step is outside `can` are omitted.
     const next_best = Object.fromEntries(Object.entries(NEXT_BEST).filter(([, id]) => can.includes(id)));
     return { result: { role, scope: a.scope ?? null, can, next_best } };

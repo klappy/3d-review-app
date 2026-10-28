@@ -125,7 +125,14 @@ export const add_project: Handler = async (ctx, params) => {
   const pid = reqStr(params, "pid");
   const { p } = await shareAuthority(ctx, wid, pid, "add");
   if (p.workspace_id && p.workspace_id !== wid) throw new CapError("INVALID_PARAMS", "project already grouped in another workspace", "remove_project first");
-  await ctx.db.prepare("UPDATE project SET workspace_id = ? WHERE id = ?").bind(wid, pid).run();
+  const written = await ctx.db.prepare(`UPDATE project SET workspace_id = ?1 WHERE id = ?2 AND workspace_id IS ?3
+    AND EXISTS (SELECT 1 FROM "grant" pg WHERE pg.principal_id = ?4 AND pg.scope_type = 'project' AND pg.scope_id = project.id AND pg.role = 'owner')
+    AND EXISTS (SELECT 1 FROM "grant" wg WHERE wg.principal_id = ?4 AND wg.scope_type = 'workspace' AND wg.scope_id = ?1 AND wg.role IN ('member','owner'))`)
+    .bind(wid, pid, p.workspace_id, ctx.principal.id).run();
+  if (!written.meta.changes) {
+    await shareAuthority(ctx, wid, pid, "add");
+    throw new CapError("STAGE_CONFLICT", "project grouping changed while access was being checked", "re-read the project before grouping again");
+  }
   const affectedGrants = await countScalar(ctx, 'SELECT COUNT(*) AS n FROM "grant" WHERE scope_type = ? AND scope_id = ?', "workspace", wid);
   return { result: { workspace_id: wid, project_id: pid, grouped: true, workspace_grantees_now_listing: affectedGrants }, scope: { type: "workspace", id: wid }, priorState: { workspace_id: p.workspace_id } };
 };
