@@ -1,6 +1,6 @@
 /** Internal C2a store–renderer integration. No public handler or authorization shortcut. */
 import type { Ctx } from './handlers/types.js';
-import { REPORT_CAPTURE_CTE, attestPackedCapture, decodePackedCapture, type CapturedAssessment } from './report-capture.js';
+import { REPORT_CAPTURE_CTE, attestPackedCapture, type CapturedAssessment } from './report-capture.js';
 import { canonicalJson, parseBoundedJson, sha256Bytes } from './report-canonical-json.js';
 import { ATTESTATION_TRUST } from './synthetic-attestation-trust.js';
 import { renderAttestedCapture, REPORT_SCHEMA, REPORT_VERSIONS } from './synthetic-report-renderer.js';
@@ -158,7 +158,7 @@ export const REPORT_OBSERVE_SQL=REPORT_CAPTURE_CTE+`
 SELECT t.id AS assessment_id,c.capture_json AS current_capture
 FROM target t LEFT JOIN captured c ON c.assessment_id=t.id;`;
 type Observation={assessment_id:string;current_capture:string|null};
-type BuildObservation={ok:true;aid:string;capture:CapturedAssessment|null;responses:number}|{ok:false;reason:'NOT_VISIBLE'|'UNAVAILABLE'};
+type BuildObservation={ok:true;aid:string;capture:CapturedAssessment|null;belowMinimum:boolean}|{ok:false;reason:'NOT_VISIBLE'|'UNAVAILABLE'};
 /** One authorized SELECT; subsequent attestation uses only its immutable bytes. role: the grant floor of that SELECT ('member' for
  * build and preview; 'viewer' only for the read-only eligibility answer on Results, which never builds). */
 async function observeBuild(ctx:StoreContext,assessmentId:string,attest:Attest=attestPackedCapture,role:'member'|'viewer'='member'):Promise<BuildObservation>{
@@ -172,21 +172,22 @@ async function observeBuild(ctx:StoreContext,assessmentId:string,attest:Attest=a
   if(row.assessment_id!==aid)return UNAVAILABLE;
   const current=await attest(aid,row.current_capture??'',participantAdmission(ctx),participantMinimum(ctx));
   stageSpan(ctx,'attest_observe',t);
-  // The captured response count (no capture = none; an undecodable one is not a count problem): only for the hold reason.
-  let responses=0;if(row.current_capture){try{responses=decodePackedCapture(aid,row.current_capture).length;}catch{responses=Number.POSITIVE_INFINITY;}}
-  return {ok:true,aid,capture:current.eligible?current.capture:null,responses};
+  // Only for the hold reason (Codex P2 4406305544): a count to collect is the attestation's own below-minimum refusal, or no capture
+  // at all (zero responses); a mixed-source, mismatched or undecodable capture is a capture problem whatever its row count.
+  const belowMinimum=!current.eligible&&(current.belowMinimum===true||!row.current_capture);
+  return {ok:true,aid,capture:current.eligible?current.capture:null,belowMinimum};
 }
-function holdReason(ctx:StoreContext,eligible:boolean,responses:number):HoldReason{
+function holdReason(ctx:StoreContext,eligible:boolean,belowMinimum:boolean):HoldReason{
   if(eligible)return null;
   if(!participantAdmission(ctx))return 'environment';
-  return responses<participantMinimum(ctx)?'count':'capture';
+  return belowMinimum?'count':'capture';
 }
 /** The one build-eligibility decision and its reason (Codex P2s 4383599307, 4383751986). The build dry run (role 'member') reads
  * only its result, unchanged; Results (role 'viewer', read-only) reads both, so report_build_allowed, report_hold_reason and the
  * build cannot disagree: participant admission, the floor and trusted synthetic captures are decided here, not re-derived. */
 export async function observeBuildDecision(ctx:StoreContext,assessmentId:string,role:'member'|'viewer'='member'):Promise<BuildDecision>{
   const observation=await observeBuild(ctx,assessmentId,attestPackedCapture,role);if(!observation.ok)return {result:observation,hold:null};
-  const decided=(eligible:boolean):BuildDecision=>({result:{ok:true,marker:marker(observation.aid,eligible)},hold:holdReason(ctx,eligible,observation.responses)});
+  const decided=(eligible:boolean):BuildDecision=>({result:{ok:true,marker:marker(observation.aid,eligible)},hold:holdReason(ctx,eligible,observation.belowMinimum)});
   if(!observation.capture)return decided(false);
   const t=clock();
   try{await descriptor().render(observation.capture);stageSpan(ctx,'render_preview',t);return decided(true);}

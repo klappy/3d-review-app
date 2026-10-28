@@ -1,5 +1,8 @@
 import {readFileSync} from 'node:fs';
-import {beforeAll,afterAll,describe,it,expect} from 'vitest';
+import {beforeAll,afterAll,describe,it,expect,vi} from 'vitest';
+// Render-failure seam for the hold-reason test below: off by default, so every other test renders for real.
+const renderFault=vi.hoisted(()=>({on:false}));
+vi.mock('../src/synthetic-report-renderer',async(orig)=>{const m:any=await orig();return {...m,renderAttestedCapture:(c:unknown)=>{if(renderFault.on)throw new Error('render fault (test)');return m.renderAttestedCapture(c);}};});
 import {Miniflare,convertV4MiniflareOptions} from 'miniflare';
 import {summary} from '../src/handlers/results';
 import {list as responseList} from '../src/handlers/response';
@@ -128,5 +131,24 @@ describe('S28: Results, responses list and report agree below the D7 minimum',()
   for(const v of [r,l]){expect(v).not.toHaveProperty('responses_in');expect(v).not.toHaveProperty('responses_needed');}
   const preview:any=(await build(ctx(),{aid:full},{dryRun:true} as any)).result;expect(preview).toMatchObject({suppressed:false,status:'ready'});
   const made:any=(await build(ctx(),{aid:full})).result;expect(made.suppressed).toBe(false);expect(made.report?.id).toMatch(/^sreport_/);
+ },60000);
+ it('Codex P2 4406305544: "count" only for the below-minimum refusal; a mixed-source or unrenderable capture is "capture"',async()=>{
+  const P=ctx('production');
+  const reason=async(aid:string)=>{const r:any=(await summary(P,{aid})).result;return [r.report_build_allowed,r.report_hold_reason];};
+  // pure participant below the floor: collect more
+  expect(await reason(three)).toEqual([false,'count']);
+  // render failure on an attested capture (50 participant responses, above the floor): not a count to collect
+  renderFault.on=true;try{expect(await reason(full)).toEqual([false,'capture']);}finally{renderFault.on=false;}
+  expect(await reason(full)).toEqual([true,null]);
+  // mixed source below the floor: one pinned synthetic response plus one participant response (2 < 5). Move the other synthetic
+  // rows to a spill review's surveys, then add a participant row; attestCapture refuses MIXED_SOURCE, which more responses never fix.
+  const spill='assess_s28_spill';await clone(spill,0);
+  const ids=(await db.prepare(`SELECT r.id FROM response r JOIN assessment_survey s ON s.id=r.assessment_survey_id WHERE s.assessment_id=? ORDER BY r.id`).bind(src).all<{id:string}>()).results.map(x=>x.id);
+  expect(ids.length).toBeGreaterThan(1);
+  for(const id of ids.slice(1))await run(`UPDATE response SET assessment_survey_id=?1||assessment_survey_id WHERE id=?2`,spill,id);
+  await run(`INSERT INTO response (id,assessment_survey_id,respondent_id,idempotency_key,answers_json,template_id,template_version,source,submitted_at) SELECT 's28p_'||id,assessment_survey_id,'s28p_'||respondent_id,'s28p_'||idempotency_key,answers_json,template_id,template_version,'participant',submitted_at FROM response WHERE id=?1`,ids[0]);
+  const c=await captureForBuild(P,src);expect(c.eligible).toBe(false);
+  expect(await reason(src)).toEqual([false,'capture']);
+  expect((await build(P,{aid:src},{dryRun:true} as any)).result).toMatchObject({status:'held'});
  },60000);
 });

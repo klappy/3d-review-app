@@ -121,7 +121,7 @@ export type CapturedAssessment = Readonly<{
 }>;
 export type CaptureResult =
   | { eligible: true; capture: CapturedAssessment }
-  | { eligible: false; reason: 'HELD' | 'UNAVAILABLE' };
+  | { eligible: false; reason: 'HELD' | 'UNAVAILABLE'; belowMinimum?: true };
 const encoder = new TextEncoder();
 function refuse(): never { throw new Error('CAPTURE_REFUSED'); }
 function text(v: unknown, max: number, nonempty = true): string {
@@ -185,7 +185,9 @@ export async function attestPackedCapture(expectedAssessmentId: string, raw: str
   try {
     const rows = decodePackedCapture(expectedAssessmentId, raw);
     const result = await attestCapture(expectedAssessmentId, rows, participant === true, minimum);
-    if (!result.eligible) return { eligible: false, reason: 'HELD' };
+    // belowMinimum: the hold is attestCapture's participant floor (BELOW_MINIMUM) and nothing else, so the caller's hold reason can say
+    // "collect more" only then (Codex P2 4406305544); every other refusal (mixed source, identity, undecodable) stays a bare HELD.
+    if (!result.eligible) return result.reason === 'BELOW_MINIMUM' ? { eligible: false, reason: 'HELD', belowMinimum: true } : { eligible: false, reason: 'HELD' };
     const capture: CapturedAssessment = Object.freeze({ assessmentId: expectedAssessmentId, packedCapture: raw, rows, responseIds: Object.freeze(result.responseIds), captureDigest: result.captureDigest, participant: participant === true });
     attested.add(capture);
     return { eligible: true, capture };
