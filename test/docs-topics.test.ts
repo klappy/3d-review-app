@@ -59,3 +59,13 @@ describe("docs topics intro/faq (PACKET 2026-09-17 option A)", () => {
     expect(Buffer.byteLength(out.result.what as string, "utf8")).toBe(791);
   });
 });
+
+describe('permissions topic follows the established containment rule', () => {
+  it('explains inherited assessment access without claiming direct project inheritance or removing direct safeguards', async () => {
+    const out = await docs(stubCtx, {topic:'permissions'});
+    expect(out.result.text).toContain('Workspace roles apply to grouped projects and their contained assessments');
+    expect(out.result.text).toContain('Direct project grants alone do not open assessments');
+    expect(out.result.text).toContain('archive, deletion and direct child delegation retain their direct-grant requirements');
+    expect(out.result.text).not.toContain('an assessment opens only by its own grant');
+  });
+});
