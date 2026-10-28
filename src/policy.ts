@@ -29,7 +29,7 @@ export const requiredRole = (roles: string): Role =>
   roles.startsWith("O, M") || roles.startsWith("project O, M") ? "member" : roles === "O" ? "owner" : "viewer";
 export const roleMeets = (have: Role, need: Role): boolean => RANK[have] >= RANK[need];
 
-/** Authorize per the matrix's role string. Only inheritance: workspace → grouped project. Unauthorized == nonexistent. */
+/** Authorize per the matrix's role string. Workspace grants inherit through containment into projects and assessments. Unauthorized == nonexistent. */
 export async function authorize(ctx: Ctx, cap: Capability, params: Record<string, any>): Promise<void> {
   const p = ctx.principal;
   if (cap.public) return;

@@ -1,18 +1,18 @@
-// No grant inheritance: assessment reads/writes require an exact assessment grant.
+// Workspace membership inherits through containment; direct project grants alone do not.
 // Creation and archive membership are deliberately project-scoped per contract.
 import type { Ctx, Handler, Role } from "./types";
 import { requireConfirmedState } from "../receipt";
 import { templateDisplayName } from "../display-names";
 import { CapError, notVisible } from "./errors";
 import { DEMOGRAPHICS_KEY, demographicsEnabled, parseContextJson } from "../context-fields";
-import { STAGES, countScalar, gate, loadProject, newId, nowIso, patchOf, reqStr, roleAt, type AssessmentRow } from "./common";
+import { STAGES, countScalar, gate, loadProject, newId, nowIso, patchOf, reqStr, effectiveRoleAt, directRoleAt, grantApplies, type AssessmentRow } from "./common";
 import { lwcOf, saveLwc, saveLwcOnCreate, takeLwc } from "./lwc";
 import { missingTable as missingPassageTable } from "../passages";
 
 async function exact(ctx: Ctx, id: string, min: Role = "viewer") {
   const row = await ctx.db.prepare("SELECT * FROM assessment WHERE id = ?").bind(id).first<AssessmentRow>();
   if (!row) throw notVisible("assessment");
-  return { row, role: gate(await roleAt(ctx, "assessment", id), min, "assessment") };
+  return { row, role: gate(await effectiveRoleAt(ctx, "assessment", id), min, "assessment") };
 }
 const view = (a: AssessmentRow, role: Role) => { const { lwc_json: _raw, ...rest } = a as AssessmentRow & { lwc_json?: unknown }; return { ...rest, lwc: lwcOf(a), role }; };
 async function language(ctx: Ctx, pid: string, languageId: string) {
@@ -68,7 +68,12 @@ export const list: Handler = async (ctx, params) => {
       FROM assessment a WHERE a.project_id=?2 ORDER BY a.created_at`).bind(ctx.principal.id,pid).all<AssessmentRow & {role:Role;response_count:number}>();
     return {result:{assessments:results.map(a => ({...view(a,a.role),response_count:Number(a.response_count)||0}))},scope:{type:"project",id:pid}};
   }
-  const {results} = await ctx.db.prepare('SELECT a.*, g.role, (SELECT COUNT(*) FROM response r JOIN assessment_survey s ON s.id = r.assessment_survey_id WHERE s.assessment_id = a.id) AS response_count FROM assessment a JOIN "grant" g ON g.scope_type = ? AND g.scope_id = a.id WHERE a.project_id = ? AND g.principal_id = ? ORDER BY a.created_at').bind("assessment", pid, ctx.principal.id).all<AssessmentRow & {role:Role; response_count:number}>();
+  const {results} = await ctx.db.prepare(`SELECT a.*,
+    (SELECT CASE MAX(CASE g.role WHEN 'owner' THEN 3 WHEN 'member' THEN 2 ELSE 1 END) WHEN 3 THEN 'owner' WHEN 2 THEN 'member' ELSE 'viewer' END
+     FROM "grant" g WHERE g.principal_id=?1 AND ${grantApplies("g", "'assessment'", "a.id")}) AS role,
+    (SELECT COUNT(*) FROM response r JOIN assessment_survey s ON s.id=r.assessment_survey_id WHERE s.assessment_id=a.id) AS response_count
+    FROM assessment a WHERE a.project_id=?2 AND EXISTS (SELECT 1 FROM "grant" g WHERE g.principal_id=?1 AND ${grantApplies("g", "'assessment'", "a.id")})
+    ORDER BY a.created_at`).bind(ctx.principal.id, pid).all<AssessmentRow & {role:Role; response_count:number}>();
   return { result: { assessments: results.map(a => ({ ...view(a, a.role), response_count: Number(a.response_count) || 0 })) }, scope: { type: "project", id: pid } };
 };
 // Survey rows carry the template's display name (Translators, Mid-Level Quality Roles (Facilitators, Team Leaders, CiTs)); the pinned name stays as source_name.
@@ -162,6 +167,7 @@ async function passageRows(ctx: Ctx, id: string): Promise<{ table: boolean; rows
 }
 export const del: Handler = async (ctx, params, opts) => {
   const id = reqStr(params,"id"), {row} = await exact(ctx,id,"owner");
+  await directRoleAt(ctx, "assessment", id, "owner");
   const surveys = await countScalar(ctx,"SELECT COUNT(*) AS n FROM assessment_survey WHERE assessment_id = ?",id);
   const responses = await countScalar(ctx,"SELECT COUNT(*) AS n FROM response r JOIN assessment_survey s ON s.id = r.assessment_survey_id WHERE s.assessment_id = ?",id);
   // Audit round 1 W3: assessment_passage.assessment_id REFERENCES assessment(id), so ANY passage row — a removed

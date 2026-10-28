@@ -1,23 +1,23 @@
 {
-  "version": "0.37.0",
+  "version": "0.37.1",
   "cookbook_repo": "klappy/3d-review-cookbook",
-  "cookbook_commit": "be9a0a3a6ddb4efe931776d594e531b8e15c088f",
+  "cookbook_commit": "5876883112c3aab0dee7d91c239f39b3203e431f",
   "records": [
     {
-      "path": "planning/2026-09-16-parity-build/releases/0.37.0.md",
-      "blob_sha": "e531b509c8bc2e835b30982b8ad74f16400c92af",
-      "sha256": "fdded099db82e77b06fdc452c769631cf80c4695472e1e0c82fe04023a8ceed8"
+      "path": "planning/2026-09-16-parity-build/releases/0.37.1.md",
+      "blob_sha": "ea51e6be779d9fa6341d9d41325f2c99376e9d13",
+      "sha256": "8e2c0920240fd3993889b1816609008f8178aafce88f60489bbb4f76da7d8926"
     },
     {
       "path": "planning/2026-09-16-parity-build/releases/releases.json",
-      "blob_sha": "ce2e4e5cf54e25a700ae433b2d4f1c5aeaa48613",
-      "sha256": "49e858525e2faa65dbe96a1811147d4bff7acd9279ad34cc3013cc9e6dd30200"
+      "blob_sha": "d1c2dc34ebba9aa1a5a8370781086cf9fa3c9014",
+      "sha256": "1992194ed060640a9cc45573d1c1cf4d1b59478265d2b12bd541d8a942871731"
     }
   ],
   "changelog": {
     "sections": {
-      "changed": [
-        "The app no longer blocks requests because of app-level request-rate limits or missing limiter bindings. This supports workshops where many participants share one connection. The existing per-address sign-in-link and collaborator-invitation product caps remain, along with upstream translation 429 responses and the MCP batch-size limit."
+      "fixed": [
+        "Workspace roles now reach contained assessments and permitted reports without per-assessment invitations. Direct project grants alone do not open assessments; direct-grant delegation and deletion checks, viewer restrictions and report privacy/admission remain. Automated isolated authentication/report scenarios are recorded separately from pending review, DEV and production validation."
       ]
     }
   }

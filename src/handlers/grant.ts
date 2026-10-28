@@ -28,19 +28,18 @@ async function callerAt(ctx: Ctx, scope: Scope, min: Role): Promise<Role> {
 /** ASK L1 default 1 (cookbook work/active/2026-10-15-3d-workspace-permissions/ASK.md): inviting at, or revoking an invitation
  *  at, ONE project needs the caller's own DIRECT project grant (member or above). An inherited workspace role no longer
  *  suffices, so removing a workspace grant ends every line of access that grant handed on. A caller with no role at all
- *  still gets NOT_FOUND_OR_NOT_VISIBLE (directRoleAt decides visibility on the effective role first). Workspace and
- *  assessment roles are exact, so inviting there already needs the caller's own grant at that scope. */
-const PROJECT_INVITE_HINT = "your role here comes from the workspace — invite them at the workspace instead (cap.grant.invite with scope workspace), or ask a direct project member";
-async function directAtProject(ctx: Ctx, scope: Scope) {
-  if (scope.type === "project") await directRoleAt(ctx, "project", scope.id, "member", PROJECT_INVITE_HINT);
+ *  still gets NOT_FOUND_OR_NOT_VISIBLE (directRoleAt decides visibility on the effective role first). Assessment invitations also require the direct child grant; workspace invitations stay exact. */
+const PROJECT_INVITE_HINT = "your role here comes from the workspace — invite them at the workspace instead (cap.grant.invite with scope workspace), or ask a direct member of this scope";
+async function directAtChildScope(ctx: Ctx, scope: Scope) {
+  if (scope.type === "project" || scope.type === "assessment") await directRoleAt(ctx, scope.type, scope.id, "member", PROJECT_INVITE_HINT);
 }
 /** update_role's direct-owner rule: raising anyone to owner needs a DIRECT owner at the scope (HOLD #483 c6204865181 #2), and
  *  since 0.35.23 (cookbook work/active/2026-10-15-3d-workspace-permissions/ASK-f4-finding4.md default 1, F4) ANY role change at a
  *  project needs a DIRECT project owner: an owner through the workspace manages project people at the workspace, or is added to
- *  the project directly. Workspace and assessment roles are direct only, so their callerAt check already is this rule. */
-const PROJECT_ROLE_HINT = "your owner role here comes from the workspace — ask a direct project owner, or get added to the project directly";
+ *  the project directly. Assessment role changes have the same direct-owner protection; workspace roles stay exact. */
+const PROJECT_ROLE_HINT = "your owner role here comes from the workspace — ask a direct owner of this scope, or get added directly";
 async function directOwnerFor(ctx: Ctx, scope: Scope, to: Role | undefined) {
-  if (scope.type === "project") await directRoleAt(ctx, "project", scope.id, "owner", PROJECT_ROLE_HINT);
+  if (scope.type === "project" || scope.type === "assessment") await directRoleAt(ctx, scope.type, scope.id, "owner", PROJECT_ROLE_HINT);
   else if (to === "owner") await directRoleAt(ctx, scope.type, scope.id, "owner");
 }
 /** D3: a member may act only up to member. */
@@ -56,9 +55,7 @@ async function refuseExistingAccess(ctx: Ctx, scope: Scope, inviteeHash: string)
   const me = await ctx.db.prepare("SELECT email_hash FROM principal WHERE id = ?").bind(ctx.principal.id).first<{ email_hash: string | null }>();
   if (me?.email_hash && me.email_hash === inviteeHash)
     throw new CapError("INVALID_PARAMS", "cannot invite yourself", "your access here comes from an existing grant; ask a direct owner if it should change", "cap.grant.invite");
-  const held = await ctx.db.prepare(`SELECT 1 FROM "grant" g JOIN principal pr ON pr.id = g.principal_id WHERE pr.email_hash = ?1 AND (
-      (g.scope_type = ?2 AND g.scope_id = ?3)
-      OR (?2 = 'project' AND g.scope_type = 'workspace' AND g.scope_id = (SELECT p.workspace_id FROM project p WHERE p.id = ?3))) LIMIT 1`)
+  const held = await ctx.db.prepare(`SELECT 1 FROM "grant" g JOIN principal pr ON pr.id = g.principal_id WHERE pr.email_hash = ?1 AND ${grantApplies("g", "?2", "?3")} LIMIT 1`)
     .bind(inviteeHash, scope.type, scope.id).first();
   if (held) throw new CapError("INVALID_PARAMS", "this person already has access at this scope", "change a direct grant with cap.grant.update_role; inherited access follows the workspace", "cap.grant.update_role");
 }
@@ -69,7 +66,7 @@ async function owners(ctx: Ctx, scope: Scope): Promise<string[]> {
 /** ASK L1 default 1 (follow-ups F3 and dead-invitations (2)/(3)): ONE predicate for "this invitation's inviter still stands
  *  behind it", over an invitation row aliased `i`. An owner invitation needs its inviter's DIRECT owner grant at the scope; any
  *  other project invitation needs the inviter's DIRECT project grant at member or above (the rule invite applies,
- *  directAtProject). 0.35.23 (cookbook work/active/2026-10-15-3d-workspace-permissions/ASK-f4-finding4.md default 1): the same
+ *  directAtChildScope). 0.35.23 (cookbook work/active/2026-10-15-3d-workspace-permissions/ASK-f4-finding4.md default 1): the same
  *  holds for workspace and assessment invitations — every invitation needs its inviter's DIRECT grant at its scope (member or
  *  above; owner for an owner invitation); there is no longer a scope that skips the check. accept refuses
  *  a row that fails it; cap.me.invitations and the roster's pending_invitations do not list it; invite de-duplication does not
@@ -175,7 +172,7 @@ export const invite: Handler = async (ctx, p, o) => {
   if (!email) throw new CapError("INVALID_PARAMS", "email must be one plain ASCII address", "letters, digits and . _ % + - before the @; no display names, lists, quotes or spaces", "cap.grant.invite");
   const caller = await callerAt(ctx, scope, "member");
   ceiling(caller, role, "invite");
-  await directAtProject(ctx, scope);
+  await directAtChildScope(ctx, scope);
   // Creating an owner needs a DIRECT owner at this scope; an inherited workspace owner cannot mint project owners.
   if (role === "owner") await directRoleAt(ctx, scope.type, scope.id, "owner");
   const inviteeHash = await sha256(email);
@@ -273,7 +270,7 @@ export const revoke_invitation: Handler = async (ctx, p) => {
   const scope: Scope = { type: inv.scope_type, id: inv.scope_id };
   const caller = await callerAt(ctx, scope, "member");
   ceiling(caller, inv.role as Role, "revoke invitations");
-  await directAtProject(ctx, scope);
+  await directAtChildScope(ctx, scope);
   // 'unconfirmed' is revocable: it is the explicit human path out of an uncertain send (revoke, then invite anew).
   if (inv.status === "accepted") throw new CapError("INVALID_PARAMS", "already accepted — revoke the grant instead", undefined, "cap.grant.revoke");
   await ctx.db.prepare("UPDATE invitation SET status = 'revoked' WHERE id = ?").bind(id).run();
@@ -464,7 +461,7 @@ export const update_role: Handler = async (ctx, p, o) => {
   const binds: unknown[] = [role, gid, g.role, ctx.principal.id, scope.type, scope.id];
   if (downgrade) binds.push(g.principal_id, nowIso(ctx), sweptIds.join(","));
   const stmts = [ctx.db.prepare(`UPDATE "grant" SET role = ?1 WHERE id = ?2 AND role = ?3 AND (role <> 'owner' OR ?1 = 'owner')`
-    + ` AND ${callerHolds("?4", "?5", "?6", "'owner'")} AND ((?1 <> 'owner' AND ?5 <> 'project') OR ${callerHolds("?4", "?5", "?6", "'owner'", true)})`
+    + ` AND ${callerHolds("?4", "?5", "?6", "'owner'")} AND ((?1 <> 'owner' AND ?5 NOT IN ('project','assessment')) OR ${callerHolds("?4", "?5", "?6", "'owner'", true)})`
     + (downgrade ? ` AND ${orphanedNow("?7", "?5", "?6", "?8", "?1")} = ?9` : ""))
     .bind(...binds)];
   if (downgrade) stmts.push(revokeOrphaned(ctx, g.principal_id, scope, true));

@@ -1,7 +1,7 @@
-// Survey access is checked at the exact assessment grant, never project grant.
+// Survey access uses assessment/workspace roles; direct project grants alone do not apply.
 import type { Ctx, Handler, Role } from "./types";
 import { CapError, notVisible } from "./errors";
-import { countScalar, gate, loadTemplate, newId, nowIso, optInt, parseItems, randomToken, renderItems, reqStr, roleAt, sha256, type AssessmentRow, type SurveyRow } from "./common";
+import { countScalar, gate, loadTemplate, newId, nowIso, optInt, parseItems, randomToken, renderItems, reqStr, effectiveRoleAt, sha256, type AssessmentRow, type SurveyRow } from "./common";
 import { codeHash, decryptCode, encryptCode } from "../code-escrow";
 import { randomCode } from "./common";
 import { DEMOGRAPHICS_KEY, demographicsEnabled, groupFields, parseContextJson, validateContext } from "../context-fields";
@@ -10,7 +10,7 @@ import { b64url } from "../receipt";
 async function assessment(ctx:Ctx,id:string,min:Role="viewer") {
   const row=await ctx.db.prepare("SELECT * FROM assessment WHERE id = ?").bind(id).first<AssessmentRow>();
   if(!row) throw notVisible("assessment");
-  return {row,role:gate(await roleAt(ctx,"assessment",id),min,"assessment")};
+  return {row,role:gate(await effectiveRoleAt(ctx,"assessment",id),min,"assessment")};
 }
 async function survey(ctx:Ctx,aid:string,sid:string,min:Role="viewer") {
   await assessment(ctx,aid,min);

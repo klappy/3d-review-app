@@ -1,5 +1,6 @@
 /** Internal B1 only: one local-primary D1 capture, no report storage or route. */
 import type { Ctx } from './handlers/types.js';
+import { grantApplies } from './handlers/common.js';
 import { attestCapture, type CaptureRow } from './report-attestation.js';
 import { canonicalJson } from './report-canonical-json.js';
 
@@ -104,6 +105,7 @@ function reportCapturePrefix(): string {
   const grantClose = "(?5 = 'viewer' AND g.role = 'viewer')))";
   if (!B1_CAPTURE_SQL.endsWith(CAPTURE_SUFFIX) || [TABLE_FREE_TARGET, grantOpen, grantClose].some(part => B1_CAPTURE_SQL.split(part).length !== 2)) throw new Error('CAPTURE_SQL_SHAPE');
   return B1_CAPTURE_SQL.slice(0, -CAPTURE_SUFFIX.length).replace(TABLE_FREE_TARGET, REPORT_TARGET)
+    .replace("g.scope_type = 'assessment' AND g.scope_id = a.id", grantApplies('g', "'assessment'", 'a.id'))
     .replace(grantOpen, "    AND ((?1 = 'support' AND ?5 = 'viewer') OR EXISTS (\n      SELECT 1 FROM \"grant\" g")
     .replace(grantClose, "(?5 = 'viewer' AND g.role = 'viewer'))))")
     .replace('-- B1 capture only: aid selects assessment; rid must be NULL. No report table reference.', '-- B2: aid selects build/list; rid selects report get. Exactly one is set.');
