@@ -303,7 +303,8 @@ export const accept: Handler = async (ctx, p, o) => {
   if (!me?.email_hash || me.email_hash !== inv.invitee_hash) throw notVisible("invitation");
   await refuseDeadInvitation(ctx, inv);
   const scope: Scope = { type: inv.scope_type, id: inv.scope_id };
-  const existing = await roleAt(ctx, scope.type, scope.id);
+  await refuseInheritedAcceptance(ctx, scope);
+  const existing = await effectiveRoleAt(ctx, scope.type, scope.id);
   const impact = { affected: [{ scope, role: inv.role, currently: existing ?? "none" }], irreversible: true, effect: "disclosure" as const, compensating_control: "cap.grant.revoke (what was seen stays seen)" };
   // 0.35.18 (cookbook work/active/2026-10-18-3d-grant-noop-followups-3 DoD (a)): the preview's `currently` is bound into the token.
   if (o?.dryRun) return { result: {}, scope, impact, confirmState: { currently: existing ?? "none" } };
@@ -318,11 +319,11 @@ export const accept: Handler = async (ctx, p, o) => {
   const nowStr = nowIso(ctx);
   const [granted, used] = await ctx.db.batch([
     ctx.db.prepare(`INSERT INTO "grant" (id, principal_id, scope_type, scope_id, role, created_at) SELECT ?1, ?2, ?3, ?4, ?5, ?6
-        WHERE ${acceptable("?7", "?6")}
+        WHERE ${acceptable("?7", "?6", "?8")}
       ON CONFLICT(principal_id, scope_type, scope_id) DO UPDATE SET role = CASE WHEN ${roleRank("excluded.role")} > ${roleRank('"grant".role')} THEN excluded.role ELSE "grant".role END
       RETURNING role`)
-      .bind(newId("grant"), ctx.principal.id, scope.type, scope.id, inv.role, nowStr, inv.id),
-    ctx.db.prepare(`UPDATE invitation SET status = 'accepted', accepted_at = ?2 WHERE id = ?1 AND ${acceptable("?1", "?2")}`).bind(inv.id, nowStr),
+      .bind(newId("grant"), ctx.principal.id, scope.type, scope.id, inv.role, nowStr, inv.id, ctx.principal.id),
+    ctx.db.prepare(`UPDATE invitation SET status = 'accepted', accepted_at = ?2 WHERE id = ?1 AND ${acceptable("?1", "?2", "?3")}`).bind(inv.id, nowStr, ctx.principal.id),
   ]);
   if ((used.meta.changes ?? 0) !== 1) {
     // Refused inside the batch: report it with the same typed refusal the checks above give for that state (a revoked row is
@@ -330,6 +331,7 @@ export const accept: Handler = async (ctx, p, o) => {
     const row = await ctx.db.prepare("SELECT id, scope_type, scope_id, role, status, expires_at, invitee_hash, created_by FROM invitation WHERE id = ?").bind(inv.id).first<any>();
     if (!row || row.status === "revoked") throw notVisible("invitation");
     await refuseDeadInvitation(ctx, row);
+    await refuseInheritedAcceptance(ctx, {type:row.scope_type,id:row.scope_id});
     throw notVisible("invitation");
   }
   const held = ((granted.results?.[0] as { role?: Role } | undefined)?.role) ?? (inv.role as Role);
@@ -353,9 +355,19 @@ async function refuseDeadInvitation(ctx: Ctx, inv: any): Promise<void> {
 }
 /** The invitation `id` can still be accepted at `now` (bound SQL expressions): open, unexpired by the one expiry rule, and its
  *  inviter still stands behind it (inviterStands). accept's write batch gates both statements on it (0.35.10 DoD (a)). */
-const acceptable = (id: string, now: string) =>
+const inheritedWorkspaceAccess = (scopeT: string, scopeI: string, recipient: string) =>
+  `EXISTS (SELECT 1 FROM "grant" wg WHERE wg.principal_id = ${recipient} AND wg.scope_type = 'workspace'`
+  + ` AND ${scopeT} IN ('project','assessment') AND ${grantApplies("wg", scopeT, scopeI)})`;
+/** An older child invitation must not convert subsequently inherited workspace access into a permanent direct grant. */
+async function refuseInheritedAcceptance(ctx: Ctx, scope: Scope) {
+  if (scope.type !== "project" && scope.type !== "assessment") return;
+  const inherited = await ctx.db.prepare(`SELECT 1 AS inherited WHERE ${inheritedWorkspaceAccess("?2", "?3", "?1")}`)
+    .bind(ctx.principal.id, scope.type, scope.id).first();
+  if (inherited) throw new CapError("NOT_AUTHORIZED_AT_SCOPE", "workspace access already applies; this invitation cannot create a permanent child grant", "use your inherited access and manage membership at the workspace");
+}
+const acceptable = (id: string, now: string, recipient: string) =>
   `EXISTS (SELECT 1 FROM invitation i WHERE i.id = ${id} AND i.status IN (${LIVE_STATUSES.map((st) => `'${st}'`).join(",")})`
-  + ` AND ${unexpired("i", now)} AND ${inviterStands("i")})`;
+  + ` AND ${unexpired("i", now)} AND ${inviterStands("i")} AND NOT ${inheritedWorkspaceAccess("i.scope_type", "i.scope_id", recipient)})`;
 /** ROLE_RANK as a SQL expression over a role expression `r` (unknown roles rank 0). */
 const roleRank = (r: string) => `(CASE ${r} ${(Object.keys(ROLE_RANK) as Role[]).map((k) => `WHEN '${k}' THEN ${ROLE_RANK[k]}`).join(" ")} ELSE 0 END)`;
 

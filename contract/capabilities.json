@@ -1558,7 +1558,7 @@
       "slice": "v2.0-bcs",
       "section": "F. Invitations, codes, collaborators",
       "ui_surface": "",
-      "notes": "**grant released** → effect (disclosure of scope contents begins); compensate=cap.grant.revoke; name the invitation by `token` (mailed link, unchanged) or by `invitation_id` (signed-in invitee, listed by cap.me.invitations; http_alt POST /v2/me/invitations/{invitation_id}/accept) — both require the caller's email hash == invitee_hash; every miss is NOT_FOUND_OR_NOT_VISIBLE (captain ruling 2026-09-28 15:27 ET, B04 step c); 0.35.23 (ASK-f4-finding4 default 1): every invitation, workspace and assessment included, is accepted only while its inviter holds a direct grant at its scope (member or above; owner for an owner invitation)",
+      "notes": "**grant released** → effect (disclosure of scope contents begins); compensate=cap.grant.revoke; name the invitation by `token` (mailed link, unchanged) or by `invitation_id` (signed-in invitee, listed by cap.me.invitations; http_alt POST /v2/me/invitations/{invitation_id}/accept) — both require the caller's email hash == invitee_hash; every miss is NOT_FOUND_OR_NOT_VISIBLE (captain ruling 2026-09-28 15:27 ET, B04 step c); 0.35.23 (ASK-f4-finding4 default 1): every invitation, workspace and assessment included, is accepted only while its inviter holds a direct grant at its scope (member or above; owner for an owner invitation); project/assessment acceptance also rechecks that the invitee has no inherited workspace access, both before confirmation and inside the guarded grant/invitation writes, so an older invitation cannot materialize inherited access as a permanent child grant",
       "status": "target",
       "inverse": {
         "kind": "none",

@@ -88,3 +88,9 @@ it('served grant-revoke guidance names direct assessment authority and its write
   expect(out.result.rules).toContain('requires a direct assessment member-or-owner grant');
   expect(out.result.rules).toContain('rechecked inside the guarded delete');
 });
+
+it('served acceptance rules explain the inherited-access write guard', async () => {
+  const out = await docs(stubCtx,{capability:'cap.grant.accept'});
+  expect(out.result.rules).toContain('rechecks that the invitee has no inherited workspace access');
+  expect(out.result.rules).toContain('inside the guarded grant/invitation writes');
+});

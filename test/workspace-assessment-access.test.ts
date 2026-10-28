@@ -118,6 +118,41 @@ describe('authenticated workspace membership reaches contained assessments and r
     expect((await db.prepare("SELECT status FROM invitation WHERE id='revoke_pending'").first<any>()).status).toBe('revoked');
     await run("DELETE FROM \"grant\" WHERE id='revoke_caller'");
   });
+  it('an older child invitation cannot materialize workspace access, including a grant arriving before the batch', async () => {
+    await run("INSERT INTO \"grant\"(id,principal_id,scope_type,scope_id,role,created_at) VALUES('accept_inviter_project','person_mara','project',?,'owner','2026-10-27') ON CONFLICT(principal_id,scope_type,scope_id) DO UPDATE SET role='owner'", pid);
+    for(const [scope,id] of [['assessment',aid],['project',pid]]) {
+      const iid='before_workspace_'+scope, token='fixture_'+iid;
+      await run("INSERT INTO invitation(id,scope_type,scope_id,invitee_hash,token_hash,role,status,created_by,created_at,expires_at) VALUES(?,?,?,?,?,'member','sent','person_mara','2026-10-27','2099-01-01')",iid,scope,id,await sha256('outsider@example.invalid'),await sha256(token));
+      const byId='/v2/me/invitations/'+iid+'/accept', byToken='/v2/invitations/'+token+'/accept';
+      const previews = new Map<string,any>();
+      for (const endpoint of [byId,byToken]) {const preview=await http(endpoint,'outsider',{mode:'dry_run'});expect(preview.body.ok).toBe(true);previews.set(endpoint,preview.body.result.confirm_token);}
+      await run("INSERT INTO \"grant\"(id,principal_id,scope_type,scope_id,role,created_at) VALUES('accept_inherited','outsider','workspace','ws_inherited','viewer','2026-10-27')");
+      for(const endpoint of [byId,byToken]) {
+        expect((await http(endpoint,'outsider',{mode:'dry_run'})).body).toMatchObject({ok:false,error:{code:'NOT_AUTHORIZED_AT_SCOPE'}});
+        expect((await http(endpoint,'outsider',{mode:'execute',confirm_token:previews.get(endpoint)})).body).toMatchObject({ok:false,error:{code:'NOT_AUTHORIZED_AT_SCOPE'}});
+      }
+      expect(await db.prepare('SELECT role FROM "grant" WHERE principal_id=? AND scope_type=? AND scope_id=?').bind('outsider',scope,id).first()).toBeNull();
+      expect((await db.prepare('SELECT status FROM invitation WHERE id=?').bind(iid).first<any>()).status).toBe('sent');
+      await run("DELETE FROM \"grant\" WHERE id='accept_inherited'");
+      expect((await http('/v2/assessments/'+aid,'outsider')).body.ok).toBe(false);
+      const original=env.DB;let prepared=false,intervened=false;
+      env.DB={prepare(sql:string){if(sql.startsWith('INSERT INTO "grant"'))prepared=true;return db.prepare(sql);},async batch(statements:D1PreparedStatement[]){
+        if(prepared && !intervened){intervened=true;await run("INSERT INTO \"grant\"(id,principal_id,scope_type,scope_id,role,created_at) VALUES('accept_inherited','outsider','workspace','ws_inherited','member','2026-10-27')");}
+        return db.batch(statements);
+      }} as D1Database;
+      try {
+        expect((await http(byToken,'outsider',{mode:'execute',confirm_token:previews.get(byToken)})).body).toMatchObject({ok:false,error:{code:'NOT_AUTHORIZED_AT_SCOPE'}});
+        expect(intervened).toBe(true);
+        expect(await db.prepare('SELECT role FROM "grant" WHERE principal_id=? AND scope_type=? AND scope_id=?').bind('outsider',scope,id).first()).toBeNull();
+        expect((await db.prepare('SELECT status FROM invitation WHERE id=?').bind(iid).first<any>()).status).toBe('sent');
+      } finally {env.DB=original;await run("DELETE FROM \"grant\" WHERE id='accept_inherited'");}
+      const preview=await http(byId,'outsider',{mode:'dry_run'});
+      expect(preview.body.ok).toBe(true);
+      expect((await http(byId,'outsider',{mode:'execute',confirm_token:preview.body.result.confirm_token})).body).toMatchObject({ok:true,result:{granted:true,role:'member'}});
+      await run('DELETE FROM "grant" WHERE principal_id=? AND scope_type=? AND scope_id=?','outsider',scope,id);
+      await run('DELETE FROM invitation WHERE id=?',iid);
+    }
+  });
   it('workspace revocation and ungrouping immediately end inherited report access', async () => {
     await run('DELETE FROM "grant" WHERE id=?', 'g_member');
     expect((await http('/v2/assessments/' + aid, 'member')).body.ok).toBe(false);
