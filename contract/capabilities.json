@@ -1008,7 +1008,7 @@
       "slice": "v2.0-bcs",
       "section": "D. Assessment (main page)",
       "ui_surface": "danger",
-      "notes": "D5",
+      "notes": "D5; requires a direct assessment-owner grant; inherited workspace ownership alone cannot delete the assessment",
       "status": "target",
       "inverse": {
         "kind": "none",

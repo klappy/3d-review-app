@@ -94,3 +94,10 @@ it('served acceptance rules explain the inherited-access write guard', async () 
   expect(out.result.rules).toContain('rechecks that the invitee has no inherited workspace access');
   expect(out.result.rules).toContain('inside the guarded grant/invitation writes');
 });
+
+it('served assessment-delete rules require direct ownership', async () => {
+  const out = await docs(stubCtx,{capability:'cap.assessment.delete'});
+  expect(out.result.roles).toBe('O');
+  expect(out.result.rules).toContain('requires a direct assessment-owner grant');
+  expect(out.result.rules).toContain('inherited workspace ownership alone cannot delete');
+});
