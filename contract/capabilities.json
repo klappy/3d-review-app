@@ -2145,7 +2145,7 @@
       "slice": "v2.0-bcs",
       "section": "H. Results, reports, recommendations (all rows in the whole-product denominator; summary is `v2.0-bcs`, the rest `v2.1-oct`)",
       "ui_surface": "(Oct)",
-      "notes": "Synthetic-only source-backed immutable reports; exact assessment grant and current/original attestation required. Real-data reporting remains held.",
+      "notes": "Synthetic-only source-backed immutable reports; effective assessment access (direct assessment grant or containing workspace membership) and current/original attestation required. Real-data reporting remains held.",
       "status": "implemented-synthetic-only",
       "inverse": {
         "kind": "none",
@@ -2419,7 +2419,7 @@
       "slice": "v2.0-bcs",
       "section": "H. Results, reports, recommendations (all rows in the whole-product denominator; summary is `v2.0-bcs`, the rest `v2.1-oct`)",
       "ui_surface": "viewer link",
-      "notes": "Synthetic-only source-backed immutable reports; exact assessment grant and current/original attestation required. Real-data reporting remains held.",
+      "notes": "Synthetic-only source-backed immutable reports; effective assessment access (direct assessment grant or containing workspace membership) and current/original attestation required. Real-data reporting remains held.",
       "status": "implemented-synthetic-only",
       "inverse": {
         "kind": "n/a"
@@ -2544,7 +2544,7 @@
       "slice": "v2.0-bcs",
       "section": "H. Results, reports, recommendations (all rows in the whole-product denominator; summary is `v2.0-bcs`, the rest `v2.1-oct`)",
       "ui_surface": "viewer link",
-      "notes": "Synthetic-only source-backed immutable reports; exact assessment grant and current/original attestation required. Real-data reporting remains held.",
+      "notes": "Synthetic-only source-backed immutable reports; effective assessment access (direct assessment grant or containing workspace membership) and current/original attestation required. Real-data reporting remains held.",
       "status": "implemented-synthetic-only",
       "inverse": {
         "kind": "n/a"

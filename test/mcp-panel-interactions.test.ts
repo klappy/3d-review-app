@@ -9,13 +9,13 @@ const script = source.split('<script>')[2].split('</script>')[0].replace('/*__CA
   .replace('/*__ACTION_CARD__*/', readFileSync(new URL('../ui/mcp/action-card.js', import.meta.url), 'utf8').replace(/^export\s+(const|function)\s/gm, '$1 '))
   .replace(/\}\)\(\);\s*$/,  'window.review = { state, go, render };})();');
 const tick = () => new Promise(resolve => setTimeout(resolve, 0));
-function fixture({ deferGet = false, deferWrite = false, connect = false, deferredConnect = false } = {}) {
+function fixture({ deferGet = false, deferWrite = false, connect = false, deferredConnect = false, directRole = undefined as string | null | undefined } = {}) {
   const dom = new JSDOM(source.split('<script>')[0], { runScripts: 'outside-only', url: 'https://panel.test' });
   const events = new Map<string, Function>();
   const w = dom.window, calls: any[] = [], pending: any[] = [], pendingGets: any[] = [], pendingWrites: any[] = [];
   let connectResolve: any, connectReject: any;
   const connection = new Promise((resolve,reject)=>{connectResolve=resolve;connectReject=reject;});
-  const assessment = (id: string) => ({ assessment: { id, name: id, role: 'owner', stage: 'permissions', project_id: 'p' }, surveys: [] });
+  const assessment = (id: string) => ({ assessment: { id, name: id, role: 'owner', ...(directRole === undefined ? {} : { direct_role: directRole }), stage: 'permissions', project_id: 'p' }, surveys: [] });
   w.McpApps = { App: class {
     addEventListener(name: string, fn: Function) { events.set(name, fn); } connect() { return deferredConnect ? connection : connect ? Promise.resolve() : new Promise(() => {}); } getHostCapabilities() { return {serverTools:{}}; }
     callServerTool(req: any) {
@@ -271,4 +271,13 @@ it.each(['email', 'role'])('PR #508: editing %s after the inline invite preview 
     stale.click(); await tick();
     expect(f.calls.filter(x => x.name === 'danger' && x.arguments?.mode === 'execute')).toHaveLength(0);
   } finally { f.dom.window.close(); }
+});
+
+it('workspace-inherited owner has no direct invitation controls in the assessment panel', async () => {
+  const f = fixture({directRole:null});
+  try {
+    await f.go('A');
+    expect(f.w.document.querySelector('[data-invite-form]')).toBeNull();
+    expect(f.w.document.body.textContent).toContain('Members of the containing workspace also have access');
+  } finally { f.w.close(); }
 });

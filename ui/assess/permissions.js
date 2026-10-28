@@ -32,12 +32,12 @@ export const NO_TRANSFER_TARGET = 'Invite someone first; you can transfer to peo
 // roster only through the project's workspace is offered neither; this one line points them to the workspace instead.
 export const FROM_WORKSPACE_NOTE = 'Your role here comes from the workspace. To add someone, invite them to the workspace.';
 export const FROM_WORKSPACE_LINK = 'Open workspace permissions';
-// DoD 4: one true line per scope — roles flow workspace → grouped project only; an assessment opens only by its own grant (D9).
+// DoD 4: one true line per scope — workspace roles follow containment into projects and assessments.
 export const APPLIES = {
-  workspaces: 'Roles here also apply to every project in this workspace. Assessments are shared one by one.',
+  workspaces: 'Roles here also apply to every contained project and assessment.',
   // A new project starts ungrouped (src/handlers/project.ts create: workspace_id null), so the line holds with or without a workspace.
-  projects: 'If this project is in a workspace, roles on that workspace also apply here. Assessments are shared one by one.',
-  assessments: 'Only the people listed here can open this assessment; project and workspace roles do not.',
+  projects: 'If this project is in a workspace, roles on that workspace also apply here and to its assessments. Direct project grants alone do not open assessments.',
+  assessments: 'People listed here have direct access. Members of the containing workspace also have access; manage inherited access at the workspace.',
 };
 // DoD 4 polish (k0021): the change-role select no longer repeats the Role column — it starts on "Change to…" and lists only the other roles.
 export const CHANGE_TO = 'Change to…';
@@ -86,7 +86,7 @@ export const permissions = {
     // B31: the notice is one plain sentence; receipt/trace ids live behind a closed "Details" (still in the DOM for audit).
     const status = `<p class="small ${m.alert ? 'alert' : 'muted'}" role="status" data-permissions-status>${esc(m.notice || '')}</p>${m.noticeRef ? learnMore(`<p class="small muted" data-permissions-ref>${esc(m.noticeRef)}</p>`, { summary: 'Details' }) : ''}`;
     // B30 (less text 3): one heading and at most one short line up front; every other note goes behind Learn more.
-    // DoD 4 (2026-10-15 workspace-permissions): workspace roles now reach grouped projects (eb72ea5); assessments stay exact (D9).
+    // DoD 4 (2026-10-15 workspace-permissions): workspace roles now reach grouped projects (eb72ea5); workspace roles also reach assessments.
     const applies = `<p class="note small" data-permissions-applies>${esc(APPLIES[m.scope] || '')}</p>`;
     const head = `<p class="eyebrow">Permissions</p><h2>Who can open this ${esc(noun)}</h2>${applies}`;
     if (m.status === 'forbidden') return `<section class="panel narrow" data-permissions data-permissions-state="viewer"><p class="eyebrow">Permissions</p><h2>Who can open this ${esc(noun)}</h2><p class="muted">${esc(VIEWER_NOTE)}</p>${status}${learnMore(applies.replace('note small', 'small muted'))}</section>`;

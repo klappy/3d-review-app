@@ -35,6 +35,7 @@ beforeAll(async () => {
     tokens[id] = await mintSession(env, id, 'user');
   }
   tokens.participant = await mintSession(env, 'outsider', 'participant');
+  tokens.support_owner = await mintSession(env, 'owner', 'support');
   await run("INSERT INTO workspace(id,name,created_at) VALUES('ws_other','Other fixture workspace','2026-10-27')");
   await run("INSERT INTO \"grant\"(id,principal_id,scope_type,scope_id,role,created_at) VALUES('g_other','outsider','workspace','ws_other','owner','2026-10-27')");
   await run('INSERT INTO "grant"(id,principal_id,scope_type,scope_id,role,created_at) VALUES(?,?,\'project\',?,?,?)', 'g_project_only', 'project_only', pid, 'owner', '2026-10-27');
@@ -43,10 +44,11 @@ afterAll(() => mf.dispose());
 
 describe('authenticated workspace membership reaches contained assessments and reports', () => {
   it('owner and member open and list existing assessments without child grants; counts agree', async () => {
-    for (const who of ['owner', 'member']) {
-      expect((await http('/v2/assessments/' + aid, who)).body).toMatchObject({ ok: true, result: { assessment: { id: aid, role: who } } });
+    for (const who of ['owner', 'member', 'support_owner']) {
+      const expectedRole = who === 'support_owner' ? 'owner' : who;
+      expect((await http('/v2/assessments/' + aid, who)).body).toMatchObject({ ok: true, result: { assessment: { id: aid, role: expectedRole, direct_role:null } } });
       const listed = await http('/v2/projects/' + pid + '/assessments', who);
-      expect(listed.body.result.assessments.some((a: any) => a.id === aid && a.role === who)).toBe(true);
+      expect(listed.body.result.assessments.some((a: any) => a.id === aid && a.role === expectedRole && a.direct_role === null)).toBe(true);
       const projects = await http('/v2/projects', who);
       expect(projects.body.result.projects.find((p: any) => p.id === pid).assessment_count).toBeGreaterThan(0);
       expect((await http('/v2/assessments/' + aid, who, {name:'Workspace edit '+who}, 'PATCH')).body.ok).toBe(true);
@@ -73,6 +75,7 @@ describe('authenticated workspace membership reaches contained assessments and r
   });
   it('viewer can read but cannot edit; inherited owner cannot mint a direct child grant or delete', async () => {
     expect((await http('/v2/assessments/' + aid, 'viewer')).body.result.assessment.role).toBe('viewer');
+    for(const action of ['archive','unarchive']) expect((await http('/v2/assessments/'+aid+'/'+action,'owner',{})).body).toMatchObject({ok:false,error:{code:'NOT_AUTHORIZED_AT_SCOPE'}});
     // Handler-level writes are exercised through the real capability dispatcher in the companion workspace suite.
     const deletion = await http('/v2/assessments/' + aid, 'owner', { mode: 'dry_run' }, 'DELETE');
     expect(deletion.body).toMatchObject({ok:false,error:{code:'NOT_AUTHORIZED_AT_SCOPE'}});

@@ -102,14 +102,18 @@ export function requireSupport(ctx: Ctx): string {
 }
 export interface GrantRow { id: string; principal_id: string; scope_type: string; scope_id: string; role: Role; created_at: string }
 
-/** Direct role at exactly this scope, or null. */
-export async function roleAt(ctx: Ctx, scopeType: ScopeType, scopeId: string): Promise<Role | null> {
+/** Stored direct grant only; global support fallback is not a direct grant. */
+export async function directGrantRoleAt(ctx: Ctx, scopeType: ScopeType, scopeId: string): Promise<Role | null> {
   if (ctx.principal.kind !== "user" && ctx.principal.kind !== "support") return null;
   const row = await ctx.db
     .prepare('SELECT role FROM "grant" WHERE principal_id = ? AND scope_type = ? AND scope_id = ?')
     .bind(ctx.principal.id, scopeType, scopeId)
     .first<{ role: Role }>();
-  return row?.role ?? (ctx.principal.kind === "support" ? "viewer" : null);
+  return row?.role ?? null;
+}
+/** Exact-scope access retains the existing global-support viewer fallback. */
+export async function roleAt(ctx: Ctx, scopeType: ScopeType, scopeId: string): Promise<Role | null> {
+  return (await directGrantRoleAt(ctx, scopeType, scopeId)) ?? (ctx.principal.kind === "support" ? "viewer" : null);
 }
 /** THE inheritance rule as SQL (0.35.14, cookbook work/active/2026-10-18-3d-grant-write-guard-followups DoD (c)): grant row
  *  `g` (an alias) applies at scope (`scopeT`, `scopeI`, SQL expressions) when it is AT that scope, or, for a project, when it is
