@@ -38,7 +38,9 @@ const target = document.getElementById("next");
 // Explicit fixture selection stays on the query form: ?screen=<name> is a fixture board (the pixel harness and tests), ?page= the
 // gallery. With the flag off and no explicit selection, the gallery shows, as before. The current UI's account menu links here with
 // ?ui_next=on ("Try the new design", playbook stage 5).
-const live = liveEntry(params, storage);
+// Production builds (vite.next.config.mjs define, WORKERS_CI_BRANCH=production) compile the fixture harness out: always the live app.
+const HARNESS = typeof __UI_NEXT_FIXTURE_HARNESS__ === "undefined" || __UI_NEXT_FIXTURE_HARNESS__;
+const live = !HARNESS || liveEntry(params, storage);
 if (live) {
   mount(Live, { target });
 } else {
