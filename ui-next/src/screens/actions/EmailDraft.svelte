@@ -19,7 +19,7 @@
     <h2 class="h2">Email draft</h2>
     <button class="btn" type="button" onclick={() => dialog.close()}>Close</button>
     <p class="small">Review this message, then open your email app to choose recipients and send it. Nothing is sent from 3D Review.</p>
-    <label class="small">Message<textarea class="in small" readonly rows="7" value={body}></textarea></label>
+    <label class="small l-stack" data-gap="1">Message<textarea class="in small" readonly rows="7" value={body}></textarea></label>
     <div class="l-row" data-wrap="true" data-gap="2"><a class="btn" href={mailto}>Open email app</a><button class="btn" type="button" onclick={copy}>Copy message</button></div>
     <p class="small">If your email app does not open, copy the message into your email.</p>
     <p class="small" role="status">{status}</p>
