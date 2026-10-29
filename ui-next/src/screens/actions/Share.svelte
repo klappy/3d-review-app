@@ -3,7 +3,8 @@
      Share.dc.html (desktop), SharePhone.dc.html (phone, ?w=phone). Who may copy links comes from the current UI's share rules
      (ui/assess/share.js CAN_SHARE, the issue_link roles, and copy.readOnly, through the lane adapter ./legacy.js, which a test holds
      equal to share.js); a role outside it sees the readOnly line instead of the copy actions. Copy controls copy (./CopyButton.svelte); the phone
-     share-out icon opens the share sheet, else copies (./ShareOut.svelte). Access codes use existing issue_codes/export_codes with explicit confirmation and one-time disclosure (AccessCodes.svelte).
+     share-out icon opens the share sheet, else copies (./ShareOut.svelte). Access codes "Make more codes" / "Download as CSV" (phone
+     #codes / #csv) wait on the codes API (cap.survey.issue_codes / export_codes): RESULTS debt.
      Work card: the pinned .glass-hi.l-card[data-pad=work]. Link rows: Grid barbell (220px 1fr 220px) stands in for the board's
      240px 1fr auto auto (no contract row: generator line); the rows sit in the work card's 20px gap, as drawn. Access codes: §2 Disclosure. Links: ../href.js href() with this screen's w/theme.
      One .btn-primary per page: desktop "Done" (page head), phone "Show QR codes for the room" (phone-bar). -->
@@ -36,8 +37,9 @@
 
   // data/share: the fixture shapes (gallery) or app/data.js shareModel (live: real links, this review's surveys, the signed-in user).
   let { phone = false, theme = "light", data = R0, share = D0, role = data.role } = $props();
-    <Card gap={2} label="Access codes"><Disclosure label="Access codes, for people who lose the link" solid={false}><AccessCodes controller={codeFlow} /></Disclosure></Card>
-    {#if canShare && R.surveys.length}<EmailDraft {phone} bind:opened={emailOpen} subject={`Survey links: ${R.review.title}`} body={emailBody} label="Email the links to someone" />{/if}
+  const codeFlow = createAccessCodesState();
+  onMount(() => codeFlow.mount());
+  let emailOpen = $state(false);
   const R = $derived(data);
   const D = $derived(share);
   const at = $derived(carry(phone, theme));
@@ -70,15 +72,10 @@
       {/each}
       {#if !canShare}<p class="small">{READ_ONLY}</p>{/if}
     </Card>
-<<<<<<< HEAD
-    <Card gap={2} label="Access codes"><Disclosure label="Access codes, for people who lose the link" solid={false}><AccessCodes controller={codeFlow} /></Disclosure></Card>
-    {#if canShare && R.surveys.length}<EmailDraft {phone} subject={`Survey links: ${R.review.title}`} body={emailBody} label="Email the links to someone" />{/if}
-=======
     <Card gap={2} label="Access codes">
-      <Disclosure label="Access codes, for people who lose the link" solid={false}><p class="small">{D.codes.unused}{#if D.codes.code} · <a class="link" href="#codes">Make more</a> · <a class="link" href="#csv">Download CSV</a>{/if}</p></Disclosure>
+      <Disclosure label="Access codes, for people who lose the link" solid={false}><AccessCodes controller={codeFlow} /></Disclosure>
     </Card>
     {#if canShare && R.surveys.length}<EmailDraft {phone} bind:opened={emailOpen} subject={`Survey links: ${R.review.title}`} body={emailBody} label="Email the links to someone" />{/if}
->>>>>>> 326e1385c359f1ac69ea0a24bcfa41f1a3586220
     <a class="link" href={`${href("collect", at)}#offline`}>Meeting offline? Print and paper</a>
   {:else}
     <Page gap={5}>
