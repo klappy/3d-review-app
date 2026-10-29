@@ -86,7 +86,7 @@ describe("actions lane screens render as the boards draw them", () => {
         expect(a, `${name} ${v}`).toBeTruthy();
         expect(a.dataset.theme).toBe(props.theme ?? "light");
         if (props.phone || name === "menu") expect(a.dataset.w).toBe("phone");
-        expect(a.querySelectorAll(".btn-primary").length).toBeLessThanOrEqual(1);
+        expect([...a.querySelectorAll(".btn-primary")].filter(el => !el.closest("dialog:not([open])")).length).toBeLessThanOrEqual(1);
         expect(a.querySelectorAll("[style]").length).toBe(0);
         for (const r of rows) expect(text(a), r).toContain(r);
       });

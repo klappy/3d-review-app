@@ -2,6 +2,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { fireEvent, render } from "@testing-library/svelte";
 import Share from "../ui-next/src/screens/actions/Share.svelte";
+import EmailDraft from "../ui-next/src/screens/actions/EmailDraft.svelte";
 import ActionPlan from "../ui-next/src/screens/actions/ActionPlan.svelte";
 import R from "../ui-next/fixtures/actions/review.json";
 
@@ -69,4 +70,16 @@ it("retains all links and special characters in a long multi-survey draft withou
   expect(mail.searchParams.get("body")).toBe(body);
   expect(body).toContain("Survey 99 & team: https://review.example/#survey=issued_99_");
   expect(draft.textContent).toContain("If your email app does not open, copy the message into your email.");
+});
+
+it("reuses the dialog title row and phone sheet with unique accessible titles",async()=>{
+ const view=render(Share,{phone:true,data:review,role:'owner'});const trigger=view.getByRole('button',{name:'Email the links to someone'});expect(trigger.classList.contains('btn-block')).toBe(true);await fireEvent.click(trigger);
+ const dialog=view.getByRole('dialog',{name:'Email draft'});expect(dialog.classList.contains('sheet')).toBe(true);expect(dialog.getAttribute('closedby')).toBe('any');expect(dialog.querySelector('.sheet-handle')).not.toBeNull();expect(dialog.querySelector('.l-row .btn-icon[aria-label="Close"]')).not.toBeNull();expect(dialog.querySelectorAll('.btn-primary')).toHaveLength(1);expect(dialog.querySelector('.btn-primary')?.textContent).toBe('Open email app');
+ const other=render(EmailDraft,{subject:'Other',body:'Other'});expect(other.container.querySelector('dialog')?.getAttribute('aria-labelledby')).not.toBe(dialog.getAttribute('aria-labelledby'));
+});
+it("keeps the draft closed until requested and reuses backdrop dismissal",async()=>{
+ const view=render(EmailDraft,{subject:'Survey',body:'Actual message'});const dialog=view.container.querySelector('dialog')!;expect(dialog.open).toBe(false);
+ await fireEvent.click(view.getByRole('button',{name:'Prepare email'}));expect(dialog.open).toBe(true);
+ vi.spyOn(dialog,'getBoundingClientRect').mockReturnValue({left:10,right:210,top:10,bottom:210,width:200,height:200,x:10,y:10,toJSON:()=>({})});
+ await fireEvent.click(dialog,{clientX:1,clientY:1});expect(dialog.open).toBe(false);
 });

@@ -47,7 +47,7 @@
 
 {#snippet mail()}<Ico d={A.mail} />{/snippet}
 {#snippet download()}<Ico d={A.download} />{/snippet}
-{#snippet top()}{#if phone}<PhoneHeader state="nested" title="Next steps" parent={live ? R.review.title : "Luke 1–2"} back={href("next-step", at)} initials={R.user.initials} menuHref={href("menu", at)} />{:else}<DocTop title={D.doc} home={href("next-step", at)}>{#if D.share}<CopyButton text={D.share.url} label="Copy share link" lead="link" />{/if}<EmailDraft subject={`Next steps: ${R.review.title}`} body={emailBody} label="Email it" />{#if live}<ActButton label="Print" lead="print" onclick={printPage} />{:else}<Button label="Download PDF" variant="primary" href="#pdf" lead={download} /><ActButton label="Print" lead="print" onclick={printPage} />{/if}</DocTop>{/if}{/snippet}
+{#snippet top()}{#if phone}<PhoneHeader state="nested" title="Next steps" parent={live ? R.review.title : "Luke 1–2"} back={href("next-step", at)} initials={R.user.initials} menuHref={href("menu", at)} />{:else}<DocTop title={D.doc} home={href("next-step", at)}>{#if D.share}<CopyButton text={D.share.url} label="Copy share link" lead="link" />{/if}<EmailDraft {phone} subject={`Next steps: ${R.review.title}`} body={emailBody} label="Email it" />{#if live}<ActButton label="Print" lead="print" onclick={printPage} />{:else}<Button label="Download PDF" variant="primary" href="#pdf" lead={download} /><ActButton label="Print" lead="print" onclick={printPage} />{/if}</DocTop>{/if}{/snippet}
 {#snippet bar()}{#if phone}{#if live}<div class="glass phone-bar" role="group" aria-label="Page actions"><button class="btn btn-primary btn-lg" type="button" onclick={printPage}>Print</button></div>{:else}<PhoneBar label="Share the PDF" href="#pdf" />{/if}{/if}{/snippet}
 
 <AppShell {phone} {theme} screen {top} {bar}>
@@ -64,9 +64,9 @@
     <Card gap={2} label="Share">
       <span class="micro">Share</span>
       {#if D.share}<p class="small">Read-only link, expires in 90 days.</p>
-      <Row wrap gap={2}><CopyButton text={D.share.url} label="Copy link" block bind:failed={refused} /><EmailDraft subject={`Next steps: ${R.review.title}`} body={emailBody} label="Email it" /></Row>
+      <Row wrap gap={2}><CopyButton text={D.share.url} label="Copy link" block bind:failed={refused} /><EmailDraft {phone} subject={`Next steps: ${R.review.title}`} body={emailBody} label="Email it" /></Row>
       {#if refused}<input class="in small" readonly value={D.share.url} aria-label="Link to this plan" />{/if}
-      {:else}<p class="small">{NO_SHARE}</p><Row wrap gap={2}><EmailDraft subject={`Next steps: ${R.review.title}`} body={emailBody} label="Email it" /></Row>{/if}
+      {:else}<p class="small">{NO_SHARE}</p><Row wrap gap={2}><EmailDraft {phone} subject={`Next steps: ${R.review.title}`} body={emailBody} label="Email it" /></Row>{/if}
     </Card>
   {:else}
     <!-- Paper sheet contents (design-system.md §8.11 row, provisional; the next-steps sheet): .paper-title-row (title + .sheet-meta, the

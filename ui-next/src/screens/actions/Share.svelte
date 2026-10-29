@@ -69,7 +69,7 @@
     <Card gap={2} label="Access codes">
       <Disclosure label="Access codes, for people who lose the link" solid={false}><p class="small">{D.codes.unused}{#if D.codes.code} · <a class="link" href="#codes">Make more</a> · <a class="link" href="#csv">Download CSV</a>{/if}</p></Disclosure>
     </Card>
-    {#if canShare && R.surveys.length}<EmailDraft subject={`Survey links: ${R.review.title}`} body={emailBody} label="Email the links to someone" />{/if}
+    {#if canShare && R.surveys.length}<EmailDraft {phone} subject={`Survey links: ${R.review.title}`} body={emailBody} label="Email the links to someone" />{/if}
     <a class="link" href={`${href("collect", at)}#offline`}>Meeting offline? Print and paper</a>
   {:else}
     <Page gap={5}>
@@ -90,7 +90,7 @@
         {#if !canShare}<p class="small">{READ_ONLY}</p>{/if}
         <hr class="hr" />
         <Row wrap gap={3}><Button label="Show QR codes for the room" href={href("qr-room", at)} lead={qr} /></Row>
-        {#if canShare && R.surveys.length}<EmailDraft subject={`Survey links: ${R.review.title}`} body={emailBody} label="Email the links to someone" />{/if}
+        {#if canShare && R.surveys.length}<EmailDraft {phone} subject={`Survey links: ${R.review.title}`} body={emailBody} label="Email the links to someone" />{/if}
         <p class="small">Meeting offline? Paper surveys and QR pages print from the <a class="link" href={`${href("collect", at)}#offline`}>Meeting offline? card on Collect</a>.</p>
         <Disclosure label="Access codes, for people who lose the link" gap={3}>
           {#if D.codes.code}<p class="small">A code opens the same survey from the home page. Codes are printed on paper surveys automatically.</p>{/if}
