@@ -21,11 +21,12 @@ test('non-numeric lane is refused loudly, never NaN or a digit prefix',()=>{asse
 test('every pending change file in release/changes parses to a numeric lane',()=>{for(const c of readChanges())assert.ok(Number.isInteger(c.lane),c.file);});
 
 test('excluded candidate stays indexed but is not advertised in the current build',()=>{
- const candidate={version:'0.37.1',excluded_from:['0.37.2'],sections:{fixed:['Unmerged inheritance']}};
+ const candidate={version:'0.37.1',included_in_product:false,excluded_from:['0.37.2'],sections:{fixed:['Unmerged inheritance']}};
  const current={version:'0.37.2',sections:{fixed:['Navigation correction']}};
  const releases={current:'0.37.2',versions:[current,candidate]};
  assert.deepEqual(includedVersions(releases),[current]);
  assert.equal(releases.versions[1],candidate);
- assert.deepEqual(includedVersions({...releases,current:'0.38.0'}),[current,candidate]);
+ assert.deepEqual(includedVersions({...releases,current:'0.38.0'}),[current]);
+ assert.deepEqual(includedVersions({...releases,current:'0.38.0',versions:[current,{...candidate,included_in_product:true}]}),[current,{...candidate,included_in_product:true}]);
  assert.equal(forecast(releases,[parseChange('1-1.md','bump: patch\nlane: 1\n- Fixed - Unmerged inheritance')]).units.length,1);
 });

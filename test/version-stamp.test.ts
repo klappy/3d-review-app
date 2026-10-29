@@ -83,11 +83,11 @@ describe("manifest records pin the cookbook byte copies (git blob id + sha256)",
 describe("generated ui/changelog.json", () => {
   it("deep-equals the derived shape: current, newest-first, current version first, no HTML", () => {
     const gen = readJson("ui/changelog.json");
-    const derived = { current: releases.current, versions: releases.versions.filter((v: any) => !v.excluded_from?.includes(releases.current))
+    const derived = { current: releases.current, versions: releases.versions.filter((v: any) => v.included_in_product !== false && !v.excluded_from?.includes(releases.current))
       .sort((a: any, b: any) => { const pa = a.version.split(".").map(Number), pb = b.version.split(".").map(Number); for (let i = 0; i < 3; i++) if (pa[i] !== pb[i]) return pb[i] - pa[i]; return 0; })
       .map((v: any) => ({ version: v.version, status: v.status, sections: { added: v.sections.added ?? [], changed: v.sections.changed ?? [], fixed: v.sections.fixed ?? [], security: v.sections.security ?? [] }, ...(v.date ? { date: v.date } : {}), ...(v.tag ? { tag: v.tag } : {}) })) };
     expect(gen).toEqual(derived);
-    for (const v of releases.versions.filter((v: any) => v.excluded_from?.includes(releases.current))) {
+    for (const v of releases.versions.filter((v: any) => v.included_in_product === false || v.excluded_from?.includes(releases.current))) {
       expect(gen.versions.some((entry: any) => entry.version === v.version)).toBe(false);
     }
     expect(gen.current).toBe(APP_VERSION);

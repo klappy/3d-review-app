@@ -31,7 +31,8 @@
       "excluded_from": [
         "0.37.2"
       ],
-      "exclusion_reason": "Unmerged workspace-inheritance candidate; preserved as historical candidate metadata, excluded from 0.37.2 product composition and generated release surfaces."
+      "exclusion_reason": "Unmerged workspace-inheritance candidate; preserved as historical candidate metadata, excluded from generated release surfaces until a reviewed product source includes it. Future current-version changes alone do not include this candidate.",
+      "included_in_product": false
     },
     {
       "version": "0.37.0",
