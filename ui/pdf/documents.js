@@ -40,13 +40,19 @@ export function surveyPdfDocument(model, {paper='letter'}={}) {
 export function reportPdfDocument(result, {paper='letter',minimum=3}={}) {
   // This guard is additional to cap.report.get, which owns current access/suppression policy.
   if (!result || result.suppressed !== false || !result.report) throw new Error('Report unavailable.');
-  const counts=lensRespondents(result.report.payload);
+  const payload=result.report.payload;
+  const key=lens=>String(lens).trim().toLowerCase().replace(/^translation team$/,'team');
+  const counts=new Map();for(const [lens,n] of lensRespondents(payload))counts.set(key(lens),(counts.get(key(lens))||0)+n);
+  const disclosed=new Set((payload?.lenses||[]).map(l=>key(l.lens)));
+  for(const i of payload?.standalone_indicators||[])disclosed.add(key(i.lens));
+  for(const row of [...(payload?.cross_lens_multi||[]),...(payload?.cross_lens_single||[])])for(const l of row.lens_scores||[])disclosed.add(key(l.lens));
+  if(payload?.translation_type_agreement?.team_values?.length)disclosed.add('team');
+  if(payload?.translation_type_agreement?.church_values?.length)disclosed.add('church');
   // This full-detail renderer includes exact scores. Hold the export if any perspective would be hidden by the UI.
   // A missing snapshot count is unknown, never permission to disclose; no live-answer fallback or rescoring.
-  if ((result.report.payload?.lenses||[]).some(l=>!counts.has(l.lens)||counts.get(l.lens)<minimum)) throw new Error('PDF_REPORT_HELD');
+  if ([...counts.values()].some(n=>n<minimum)||[...disclosed].some(l=>!counts.has(l)||counts.get(l)<minimum)) throw new Error('PDF_REPORT_HELD');
   const root = node('div');
   if (!renderReport({doc,root,report:result.report})) throw new Error('Report unavailable.');
-  const payload = result.report.payload;
   // The same exact stored aggregates in an accessible table beside the vector charts.
   const rows = (payload.lenses||[]).flatMap(l => (l.sub_dimensions||[]).map(s => `<tr><th scope="row">${esc(l.lens)}</th><td>${esc(s.sub_dimension)}</td><td>${esc(s.score)}</td></tr>`));
   const table = rows.length ? `<section><h2>Scores in this report</h2><table><thead><tr><th>Perspective</th><th>Area</th><th>Score (out of 100)</th></tr></thead><tbody>${rows.join('')}</tbody></table></section>` : '';

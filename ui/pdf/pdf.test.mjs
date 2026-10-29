@@ -36,3 +36,10 @@ test('full report export holds if a scored perspective is below the current disc
  assert.throws(()=>reportPdfDocument(result),/PDF_REPORT_HELD/);assert.doesNotThrow(()=>reportPdfDocument(result,{minimum:1}));
  result.report.payload.evidence=[];assert.throws(()=>reportPdfDocument(result,{minimum:1}),/PDF_REPORT_HELD/);
 });
+test('disclosure guard includes standalone, cross-lens, categorical and narrative-only evidence perspectives',()=>{
+ const base={suppressed:false,report:{payload:{source_commit:'f042cde',versions:{},lenses:[{lens:'Community',score:60,sub_dimensions:[]}],evidence:[{label:'Community — Written',n:7},{label:'Church — Written',n:1}]}}};
+ for(const extra of [{standalone_indicators:[{lens:'Church',score:12.345}]},{cross_lens_multi:[{lens_scores:[{lens:'Church',score:12.345}]}]},{cross_lens_single:[{lens_scores:[{lens:'Church',score:12.345}]}]},{translation_type_agreement:{church_values:['Clarifying']}},{narrative:['Church scored 12.345']}]){
+  const r=structuredClone(base);Object.assign(r.report.payload,extra);assert.throws(()=>reportPdfDocument(r),/PDF_REPORT_HELD/);
+ }
+ const missing=structuredClone(base);missing.report.payload.evidence.pop();missing.report.payload.standalone_indicators=[{lens:'Church',score:12.345}];assert.throws(()=>reportPdfDocument(missing),/PDF_REPORT_HELD/);
+});

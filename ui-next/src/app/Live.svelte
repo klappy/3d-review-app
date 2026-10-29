@@ -427,11 +427,14 @@
     {#if page.data.answers?.suppressed}
       <Status {phone} {theme} kind="held" message={`Answer-by-answer rows are not disclosed for this review: ${page.data.answers.reason ?? "held by policy"} (the server holds them for everyone, owners included). The levels and gaps on Results are built from these answers.`} inline back={to("results", route.params)} backLabel="Back to Results" />
     {:else}
-      <C {phone} {theme} report={rep} state={route.query.get("state") ?? undefined} pdfUrl={page.data.data.reportId ? reportPdfUrl(page.data.data.reportId) : null} pdfToken={token()} />
+      <C {phone} {theme} report={rep} state={route.query.get("state") ?? undefined} />
     {/if}
   {:else if page.data.screen === "results"}
     {@const C = REGISTRY.results}
     <C {phone} {theme} report={rep} onrefresh={refreshResults} refreshed={building ? "Building the results…" : page.data.refreshed ?? ""}>{#if build}{@render buildConfirm(false)}{/if}</C>
+  {:else if page.data.screen === "report" || page.data.screen === "report-detailed"}
+    {@const C = REGISTRY[page.data.screen]}
+    <C {phone} {theme} report={rep} state={route.query.get("state") ?? undefined} pdfUrl={m.reportId ? reportPdfUrl(m.reportId) : null} pdfToken={token()} />
   {:else}
     {@const C = REGISTRY[page.data.screen]}
     <C {phone} {theme} report={rep} state={route.query.get("state") ?? undefined} />
