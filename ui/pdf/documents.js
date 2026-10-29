@@ -50,7 +50,8 @@ export function reportPdfDocument(result, {paper='letter',minimum=3}={}) {
   if(payload?.translation_type_agreement?.church_values?.length)disclosed.add('church');
   // This full-detail renderer includes exact scores. Hold the export if any perspective would be hidden by the UI.
   // A missing snapshot count is unknown, never permission to disclose; no live-answer fallback or rescoring.
-  if ([...counts.values()].some(n=>n<minimum)||[...disclosed].some(l=>!counts.has(l)||counts.get(l)<minimum)) throw new Error('PDF_REPORT_HELD');
+  if ([...counts.values()].some(n=>n<minimum)||[...disclosed].some(l=>!counts.has(l)||counts.get(l)<minimum)||
+    (payload?.standalone_indicators||[]).some(i=>!Number.isFinite(i.n_responses)||i.n_responses<minimum)) throw new Error('PDF_REPORT_HELD');
   const root = node('div');
   if (!renderReport({doc,root,report:result.report})) throw new Error('Report unavailable.');
   // The same exact stored aggregates in an accessible table beside the vector charts.

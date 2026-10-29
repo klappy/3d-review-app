@@ -42,4 +42,5 @@ test('disclosure guard includes standalone, cross-lens, categorical and narrativ
   const r=structuredClone(base);Object.assign(r.report.payload,extra);assert.throws(()=>reportPdfDocument(r),/PDF_REPORT_HELD/);
  }
  const missing=structuredClone(base);missing.report.payload.evidence.pop();missing.report.payload.standalone_indicators=[{lens:'Church',score:12.345}];assert.throws(()=>reportPdfDocument(missing),/PDF_REPORT_HELD/);
+ const smallCell=structuredClone(base);smallCell.report.payload.evidence=[{label:'Community — Written',n:7}];smallCell.report.payload.standalone_indicators=[{lens:'Community',score:12.345,n_responses:1}];assert.throws(()=>reportPdfDocument(smallCell),/PDF_REPORT_HELD/);
 });
