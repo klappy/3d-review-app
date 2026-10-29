@@ -1,23 +1,23 @@
 {
-  "version": "0.37.0",
+  "version": "0.37.2",
   "cookbook_repo": "klappy/3d-review-cookbook",
-  "cookbook_commit": "be9a0a3a6ddb4efe931776d594e531b8e15c088f",
+  "cookbook_commit": "ccc107e04675750cdd1c8ebcbcfbc0191df42b73",
   "records": [
     {
-      "path": "planning/2026-09-16-parity-build/releases/0.37.0.md",
-      "blob_sha": "e531b509c8bc2e835b30982b8ad74f16400c92af",
-      "sha256": "fdded099db82e77b06fdc452c769631cf80c4695472e1e0c82fe04023a8ceed8"
+      "path": "planning/2026-09-16-parity-build/releases/0.37.2.md",
+      "blob_sha": "b11fc51e1d3d3d2d721ee4ab05b078cf5c6c7de5",
+      "sha256": "d301d7b5023e94c07992ddf69b515e050283abc22d156e26d9b7b2dcee50337f"
     },
     {
       "path": "planning/2026-09-16-parity-build/releases/releases.json",
-      "blob_sha": "ce2e4e5cf54e25a700ae433b2d4f1c5aeaa48613",
-      "sha256": "49e858525e2faa65dbe96a1811147d4bff7acd9279ad34cc3013cc9e6dd30200"
+      "blob_sha": "cc1df2ff73a9a8598134e2bbf574322055d8dba8",
+      "sha256": "f77bede89b670fbd95ac1dbf37fbab178e06bfcdc4fd14f40595b3d7b76c1834"
     }
   ],
   "changelog": {
     "sections": {
-      "changed": [
-        "The app no longer blocks requests because of app-level request-rate limits or missing limiter bindings. This supports workshops where many participants share one connection. The existing per-address sign-in-link and collaborator-invitation product caps remain, along with upstream translation 429 responses and the MCP batch-size limit."
+      "fixed": [
+        "Next UI results and report navigation starts independent reads together, and following an in-page anchor no longer repeats data reads. Existing access checks, required-read errors, explicit report-build confirmation and current UI default are preserved. Automated and local synthetic evidence is distinct from pending DEV and production verification."
       ]
     }
   }
