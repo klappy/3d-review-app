@@ -6,6 +6,10 @@ main = "src/worker.ts"
 compatibility_date = "2026-09-01"
 workers_dev = true # preserve existing DEV alias when adding the custom domain
 
+# DEV-only PDF Quick Actions; non-inheritable binding, no API credential or plan upgrade.
+[browser]
+binding = "PDF_BROWSER"
+
 [[routes]]
 pattern = "dev.3dreview.app"
 custom_domain = true

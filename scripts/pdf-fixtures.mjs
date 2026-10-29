@@ -9,7 +9,7 @@ const english={visible:true,blank:true,title:'Community survey',identity,passage
 const hindi={...english,title:'समुदाय सर्वेक्षण',lang:'hi',language:'Hindi',items:english.items.map((it,i)=>({...it,text:`${i+1}. क्या इस अंश का अर्थ आपके समुदाय के लोगों के लिए स्पष्ट है?`,options:[{text:'हाँ, अर्थ समझना आसान है।'},{text:'कुछ भाग स्पष्ट हैं; अन्य भागों को समझाने की आवश्यकता है।'},{text:'नहीं, अर्थ समझना कठिन है और अनुवाद पर और काम करने की आवश्यकता है।'}]}))};
 const corpus=JSON.parse(readFileSync(new URL('../test/fixtures/synthetic-report-renderer-v1.json',import.meta.url)));
 const payload={...corpus.contexts['assess_syn_earning-trust-2026-01'],source_commit:corpus.source_commit,versions:{scorer:'fixture',narrative:'fixture',policy:'fixture'}};
-const files={'survey-en-letter':surveyPdfDocument(english),'survey-hi-a4':surveyPdfDocument(hindi,{paper:'a4'}),'report-letter':reportPdfDocument({suppressed:false,report:{id:'synthetic_fixture',created_at:'2026-10-29T12:00:00Z',payload}})};
+const files={'survey-en-letter':surveyPdfDocument(english),'survey-hi-a4':surveyPdfDocument(hindi,{paper:'a4'}),'report-letter':reportPdfDocument({suppressed:false,report:{id:'synthetic_fixture',created_at:'2026-10-29T12:00:00Z',payload}},{minimum:1})};
 for(const [name,html]of Object.entries(files))writeFileSync(`${out}/${name}.html`,html);
 writeFileSync(`${out}/source-report.json`,JSON.stringify(payload,null,2));
 console.log(out);

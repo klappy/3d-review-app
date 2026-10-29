@@ -21,6 +21,7 @@
   import Level from "../../Level.svelte";
   import Coverage from "./Coverage.svelte";
   import DocBar from "./DocBar.svelte";
+  import PdfActions from '../actions/PdfActions.svelte';
   import PaperHead from "./PaperHead.svelte";
   import PaperLegend from "./PaperLegend.svelte";
   import ScoreBar from "./ScoreBar.svelte";
@@ -32,7 +33,7 @@
   import { href } from "../href.js";
   import { REPORT, currentLevelMin, snapshotTotal, fmtScore, footPrivacy, readingPrivacy, lensCards, scoreRows, comparedRows, radar, gapLead, countWord, evidenceSheets, detailedPages } from "./data.js";
 
-  let { phone = false, theme = "light", report } = $props();
+  let { phone = false, theme = "light", report, pdfUrl = null, pdfToken = null } = $props();
   const D = $derived(report ?? REPORT.desktop);
   const cards = $derived(lensCards(D.payload, D.counts, { sent: D.sent }));
   const tensions = $derived(scoreRows(D, D.counts).filter((r) => r.spread !== null).slice(0, 3));
@@ -47,7 +48,7 @@
   const tensionsLead = $derived(tensions.length === 0 ? "No area has two perspectives to compare yet." : tensions.length === 1 ? "The area where the perspectives are furthest apart." : `The ${countWord(tensions.length)} areas where the perspectives are furthest apart.`);
 </script>
 
-{#snippet top()}<DocBar title={`Detailed report · ${PAGES} pages · ${D.review.title}`} other="Open the overview · 1 page" otherHref={href("report")} />{/snippet}
+{#snippet top()}<DocBar title={`Detailed report · ${PAGES} pages · ${D.review.title}`} other="Open the overview · 1 page" otherHref={href("report")} {pdfUrl} {pdfToken} />{/snippet}
 {#snippet foot(n)}<div class="pfoot"><span class="pf-text">{FOOT}</span><span class="pn">{n} of {PAGES}</span></div>{/snippet}
 {#snippet scores(rows)}
   {#each rows as row}
@@ -119,14 +120,15 @@
     </div>
 {/snippet}
 {#snippet ptop()}<PhoneHeader state="nested" title="Detailed report" parent="Overview" back={href("report", { state: "overview" })} menuHref={out("menu")} />{/snippet}
-{#snippet pbar()}<div class="glass phone-bar" role="group" aria-label="Page actions"><button class="btn btn-primary btn-lg btn-block" type="button" disabled aria-describedby="pdf-why">Download this report (PDF)</button></div>{/snippet}
+{#snippet pbar()}{#if !pdfUrl}<div class="glass phone-bar" role="group" aria-label="Page actions"><button class="btn btn-primary btn-lg btn-block" type="button" disabled aria-describedby="pdf-why">Download this report (PDF)</button></div>{/if}{/snippet}
 
 {#if phone}
 <!-- design-system.md Phone report reading (QA-LIVE N2): the detailed view, the same sheets as desktop scaled to the width (.psheet[data-fit=a4]),
      back to the overview; the PDF reason in the page; the download disabled with it. -->
 <AppShell phone {theme} screen top={ptop} bar={pbar}>
+  {#if pdfUrl}<PdfActions url={pdfUrl} token={pdfToken} label="Download full report PDF" />{/if}
   <span class="micro">Detailed · {PAGES} pages · A4 scaled to the width; pinch to zoom</span>
-  <p class="small" id="pdf-why">PDF export is not in the new design yet; the current design's report page downloads it.</p>
+  {#if !pdfUrl}<p class="small" id="pdf-why">PDF export is not in the new design yet; the current design's report page downloads it.</p>{/if}
   <div class="report-sheets">
     <div class="psheet" data-fit="a4">{@render page1()}</div>
     <div class="psheet" data-fit="a4">{@render page2()}</div>

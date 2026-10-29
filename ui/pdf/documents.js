@@ -1,7 +1,7 @@
 // A PDF is the existing paper/report presentation of an authorized read, never a new report build.
 import { paperHtml, PRINT_DOC_CSS } from '../assess/print.js';
 import { renderReport } from '../report-view.js';
-import { lensesCss } from '../report-lenses.js';
+import { lensesCss, lensRespondents } from '../report-lenses.js';
 import { pdfFontCss } from './font.js';
 
 const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -37,9 +37,13 @@ export function surveyPdfDocument(model, {paper='letter'}={}) {
   if (!body) throw new Error('Blank survey unavailable.');
   return documentHtml(body,{paper,lang:model.lang||'en',title:model.title||'Survey',css:PRINT_DOC_CSS+'\n'+pdfFontCss});
 }
-export function reportPdfDocument(result, {paper='letter'}={}) {
+export function reportPdfDocument(result, {paper='letter',minimum=3}={}) {
   // This guard is additional to cap.report.get, which owns current access/suppression policy.
   if (!result || result.suppressed !== false || !result.report) throw new Error('Report unavailable.');
+  const counts=lensRespondents(result.report.payload);
+  // This full-detail renderer includes exact scores. Hold the export if any perspective would be hidden by the UI.
+  // A missing snapshot count is unknown, never permission to disclose; no live-answer fallback or rescoring.
+  if ((result.report.payload?.lenses||[]).some(l=>!counts.has(l.lens)||counts.get(l.lens)<minimum)) throw new Error('PDF_REPORT_HELD');
   const root = node('div');
   if (!renderReport({doc,root,report:result.report})) throw new Error('Report unavailable.');
   const payload = result.report.payload;

@@ -11,7 +11,7 @@ test('survey reuses the paper, includes all choices, embedded font and page size
 });
 test('report refuses held data and renders exact stored aggregates as text, charts and tables',()=>{
   assert.throws(()=>reportPdfDocument({suppressed:true,report:{payload:{}}}));
-  const result={suppressed:false,report:{created_at:'2026-10-29',payload:{source_commit:'f042cde',versions:{scorer:'s',narrative:'n',policy:'p'},lenses:[{lens:'Community',score:68.25,sub_dimensions:[{sub_dimension:'Clarity',score:72.5,n_items_included:3}]}],narrative:['<img src=x onerror=bad>']}}};
+  const result={suppressed:false,report:{created_at:'2026-10-29',payload:{source_commit:'f042cde',versions:{scorer:'s',narrative:'n',policy:'p'},evidence:[{label:'Community — Written',n:7}],lenses:[{lens:'Community',score:68.25,sub_dimensions:[{sub_dimension:'Clarity',score:72.5,n_items_included:3}]}],narrative:['<img src=x onerror=bad>']}}};
   const d=new JSDOM(reportPdfDocument(result)).window.document;assert.match(d.body.textContent,/68.25/);assert.match(d.querySelector('table').textContent,/72.5/);assert.equal(d.querySelectorAll('img,script').length,0);assert.match(d.body.textContent,/<img src=x onerror=bad>/);
 });
 test('download validates bytes/type and uses the server filename; errors remain actionable',async()=>{
@@ -29,4 +29,10 @@ test('repeated clicks share a request; cancel permits retry; object URL is expli
 test('share cancellation keeps the prepared file available for save/open',async()=>{
   const pdf={blob:new Blob(['%PDF-']),name:'x.pdf'};
   assert.equal(await sharePdf(pdf,{canShare:()=>true,share:async()=>{throw Object.assign(new Error(),{name:'AbortError'});}}),false);
+});
+
+test('full report export holds if a scored perspective is below the current disclosure floor or count is unknown',()=>{
+ const result={suppressed:false,report:{payload:{source_commit:'f042cde',versions:{},lenses:[{lens:'Church',score:12.345,sub_dimensions:[]}],evidence:[{label:'Church — Written',n:2}]}}};
+ assert.throws(()=>reportPdfDocument(result),/PDF_REPORT_HELD/);assert.doesNotThrow(()=>reportPdfDocument(result,{minimum:1}));
+ result.report.payload.evidence=[];assert.throws(()=>reportPdfDocument(result,{minimum:1}),/PDF_REPORT_HELD/);
 });

@@ -1,5 +1,7 @@
 // Binary download primitive shared by survey/report controls. The UI supplies its existing authorized PDF endpoint.
 // Prepare asynchronously, then offer Save/Open/Share on a fresh click: iOS requires user activation for file sharing.
+export const surveyPdfUrl=(aid,sid,{lang='en',paper='letter'}={})=>`/v2/assessments/${encodeURIComponent(aid)}/surveys/${encodeURIComponent(sid)}/print.pdf?lang=${encodeURIComponent(lang)}&paper=${String(paper).toLowerCase()==='a4'?'a4':'letter'}`;
+export const reportPdfUrl=id=>`/v2/reports/${encodeURIComponent(id)}/pdf`;
 export async function fetchPdf(url, {fetchImpl=globalThis.fetch,token,signal}={}) {
   const response=await fetchImpl(url,{credentials:'same-origin',cache:'no-store',signal,headers:{accept:'application/pdf',...(token?{authorization:`Bearer ${token}`}:{})}});
   if(!response.ok) {

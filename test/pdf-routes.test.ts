@@ -46,6 +46,10 @@ describe('PDF endpoints preserve existing authorization and report policy',()=>{
   it('rechecks report visibility instead of trusting the id from a prior download',async()=>{
     render.mockClear();const r=await request(`/v2/reports/${reportId}/pdf`,other);expect(r.status).toBe(404);expect(render).not.toHaveBeenCalled();
   });
+  it('does not disclose a perspective below the environment display minimum in a full-detail PDF',async()=>{
+    render.mockClear();const r=await request(`/v2/reports/${reportId}/pdf`,owner,{ENVIRONMENT:'production'});
+    expect(r.status).toBe(409);expect((await r.json() as any).error.code).toBe('PDF_REPORT_HELD');expect(render).not.toHaveBeenCalled();
+  });
   it('retains current suppression when a stored report loses its eligible capture',async()=>{
     const rows=(await db.prepare("SELECT r.* FROM response r JOIN assessment_survey s ON s.id=r.assessment_survey_id WHERE s.assessment_id=?").bind('assess_syn_earning-trust-2026-01').all<Record<string,unknown>>()).results;
     try {

@@ -1,6 +1,6 @@
 declare module '*ui/pdf/documents.js' {
   export function surveyPdfDocument(model: Record<string, any>, options?: {paper?:string}): string;
-  export function reportPdfDocument(result: Record<string, any>, options?: {paper?:string}): string;
+  export function reportPdfDocument(result: Record<string, any>, options?: {paper?:string;minimum?:number}): string;
 }
 declare module '*ui/assess/print.js' {
   export function paperLink(link: {url:string}|null): unknown;

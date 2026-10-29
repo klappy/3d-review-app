@@ -7,6 +7,7 @@
   import { tick } from "svelte";
   import { openQrPrint, preparePapers, openPapersPrint, paperPreview, printOpenedLine, printAllowed } from "./print.js";
   import { loadBlankPrint } from "../../../ui/stage-screens.js";
+  import { reportPdfUrl } from '../../../ui/pdf/download.js';
   import { SAMPLE_HREF, SAMPLE_AID } from "./router.js";
   import { REPORT as SAMPLE_REPORT } from "../screens/results/data.js";
   import { api, token } from "./api.js";
@@ -373,7 +374,7 @@
     <Status {phone} {theme} kind="refused" message="Your role here cannot print blank surveys (an owner or member can)." back={to("collect", route.params)} backLabel="Back to Collect" />
   {:else}
     {@const C = REGISTRY.print}
-    <C {phone} {theme} data={page.data.data} previews={page.data.previews} onprint={printPapers} status={printStatus} busy={printBusy} />
+    <C {phone} {theme} data={page.data.data} previews={page.data.previews} onprint={printPapers} status={printStatus} busy={printBusy} pdfEnabled pdfToken={token()} />
   {/if}
 {:else if page.data.unavailable}
   <Status {phone} {theme} kind="unavailable" message={page.data.message} back={page.data.assessment ? to("collect", { aid: page.data.assessment.id }) : to("home")} backLabel={page.data.assessment ? "Back to Collect" : "Home"} />
@@ -426,7 +427,7 @@
     {#if page.data.answers?.suppressed}
       <Status {phone} {theme} kind="held" message={`Answer-by-answer rows are not disclosed for this review: ${page.data.answers.reason ?? "held by policy"} (the server holds them for everyone, owners included). The levels and gaps on Results are built from these answers.`} inline back={to("results", route.params)} backLabel="Back to Results" />
     {:else}
-      <C {phone} {theme} report={rep} state={route.query.get("state") ?? undefined} />
+      <C {phone} {theme} report={rep} state={route.query.get("state") ?? undefined} pdfUrl={page.data.data.reportId ? reportPdfUrl(page.data.data.reportId) : null} pdfToken={token()} />
     {/if}
   {:else if page.data.screen === "results"}
     {@const C = REGISTRY.results}

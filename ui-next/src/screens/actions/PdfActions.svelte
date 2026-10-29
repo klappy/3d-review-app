@@ -4,7 +4,7 @@
   import Row from '../../Row.svelte';
   import Stack from '../../Stack.svelte';
   import { fetchPdf, pdfLoader, pdfObjectUrl, canSharePdf, sharePdf } from '../../../../ui/pdf/download.js';
-  let { url, token = null, label = 'Download PDF', fetchImpl = globalThis.fetch } = $props();
+  let { url, token = null, label = 'Download PDF', primary = true, fetchImpl = globalThis.fetch } = $props();
   let busy = $state(false), status = $state(''), ready = $state(null), file = $state(null), shareable = $state(false);
   const loader = pdfLoader(fetchPdf);
   let generation = 0;
@@ -27,10 +27,10 @@
   async function share() {try {status=await sharePdf(file)?'PDF shared.':'Sharing cancelled. Your PDF is still ready.';}catch(e){status=e.message;}}
   onDestroy(()=>{generation++;loader.cancel();clear();});
 </script>
-<div aria-label="PDF download">
+<div class="pdf-actions" aria-label="PDF download">
   <Stack gap={2}>
   <Row gap={2} wrap>
-  <button class="btn btn-primary" type="button" disabled={busy || !url} onclick={prepare}>{busy ? 'Preparing PDF…' : ready ? 'Prepare again' : label}</button>
+  <button class={primary ? 'btn btn-primary' : 'btn'} type="button" disabled={busy || !url} onclick={prepare}>{busy ? 'Preparing PDF…' : ready ? 'Prepare again' : label}</button>
   {#if busy}<button class="btn" type="button" onclick={cancel}>Cancel</button>{/if}
   {#if ready}
     <a class="btn" href={ready.url} download={ready.name} target="_blank" rel="noopener">Save PDF</a>

@@ -7,6 +7,7 @@ import { existingBlankPrintLink } from './handlers/survey';
 import { listPassages } from './passages';
 import { handleTranslate } from './translate';
 import { lwcLanguage } from './languages';
+import { perspectiveLevelMinimum } from './report-admission';
 import { PdfError, pdfBytes, pdfResponse, type PdfEnv } from './pdf-render';
 import { surveyPdfDocument, reportPdfDocument } from '../ui/pdf/documents.js';
 import { paperLink, printIdentityFrom } from '../ui/assess/print.js';
@@ -63,6 +64,9 @@ export function installPdf(app:Hono<{Bindings:Env}>,context:(request:Request,env
   app.get('/v2/reports/:id/pdf',c=>handle(c.req.raw,c.env,async(ctx,paper)=>{
     const stored=await read(ctx,'cap.report.get',{id:c.req.param('id')}); // current store policy; never report.build
     if(stored.suppressed!==false||!stored.report)throw new PdfError('PDF_REPORT_HELD','This report is unavailable under the current reporting policy.',409);
-    return {html:reportPdfDocument(stored,{paper}),name:`report-${c.req.param('id')}`};
+    let html:string;
+    try {html=reportPdfDocument(stored,{paper,minimum:perspectiveLevelMinimum(ctx.env)});}
+    catch(e) {if(e instanceof Error&&e.message==='PDF_REPORT_HELD')throw new PdfError('PDF_REPORT_HELD','This full report cannot be exported until every included perspective has enough responses.',409);throw e;}
+    return {html,name:`report-${c.req.param('id')}`};
   },false));
 }
