@@ -16,11 +16,18 @@ describe("live data helpers", () => {
     expect(cells).toMatch(/^[01]+$/);
     expect(cells.length).toBe(n * n);
   });
-  it("names the widest gaps and the narrowest agreement from cross_lens_multi", () => {
-    const payload = { cross_lens_multi: [{ construct_name: "A", agreement_range: 5 }, { construct_name: "B", agreement_range: 25 }, { construct_name: "C", agreement_range: 17 }, { construct_name: "D", agreement_range: 1 }, { construct_name: "E", agreement_range: 9 }] };
-    expect(gapsOf(payload)).toEqual({ biggest: ["B", "C", "E"], agree: ["D"] });
+  it("names the widest gaps and the same-band areas from cross_lens_multi", () => {
+    // Codex P2 4383879670: from the placed scores (post-suppression), not agreement_range: biggest = gapRows' first three (a band or
+    // more apart, widest placed spread first); agree (QA-LIVE Q13) = every area whose two or more placed perspectives share a band
+    // (A 60/65 and D 62/63 are Growing/Growing; C and E are one band apart, so a gap and never agreement)
+    const area = (name: string, team: number, community: number) => ({ construct_name: name, agreement_range: Math.abs(team - community), lens_scores: [{ lens: "team", score: team }, { lens: "community", score: community }] });
+    const payload = { cross_lens_multi: [area("A", 60, 65), area("B", 80, 55), area("C", 77, 60), area("D", 62, 63), area("E", 70, 79)] };
+    expect(gapsOf(payload, { team: 5, community: 5, church: 0 })).toEqual({ biggest: ["B", "C", "E"], agree: ["A", "D"] });
+    // every compared area apart: no agreement at all (and no >3-area prerequisite either way)
+    expect(gapsOf({ cross_lens_multi: [area("X", 90, 30), area("Y", 76, 70)] }, { team: 5, community: 5, church: 0 })).toEqual({ biggest: ["X", "Y"], agree: [] });
+    expect(gapsOf({ cross_lens_multi: [area("Z", 62, 70)] }, { team: 5, community: 5, church: 0 })).toEqual({ biggest: [], agree: ["Z"] });
     expect(radarOf(payload)).toEqual(["A", "B", "C", "D", "E"]);
-    expect(gapsOf(null)).toEqual({ biggest: [], agree: [] });
+    expect(gapsOf(null, {})).toEqual({ biggest: [], agree: [] });
   });
   it("maps server stages and perspectives to the lanes' words", () => {
     expect(STAGE_OF.prepare).toBe("setup"); expect(STAGE_OF.collect).toBe("collecting"); expect(STAGE_OF.understand).toBe("results");

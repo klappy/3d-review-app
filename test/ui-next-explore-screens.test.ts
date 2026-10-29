@@ -4,6 +4,7 @@
 // Boards: 3d-review-cookbook design/2026-10-15-glass-redesign/canvas Explore.dc.html, ExplorePhone.dc.html, ExploreFiltersPhone.dc.html,
 // Feedback.dc.html, FeedbackPhone.dc.html, Help.dc.html, HelpPhone.dc.html; nesting design-system.md 8.1; dialogs "Dialog and sheet states".
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { useLevelMinimum } from "../ui-next/src/screens/results/data.js";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { render } from "@testing-library/svelte";
@@ -14,11 +15,11 @@ import Help from "../ui-next/src/screens/explore/Help.svelte";
 // @ts-expect-error -- plain .js module, no type declarations
 import lane from "../ui-next/src/screens/explore/index.js";
 // @ts-expect-error -- plain .js module, no type declarations
-import { levelOf, stagePill, responsesText, exploreRows, phoneRows, matchCounts, LENS_KEYS, STAGE_PILL } from "../ui-next/src/screens/explore/explore-data.js";
+import { levelOf, stagePill, responsesText, exploreRows, phoneRows, matchCounts, tableAssurance, LENS_KEYS, STAGE_PILL } from "../ui-next/src/screens/explore/explore-data.js";
 // @ts-expect-error -- plain .js module, no type declarations
 import { modal, backdropClose, closeTo } from "../ui-next/src/screens/explore/dialog.js";
 // @ts-expect-error -- plain .js module, no type declarations
-import { TOPICS, FAQ, INTRO } from "../ui-next/src/screens/explore/help-copy.js";
+import { TOPICS, FAQ, INTRO, faqFor, topicsFor } from "../ui-next/src/screens/explore/help-copy.js";
 // @ts-expect-error -- plain .js module, no type declarations
 import { v3ScoreBand } from "../ui/assess/v3-assessment.js";
 // @ts-expect-error -- plain .js module, no type declarations
@@ -110,8 +111,8 @@ describe("Explore (Explore.dc.html, ExplorePhone.dc.html, ExploreFiltersPhone.dc
     const a = mount(Explore, {});
     expect(text(a.querySelector("h1.title-page")!)).toBe("Explore reviews");
     expect(text(a)).toContain("Every review you can see, as one table. Filter by any cross-section; group or save the view.");
-    expect([...a.querySelectorAll(".seg label")].map(text)).toEqual(["Cards", "Table"]);
-    expect((a.querySelector(".seg input:checked") as HTMLInputElement).value).toBe("table");
+    expect([...a.querySelectorAll("main .seg label")].map(text)).toEqual(["Cards", "Table"]);
+    expect((a.querySelector("main .seg input:checked") as HTMLInputElement).value).toBe("table");
     expect([...a.querySelectorAll(".chip")].map(text)).toEqual(["Workspace · BCS India", "Region · South Asia", "Stage · Collecting, Results ready", "Date · Last 12 months"]);
     expect([...a.querySelectorAll(".chip button")].map((b) => b.getAttribute("aria-label"))).toEqual(["Remove Workspace filter", "Remove Region filter", "Remove Stage filter", "Remove Date filter"]);
     // R3-4: the rows are not grouped, so Group by says None rather than the board's "Stage"
@@ -123,10 +124,21 @@ describe("Explore (Explore.dc.html, ExplorePhone.dc.html, ExploreFiltersPhone.dc
     expect(rows.map((r) => r[0])).toEqual(["Mark 1–4 draft", "Luke 1–2 community review", "Workshop 2 · Luke 1", "Workshop 2 · Luke 1", "Mark 2 signed", "Genesis audio check"]);
     expect(rows.map((r) => r[5])).toEqual(["Collecting", "Results ready", "Collecting", "Collecting", "Results ready", "Setting up"]);
     expect(rows.map((r) => r[6])).toEqual(["18 / 30", "24", "9 / 24", "11 / 24", "15", "—"]);
-    expect(rows.map((r) => r.slice(7, 10))).toEqual([["—", "—", "—"], ["Growing", "Needs support", "Growing"], ["—", "—", "—"], ["—", "—", "—"], ["Strong", "Growing", "More input needed"], ["—", "—", "—"]]);
+    // each level cell: the Level, then the Coverage cue's count variant under it in .l-stack[data-gap="1"] (Codex P2 4383334399;
+    // design-system.md §2 Coverage cue, Explore placement @5edfbfab); no report is the board's dash with no cue
+    const cell = (td: Element) => (td.querySelector(".lvl-word") ? text(td.querySelector(".lvl-word")!) : text(td));
+    const lvl = [...a.querySelectorAll("tbody tr")].map((tr) => [...tr.querySelectorAll("td")].slice(7, 10));
+    expect(lvl.map((r) => r.map(cell))).toEqual([["—", "—", "—"], ["Growing", "Needs support", "Growing"], ["—", "—", "—"], ["—", "—", "—"], ["Strong", "Growing", "More input needed"], ["—", "—", "—"]]);
+    expect(lvl.map((r) => r.map((td) => td.querySelector("[data-coverage] [data-short]")?.textContent ?? null))).toEqual([[null, null, null], ["9", "10", "5"], [null, null, null], [null, null, null], ["8", "7", "0"], [null, null, null]]);
+    for (const td of lvl.flat().filter((td) => td.querySelector(".lvl-word"))) {
+      const stack = td.firstElementChild!;
+      expect([stack.tagName, stack.className, stack.getAttribute("data-gap")]).toEqual(["SPAN", "l-stack", "1"]);
+      expect([...stack.children].map((c) => c.matches("[data-coverage]") ? "cue" : c.querySelector(".lvl-word") || c.matches(".lvl, [data-level]") ? "level" : c.className)).toEqual(["level", "cue"]);
+      expect(td.querySelector("[data-coverage]")!.getAttribute("title")).toMatch(/· \d+ responses?$/);
+    }
     expect(rows.map((r) => r[10])).toEqual(["today", "12 Sep", "3 days ago", "3 days ago", "28 Sep", "26 Sep"]);
     expect(text(a)).toContain("6 of 23 reviews match · 4 projects · 5 languages"); // counted from the six rows (N4), not the board's literal
-    expect(text(a)).toContain("Nothing here identifies a participant.");
+    expect(text(a)).toContain("Nothing here identifies a participant: a level shows only with at least 3 responses."); // the safe 3 in the gallery (design-system.md:609 @c4bd0164)
     expect([...a.querySelectorAll("button.mi")].map((b) => text(b.firstElementChild!))).toEqual(["Project", "Language", "Cluster", "Organisation involved", "Translation format", "Facilitator"]);
     expect(text(a.querySelector("aside h2.h3")!)).toBe("Add a filter");
     expect(text(a)).toContain("Workspace and project are filters like any other. The Workspace and Project pages are the same table with those filters saved.");
@@ -141,12 +153,18 @@ describe("Explore (Explore.dc.html, ExplorePhone.dc.html, ExploreFiltersPhone.dc
     expect(a.querySelector("[aria-label='Search reviews']")).not.toBeNull();
     const rows = [...a.querySelectorAll("a.card-link.list-row")];
     expect(rows.map((r) => text(r.querySelector(".list-title")!))).toEqual(["Luke 1–2 community review", "Genesis audio check", "Mark 1–4 draft", "Acts listening review", "Psalms reading group"]);
-    expect(rows.map((r) => text(r.querySelector(".lvl-name")!))).toEqual(["Growing", "Needs support", "More input needed", "Growing", "Strong"]);
+    expect(rows.map((r) => text(r.querySelector(".lvl-word")!))).toEqual(["Growing", "Needs support", "More input needed", "Growing", "Strong"]);
+    // one overall level per row (the team's), and the count under it is that same perspective's (Codex P2 4383879651; R72 corrected)
+    expect(rows.map((r) => r.querySelector("[data-coverage] [data-short]")?.textContent)).toEqual(["9", "5", "2", "9", "6"]);
+    expect(rows.map((r) => r.querySelector(".l-stack[data-gap='1'] > [data-coverage]") !== null)).toEqual(Array(5).fill(true));
     expect(rows.map((r) => text(r.querySelector(".small")!))).toEqual(["Hindi NT · Sep 2026", "Lao OT · Sep 2026", "Hindi NT · Oct 2026", "Hindi NT · Aug 2026", "Lao OT · Jul 2026"]);
     expect(text(a)).toContain("Save this view");
     expect(text(a)).toContain("Download CSV");
     expect(a.querySelector("dialog")).toBeNull();
-    expect(a.querySelector(".phone-bar .btn-primary")!.getAttribute("href")).toBe("?ui_next=on&screen=explore&w=phone&state=filters");
+    // live QA Q5: the filters cannot be served yet, so the primary is a disabled button named by the visible reason, never a no-op link
+    const prim = a.querySelector(".phone-bar .btn-primary") as HTMLButtonElement;
+    expect([prim.tagName, prim.disabled, prim.getAttribute("aria-describedby")]).toEqual(["BUTTON", true, "explore-why"]);
+    expect(a.querySelector("#explore-why")!.textContent).toContain("not in the new design yet");
     expect(rows.map((r) => r.getAttribute("href"))).toEqual(Array(5).fill("?ui_next=on&screen=results&w=phone"));
   });
   it("filters (ExploreFiltersPhone): the sheet is an open native <dialog>, titled by its micro line, with the ten filter rows", () => {
@@ -190,7 +208,6 @@ describe("Explore (Explore.dc.html, ExplorePhone.dc.html, ExploreFiltersPhone.dc
       fire("click"); // a press that starts and ends on the backdrop
       expect(d.open).toBe(false);
       expect(window.location.search).toBe(closed);
-      expect(a.querySelector(".phone-bar .btn-primary")!.getAttribute("href")).toBe(`${closed}&state=filters`); // a real navigation again
       window.history.replaceState(null, "", sheetUrl);
       d.dispatchEvent(new Event("close")); // Escape: the native cancel closes the dialog, which fires close
       expect(window.location.search).toBe(closed);
@@ -223,7 +240,6 @@ describe("Explore (Explore.dc.html, ExplorePhone.dc.html, ExploreFiltersPhone.dc
     window.history.replaceState(null, "", "/next/?ui_next=on&screen=explore&w=phone&theme=dark");
     try {
       const a = mount(Explore, { phone: true, theme: "dark" });
-      expect(a.querySelector(".phone-bar .btn-primary")!.getAttribute("href")).toBe("?ui_next=on&screen=explore&w=phone&theme=dark&state=filters");
       expect(a.querySelector("a.list-row")!.getAttribute("href")).toBe("?ui_next=on&screen=results&w=phone&theme=dark");
     } finally { window.history.replaceState(null, "", "/"); }
   });
@@ -242,6 +258,24 @@ describe("Explore data adapts through the current UI's level function (ui/assess
       const l = (r.lenses as Record<string, { score: number; responses: number }> | null)?.[k];
       if (l) expect({ strong: "Strong", growing: "Growing", support: "Needs support", urgent: "Needs urgent attention", more: "More input needed" }[levelOf(l) as string]).toBe(v3ScoreBand(l.score, l.responses));
     }
+  });
+  it("Codex P1 4384112230: the table footer's assurance follows the served level minimum (design-system.md:609 @c4bd0164)", () => {
+    const ONE = "Nothing here names a participant; a level shown with one response reflects that person's answers.";
+    expect([tableAssurance(1), tableAssurance(3), tableAssurance(5)]).toEqual([ONE, "Nothing here identifies a participant: a level shows only with at least 3 responses.", "Nothing here identifies a participant: a level shows only with at least 5 responses."]);
+    const foot = (m: number) => { useLevelMinimum(m); const a = mount(Explore, {}); return text(a.querySelector(".tbl-foot > span:last-child")!); };
+    expect(foot(1)).toBe(ONE); // DEV: never "nothing identifies" beside a one-response level
+    expect(foot(3)).toBe(tableAssurance(3));
+    expect(text(mount(Explore, { data: { ...explore, levelMinimum: 1 } }).querySelector(".tbl-foot > span:last-child")!)).toBe(ONE); // a live model's own value
+    useLevelMinimum(undefined);
+  });
+  it("phoneRows: the cue beside a phone row's team level counts the team, never another perspective; none carried is null", () => {
+    // 9 team, 10 community, 5 church: the team level sits beside the team's 9, not the church's 5 (Codex P2 4383879651)
+    const [r] = phoneRows([{ title: "x", team: { score: 68, responses: 9 }, lenses: { team: { score: 68, responses: 9 }, community: { responses: 10 }, church: { responses: 5 } } }]);
+    expect([r.level, r.n]).toEqual([levelOf({ score: 68, responses: 9 }), 9]);
+    expect(phoneRows([{ title: "x", team: { score: null, responses: 2 }, lenses: { team: { score: null, responses: 2 }, church: { responses: 0 } } }])[0].n).toBe(2);
+    expect(phoneRows([{ title: "x", team: { score: 60 } }])[0].n).toBeNull();
+    expect(phoneRows([{ title: "x", team: null, lenses: null }])[0]).toMatchObject({ level: "more", n: null });
+    expect(phoneRows([{ title: "x", lenses: { team: { score: 70, responses: 4 }, church: { responses: 1 } } }])[0].n).toBe(4); // lenses only: still the team
   });
   it("app stage ids map onto the Stage pill; responses read n / expected only when an expected count exists", () => {
     expect(STAGE_PILL).toEqual({ prepare: "setup", collect: "collecting", understand: "results", improve: "reviewed" });
@@ -336,7 +370,31 @@ describe("Help (Help.dc.html, HelpPhone.dc.html)", () => {
     for (const [id, , runs] of TOPICS) expect(text(a.querySelector(`#${id} p`)!)).toBe(runs.join(""));
     const qs = [...a.querySelectorAll("#h8 details.disc")];
     expect(qs.map((d) => text(d.querySelector("summary")!))).toEqual(FAQ.map(([q]: string[]) => q));
-    expect(qs.map((d) => text(d.querySelector(".disc-body")!))).toEqual(FAQ.map(([, ans]: string[]) => ans));
+    expect(qs.map((d) => text(d.querySelector(".disc-body")!))).toEqual(faqFor().map(([, ans]: string[]) => ans));
+    // The answers-needed FAQ follows the served level minimum: absent (this test) is the safe 3; DEV 1 reads "its first answer";
+    // no "nobody can be picked out" promise either way
+    const need = (rows: string[][]) => rows.find(([q]) => q === "How many answers do we need?")![1];
+    const TAIL = " The drops beside each level show how much evidence it rests on: a few drops is little evidence, not a low result. Answer-by-answer splits are not shown.";
+    expect(need(FAQ)).toBe(`A perspective shows its level once it has at least 3 answers.${TAIL}`);
+    expect(need(faqFor(3))).toBe(`A perspective shows its level once it has at least 3 answers.${TAIL}`);
+    expect(need(faqFor(5))).toBe(`A perspective shows its level once it has at least 5 answers.${TAIL}`);
+    expect(need(faqFor(1))).toBe(`A perspective shows its level from its first answer.${TAIL}`);
+    useLevelMinimum(1);
+    const dev = [...mount(Help, {}).querySelectorAll("#h8 details.disc")].map((d) => text(d.querySelector(".disc-body")!));
+    expect(dev).toContain(`A perspective shows its level from its first answer.${TAIL}`);
+    useLevelMinimum(undefined);
+    expect(FAQ.flat().join(" ")).not.toMatch(/At least 3 from each perspective|picked out/);
+    // design-system.md section 4 Privacy topic: the minimum-1 and minimum >= 3 variants, by the served minimum (Codex P1 4381711859)
+    const priv = (rows: unknown[][]) => (rows.find((t) => t[0] === "h6")![3] as string);
+    expect(priv(topicsFor(1))).toBe("Your answers are confidential. Results never show names. A perspective's level shows from its first answer, so while only one person from a perspective has answered, its level and the detailed report's scores reflect that one person's answers. Printed surveys and QR codes carry nothing personal.");
+    expect(priv(topicsFor(3))).toBe("Your answers are confidential. When fewer than 3 people from one perspective have answered, their results are hidden and the page says so; no number is shown that could point to someone. Printed surveys and QR codes carry nothing personal.");
+    expect(priv(TOPICS as unknown[][])).toBe(priv(topicsFor(3)));
+    expect([...faqFor(1), ...faqFor(3)].flat().join(" ")).not.toMatch(/splits (still )?wait|splits with|unlock/);
+    useLevelMinimum(1);
+    const hm = mount(Help, {});
+    const h6 = [...hm.querySelectorAll("section")].find((x) => x.id === "h6")?.querySelector("p") ?? null;
+    useLevelMinimum(undefined);
+    expect(h6 && text(h6)).toBe(priv(topicsFor(1)));
     expect(qs.every((d) => !(d as HTMLDetailsElement).open)).toBe(true);
     expect(text(a)).toContain("Still stuck? Send app feedback, or read why 3D Review exists.");
     const hrefs = [...a.querySelectorAll("main a.link")].map((l) => l.getAttribute("href"));
@@ -367,6 +425,15 @@ describe("the pinned 8.7 Explore-lane rows (ui-next/design-source/PIN a594830, b
   it("base.css at the PIN has every row the lane composes with", () => {
     for (const r of [".l-grid[data-tpl=aside-end]{grid-template-columns:minmax(0,1fr) 300px", ".l-grid[data-tpl=aside-start]{grid-template-columns:260px minmax(0,1fr)", ".l-measure{max-width:720px}", ".side-nav{position:sticky", ".l-card[data-pad=table]{", ".tbl-wrap{overflow-x:auto}", ".tbl-foot{", ".l-card[data-pad=bar]{", ".l-card[data-pad=rows]{", ".list-row{", ".list-title{", ".menu[data-flow]{", ".mi-end{margin-left:auto}", ".chip[data-on]{", ".sel[data-size=compact]{", ".seg[data-inline]{", ".l-media[data-dir=row]{", ".app .t-24", "dialog.glass-hi{", "dialog.glass-hi::backdrop{", "dialog.glass-hi.sheet{", ".sheet[data-pad=menu],dialog.glass-hi.sheet[data-pad=menu]{", ".sheet-handle{", ".mi[data-size=lg]{"]) expect(css, r).toContain(r);
   });
+  it("live QA Q5: every control the explore model cannot serve is disabled and names the visible reason; the table stays live", () => {
+    const a = mount(Explore, {});
+    const why = a.querySelector("#explore-why")!;
+    expect(why.textContent).toContain("not in the new design yet");
+    const ctl = [...a.querySelectorAll("button, select, input[value=cards]")].filter((e) => !e.closest("header"));
+    expect(ctl.length).toBeGreaterThan(5);
+    for (const c of ctl) expect([(c as HTMLButtonElement).disabled, c.getAttribute("aria-describedby") ?? c.closest("[aria-describedby]")?.getAttribute("aria-describedby")]).toEqual([true, "explore-why"]);
+    expect(a.querySelectorAll("table.tbl tbody tr").length).toBeGreaterThan(0);
+  });
   it("Explore desktop: table + 300px aside grid; the bar and table cards; the table scrolls inside its card (.tbl-wrap), its foot inside it", () => {
     const a = mount(Explore, {});
     const grid = a.querySelector(".l-page > .l-grid[data-tpl=aside-end]")!;
@@ -375,7 +442,7 @@ describe("the pinned 8.7 Explore-lane rows (ui-next/design-source/PIN a594830, b
     const card = grid.querySelector("section.glass.l-card.tbl-wrap[data-pad=table]")!;
     expect(card.getAttribute("tabindex")).toBe("0");
     expect(card.querySelector(":scope > table.tbl")).not.toBeNull();
-    expect(text(card.querySelector(":scope > .l-row.tbl-foot")!)).toContain("Nothing here identifies a participant.");
+    expect(text(card.querySelector(":scope > .l-row.tbl-foot")!)).toContain("Nothing here identifies a participant: a level shows only with at least 3 responses.");
     expect(a.querySelectorAll(".chip[data-on]").length).toBe(4);
     expect(a.querySelector(".seg[data-inline]")).not.toBeNull();
     expect(a.querySelector(".sel[data-size=compact] select")).not.toBeNull();
@@ -388,7 +455,9 @@ describe("the pinned 8.7 Explore-lane rows (ui-next/design-source/PIN a594830, b
     const a = mount(Explore, { phone: true });
     const rows = [...a.querySelectorAll("section.glass.l-card[data-pad=rows] > a.card-link.list-row")];
     expect(rows.length).toBe(5);
-    for (const r of rows) expect([...r.children].map((c) => c.className)).toEqual(["icn icn-row", "list-body", "lvl"]);
+    // the right column is the Level over the Coverage count in .l-stack[data-gap="1"] (ExplorePhone @5edfbfab), no inline style
+    for (const r of rows) expect([...r.children].map((c) => c.className)).toEqual(["icn icn-row", "list-body", "l-stack"]);
+    for (const r of rows) expect([...r.lastElementChild!.children].map((c) => c.className)).toEqual(["lvl", "lvl-pair small"]);
     expect(a.querySelectorAll(".l-row > .btn.btn-block").length).toBe(3);
     const d = mount(Explore, { phone: true, state: "filters" }).querySelector("dialog.glass-hi.sheet[data-pad=menu]")!;
     expect(d.querySelector(".sheet-handle")!.getAttribute("aria-hidden")).toBe("true");
@@ -430,6 +499,18 @@ describe("the pinned 8.7 Explore-lane rows (ui-next/design-source/PIN a594830, b
   });
   it("Feedback: the shared dialog row and the 24px heading row", () => {
     expect(mount(Feedback, {}).querySelector("dialog.glass-hi h1.h2.t-24")).not.toBeNull();
+  });
+});
+
+describe("Codex P2 4383334410: a live phone screen is the board's bounded frame (design-system.md §9 Phone frame)", () => {
+  it("phone screens scroll main.l-page.l-phone.phone-main inside one viewport; desktop and the non-screen gallery shell do not", () => {
+    expect(mount(Explore, { phone: true }).querySelector("main")!.className).toBe("l-page l-phone phone-main");
+    expect(mount(Explore, {}).querySelector("main")!.className).toBe("l-main");
+    const css = readFileSync(resolve(__dirname, "../ui-next/components/phone.css"), "utf8");
+    expect(css).toContain(".app.l-screen[data-w=phone]{display:flex;flex-direction:column;height:100dvh}");
+    expect(css).toContain(".app.l-screen[data-w=phone]>.l-shell{flex:1 1 0;min-height:0}");
+    expect(readFileSync(resolve(__dirname, "../ui-next/components/base.css"), "utf8")).toContain(".app[data-w=phone]>.l-shell>.phone-main{flex:1 1 0;min-height:0;overflow-y:auto");
+    expect(readFileSync(resolve(__dirname, "../ui-next/src/AppShell.svelte"), "utf8")).toContain('phone ? (screen ? "l-page l-phone phone-main" : "l-page l-phone") : "l-main"');
   });
 });
 

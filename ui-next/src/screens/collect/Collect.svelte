@@ -44,9 +44,10 @@
       <aside class="l-stack" data-gap="4">
         <Card gap={3}>
           <h3 class="h3">Survey open</h3>
-          <p class="small t-15">{r.opens} – {r.closes} · <strong>{r.daysLeft} days left</strong></p>
+          <!-- Live QA N5: a review with no closing date says so; never "Sep 16 – · days left" or "Results open on ," -->
+          <p class="small t-15">{#if r.closes}{`${r.opens} – ${r.closes}`}{#if r.daysLeft != null}{" · "}<strong>{r.daysLeft === 1 ? "1 day left" : `${r.daysLeft} days left`}</strong>{/if}{:else}Open since {r.opens} · no closing date set{/if}</p>
           <a class="link" href={href("setup1")}>Change dates</a>
-          <p class="small">Results open on {r.closes}, or earlier if you close collection from the ⋯ menu.</p>
+          <p class="small">{#if r.closes}Results open on {r.closes}, or earlier if you close collection from the ⋯ menu.{:else}Results open when you close collection from the ⋯ menu.{/if}</p>
         </Card>
         <div class="glass l-card l-stack" data-gap="3" id="offline">
           <h3 class="h3">Meeting offline?</h3>

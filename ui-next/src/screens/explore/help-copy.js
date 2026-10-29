@@ -1,5 +1,13 @@
 // UI Next (v4) explore lane: Help and FAQ copy, word for word from the boards (cookbook design/2026-10-15-glass-redesign/canvas
 // Help.dc.html desktop, HelpPhone.dc.html phone). Status: provisional. No current-UI module holds this copy (searched ui/ and ui-next/src).
+// The answers-needed FAQ follows the level minimum in force (results/data.js currentLevelMin: the server's value, else the safe
+// 3); faqFor(min) and topicsFor(min) build the wording, FAQ and TOPICS are the safe-floor wording.
+import { currentLevelMin, SAFE_LEVEL_MIN } from "../results/data.js";
+// design-system.md section 4 (Help FAQ, Privacy topic): the minimum-1 and minimum >= 3 variants, chosen by the served minimum N.
+const answersNeeded = (min) => `A perspective shows its level ${min === 1 ? "from its first answer" : `once it has at least ${min} answers`}. The drops beside each level show how much evidence it rests on: a few drops is little evidence, not a low result. Answer-by-answer splits are not shown.`;
+const privacy = (min) => (min === 1
+  ? "Your answers are confidential. Results never show names. A perspective's level shows from its first answer, so while only one person from a perspective has answered, its level and the detailed report's scores reflect that one person's answers. Printed surveys and QR codes carry nothing personal."
+  : `Your answers are confidential. When fewer than ${min} people from one perspective have answered, their results are hidden and the page says so; no number is shown that could point to someone. Printed surveys and QR codes carry nothing personal.`);
 // TOPICS: [id, title, desktop paragraph, phone paragraph]. A desktop paragraph is a list of runs; odd runs are bold (the board's <strong>).
 export const INTRO = "Everything that used to be inside the steps now lives here. The steps stay short.";
 export const VIDEO = Object.freeze({ title: "What 3D Review is", duration: "2:10", also: "Also: The three perspectives (1:40) · Running a review (3:05)" });
@@ -19,9 +27,7 @@ export const TOPICS = Object.freeze([
   ["h5", "Reading results",
     ["Under Understand, every perspective is placed on the same levels — Strong, Growing, Needs support, Needs urgent attention, or More input needed when too few have answered — and they are never averaged into one number. Read the gaps first: two perspectives two levels apart or more is where to start talking. Improve holds what you will talk about and do next."],
     "Under Understand, every perspective is placed on the same levels — Strong, Growing, Needs support, Needs urgent attention, or More input needed when too few have answered — and they are never averaged into one number. Read the gaps first: two perspectives two levels apart or more is where to start talking. Improve holds what you will talk about and do next."],
-  ["h6", "Privacy",
-    ["Your answers are confidential. When too few people from one perspective have answered, their results are hidden and the page says so; no number is shown that could point to someone. Printed surveys and QR codes carry nothing personal."],
-    "Your answers are confidential. When too few people from one perspective have answered, their results are hidden and the page says so; no number is shown that could point to someone. Printed surveys and QR codes carry nothing personal."],
+  ["h6", "Privacy", [privacy(SAFE_LEVEL_MIN)], privacy(SAFE_LEVEL_MIN)],
   ["h7", "What changed",
     ["Addresses from the old 3D Review site now forward to the new app: to the same project where there is a match, otherwise to Your reviews. The help that used to sit inside the steps now lives on this page, so the steps stay short. Forwarding moves no answers: anything entered on the old site stays there."],
     "Addresses from the old 3D Review site now forward to the new app: to the same project where there is a match, otherwise to Your reviews. The help that used to sit inside the steps now lives on this page, so the steps stay short. Forwarding moves no answers: anything entered on the old site stays there."],
@@ -35,8 +41,12 @@ export const FAQ = Object.freeze([
   ["How does it measure use and impact?", "Community members say how the translation has shaped their understanding and their lives; church leaders record changes they observe in their congregations. The two can be compared."],
   ["What does the report include?", "A high-level summary from each perspective, where to improve, and detailed comparisons that pinpoint disconnects. Repeated reviews show a trajectory over time."],
   ["Is there a right answer?", "No. Participants are told there are no wrong answers and may say \"I don't know\"."],
-  ["How many answers do we need?", "At least 3 from each perspective before levels show, so nobody can be picked out."],
+  ["How many answers do we need?", answersNeeded(SAFE_LEVEL_MIN)],
   ["Can we do this on paper?", "Yes. Print the survey in any answer language, collect it, and enter the answers under Collect."],
   ["What stage is 3D Review in?", "Experimentation. Early-adopter teams are testing it and shaping the next iterations — your feedback is part of the product."],
   ["How can my team try it?", "Use Send app feedback from the account menu, or ask the Innovation Lab team — the contact address lives on the Lab's 3D Review page."],
 ]);
+/** The FAQ with the answers-needed line for the level minimum in force (default: currentLevelMin()). */
+export const faqFor = (min = currentLevelMin()) => FAQ.map(([q, a]) => [q, q === "How many answers do we need?" ? answersNeeded(min) : a]);
+/** TOPICS with the Privacy topic for the level minimum in force (default: currentLevelMin()). */
+export const topicsFor = (min = currentLevelMin()) => TOPICS.map((t) => (t[0] === "h6" ? [t[0], t[1], [privacy(min)], privacy(min)] : t));

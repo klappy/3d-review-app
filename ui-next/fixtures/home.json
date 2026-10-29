@@ -6,7 +6,7 @@
   "groups": [
     { "stage": "results", "heading": "Results ready", "help": "read and plan the next step",
       "reviews": [{ "project": "Hindi New Testament", "language": "Hindi", "title": "Luke 1–2 community review", "meta": "24 responses · closed 12 Sep",
-        "levels": [["team", "growing"], ["community", "support"], ["church", "growing"]], "tag": "Not yet reviewed", "action": "Read the results", "href": "#results" }] },
+        "levels": [["team", "growing", 9], ["community", "support", 10], ["church", "growing", 5]], "tag": "Not yet reviewed", "action": "Read the results", "href": "#results" }] },
     { "stage": "collecting", "heading": "Collecting", "help": "links are live",
       "reviews": [{ "project": "Hindi New Testament", "language": "Hindi", "title": "Mark 1–4 draft", "meta": "18 of 30 responses", "phoneMeta": "18 of 30 responses · open until 31 Oct",
         "counts": [["team", "6/8"], ["community", "8/15"], ["church", "4/7"]], "until": "· Open until 31 Oct", "action": "Share the survey", "href": "#collect" }] },

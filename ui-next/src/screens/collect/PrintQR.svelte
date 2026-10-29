@@ -131,7 +131,7 @@
                     {#each cells as c, i (i)}<div class="l-stack" data-gap="2" data-align="center"><Qr cells={c.qr} size="room" /><span class="ptitle">{c.name}</span><span class="kbd">{c.link}</span></div>{/each}
                   </div>
                 {/if}
-                <div class="pfoot"><span>1 of {n}</span></div>
+                <div class="pfoot"><span class="pn">1 of {n}</span></div>
               </div>
             </div>
           {:else}

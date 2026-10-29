@@ -254,19 +254,20 @@ describe("screen links retain presentation and UI Next on a full navigation", ()
 });
 
 
-it("live phone CSS overrides fixed-board positioning without creating a sticky scroll container", () => {
+it("live phone CSS fixes the phone bar to the viewport foot (design-system.md §9 phone-bar) and clips, not scrolls, the app", () => {
   const style = document.createElement("style");
   style.textContent = ["base.css", "phone.css"].map((name) =>
     readFileSync(resolve(__dirname, "../ui-next/components", name), "utf8")).join("\n");
   document.head.append(style);
   try {
     const app = mount(About, { phone: true });
-    expect(getComputedStyle(app.querySelector(".phone-bar")!).position).toBe("sticky");
+    const bar = getComputedStyle(app.querySelector(".phone-bar")!);
+    expect([bar.position, bar.left, bar.right, bar.bottom]).toEqual(["fixed", "0px", "0px", "0px"]);
     expect(getComputedStyle(app).overflow).toBe("clip");
   } finally { style.remove(); }
 });
 
-it("a short phone page fills the viewport so the sticky bar sits at its foot; desktop keeps its block shell (VALIDATION-integration B1)", () => {
+it("a short phone page fills the viewport and the fixed bar sits at its foot; desktop keeps its block shell (VALIDATION-integration B1)", () => {
   // .l-shell height:100% cannot resolve against .app's min-height alone; on a page shorter than the viewport the in-flow sticky bar
   // then sat under the content (sign-in 482-575 at 390x844). The phone screen is a flex column one dynamic viewport tall and the
   // shell grows, so main.l-phone (flex-grow 1) pushes the bar to the foot. Real Chromium 390x844 numbers: RESULTS-shared.md Final pass.
@@ -280,11 +281,12 @@ it("a short phone page fills the viewport so the sticky bar sits at its foot; de
     const shell = app.querySelector(":scope > .l-shell") as HTMLElement;
     expect(getComputedStyle(app).display).toBe("flex");
     expect(getComputedStyle(app).flexDirection).toBe("column");
-    expect(getComputedStyle(app).minHeight).toBe("100dvh");
+    expect(getComputedStyle(app).height).toBe("100dvh"); // the bounded frame (§9 Phone frame; Codex P2 4383334410): main scrolls inside it
+    expect(getComputedStyle(app.querySelector("main.l-phone.phone-main")!).overflowY).toBe("auto");
     expect(getComputedStyle(shell).flexGrow).toBe("1");
     expect(getComputedStyle(app.querySelector("main.l-phone")!).flexGrow).toBe("1");
     expect(shell.lastElementChild!.matches(".phone-bar")).toBe(true);
-    expect(getComputedStyle(shell.lastElementChild!).position).toBe("sticky");
+    expect(getComputedStyle(shell.lastElementChild!).position).toBe("fixed"); // §9: fixed; main.l-phone's 120px bottom padding is the clearance
     // Desktop fills the viewport the same way (type.css): the board frame is 1280x800, so the live shell must be at least one viewport
     // tall for main.l-main[data-rhythm=center] (QR room) to centre as the board does.
     const desk = mount(About, {});

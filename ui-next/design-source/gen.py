@@ -91,6 +91,16 @@ details.dd{position:relative}details.dd>summary{list-style:none;cursor:pointer}d
 .paper .ptitle{font-family:'Newsreader',ui-serif,serif;font-weight:450;color:var(--ink)}
 .paper .pbadge{display:inline-block;border:1.5px solid var(--ink);color:var(--ink);padding:3px 10px;font-size: var(--t-13);line-height:18px;font-weight:650;white-space:nowrap}
 .paper .pfoot{margin-top:auto;display:flex;justify-content:space-between;align-items:center;gap:16px;padding-top:12px;font-size: var(--t-13);color:var(--ink-3)}
+/* §8.11 Paper footer counter (QA-LIVE Q14, provisional): the attestation line wraps in its own flexible column and keeps its full text; the page counter is one unbroken line */
+.paper .pfoot .pf-text{flex:1 1 0;min-width:0}
+.paper .pfoot .pn{flex:none;white-space:nowrap}
+/* Top bar variants · document bar fit (lens-design-1332, provisional): only the title gives way (ellipsis, full text in its title attribute); brand, status, switch, PDF and Print never shrink or wrap */
+.top[data-variant=document]>.brand,.top[data-variant=document]>.small{flex:none}
+.top[data-variant=document]>.h3{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.top[data-variant=document] .top-end{flex:none}
+.top[data-variant=document] .top-end>*{flex:none;white-space:nowrap}
+/* Document bar fit, narrow (lens-design-1410: 1280 and up stay as accepted): below 1200px the bar grows from 64px and wraps, so the controls group (status, switch, PDF, Print) takes its own row under the title instead of running past the viewport */
+@media (max-width: 1199.98px){.top[data-variant=document]{height:auto;min-height:64px;flex-wrap:wrap;row-gap:8px;padding-top:10px;padding-bottom:10px}.top[data-variant=document] .top-end{margin-left:auto}}
 .psheet{overflow:hidden;box-shadow:0 1px 2px rgba(0,0,0,.1),0 24px 48px -24px rgba(19,38,58,.4)}
 .psheet>.paper{width:794px;transform-origin:top left;box-shadow:none}
 /* §2 Paper preview (V-20, CORRECTIONS 31): .psheet[data-fit=a4|letter] scales the whole sheet to the width of its box (box ÷ sheet, no script, no inline transform);
@@ -163,6 +173,81 @@ html:has(dialog[open]:modal){overflow:hidden}
 /* People lane rows (auggie-fanout-people-1133, playbook rules 11 + 16, provisional): People*, Workspace*, Invitations*, SignIn* board inlines closed as rows, values as the boards drew them. Dialog/sheet geometry and ::backdrop, .tbl, .list-row, .t-24, [data-grow], .l-stack[data-align=center] and .num[data-size="20"] are the collect/explore lane rows (PRs 190 and the explore gaps PR), not repeated here */
 .l-grid[data-cols="5"]{grid-template-columns:repeat(5,minmax(0,1fr))}/* §8 Grid: the Workspace stat strip, five equal tiles */
 .num[data-size="36"]{font-size:var(--t-36);line-height:40px}/* §1.2 numeral: a stat tile's figure */
+.l-main[data-rhythm=report]{gap:var(--sp-6)}/* §8.3 Report frame (cook-cue-boards-1800, provisional): .l-main 32/56 + sheets --sp-6 apart (28/36/64 inline -> scale, CORRECTIONS row 8 remap); natural height */
+.inv-banner>.small{flex-grow:1;color:var(--ink)}/* §9 phone invitation banner (cook-cue-boards-1800, provisional) */
+/* §2 Theme control (cook-cue-boards-1800, provisional; QA-LIVE Q8): a row in the account menu / MenuPhone sheet — label + compact
+   segmented radio group Light · Dark · System (.seg[data-size=compact]); persisted per viewer; System follows prefers-color-scheme. */
+.mi-theme{display:flex;align-items:center;justify-content:space-between;gap:var(--sp-3);min-height:var(--target);padding:0 12px;color:var(--ink);font-weight:600;font-size:var(--t-15)}
+/* §2 Band-barbell label row (cook-cue-boards-1800, provisional; QA-LIVE Q11): the four level words as HTML under the axis, one per
+   quarter, centred, wrapping (no nowrap, no short forms; overflow-wrap + hyphens for long translated words); --t-12 on screen,
+   --t-11 on paper (§1.0 type: --t-11 "paper and meta only"). The axis keeps its height; the label row sits under it, 2px apart. */
+.band-axis{display:flex;flex-direction:column;gap:2px;min-width:0}.band-axis>.band-track{position:relative;height:40px}.paper .band-axis>.band-track{height:32px}
+.band-labels{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));column-gap:var(--sp-1)}
+.band-labels>span{text-align:center;font-size:var(--t-12);line-height:16px;font-weight:550;color:var(--ink-3);overflow-wrap:anywhere;hyphens:auto}
+.paper .band-labels>span{font-size:var(--t-11);line-height:14px}
+/* §2 Phone report reading (cook-cue-boards-1800, provisional; QA N2): sheets read on a phone are .psheet[data-fit=a4] (§2 Paper preview,
+   scaled to the page width, light paper kept) stacked in .report-sheets; the PDF reason sits in the page (p.small#pdf-why), never in the bar. */
+.report-sheets{display:flex;flex-direction:column;gap:var(--sp-4)}
+/* §8 Barbell row (cook-cue-boards-1800, provisional; were gen.band_barbell / boards_report.barbell inlines): label · track · verdict.
+   Screen: 220px 1fr 220px, gap 20 (the glass card: --radius-l, 18/24/24). Paper: 180px 1fr 150px, gap 14, min-height 56 (48 for the
+   numeric score row, data-kind=score) so the band labels keep a ~300px track on the 794 sheet. */
+.barbell-row{display:grid;grid-template-columns:220px minmax(0,1fr) 220px;gap:20px;align-items:center}.glass.barbell-row{border-radius:var(--radius-l);padding:18px 24px 24px}
+.paper .barbell-row>.bb-label{font-size:var(--t-13);font-weight:600;color:var(--ink)}.paper .barbell-row>.bb-verdict{font-size:var(--t-12);color:var(--ink-2)}/* paper barbell label and verdict (cook-cue-boards-1800; V-34 tokens, was #555) */
+.paper .barbell-row{grid-template-columns:180px minmax(0,1fr) 150px;gap:14px;min-height:56px}.paper .barbell-row[data-kind=score]{min-height:48px}
+/* §2 Paper sheet classes (cook-cue-boards-1800, provisional; rule 16 sweep of every inline type/spacing style inside .paper on Report,
+   ReportDetailed, the phone report views and ActionPlan; values are the boards' own, unchanged). Only value-driven left/width % stay inline. */
+.paper .paper-title-row{display:flex;justify-content:space-between;align-items:flex-start}
+.paper .paper-title{font-family:Newsreader, ui-serif, serif;font-size:var(--t-36);line-height:36px}
+.paper .sheet-meta{font-size:var(--t-13);color:var(--ink-2);margin-top:6px}
+.paper .sheet-tiles{display:grid;grid-template-columns:repeat(3, minmax(0, 1fr));gap:14px}
+.paper .sheet-tile{border:1px solid #ddd;border-radius:var(--radius-m);padding:14px;border-top:var(--accent-bar) solid var(--lens)}
+.paper .sheet-tile-name{font-weight:650}
+.paper .sheet-tile-level{margin-top:8px}
+.paper .nowrap{white-space:nowrap}
+.paper .score-track{position:relative;height:40px}
+.paper .score-line{position:absolute;left:0;right:0;top:19px;height:2px;background:#e3e8ec;border-radius:var(--radius-hair)}
+.paper .bb-legend{display:flex;gap:14px;margin-top:6px}
+.paper .legend-item{display:inline-flex;align-items:center;gap:6px;font-size:var(--t-12)}
+.paper .bb-legend-dot{width:12px;height:12px;border-radius:50%;background:var(--lens);border:2px solid #fff;box-shadow:0 0 0 1px #c9d2da}
+.paper .bb-legend-note{font-size:var(--t-12);color:var(--ink-2);margin-left:auto}
+.paper .radar-label{font-size:var(--t-11)}
+.paper .radar-dot{width:10px;height:10px;border-radius:50%;background:var(--lens)}
+.paper .radar-row{display:grid;grid-template-columns:420px 1fr;gap:16px;align-items:center}
+.paper .svg-visible{overflow:visible}
+.paper .radar-side{display:flex;flex-direction:column;gap:10px}
+.paper .radar-legend{display:flex;gap:14px;flex-wrap:wrap}
+.paper .sheet-text{font-size:var(--t-13);line-height:20px;color:var(--ink)}
+.paper .sheet-head{font-weight:650;font-size:var(--t-15);margin-bottom:6px}
+.paper .sheet-text[data-v="14"]{font-size:var(--t-14);line-height:22px}
+.paper .sheet-head[data-v="2"]{font-weight:650;font-size:var(--t-15);margin-bottom:2px}
+.paper .sheet-head[data-v="4"]{font-weight:650;font-size:var(--t-15);margin-bottom:4px}
+.paper .sheet-head[data-v="8"]{font-weight:650;font-size:var(--t-15);margin-bottom:8px}
+.paper .sheet-head[data-v="0"]{font-weight:650;font-size:var(--t-15);margin-bottom:0}
+.paper .sheet-lead{font-size:var(--t-12);color:var(--ink-2);margin-bottom:8px}
+.paper .sheet-list{margin:0;padding-left:20px;font-size:var(--t-14);line-height:22px}
+.paper .plan-row{display:grid;grid-template-columns:24px 1fr 90px;gap:12px;align-items:center;min-height:36px;border-top:1px solid #eee;font-size:var(--t-13)}
+.paper .plan-check{display:inline-grid;place-content:center;width:18px;height:18px;border:1.5px solid #333;border-radius:var(--radius-s);font-size:var(--t-12)}
+.paper .plan-gap{text-align:right;color:var(--ink-2)}
+.paper .plan-cols{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.paper .plan-tile{border:1px solid #ddd;border-radius:var(--radius-m);padding:12px 14px;border-top:var(--accent-bar) solid var(--lens)}
+.paper .plan-tile-name{font-weight:650;font-size:var(--t-13)}
+.paper .plan-tile-level{margin-top:6px}
+.paper .plan-notes{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+.paper .plan-note{font-size:var(--t-13);line-height:20px;border:1px solid #ddd;border-radius:var(--radius-m);padding:12px 14px;min-height:90px}
+.paper .plan-dates{display:grid;grid-template-columns:repeat(3, minmax(0, 1fr));gap:14px;font-size:var(--t-13)}
+.paper .plan-dt{color:#666;font-size:var(--t-11);text-transform:uppercase;letter-spacing:.04em}
+.paper .plan-dd{font-weight:650;margin-top:2px}
+.paper .mono{font-family:ui-monospace, Menlo, monospace}
+.paper .plan-share{border:1px solid #ddd;border-radius:var(--radius-m);padding:12px 14px;display:grid;grid-template-columns:1fr 72px;gap:12px;align-items:center;font-size:var(--t-12);color:var(--ink)}
+.paper .score-val{position:absolute;top:-5px;transform:translateX(-50%);font-size:var(--t-11);font-weight:650;color:var(--ink)}
+.paper .score-track>.pt{top:11px;width:18px;height:18px;margin-left:-9px;border:3px solid #fff;box-shadow:0 0 0 1px #c9d2da}
+.paper .score-band{position:absolute;top:17px;height:6px;border-radius:var(--radius-hair);background:#c9d2da}.paper .score-band[data-wide]{background:var(--b-urgent)}
+.paper .band-track>.pt{top:11px;width:18px;height:18px;margin-left:-9px;border:3px solid #fff;box-shadow:0 0 0 1px #c9d2da}
+.paper .band-sep{position:absolute;top:14px;width:1px;height:12px;background:var(--line-2)}
+.paper .band-span{position:absolute;top:17px;height:6px;border-radius:var(--radius-hair);background:var(--line-2);opacity:.8}.paper .band-span[data-wide]{background:var(--b-urgent)}
+.paper .band-line{position:absolute;left:0;right:0;top:19px;height:2px;background:var(--line);border-radius:var(--radius-hair)}
+.paper .bb-na{color:var(--ink-3)}
+.lvl>.lvl-word{color:var(--ink)}/* the level word beside its glyph (was meter() inline, cook-cue-boards-1800) */
 .l-main[data-rhythm=center]{justify-content:center;padding:var(--sp-6) var(--gutter)}/* §8.2 a single-card page centred in the viewport (SignInCheck; Invitations) */
 .icn[data-size="28"],.app .icn.icn-lens.su-icn-s{width:28px;height:28px;border-radius:var(--radius-s)}/* §2 lens chip on a project card (36/56/64 are the participant rows) */
 .av[data-size="28"]{width:28px;height:28px;font-size:var(--t-11);border-radius:var(--radius-s)}.av[data-logo]{border:1.5px dashed var(--field-edge);background:var(--field);color:var(--ink-3);letter-spacing:.04em;text-transform:uppercase}/* §2 organisation mark: the logo slot, else the initial */
@@ -252,6 +337,38 @@ html:has(dialog[open]:modal){overflow:hidden}
 .paper[data-sheet]{width:794px;min-height:1000px;break-inside:avoid;padding:56px 64px;display:flex;flex-direction:column;gap:var(--sp-5);border-radius:var(--radius-s)}.paper[data-sheet=a4]{min-height:1120px}
 /* Held results preview: the perspective cards behind a hold are drawn dimmed (and aria-hidden on the board) (results_held() inline) */
 .l-grid[data-state=held]{opacity:.45}
+/* §8.11 held card, compact legend, project-link target (cook-cue-boards-1800, 2026-10-26, provisional; were board inlines, rule 16).
+   Component variants the app's generated base.css carries (rule 14): no generic pad or .seg default changes. */
+.held-card{border-radius:var(--radius-xl);padding:40px;display:grid;grid-template-columns:auto 1fr auto;gap:28px;align-items:center}
+.held-card .held-lines{padding-top:6px}
+.lvl-legend{border-radius:var(--radius-l);padding:12px 18px;display:flex;align-items:center;gap:22px;flex-wrap:wrap}
+.seg[data-size=compact]{padding:3px}.seg[data-size=compact] label{min-height:36px;padding:0 10px;font-size:var(--t-13)}
+.crumb-hit{min-height:var(--target);display:inline-flex;align-items:center;align-self:flex-start}
+/* §9 facilitator phone header (DS :498, :643 — 56px = 6 + 44 + 6; was the fa_header() inline, cook-cue-boards-1800 rule 16) */
+.phone-top[data-shell=facilitator]{padding:6px 12px 6px 16px;gap:8px}
+/* §8 Card row (DS :691): a card with no named pad — --sp-5 desktop, --sp-4 phone (= app ui-next/components/layout.css:3) */
+.l-card:not([data-pad]){border-radius:var(--radius-l);padding:var(--sp-5)}.app[data-w=phone] .l-card:not([data-pad]){padding:var(--sp-4)}
+/* §8.11 Evidence table (detailed report pp 3–4; cook-cue-boards-1800, provisional): compact paper table, paper tokens only (V-34) */
+.ev-card{border:1px solid var(--line-2);border-radius:var(--radius-m);break-inside:avoid;border-top:var(--accent-bar) solid var(--lens)}
+.ev-head{display:flex;align-items:center;gap:10px;padding:10px 14px;background:color-mix(in srgb,var(--line) 40%,transparent)}
+.ev-table{width:100%;border-collapse:collapse;font-size:var(--t-12)}
+.ev-table th{padding:6px 14px;font-weight:600;color:var(--ink-2);text-align:left}
+.ev-table td{padding:8px 14px;border-top:1px solid var(--line);color:var(--ink)}
+.ev-table [data-align=end]{text-align:right}.ev-table td.ev-muted{color:var(--ink-2)}
+/* §8.11 Phone perspective card (cook-cue-boards-1800, provisional; were f_results() inlines): .glass.l-card.l-stack.lens-card[data-gap="1"]
+   (4px between children) > .lens-card-head (name · level, 6px under) · coverage cue · [newer line] · .lvl-row area rows as DIRECT children. */
+.lens-card-head{display:flex;align-items:center;justify-content:space-between;padding-bottom:6px}.lens-card>.lvl-row>.small{color:var(--ink)}
+/* §9 phone frame (cook-cue-boards-1800, provisional; DS §9 fixed bottom bar, §8.3 120px clearance): the board is the 390×844 viewport.
+   The page scrolls inside the frame under the header; the bar stays at the viewport's bottom; .l-phone's 120px bottom padding is
+   the clearance, so the last content scrolls clear of the bar. App: the document scrolls and .phone-bar is position:fixed. */
+.app[data-w=phone]>.l-shell>.phone-main{flex:1 1 0;min-height:0;overflow-y:auto;overscroll-behavior:contain}
+/* §2 Coverage cue (cook-cue-boards-1800, 2026-10-26, status: provisional; playbook rule 11b/16): quantity beside the Level.
+   .lvl-pair = app ui-next/components/type.css:19 (summary level pairs and the cue); .sr-only = app components/topbar.css:9 (the short
+   variants' full words); [data-newer] = the Results-card "N newer responses not in this report yet" line, drawn as a board state:
+   hidden unless the board's "Newer responses" tweak is on (.newer-state[data-newer-state=on]). gen.py coverage(). */
+.lvl-pair{display:inline-flex;align-items:center;gap:var(--sp-2);font-size:var(--t-14);color:var(--ink-2)}
+.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+.newer-state:not([data-newer-state=on]) [data-newer]{display:none}
 /* Shared slice 2 (auggie-fanout-shared-1133, playbook rule 11, provisional; parity-loop CORRECTIONS sh-1, sh-2) */
 .seg label{white-space:nowrap}/* §2 Segmented: a label is one line; the track shares its width equally and a longer label takes its own width (Feedback kinds at the 560 dialog: 155 · 160 · 155) */
 """
@@ -326,6 +443,12 @@ def btn(label, href=None, kind='', icon=None, lead=None, extra='', lg=False, blo
         return f'<a class="{cls}" href="{href}"{a}{(" style=%s" % json.dumps(extra)) if extra else ""}>{inner}</a>'
     return f'<button class="{cls}" type="button"{a}{(" style=%s" % json.dumps(extra)) if extra else ""}>{inner}</button>'
 
+def dbtn(label, why, kind='', lead=None, block=False, lg=False, aria=None, icon_only=None):
+    """A control the model cannot serve yet (provisional): a disabled <button> described by one visible reason line (#<why>)."""
+    cls = 'btn' + (' ' + kind if kind else '') + (' btn-lg' if lg else '') + (' btn-block' if block else '') + (' btn-icon' if icon_only else '')
+    inner = ic(icon_only, 20) if icon_only else (ic(lead) + ' ' if lead else '') + label
+    return f'<button class="{cls}" type="button" disabled aria-describedby="{why}"{f' aria-label="{aria}"' if aria else ''}>{inner}</button>'
+
 def iconbtn(n, aria, href=None):
     if href: return f'<a class="btn btn-quiet btn-icon" href="{href}" aria-label="{aria}">{ic(n,20)}</a>'
     return f'<button class="btn btn-quiet btn-icon" type="button" aria-label="{aria}">{ic(n,20)}</button>'
@@ -348,6 +471,8 @@ def topbar(crumb=None, menu_open=False, who='Bincy', right=True):
             + f'<a class="mi" href="Help.dc.html" role="menuitem">{ic("help")} Help and FAQ</a>'
             + f'<a class="mi" href="About.dc.html" role="menuitem">{ic("sparkle")} Why 3D Review exists</a>'
             + f'<a class="mi" href="Feedback.dc.html" role="menuitem">{ic("pen")} Send app feedback</a>'
+            + f'<a class="mi" href="Landing.dc.html" role="menuitem">{ic("globe")} Public website home</a>'
+            + theme_control('acct')
             + '<hr class="hr" style="margin: 4px 0">'
             + f'<a class="mi" href="Main.dc.html" role="menuitem">{ic("people")} Use another account</a>'
             + f'<a class="mi" href="Main.dc.html" role="menuitem">{ic("out")} Sign out</a></div>')
@@ -440,7 +565,35 @@ def meter(level):
     cls = 'meter gap' if on == 0 else 'meter'
     bars = ''.join(f'<b{" class=on" if i < on else ""}></b>' for i in range(4))
     return (f'<span class="lvl" data-level="{LEVEL_KEY[level]}"><span class="g g-bars {cls}" aria-hidden="true">{bars}</span><span class="g g-faces" aria-hidden="true">{glyph_face(on)}</span>'
-            f'<span class="g g-jars" aria-hidden="true">{glyph_jar(on)}</span><span class="g g-plants" aria-hidden="true">{glyph_plant(on)}</span><span style="color: var(--ink)">{level}</span></span>')
+            f'<span class="g g-jars" aria-hidden="true">{glyph_jar(on)}</span><span class="g g-plants" aria-hidden="true">{glyph_plant(on)}</span><span class="lvl-word">{level}</span></span>')
+
+# §2 Coverage cue (status: provisional): drawn exactly as app ui-next/src/screens/results/Coverage.svelte @24af049 with the tiers of
+# results/data.js coverageOf (0 No drops yet · 1-2 A few drops · 3-5 Filling up · 6+ Well filled · None not counted, no word).
+def coverage_of(n):
+    if n is None: return 0, ''
+    return (0, 'No drops yet') if n <= 0 else (1, 'A few drops') if n < 3 else (2, 'Filling up') if n < 6 else (3, 'Well filled')
+def responses_text(n):  # app results/data.js responsesText = ui/report-lenses.js lensesCopy.respondents / noCount
+    return 'responses not counted' if n is None else f'{n} {"response" if n == 1 else "responses"}'
+def coverage(n, variant='full'):
+    """variant: full ("Well filled · 6 responses": cards, paper head, evidence) · short ("Well filled · 6": Home, Project) ·
+    count (drops and "6": a Workspace card's third-width cell); the short variants carry the full words in title + .sr-only."""
+    fill, word = coverage_of(n)
+    words = (f'{word} · ' if word else '') + responses_text(n)
+    drops = ''.join(f'<path d="M{x} 5c0 0-4 5.5-4 9a4 4 0 0 0 8 0c0-3.5-4-9-4-9z" fill="{"currentColor" if i < fill else "none"}"{" stroke-dasharray=\"2 2\"" if fill == 0 else ""}></path>' for i, x in enumerate((5, 15, 25)))
+    svg = f'<svg width="22" height="18" viewBox="0 0 30 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" aria-hidden="true">{drops}</svg>'
+    if variant == 'full':
+        return f'<span class="lvl-pair small" data-coverage="{fill}">{svg}<span>{words}</span></span>'
+    shown = ('' if variant == 'count' or not word else f'{word} · ') + (str(n) if word else responses_text(n))
+    return f'<span class="lvl-pair small" data-coverage="{fill}" title="{words}">{svg}<span aria-hidden="true" data-short>{shown}</span><span class="sr-only">{words}</span></span>'
+def newer_line(k):  # app results/data.js newerText: Results cards only, never the printed report
+    return f'<span class="small" data-newer>{k} newer {"response" if k == 1 else "responses"} not in this report yet</span>' if k > 0 else ''
+
+def theme_control(uid):
+    """§2 Theme control (provisional): Light · Dark · System radios in a compact segmented group; System is a new viewer's default."""
+    return (f'<div class="mi-theme" role="group" aria-labelledby="theme-{uid}"><span id="theme-{uid}">Theme</span>'
+            f'<div class="seg" data-size="compact" role="radiogroup" aria-labelledby="theme-{uid}">'
+            + ''.join(f'<label><input type="radio" name="theme-{uid}"{" checked" if v == "System" else ""}>{v}</label>' for v in ('Light', 'Dark', 'System'))
+            + '</div></div>')
 
 def prov_panel(entries, w):
     # R45: review overlay drops .glass-hi's --sh-2 drop shadow (inline box-shadow keeps only --hl) so it never dims content under it
@@ -500,18 +653,20 @@ def band_barbell(area, who, scores, paper=False, phone=False):
     apart = hi - lo
     verdict = 'same band' if apart == 0 else ('1 band apart' if apart == 1 else f'{apart} bands apart — talk about this')
     ink = 'var(--ink)'; line = 'var(--line-2)'; soft = 'var(--line)'
-    dots = ''.join(f'<span class="pt" data-lens="{k}" style="left: {pos[k]}%; top: {"11px" if paper else "18px"};{" width: 18px; height: 18px; margin-left: -9px; border: 3px solid #fff; box-shadow: 0 0 0 1px #c9d2da;" if paper else ""}" role="img" aria-label="{dict(LENS_NAMES)[k]} · {b}" title="{dict(LENS_NAMES)[k]} · {b}"></span>' for k, b in pts)
-    ticks = ''.join(f'<span class="micro" style="position: absolute; left: {12.5 + 25 * i}%; bottom: -6px; transform: translateX(-50%); white-space: nowrap; font-size: var(--t-11)">{b.replace("Needs urgent attention", "Urgent").replace("Needs support", "Support")}</span>' for i, b in enumerate(BANDS))
-    seps = ''.join(f'<span style="position: absolute; left: {25 * i}%; top: {"14px" if paper else "22px"}; width: 1px; height: {"12px" if paper else "14px"}; background: {line}"></span>' for i in range(1, 4))
-    band = f'<span style="position: absolute; top: {"17px" if paper else "27px"}; height: 6px; border-radius: var(--radius-hair); left: {12.5 + 25 * lo}%; width: {25 * (hi - lo)}%; background: {"var(--b-urgent)" if apart >= 2 else line}; opacity: .8"></span>' if apart else ''
-    axis = (f'<div style="position: relative; height: {"46px" if paper else "60px"}"><span style="position: absolute; left: 0; right: 0; top: {"19px" if paper else "29px"}; height: 2px; background: {soft}; border-radius: var(--radius-hair)"></span>{seps}{band}{dots}{ticks}</div>')
+    dots = ''.join(f'<span class="pt" data-lens="{k}" style="left: {pos[k]}%{"" if paper else "; top: 18px;"}" role="img" aria-label="{dict(LENS_NAMES)[k]} · {b}" title="{dict(LENS_NAMES)[k]} · {b}"></span>' for k, b in pts)
+    # §2 Band-barbell label row (cook-cue-boards-1800, provisional; QA-LIVE Q11): HTML, not SVG text, under the axis; the full
+    # glossary level words in four equal quarters, wrapping to as many lines as a word needs (longest and translated lengths)
+    labels = '<div class="band-labels" aria-hidden="true">' + ''.join(f'<span>{b}</span>' for b in BANDS) + '</div>'
+    seps = ''.join((f'<span class="band-sep" style="left: {25 * i}%"></span>' if paper else f'<span style="position: absolute; left: {25 * i}%; top: 22px; width: 1px; height: 14px; background: {line}"></span>') for i in range(1, 4))
+    band = ((f'<span class="band-span"{" data-wide" if apart >= 2 else ""} style="left: {12.5 + 25 * lo}%; width: {25 * (hi - lo)}%"></span>' if paper else f'<span style="position: absolute; top: 27px; height: 6px; border-radius: var(--radius-hair); left: {12.5 + 25 * lo}%; width: {25 * (hi - lo)}%; background: {"var(--b-urgent)" if apart >= 2 else line}; opacity: .8"></span>') if apart else '')
+    axis = (f'<div class="band-axis"><div class="band-track">{'<span class="band-line"></span>' if paper else f'<span style="position: absolute; left: 0; right: 0; top: 29px; height: 2px; background: {soft}; border-radius: var(--radius-hair)"></span>'}{seps}{band}{dots}</div>{labels}</div>')
     notasked = [dict(LENS_NAMES)[k] for k, v in scores.items() if v is None]
-    na = (f'<span class="small" style="color: var(--ink-3)"> · {", ".join(notasked)} not asked</span>' if notasked else '')
+    na = ((f'<span class="small bb-na"> · {", ".join(notasked)} not asked</span>' if paper else f'<span class="small" style="color: var(--ink-3)"> · {", ".join(notasked)} not asked</span>') if notasked else '')
     if phone:  # R37: axis full card width, verdict below it (no desktop 220px columns)
         return (f'<div style="display: flex; flex-direction: column; gap: 4px">{axis}<span class="small"><strong style="color: var(--ink)">{verdict}</strong></span><span class="small">{" · ".join(dict(LENS_NAMES)[k] + " " + b for k, b in pts)}{na}</span></div>')
     if paper:
-        return (f'<div style="display: grid; grid-template-columns: 180px 1fr 150px; gap: 14px; align-items: center; min-height: 56px"><span style="font-size: var(--t-13); font-weight: 600">{area}</span>{axis}<span style="font-size: var(--t-12); color: #555">{verdict}{na}</span></div>')
-    return (f'<div class="glass" style="border-radius: var(--radius-l); padding: 18px 24px 24px; display: grid; grid-template-columns: 220px 1fr 220px; gap: 20px; align-items: center">'
+        return (f'<div class="barbell-row"><span class="bb-label">{area}</span>{axis}<span class="bb-verdict">{verdict}{na}</span></div>')
+    return (f'<div class="glass barbell-row">'
             f'<div><div class="h3">{area}</div><span class="small">{who}</span></div>{axis}'
             f'<div style="display: flex; flex-direction: column; gap: 4px"><span class="small"><strong style="color: var(--ink)">{verdict}</strong></span><span class="small">{" · ".join(dict(LENS_NAMES)[k] + " " + b for k, b in pts)}{na}</span></div></div>')
 LENS_NAMES = [('team', 'Translation team'), ('community', 'Community'), ('church', 'Church')]
@@ -519,6 +674,8 @@ LENS_NAMES = [('team', 'Translation team'), ('community', 'Community'), ('church
 def page(title, body, w, h, theme_prop=True, extra_props=None, prov=None):
     props = {"dark": {"editor": "boolean", "default": False, "section": "Theme"}, "imagery": {"editor": "enum", "default": "bars", "options": ["bars", "faces", "jars", "plants"], "section": "Levels"}, "provenance": {"editor": "boolean", "default": False, "section": "Notes"}, "$preview": {"width": w, "height": h}}
     if extra_props: props.update(extra_props)
+    # a boolean board-state tweak (Results 'newer', cook-cue-boards-1800) renders as {{name}} = on | off; boards without one are unchanged
+    extra_vals = ''.join(f", {k}: (this.props.{k} ?? false) ? 'on' : 'off'" for k, v in (extra_props or {}).items() if v.get('editor') == 'boolean')
     # placeholder: the build step swaps in prov_panel(PROV[name], w) so it overlays without changing layout
     # match the class list, not the literal attribute: shell() emits class="layer l-shell" (fresh-review 6302493905 #1)
     body, n = re.subn(r'<div class="layer(?=[\s"])', f'<!--PROV:{w}--><div class="layer', body, count=1)
@@ -526,7 +683,7 @@ def page(title, body, w, h, theme_prop=True, extra_props=None, prov=None):
     return ('<!doctype html>\n<html lang="en">\n<head>\n<meta charset="utf-8">\n'
             f'<title>{html.escape(title)}</title>\n<script src="./support.js"></script>\n</head>\n<body>\n<x-dc>\n{H}\n{body}\n</x-dc>\n'
             f"<script type=\"text/x-dc\" data-dc-script data-props='{json.dumps(props).replace(chr(39), '&#39;')}'>\n"
-            "class Component extends DCLogic {\nrenderVals() {\nconst dark = this.props.dark ?? false;\nconst prov = this.props.provenance ?? false;\nconst imagery = this.props.imagery ?? 'bars';\nreturn { theme: dark ? 'dark' : 'light', prov, imagery };\n}\n}\n</script>\n</body>\n</html>\n")
+            "class Component extends DCLogic {\nrenderVals() {\nconst dark = this.props.dark ?? false;\nconst prov = this.props.provenance ?? false;\nconst imagery = this.props.imagery ?? 'bars';\nreturn { theme: dark ? 'dark' : 'light', prov, imagery" + extra_vals + " };\n}\n}\n</script>\n</body>\n</html>\n")
 
 def shell(body, w=1440, h=900, top=None):
     dw = ' data-w="phone"' if w < 720 else ''
@@ -534,13 +691,18 @@ def shell(body, w=1440, h=900, top=None):
             '<div class="aurora" aria-hidden="true"><i></i><i></i><i></i></div>'
             f'<div class="layer l-shell">{top or ""}{body}</div></div>')
 
-def review_page(h, head, content, title):
+def review_page(h, head, content, title, extra_props=None):
     body = shell(f'{topbar(crumb="Mark 1–4 draft")}<main class="l-main"><div class="l-page">{head}{content}</div></main>', h=h)
-    return page(title, body, 1440, h)
+    return page(title, body, 1440, h, extra_props=extra_props)
 
-def phone(title, h, header, main, bar=None, w=390, hh=844):
-    body = shell(f'{header}<main class="l-page l-phone" style="overflow: hidden">{main}</main>{("<div class=\"glass phone-bar\">" + bar + "</div>") if bar else ""}', w=w, h=hh)
-    return page(title, body, w, hh)
+PHONE_VH = 844  # §8.3 / §9 (cook-cue-boards-1800, provisional): a phone board IS the shipping viewport, 390×844 — never grown to fit
+def phone(title, h, header, main, bar=None, w=390, hh=PHONE_VH, extra_props=None):
+    """The phone frame is the real viewport (PHONE_VH): the header stays, <main class="l-phone"> scrolls inside the frame
+    (.phone-main), and the phone-bar is fixed to the viewport's bottom (§9 fixed bottom bar) with the 120px clearance of .l-phone
+    under the last content (§8.3). h/hh are kept for call-site compatibility and must equal PHONE_VH."""
+    assert hh == PHONE_VH, f'{title}: phone boards are {PHONE_VH} tall (the viewport); content scrolls, the board never grows'
+    body = shell(f'{header}<main class="l-page l-phone phone-main">{main}</main>{("<div class=\"glass phone-bar\">" + bar + "</div>") if bar else ""}', w=w, h=PHONE_VH)
+    return page(title, body, w, PHONE_VH, extra_props=extra_props)
 
 def phone_header(lang=True, brandlabel=True):
     # participant shell (design-system.md §2 Phone chrome, V-19): brand as plain text -> the language button; padding from the §9 participant row
@@ -620,7 +782,7 @@ HELP_SECS = ['What 3D Review is', 'The three perspectives', 'Running a review', 
 HELP_BODY = [None, None, None,
     'Each perspective answers its own survey. Under Collect, send the survey by message or show its QR code in the room; answers arrive as people finish. Where phones are not practical, print a blank survey: it carries the survey\'s actual questions and its QR code for the helper who enters the paper answers later — never access codes or anything personal.',
     'Under Understand, every perspective is placed on the same levels — Strong, Growing, Needs support, Needs urgent attention, or More input needed when too few have answered — and they are never averaged into one number. Read the gaps first: two perspectives two levels apart or more is where to start talking. Improve holds what you will talk about and do next.',
-    'Your answers are confidential. When too few people from one perspective have answered, their results are hidden and the page says so; no number is shown that could point to someone. Printed surveys and QR codes carry nothing personal.',
+    "Your answers are confidential. Results never show names. A perspective's level shows from its first answer, so while only one person from a perspective has answered, its level and the detailed report's scores reflect that one person's answers. Printed surveys and QR codes carry nothing personal.",  # Privacy, level minimum 1 variant (§4; cook-cue-boards-1800, provisional)
     'Addresses from the old 3D Review site now forward to the new app: to the same project where there is a match, otherwise to Your reviews. The help that used to sit inside the steps now lives on this page, so the steps stay short. Forwarding moves no answers: anything entered on the old site stays there.',
     None]
 HELP_FAQ = [('What is the 3D Review tool?', 'A survey-based review that shows a Bible translation\'s trustworthiness, usability and impact from three perspectives.'),
@@ -630,7 +792,7 @@ HELP_FAQ = [('What is the 3D Review tool?', 'A survey-based review that shows a 
                                ('How does it measure use and impact?', 'Community members say how the translation has shaped their understanding and their lives; church leaders record changes they observe in their congregations. The two can be compared.'),
                                ('What does the report include?', 'A high-level summary from each perspective, where to improve, and detailed comparisons that pinpoint disconnects. Repeated reviews show a trajectory over time.'),
                                ('Is there a right answer?', 'No. Participants are told there are no wrong answers and may say "I don\'t know".'),
-                               ('How many answers do we need?', 'At least 3 from each perspective before levels show, so nobody can be picked out.'),
+                               ('How many answers do we need?', 'A perspective shows its level from its first answer. The drops beside each level show how much evidence it rests on: a few drops is little evidence, not a low result. Answer-by-answer splits are not shown.'),  # floor of 1, provisional (app help-copy.js:41 @24af049; cook-cue-boards-1800)
                                ('Can we do this on paper?', 'Yes. Print the survey in any answer language, collect it, and enter the answers under Collect.'),
                                ('What stage is 3D Review in?', 'Experimentation. Early-adopter teams are testing it and shaping the next iterations — your feedback is part of the product.'),
                                ('How can my team try it?', 'Use Send app feedback from the account menu, or ask the Innovation Lab team — the contact address lives on the Lab\'s 3D Review page.')]

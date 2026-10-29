@@ -1,6 +1,8 @@
-<!-- UI Next (v4) Results gaps screen ("The three biggest gaps"). Status: provisional (playbook rule 12). ?screen=results-gaps (&w=phone).
+<!-- UI Next (v4) Results gaps screen (the biggest gaps, counted: design-system.md §4 "Gap heading and links"). Status: provisional (playbook rule 12). ?screen=results-gaps (&w=phone).
      Boards: ResultsGaps.dc.html (desktop), ResultsGapsPhone.dc.html (phone). Rows: the board's areas (fixture gaps.biggest / gaps.agree),
-     each perspective's band from ./data.js bandRow over ui/report-lenses.js lensSpreadRows + v3ScoreBand.
+     each perspective's band from ./data.js bandRow over ui/report-lenses.js lensSpreadRows + v3ScoreBand. Gaps (gapList: two placed
+     perspectives at least one band apart) and agreement (agreeList: two or more placed perspectives in the same band, design-system.md
+     §4 "Results gaps agreement", QA-LIVE Q13) are re-checked against the band rule; headings count the rows drawn (Q15).
      Any ?state= renders the default. One .btn-primary: desktop review head; phone the phone-bar. Copy: the boards. -->
 <script>
   import AppShell from "../../AppShell.svelte";
@@ -19,25 +21,26 @@
   import { G } from "./icons.js";
   import { href } from "../href.js";
   import { out } from "./links.js";
-  import { REPORT, LENS_ORDER, lensLabel, bandRows } from "./data.js";
+  import { REPORT, LENS_ORDER, lensLabel, gapList, agreeList, gapHeading, GAPS_NONE, AGREE_HEADING, AGREE_LEAD, AGREE_NONE } from "./data.js";
 
   let { phone = false, theme = "light", report } = $props();
   const src = $derived(report ?? (phone ? REPORT.phone : REPORT.desktop));
-  const biggest = $derived(bandRows(src, src.counts, src.gaps.biggest));
-  const agree = $derived(bandRows(src, src.counts, src.gaps.agree));
+  const biggest = $derived(gapList(src));
+  const agree = $derived(agreeList(src));
+  const heading = $derived(gapHeading(biggest.length));
   const review = $derived(src.review);
   const crumbs = $derived([{ label: review.project, href: out("project") }, { label: review.title }]);
 </script>
 
 {#snippet arrow()}<Glyph d={G.arrow} />{/snippet}
 {#snippet doc()}<Glyph d={G.doc} />{/snippet}
-{#snippet top()}{#if phone}<PhoneHeader state="nested" title="Biggest gaps" parent="Results" back={href("results")} menuHref={out("menu")} />{:else}<TopBar {crumbs} home={out("workspace")} />{/if}{/snippet}
+{#snippet top()}{#if phone}<PhoneHeader state="nested" title="Gaps" parent="Results" back={href("results")} menuHref={out("menu")} />{:else}<TopBar {crumbs} home={out("workspace")} />{/if}{/snippet}
 {#snippet bar()}{#if phone}<PhoneBar label="Plan the next step" href={out("nextStep")} trail="arrow" />{/if}{/snippet}
 
 <AppShell {phone} {theme} screen {top} {bar}>
   {#if phone}
     <ReviewHead {review} phone />
-    <p class="small">The three biggest gaps between how the perspectives see the same thing.</p>
+    <p class="small" data-gap-lead>{biggest.length ? `${heading} between how the perspectives see the same thing.` : GAPS_NONE}</p>
     {#each biggest as row}<GapRow {row} phone />{/each}
     <a class="link" href={href("report")}>Open the detailed report</a>
   {:else}
@@ -50,9 +53,10 @@
           <div class="l-row" data-justify="end" data-grow><span class="small">Each perspective sits in one of four bands. The line between dots is the gap; it turns red at two bands or more.</span></div>
         </Row>
       </Card>
-      <Row gap={3}><h2 class="h2">The three biggest gaps</h2><span class="small">Each row is one area; each perspective that was asked lands in a band.</span></Row>
-      {#each biggest as row}<GapRow {row} />{/each}
-      {#if agree.length}<h2 class="h2">Where everyone agrees</h2>{#each agree as row}<GapRow {row} />{/each}{/if}
+      <Row gap={3}><h2 class="h2">{heading}</h2><span class="small">Each row is one area; each perspective that was asked lands in a band.</span></Row>
+      {#each biggest as row}<GapRow {row} />{:else}<p class="small" data-gap-none>{GAPS_NONE}</p>{/each}
+      <Row gap={3}><h2 class="h2">{AGREE_HEADING}</h2>{#if agree.length}<span class="small">{AGREE_LEAD}</span>{/if}</Row>
+      {#each agree as row}<GapRow {row} />{:else}<p class="small" data-agree-none>{AGREE_NONE}</p>{/each}
       <Card hi gap={3} label="What this does not tell you">
         <Row split gap={5}>
           <Stack gap={1}>

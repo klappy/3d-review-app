@@ -15,6 +15,7 @@
 //     FeedbackPhone.dc.html (phone page); "from" is the page and review the dialog names.
 import { v3ScoreBand, V3_STAGES } from "../../../../ui/assess/v3-assessment.js";
 import { LEVELS } from "../../Level.svelte";
+import { levelOf as bandLevel, currentLevelMin } from "../results/data.js";
 
 // Band word (v3ScoreBand) -> Level key (Level.svelte, design-system.md section 2 Level row).
 const BAND_TO_LEVEL = Object.freeze(Object.fromEntries(Object.entries(LEVELS).map(([key, word]) => [word, key])));
@@ -22,13 +23,12 @@ const BAND_TO_LEVEL = Object.freeze(Object.fromEntries(Object.entries(LEVELS).ma
 export const STAGE_PILL = Object.freeze({ prepare: "setup", collect: "collecting", understand: "results", improve: "reviewed" });
 export const LENS_KEYS = Object.freeze(["team", "community", "church"]);
 
-/** One perspective's level key from a built report's score and its response count; null when no report exists yet (the board's dash). */
+/** One perspective's level key from a built report's score and its response count; null when no report exists yet (the board's dash).
+ *  Banded by the results lane's levelOf, so Explore, Results, Project and Workspace share one cut-off: the server's level minimum
+ *  (level_minimum_responses, read by app/data.js exploreModel), else the safe 3. */
 export function levelOf(lens) {
   if (lens === null || lens === undefined) return null;
-  const word = v3ScoreBand(lens.score, lens.responses);
-  const key = BAND_TO_LEVEL[word];
-  if (!key) throw new TypeError(`explore-data: v3ScoreBand returned an unknown band "${word}"`);
-  return key;
+  return bandLevel(lens.score, lens.responses);
 }
 
 /** Stage pill for an app stage id; throws on an id the app does not have. */
@@ -51,6 +51,8 @@ export function exploreRows(reviews) {
     pill: stagePill(r.stage),
     responsesText: responsesText(r.responses),
     levels: Object.fromEntries(LENS_KEYS.map((k) => [k, r.lenses ? levelOf(r.lenses[k]) : null])),
+    // Each level's response count for its coverage cue (count variant under the Level; Codex P2 4383334399).
+    counts: Object.fromEntries(LENS_KEYS.map((k) => [k, countOf(r.lenses?.[k])])),
   }));
 }
 
@@ -61,7 +63,17 @@ export function matchCounts(rows) {
   return { reviews: rows.length, projects: distinct("project"), languages: distinct("language") };
 }
 
-/** Phone list rows: one level per row (the boards draw the translation-team level). */
+/** The Explore table footer's assurance by the served level minimum (Codex P1 4384112230; design-system.md:609 @c4bd0164, the same
+ *  policy as Help's Privacy topic and the report footer): at 1 a level shown with one response is that person's answers, so the
+ *  footer never claims nothing identifies a participant; at N or more, the level shows only with at least N responses. */
+export const tableAssurance = (min = currentLevelMin()) => (min === 1
+  ? "Nothing here names a participant; a level shown with one response reflects that person's answers."
+  : `Nothing here identifies a participant: a level shows only with at least ${min} responses.`);
+/** A perspective's response count, or null when none is carried (the cue then reads "responses not counted"). */
+const countOf = (lens) => (Number.isInteger(lens?.responses) && lens.responses >= 0 ? lens.responses : null);
+/** Phone list rows: one level per row (the boards draw the translation-team level) and, under it, that same perspective's count
+ *  (Codex P2 4383879651; design-system.md §2 Coverage cue, Explore placement @5180eb72, R72 as corrected: the count beside a level is that
+ *  same perspective's count), null when the team carries none (the cue then reads "responses not counted"). */
 export function phoneRows(rows) {
-  return rows.map((r) => ({ ...r, level: levelOf(r.team) ?? "more" }));
+  return rows.map((r) => { const team = r.team ?? r.lenses?.team ?? null; return { ...r, level: levelOf(team) ?? "more", n: countOf(team) }; });
 }

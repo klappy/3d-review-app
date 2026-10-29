@@ -7,6 +7,7 @@ export const A = Object.freeze({
   dots: "M4.4 12a1.6 1.6 0 1 0 3.2 0a1.6 1.6 0 1 0-3.2 0M10.4 12a1.6 1.6 0 1 0 3.2 0a1.6 1.6 0 1 0-3.2 0M16.4 12a1.6 1.6 0 1 0 3.2 0a1.6 1.6 0 1 0-3.2 0",
   check: BOARD.check,
   chev: BOARD.chev,
+  globe: BOARD.globe,
   plus: BOARD.plus,
   back: BOARD.back,
   arrow: BOARD.arrow,

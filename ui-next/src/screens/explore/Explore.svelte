@@ -13,8 +13,9 @@
      so Reload or Back does not reopen it (validator R3-1).
      Links through ../href.js (carries ?theme=); a phone review row opens the results lane's "results" screen. The desktop rows are
      plain, as the board draws them. The match line counts the rows the table shows (./explore-data.js matchCounts).
-     Group by shows "None": the rows are not grouped, so it does not claim the board's "Stage" (validator R3-4). Not wired yet
-     (RESULTS-explore.md Round 4 debt): chip remove, Add filter, Cards/Table, Save this view, Download CSV, Group by, the aside rows.
+     Group by shows "None": the rows are not grouped, so it does not claim the board's "Stage" (validator R3-4). Live QA Q5: the
+     controls the explore model cannot serve yet (chip remove, Add filter, Cards/Table, Save this view, Download CSV, Group by, Sort,
+     Search, Filters, the aside rows) are drawn disabled, each described by one visible reason line (WHY), never a silent no-op.
      One .btn-primary per page: none on desktop (the board draws none); phone "Open the filters" in the phone-bar. -->
 <script module>
   export const STATES = Object.freeze(["filters"]);
@@ -29,11 +30,13 @@
   import Button from "../../Button.svelte";
   import Pill from "../../Pill.svelte";
   import Level from "../../Level.svelte";
+  import Coverage from "../results/Coverage.svelte";
   import Icon from "../../Icon.svelte";
   import { I } from "../../icons.js";
   import { E } from "./icons.js";
   import { href } from "../href.js";
-  import { exploreRows, phoneRows, matchCounts, LENS_KEYS } from "./explore-data.js";
+  import { exploreRows, phoneRows, matchCounts, LENS_KEYS, tableAssurance } from "./explore-data.js";
+  import { currentLevelMin } from "../results/data.js";
   import { modal, backdropClose, closeTo } from "./dialog.js";
   import fixture from "../../../fixtures/explore/explore.json";
 
@@ -42,7 +45,7 @@
   // Unknown states, and the phone-only sheet asked for on desktop, render the default board (never throw on a URL value).
   const sheet = $derived(phone && state === "filters");
   const W = $derived({ w: phone ? "phone" : null });
-  const HOME = $derived(href("home", W)), SELF = $derived(href("explore", W)), SHEET = $derived(href("explore", { ...W, state: "filters" }));
+  const HOME = $derived(href("home", W)), SELF = $derived(href("explore", W));
   const RESULTS = $derived(href("results", W));
   const HEADS = ["Review", "Project", "Language", "Region", "Organisations", "Stage", "Responses", "Team", "Community", "Church", "Updated"];
   const rows = exploreRows(data.reviews);
@@ -50,6 +53,8 @@
   const match = matchCounts(rows);
   const many = (n, word) => `${n} ${word}${n === 1 ? "" : "s"}`;
   const closer = backdropClose();
+  // Live QA Q5: one visible reason for every control the explore model cannot serve yet (no filter, group, sort, saved-view or export store).
+  const WHY = "Filters, grouping, sorting, search, saved views, the card view and CSV download are not in the new design yet; the table lists every review you can see.";
 </script>
 
 {#snippet pen()}<Icon d={E.pen} />{/snippet}
@@ -59,30 +64,31 @@
 {#snippet search()}<Icon d={E.search} />{/snippet}
 {#snippet check()}<Icon d={I.check} />{/snippet}
 {#snippet doc()}<Icon d={E.doc} />{/snippet}
-{#snippet chip(label, aria, on = false)}<span class="chip" data-on={on ? "" : undefined}>{label}<button type="button" aria-label={`Remove ${aria} filter`}><Icon d={I.x} /></button></span>{/snippet}
+{#snippet chip(label, aria, on = false)}<span class="chip" data-on={on ? "" : undefined}>{label}<button type="button" aria-label={`Remove ${aria} filter`} disabled aria-describedby="explore-why"><Icon d={I.x} /></button></span>{/snippet}
 {#snippet top()}{#if phone}<PhoneHeader state="root" initials={data.user.initials} home={HOME} />{:else}<TopBar who={data.user.first} initials={data.user.initials} workspace={data.workspace} home={HOME} />{/if}{/snippet}
-{#snippet bar()}{#if phone}<div class="glass phone-bar" role="group" aria-label="Page actions"><Button label="Open the filters" variant="primary" lg block href={SHEET} lead={list} /></div>{/if}{/snippet}
+{#snippet bar()}{#if phone}<div class="glass phone-bar" role="group" aria-label="Page actions"><Button label="Open the filters" variant="primary" lg block lead={list} disabled ariaDescribedby="explore-why" /></div>{/if}{/snippet}
 
 <AppShell {phone} {theme} screen {top} {bar}>
   {#if phone}
     <h1 class="title-phone">Explore</h1>
     <p class="small">All reviews you can see · {data.visible}</p>
+    <p class="small" id="explore-why">{WHY}</p>
     <Row wrap gap={2}>{#each data.phone.chips as c}{@render chip(c, c)}{/each}</Row>
     <Row gap={2}>
-      <Button label={`Filters · ${data.phone.chips.length}`} href={SHEET} lead={list} block />
-      <Button label="Sort" href={SELF} lead={download} />
-      <Button icon={search} ariaLabel="Search reviews" variant="quiet" />
+      <Button label={`Filters · ${data.phone.chips.length}`} lead={list} block disabled ariaDescribedby="explore-why" />
+      <Button label="Sort" lead={download} disabled ariaDescribedby="explore-why" />
+      <Button icon={search} ariaLabel="Search reviews" variant="quiet" disabled ariaDescribedby="explore-why" />
     </Row>
     <section class="glass l-card" data-pad="rows" aria-label="Reviews">
       {#each prows as r}
         <a class="card-link list-row" href={r.href ?? RESULTS}>
           <span class="icn icn-row" data-lens="team" aria-hidden="true"><Icon d={E.doc} /></span>
           <div class="list-body"><div class="list-title">{r.title}</div><div class="small">{r.meta}</div></div>
-          <Level level={r.level} />
+          <span class="l-stack" data-gap="1"><Level level={r.level} /><Coverage n={r.n} variant="count" /></span>
         </a>
       {/each}
     </section>
-    <Row gap={2}><Button label="Save this view" href={SELF} lead={check} block /><Button label="Download CSV" href={SELF} lead={doc} block /></Row>
+    <Row gap={2}><Button label="Save this view" lead={check} block disabled ariaDescribedby="explore-why" /><Button label="Download CSV" lead={doc} block disabled ariaDescribedby="explore-why" /></Row>
     {#if sheet}
       <dialog class="glass-hi sheet" data-pad="menu" aria-labelledby="explore-filters-title" {@attach modal} onpointerdown={closer.onpointerdown} onclick={closer.onclick} onclose={closeTo(SELF)}>
         <div class="l-stack" data-gap="1">
@@ -98,11 +104,12 @@
         <Stack gap={1}>
           <h1 class="title-page">Explore reviews</h1>
           <p class="small t-15">Every review you can see, as one table. Filter by any cross-section; group or save the view.</p>
+          <p class="small" id="explore-why">{WHY}</p>
         </Stack>
         <Row gap={2}>
-          <div class="seg" data-inline role="radiogroup" aria-label="Show reviews as"><label><input type="radio" name="explore-view" value="cards" />Cards</label><label><input type="radio" name="explore-view" value="table" checked />Table</label></div>
-          <Button label="Save this view" lead={pen} />
-          <Button label="Download CSV" lead={download} />
+          <div class="seg" data-inline role="radiogroup" aria-label="Show reviews as" aria-describedby="explore-why"><label><input type="radio" name="explore-view" value="cards" disabled />Cards</label><label><input type="radio" name="explore-view" value="table" checked />Table</label></div>
+          <Button label="Save this view" lead={pen} disabled ariaDescribedby="explore-why" />
+          <Button label="Download CSV" lead={download} disabled ariaDescribedby="explore-why" />
         </Row>
       </Row>
       <div class="l-grid" data-tpl={data.addFilter.length ? "aside-end" : undefined} data-gap="5">
@@ -111,11 +118,11 @@
             <Row wrap gap={2}>
               <span class="small">Filters</span>
               {#each data.filters as f}{@render chip(`${f.key} · ${f.value}`, f.key, true)}{/each}
-              <Button label="Add filter" variant="quiet" lead={plus} />
+              <Button label="Add filter" variant="quiet" lead={plus} disabled ariaDescribedby="explore-why" />
             </Row>
             <Row gap={2}>
               <span class="small">Group by</span>
-              <label class="sel" data-size="compact"><select class="in" aria-label="Group by">{#each data.groupBy.options as o}<option selected={o === data.groupBy.selected}>{o}</option>{/each}</select><Icon d={I.chev} /></label>
+              <label class="sel" data-size="compact"><select class="in" aria-label="Group by" disabled aria-describedby="explore-why">{#each data.groupBy.options as o}<option selected={o === data.groupBy.selected}>{o}</option>{/each}</select><Icon d={I.chev} /></label>
             </Row>
           </div>
           <!-- The table card scrolls sideways (.tbl-wrap), so it takes keyboard focus to be scrollable without a pointer. -->
@@ -128,7 +135,7 @@
                   <tr>
                     <td class="td">{r.title}</td><td class="td">{r.project}</td><td class="td">{r.language}</td><td class="td">{r.region}</td><td class="td">{r.orgs}</td>
                     <td class="td"><Pill stage={r.pill} /></td><td class="td">{r.responsesText}</td>
-                    {#each LENS_KEYS as k}<td class="td">{#if r.levels[k]}<Level level={r.levels[k]} />{:else}<span class="micro">—</span>{/if}</td>{/each}
+                    {#each LENS_KEYS as k}<td class="td">{#if r.levels[k]}<span class="l-stack" data-gap="1"><Level level={r.levels[k]} /><Coverage n={r.counts[k]} variant="count" /></span>{:else}<span class="micro">—</span>{/if}</td>{/each}
                     <td class="td">{r.updated}</td>
                   </tr>
                 {/each}
@@ -136,14 +143,14 @@
             </table>
             <div class="l-row tbl-foot" data-split data-gap="3">
               <span class="small">{match.reviews} of {data.visible} reviews match · {many(match.projects, "project")} · {many(match.languages, "language")}</span>
-              <span class="small">Nothing here identifies a participant.</span>
+              <span class="small">{tableAssurance(data.levelMinimum ?? currentLevelMin())}</span>
             </div>
           </section>
         </Stack>
         {#if data.addFilter.length}<aside class="l-stack" data-gap="3" aria-labelledby="explore-add-title">
           <h2 class="h3" id="explore-add-title">Add a filter</h2>
           <div class="glass-hi menu" data-flow role="group" aria-labelledby="explore-add-title">
-            {#each data.addFilter as f}<button class="mi" type="button"><span>{f}</span><span class="small mi-end">Any</span></button>{/each}
+            {#each data.addFilter as f}<button class="mi" type="button" disabled aria-describedby="explore-why"><span>{f}</span><span class="small mi-end">Any</span></button>{/each}
           </div>
           <p class="small">Workspace and project are filters like any other. The Workspace and Project pages are the same table with those filters saved.</p>
         </aside>{/if}

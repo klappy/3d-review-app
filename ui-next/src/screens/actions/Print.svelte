@@ -100,7 +100,7 @@
               <span class="lbl" id="pt-which">Which surveys</span>
               <Stack gap={2}>
                 {#each R.surveys as s, i}
-                  <label class="row-opt l-row" data-split><span class="l-row" data-gap="3"><input class="cb" type="checkbox" value={i} bind:group={picked} /><b>{s.name}</b></span><span class="small">{#if s.pages}{s.pages} pages{:else if s.linkError}{s.linkError}{:else if !s.open}not collecting{/if}</span></label>
+                  <label class="row-opt l-row" data-split><span class="l-row" data-gap="3"><input class="cb" type="checkbox" value={i} bind:group={picked} /><b>{s.name}</b></span><span class="small">{#if typeof s.pages === "string"}{s.pages}{:else if s.pages}{s.pages} {s.pages === 1 ? "page" : "pages"}{:else if s.linkError}{s.linkError}{:else if !s.open}not collecting{/if}</span></label>
                 {/each}
               </Stack>
             </div>

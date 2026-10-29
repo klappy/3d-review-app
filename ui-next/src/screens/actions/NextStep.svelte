@@ -26,6 +26,7 @@
   import { A } from "./icons.js";
   import { href } from "../href.js";
   import { carry } from "./links.js";
+  import { widestLine } from "../results/data.js";
   import R0 from "../../../fixtures/actions/review.json";
   import D0 from "../../../fixtures/actions/next-step.json";
 
@@ -67,7 +68,7 @@
         <div class="glass-hi l-card l-stack" data-pad="work" data-gap="5" role="group" aria-label="What will you talk about?">
           <div><h2 class="h2 t-24">What will you talk about?</h2><p class="small t-15">Suggested from the results. Keep the ones that matter; add your own.</p></div>
           <Stack gap={2}>
-            <Row gap={3}><span class="h3">Where the perspectives disagree</span><span class="small">the three widest gaps</span></Row>
+            <Row gap={3}><span class="h3">Where the perspectives disagree</span>{#if widestLine(D.gaps.length)}<span class="small">{widestLine(D.gaps.length)}</span>{/if}</Row>
             {#if live && !D.gaps.length}<p class="small">The built report shows no area two perspectives both scored.</p>{/if}
             {#each D.gaps as g}
               <label class="row-opt" data-kind="gap"><input class="cb" type="checkbox" checked={g.checked} /><b>{g.area}</b><GapBar pts={g.pts} span={g.span} wide={g.wide} w="100%" /><strong class="small">{g.apart}</strong></label>

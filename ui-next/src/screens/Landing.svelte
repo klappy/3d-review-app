@@ -25,8 +25,10 @@
   import { C01, C02 } from "../copy/rachel.js";
 
   // videoSrc: the intro video through the Transcode proxy (generate_transcode_url) once it exists; absent = placeholder frame (Media card contract).
-  let { phone = false, theme = "light", w, videoSrc } = $props();
+  // home (live, signed in): the logo goes to the signed-in home, not back to this page (cookbook work/active/2026-10-26-3d-logged-in-home).
+  let { phone = false, theme = "light", w, videoSrc, home } = $props();
   let SELF = $derived(screenHref("landing", { phone, theme, w }));
+  const LOGO = $derived(home ?? SELF);
   const SAMPLE = "#results", VIDEO = "#video", CODE = "#survey-code", HELP = "#help";
   const PERSPECTIVES = [
     ["team", "Translation team", "How the team prepares, reviews and decides a passage is ready."],
@@ -53,7 +55,7 @@
   ];
 </script>
 
-{#snippet top()}{#if phone}<PhoneHeader state="public" home={SELF} />{:else}<TopBar variant="public" home={SELF} />{/if}{/snippet}
+{#snippet top()}{#if phone}<PhoneHeader state="public" home={LOGO} />{:else}<TopBar variant="public" home={LOGO} />{/if}{/snippet}
 {#snippet trail()}<Icon d={I.arrow} />{/snippet}
 {#snippet lead()}<Icon d={I.play} />{/snippet}
 {#snippet bar()}{#if phone}<PhoneBar label="Try the sample review" href={SAMPLE} />{/if}{/snippet}

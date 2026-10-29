@@ -38,6 +38,9 @@
   const review = $derived(report?.review ?? (phone ? REPORT.phone.review : REPORT.desktop.review));
   const crumbs = $derived([{ label: review.project, href: out("project") }, { label: review.title }]);
   const splitLabel = $derived(SPLITS.find((s) => s.key === A.split).label.replace(/^Split by /, "by "));
+  // Live QA Q10: no answer CSV yet. The server discloses no answer-by-answer rows (src/handlers/response.ts list: D7, held for everyone,
+  // owners included), and a raw-response export is a disclosure decision outside this screen, so both buttons are off and say why.
+  const CSV_WHY = "Downloading answers is not available yet: the server does not release answer-by-answer rows, so there is nothing to export.";
 </script>
 
 {#snippet download()}<Glyph d={G.download} />{/snippet}
@@ -55,8 +58,9 @@
     <ReviewHead {review} phone />
     <Row gap={2}>
       <Button label={`${A.label} · ${A.answers}`} ariaLabel={`Perspective: ${A.label}, ${A.answers} answers. Show ${lensLabel(next)}`} href={href("results-answers", { state: next })} lead={people} block />
-      <Button label="Download CSV" href="#csv" lead={doc} />
+      <Button label="Download CSV" lead={doc} disabled ariaDescribedby="csv-why" />
     </Row>
+    <p class="small" id="csv-why">{CSV_WHY}</p>
     <Card pad="list" label="Questions">
       {#each A.questions as q, i (q.id)}
         <Disclosure label={q.q} open={i === 0} solid={false} gap={1}>
@@ -76,9 +80,10 @@
         <div class="seg" role="radiogroup" aria-label="Perspective" data-grow>{#each ANSWER_LENSES as l (l)}<label><input type="radio" name="lens" value={l} bind:group={lens} />{lensLabel(l)}</label>{/each}</div>
         <Row gap={3}>
           <label class="sel"><select class="in" aria-label="Split by" bind:value={split}>{#each SPLITS as s (s.key)}<option value={s.key}>{s.label}</option>{/each}</select><Glyph d="M6 9l6 6 6-6" /></label>
-          <Button label="Download answers (CSV)" href="#csv" lead={download} />
+          <Button label="Download answers (CSV)" lead={download} disabled ariaDescribedby="csv-why" />
         </Row>
       </Row>
+      <p class="small" id="csv-why">{CSV_WHY}</p>
       <Row gap={3}>
         <h2 class="h2" aria-live="polite">{A.label} · {A.modality} · {A.answers} answers{A.split === "everyone" ? "" : ` · ${splitLabel}`}</h2>
         <Row gap={2}><LensDot lens={A.lens} decorative /><span>{A.focus.area} ·</span><Level level={A.focus.level} /></Row>

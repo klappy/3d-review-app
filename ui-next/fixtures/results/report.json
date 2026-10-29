@@ -47,10 +47,10 @@
     "theirWords": ["Some words sound like the neighbouring dialect, not ours.", "The chapter headings are fine but the verses run together.", "We have the brief, we just haven’t had anyone from outside look at it yet."]
   },
   "held": {
-    "_note": "ResultsHeld / ResultsHeldPhone: the church survey is below the minimum (V3_BAND_CUTOFFS.minResponses), so every church level is More input needed.",
-    "review": { "closedResponses": 15 },
-    "counts": { "team": 6, "community": 8, "church": 1 },
-    "phoneCounts": { "church": 2 },
+    "_note": "ResultsHeld / ResultsHeldPhone: the church survey has no response yet (below results/data.js LEVEL_MIN), so every church level is More input needed.",
+    "review": { "closedResponses": 14 },
+    "counts": { "team": 6, "community": 8, "church": 0 },
+    "phoneCounts": { "church": 0 },
     "preview": 3
   },
   "phone": {

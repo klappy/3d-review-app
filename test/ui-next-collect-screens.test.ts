@@ -5,7 +5,8 @@
 // (§2 Room health, Offline actions, Dialog and sheet states (R14), Field and button states (R16), Top bar variants); data
 // ui-next/fixtures/collect/collect.json (one source per value). Links come from the shared screens/href.js, which carries ?w= and ?theme=
 // from location.search: each render sets the URL the route would have (at()).
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { useLevelMinimum } from "../ui-next/src/screens/results/data.js";
 import { readFileSync, readdirSync } from "node:fs";
 import { resolve } from "node:path";
 import { createRawSnippet, flushSync } from "svelte";
@@ -272,6 +273,7 @@ describe("Dialog (R14 dismissal): title row + Close, Escape, a forced close and 
 });
 
 describe("CloseCollection (CloseCollection, CloseCollectionPhone)", () => {
+  beforeEach(() => { useLevelMinimum(1); }); // DEV-like fixtures band at 1, set explicitly
   it("desktop: modal dialog with icon tile + title + Close, consequence, per-perspective counts, Keep collecting (focused) then the one primary", () => {
     const a = shot(CloseCollection);
     const d = a.querySelector("dialog.glass-hi:not(.sheet)")!;
@@ -279,7 +281,7 @@ describe("CloseCollection (CloseCollection, CloseCollectionPhone)", () => {
     expect(text(a.querySelector(`#${d.getAttribute("aria-labelledby")}`))).toBe("Close collection now?");
     expect(d.querySelector("[aria-label=Close]")!.getAttribute("href")).toBe("?ui_next=on&screen=collect");
     expect(text(d.querySelector("p.small"))).toBe("Links and codes stop working and the review moves to Understand. 18 responses are in. You can reopen collection later — results refresh when you do.");
-    expect(text(d.querySelector(".solid"))).toBe("Translation team 6 · Community 8 · Church 4. Every perspective has at least 3 answers, so results can show.");
+    expect(text(d.querySelector(".solid"))).toBe("Translation team 6 · Community 8 · Church 4. Every perspective has an answer, so its level can show; the drops beside each level show how much evidence it rests on. Answer-by-answer splits are not shown.");
     expect(all(d, ".btn:not(.btn-icon)")).toEqual(["Keep collecting", "Yes, close and see results"]);
     expect(document.activeElement?.textContent).toBe("Keep collecting");
     expect(a.querySelectorAll(".btn-primary").length).toBe(1);
@@ -287,11 +289,23 @@ describe("CloseCollection (CloseCollection, CloseCollectionPhone)", () => {
     expect(a.querySelector(".btn-primary")!.getAttribute("href")).toBe("?ui_next=on&screen=results");
     expect(text(a.querySelector("main .l-row > .l-row .btn:not(details .btn)"))).toBe("Share the survey");
   });
-  it("the 3-answer line is said only when every perspective has 3 answers", () => {
-    const thin = structuredClone(fixture);
-    thin.groups[2].surveys[0].answered = 1;
-    const a = shot(CloseCollection, { data: thin });
-    expect(text(a.querySelector("dialog .solid"))).toBe("Translation team 6 · Community 8 · Church 2.");
+  it("the ready line follows the served level minimum: DEV 1 says it from one answer; production-like or absent (3) waits for 3; no 3-answer promise", () => {
+    useLevelMinimum(3);
+    const two = structuredClone(fixture);
+    two.groups[2].surveys.forEach((x: { answered: number }, i: number) => { x.answered = i ? 0 : 2; });
+    expect(text(shot(CloseCollection, { data: two }).querySelector("dialog .solid"))).toBe("Translation team 6 · Community 8 · Church 2.");
+    expect(text(shot(CloseCollection).querySelector("dialog .solid"))).toBe("Translation team 6 · Community 8 · Church 4. Every perspective has at least 3 answers, so its level can show; the drops beside each level show how much evidence it rests on. Answer-by-answer splits are not shown.");
+    useLevelMinimum(undefined); // absent: the safe 3
+    expect(text(shot(CloseCollection, { data: two }).querySelector("dialog .solid"))).toBe("Translation team 6 · Community 8 · Church 2.");
+    useLevelMinimum(1);
+    const one = structuredClone(fixture);
+    one.groups[2].surveys.forEach((x: { answered: number }, i: number) => { x.answered = i ? 0 : 1; });
+    const a = shot(CloseCollection, { data: one });
+    expect(text(a.querySelector("dialog .solid"))).toBe("Translation team 6 · Community 8 · Church 1. Every perspective has an answer, so its level can show; the drops beside each level show how much evidence it rests on. Answer-by-answer splits are not shown.");
+    expect(text(a)).not.toMatch(/at least 3 answers|results can show|splits wait/);
+    const empty = structuredClone(fixture);
+    empty.groups[2].surveys.forEach((x: { answered: number }) => { x.answered = 0; });
+    expect(text(shot(CloseCollection, { data: empty }).querySelector("dialog .solid"))).toBe("Translation team 6 · Community 8 · Church 0.");
   });
   it("no perspectives: the 3-answer line is never said vacuously, no stray count line, no throw (desktop and phone)", () => {
     const none = structuredClone(fixture);
@@ -653,5 +667,24 @@ describe("collect view model and data wiring", () => {
   it("the lane passes the ui-next lint (no inline style, tokens only)", () => {
     expect([...lintDir(LANE)]).toEqual([]);
     expect([...lintDir(resolve(__dirname, "../ui-next/fixtures/collect"))]).toEqual([]);
+  });
+});
+
+describe("live QA N5: a review with no closing date shows no blank date parts", () => {
+  it("says what is true with and without a closing date (desktop aside and phone card)", () => {
+    const t = (el: Element) => (el.textContent ?? "").replace(/\s+/g, " ").trim();
+    const withDate = shot(Collect);
+    expect(t(withDate)).toContain("28 Sep – 31 Oct · 33 days left");
+    expect(t(withDate)).toContain("Results open on 31 Oct, or earlier if you close collection from the ⋯ menu.");
+    const none = structuredClone(fixture); none.review.closes = ""; (none.review as { daysLeft: number | null }).daysLeft = null;
+    const d = shot(Collect, { data: none });
+    expect(t(d)).toContain("Open since 28 Sep · no closing date set");
+    expect(t(d)).toContain("Results open when you close collection from the ⋯ menu.");
+    expect(t(d)).not.toMatch(/ – ·|days left|open on ,|Open until ·/);
+    const p = shot(Collect, { data: none, phone: true });
+    expect(t(p)).toContain("No closing date set");
+    expect(t(p)).not.toMatch(/Open until ·|Open until $/);
+    const one = structuredClone(fixture); (one.review as { daysLeft: number }).daysLeft = 1;
+    expect(t(shot(Collect, { data: one }))).toContain("· 1 day left");
   });
 });

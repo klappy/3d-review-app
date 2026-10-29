@@ -20,6 +20,7 @@
   import Pill from "../../Pill.svelte";
   import Level from "../../Level.svelte";
   import LensDot from "../../LensDot.svelte";
+  import Coverage from "../results/Coverage.svelte";
   import Glyph from "./Glyph.svelte";
   import { href } from "../href.js";
   import { out } from "./links.js";
@@ -77,7 +78,7 @@
               <span class="small tab-n">{r.when}</span>
               <span class="l-stack" data-gap="2">
                 <span class="l-row" data-gap="2"><span class="h3">{r.title}</span><Pill stage={r.stage} /></span>
-                <span class="l-row" data-wrap data-gap="4">{#if r.levels}{#each r.levels as [lens, level]}<span class="lvl-pair"><LensDot {lens} /><Level {level} /></span>{/each}{:else}<span class="small">{r.note}</span>{/if}</span>
+                <span class="l-row" data-wrap data-gap="4">{#if r.levels}{#each r.levels as [lens, level, n]}<span class="lvl-pair"><LensDot {lens} /><Level {level} /><Coverage {n} variant="short" /></span>{/each}{:else}<span class="small">{r.note}</span>{/if}</span>
               </span>
               <span class="go" aria-hidden="true"><Glyph name="arrow" /></span>
             </a>

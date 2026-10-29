@@ -20,9 +20,9 @@ describe("B2. the phone bar stays in the thumb zone on every phone screen (secti
   // The position rule is main's (638275c: phone.css .phone-bar sticky + .app.l-screen overflow clip, asserted in
   // test/ui-next-about-landing.test.ts); slice 2's position:fixed rule was dropped in the main sync. Sticky bottom:0 holds the bar
   // at the viewport foot only while it is the last in-flow child after the scrolling content, so the shell structure is pinned here.
-  it("phone.css carries no position:fixed rule (main's sticky bar is the one live rule)", () => {
-    expect(rules(read("components/phone.css")).filter(([, d]) => /position:\s*fixed/.test(d))).toEqual([]);
-    expect(rules(read("components/phone.css")).filter(([, d]) => /position:\s*sticky/.test(d)).map(([s]) => s)).toEqual([".phone-bar"]);
+  it("phone.css fixes .phone-bar and nothing else (design-system.md §9 phone-bar: fixed; no sticky rule left)", () => {
+    expect(rules(read("components/phone.css")).filter(([, d]) => /position:\s*fixed/.test(d)).map(([s]) => s)).toEqual([".phone-bar"]);
+    expect(rules(read("components/phone.css")).filter(([, d]) => /position:\s*sticky/.test(d))).toEqual([]);
     const main = read("src/main.js");
     expect(main.indexOf(`"../components/phone.css"`)).toBeGreaterThan(main.indexOf(`"../components/base.css"`));
   });
@@ -50,8 +50,10 @@ describe("B2. the phone bar stays in the thumb zone on every phone screen (secti
     const decl = (sel: string) => phone.filter(([s]) => s === sel).map(([, d]) => d).join(";");
     expect(decl(".app.l-screen[data-w=phone]")).toMatch(/(^|;)display:flex(;|$)/);
     expect(decl(".app.l-screen[data-w=phone]")).toMatch(/(^|;)flex-direction:column(;|$)/);
-    expect(decl(".app.l-screen[data-w=phone]")).toMatch(/(^|;)min-height:100dvh(;|$)/);
-    expect(decl(".app.l-screen[data-w=phone]>.l-shell")).toMatch(/(^|;)flex:1 0 auto(;|$)/);
+    // the bounded frame (§9 Phone frame; Codex P2 4383334410): one dynamic viewport tall, the shell fills it, main.phone-main scrolls
+    expect(decl(".app.l-screen[data-w=phone]")).toMatch(/(^|;)height:100dvh(;|$)/);
+    expect(decl(".app.l-screen[data-w=phone]>.l-shell")).toMatch(/(^|;)flex:1 1 0(;|$)/);
+    expect(decl(".app.l-screen[data-w=phone]>.l-shell")).toMatch(/(^|;)min-height:0(;|$)/);
     // phone only: no phone.css rule gives a desktop screen a flex or min-height shell (desktop pixels unchanged)
     expect(phone.filter(([s, d]) => /\.app\.l-screen(?!\[data-w=phone\])/.test(s) && /(display|min-height|flex)/.test(d))).toEqual([]);
     // what the bar's place rests on in the generated helmet: the shell is a column and main.l-phone takes the free space

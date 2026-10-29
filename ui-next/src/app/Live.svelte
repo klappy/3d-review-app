@@ -5,7 +5,7 @@
      and labelled as a preview (never hidden): the receipt lists them. -->
 <script>
   import { tick } from "svelte";
-  import { openQrPrint, preparePapers, openPapersPrint, paperPreview, printReadyLine, printAllowed } from "./print.js";
+  import { openQrPrint, preparePapers, openPapersPrint, paperPreview, printOpenedLine, printAllowed } from "./print.js";
   import { loadBlankPrint } from "../../../ui/stage-screens.js";
   import { SAMPLE_HREF, SAMPLE_AID } from "./router.js";
   import { REPORT as SAMPLE_REPORT } from "../screens/results/data.js";
@@ -29,12 +29,19 @@
   import Status from "./Status.svelte";
   import { collectModel as collectView } from "../screens/collect/model.js";
   import Card from "../Card.svelte";
+  import Row from "../Row.svelte";
+  import { systemTheme } from "../theme.svelte.js";
+  import NotBuilt from "./NotBuilt.svelte";
   import { buildConfirmText } from "../../../ui/assess/report-build.js";
 
   let hash = $state(globalThis.location?.hash ?? "");
   let phone = $state(typeof matchMedia === "function" ? matchMedia(PHONE_QUERY).matches : false);
   const route = $derived(parse(hash));
-  const theme = $derived(route.query.get("theme") === "dark" ? "dark" : "light");
+  // The screen theme: the link's ?theme= when it carries one, else the system's (prefers-color-scheme, followed live); the viewer's own
+  // Light or Dark choice in the account menu overrides both (AppShell themeOf).
+  let systemDark = $state(systemTheme() === "dark");
+  $effect(() => { const mq = globalThis.matchMedia?.("(prefers-color-scheme: dark)"); if (!mq?.addEventListener) return; const f = () => { systemDark = mq.matches; }; mq.addEventListener("change", f); return () => mq.removeEventListener("change", f); });
+  const theme = $derived(route.query.get("theme") === "dark" ? "dark" : route.query.get("theme") === "light" ? "light" : systemDark ? "dark" : "light");
   let session = $state(undefined); // undefined = not read yet; null = signed out
   let page = $state({ status: "loading", key: "", data: null, error: null });
   let pstate = $state(P.snapshot()); // participant journey snapshot
@@ -185,7 +192,7 @@
     printBusy = true; printStatus = "Preparing the forms…";
     try {
       const models = await preparePapers(m, picked, { lang, onProgress: (t) => { printStatus = t; } });
-      printStatus = openPapersPrint(globalThis, models, { paper, title: `${m.review.title} · paper surveys` }) ? models.map((x) => `${x.identity?.survey?.name ?? x.title}: ${printReadyLine(x)}`).join(" ") : "Your browser blocked the print page. Allow pop-ups for this site, then use Print again.";
+      printStatus = openPapersPrint(globalThis, models, { paper, title: `${m.review.title} · paper surveys` }) ? models.map((x) => `${x.identity?.survey?.name ?? x.title}: ${printOpenedLine(x)}`).join(" ") : "Your browser blocked the print page. Allow pop-ups for this site, then use Print again.";
     } catch (e) { printStatus = e?.message || "The blank questionnaire could not be prepared. Try Print again."; }
     finally { printBusy = false; }
   }
@@ -233,7 +240,7 @@
   const accountItems = $derived(session ? [
     { kind: "head", label: session.principal?.display_name || "Signed in", sub: session.principal?.id ? "Facilitator" : "" }, { kind: "hr" },
     { label: "Help and FAQ", href: to("help") }, { label: "Why 3D Review exists", href: to("about") }, { label: "Send app feedback", href: to("feedback", {}, { from: route.name, review: page.data?.data?.review?.title ?? page.data?.results?.review?.title ?? "" }) },
-    { label: "Current design", href: "/" }, { kind: "hr" }, { label: "Sign out", onclick: signOut },
+    { label: "Public website home", href: to("landing") }, { kind: "theme" }, { label: "Current design", href: "/" }, { kind: "hr" }, { label: "Sign out", onclick: signOut },
   ] : []);
   function onSignedIn() { D.clearLinks(); SU.forgetAll(); S.forget(); session = undefined; const next = page.data?.next; go(next && next !== "#/signin" ? next : to("home")); }
   // Report build (first build and "Refresh with new answers" alike): the current design's contract (ui/assess/report-build.js) —
@@ -248,7 +255,7 @@
     if (building || build) return;
     if (uncertainBuild === aid) { say("A report build's outcome is unknown. Reload this page to see the report list before building again."); return; }
     build = null; say("");
-    try { const out = await D.previewBuild(aid); if (out.held) { say("The results can’t be built yet: more answers are needed. Nothing was built."); return; } build = { aid, text: buildConfirmText(m?.review?.responses), token: out.token, expires: out.expires }; }
+    try { const out = await D.previewBuild(aid); if (out.held) { say(D.heldBuildText(out.preview, "Nothing was built.", m?.results?.report_hold_reason)); return; } build = { aid, text: buildConfirmText(m?.review?.liveResponses ?? m?.review?.responses), token: out.token, expires: out.expires }; }
     catch (e) { say(`The preview could not be loaded. Nothing was built; ${e?.message || "try again"}.`); }
   }
   function cancelBuild() { build = null; say("Cancelled. Nothing was built."); }
@@ -256,7 +263,7 @@
     const b = build; if (!b || building) return;
     if (Date.now() >= b.expires) { build = null; say("Preview expired. Preview again before building."); return; }
     build = null; building = true;
-    try { const out = await D.executeBuild(b.aid, b.token); if (out.held) say("The results can’t be built yet: more answers are needed. No report was built."); else load(); }
+    try { const out = await D.executeBuild(b.aid, b.token); if (out.held) say(D.heldBuildText(out.preview, "No report was built.", page.data?.results?.results?.report_hold_reason)); else load(); }
     catch (e) { uncertainBuild = b.aid; say(`The report build outcome could not be confirmed: ${e?.message || "reload to see whether a report was built"}. Rebuilding is locked until this page reloads the report list.`); }
     finally { building = false; }
   }
@@ -292,8 +299,6 @@
   const applyChrome = (s) => setLiveChrome(s ? { who: S.firstName(s.principal), initials: S.initialsOf(s.principal), workspace: "Your workspace", workspaces: [], accountItems, home: to("home"), workspaceItems: [{ kind: "micro", label: "Your workspaces" }, { label: "Home", href: to("home") }] } : { who: "", initials: "", workspace: "", workspaces: [], accountItems: [], home: to("home"), workspaceItems: [], signedOut: true });
   const chrome = $derived({ phone, theme, who, accountItems, session });
   $effect(() => { setLiveChrome(session ? { who: who.first, initials: who.initials, workspace: page.data?.home?.workspace ?? "Your workspace", workspaces: [], accountItems, home: to("home"), workspaceItems: [{ kind: "micro", label: "Your workspaces" }, { label: "Home", href: to("home") }] } : { who: "", initials: "", workspace: "", workspaces: [], accountItems: [], home: to("home"), workspaceItems: [], signedOut: true }); });
-  // The phone boards (ResultsPhone.dc.html, fixtures/results/report.json "phone") draw each perspective's strongest and weakest area only.
-  const phonePayload = (payload) => ({ ...payload, lenses: (payload.lenses ?? []).map((l) => { const sd = [...(l.sub_dimensions ?? [])].filter((x) => Number.isFinite(Number(x.score))).sort((a, b) => Number(b.score) - Number(a.score)); return { ...l, sub_dimensions: sd.length > 2 ? [sd[0], sd[sd.length - 1]] : l.sub_dimensions }; }) });
   // Setup steps 1-4 (app/setup.js): the open state lives outside the page (its draft is edited in place); suRev re-derives the views.
   let suSt = null, suRev = $state(0), suBusy = $state(false), suError = $state("");
   const bump = () => { suRev++; };
@@ -327,7 +332,8 @@
   };
   const suGroups = { ongroup: (tid, version, on) => { SU.setGroup(suSt, tid, version, on); suError = ""; bump(); }, onexpected: (tid, v) => { SU.setExpected(suSt, tid, v); bump(); } };
   const suContext = { oncontext: (key, field, v) => { const tid = SU.tidOfKey(suSt, key); if (tid) SU.setContext(suSt, tid, field, v); }, ondemographics: (on) => { suSt.draft.demographics = on; bump(); } };
-  const reportFor = (m) => (m.payload ? { review: m.review, counts: m.counts, payload: phone ? phonePayload(m.payload) : m.payload, gaps: D.gapsOf(m.payload), radar: D.radarOf(m.payload), lookNext: [] } : null);
+  // The built report for this screen (app/data.js liveReport: full snapshot for the readers, compact payload for phone Results only).
+  const reportFor = (m, screen) => D.liveReport(m, { phone, screen });
 </script>
 
 <!-- The build confirm (report-build.js: one plain sentence with the response count, confirm "Build the results", cancel "Not now").
@@ -348,7 +354,7 @@
   <Status {phone} {theme} kind="preview" inline message="Sample data: a made-up review that shows the design. Nothing here is saved." back={to("home")} backLabel="Home" />
   <C {phone} {theme} state={route.query.get("state") ?? undefined} />
 {:else if page.data.screen === "landing"}
-  <Landing {phone} {theme} />
+  <Landing {phone} {theme} home={session ? to("home") : undefined} />
 {:else if page.data.screen === "about"}
   <About {phone} {theme} />
 {:else if page.data.screen === "sign-in"}
@@ -406,14 +412,15 @@
   {/if}
 {:else if page.data.screen === "results" || page.data.screen === "results-gaps" || page.data.screen === "results-answers" || page.data.screen === "report" || page.data.screen === "report-detailed" || page.data.screen === "results-held"}
   {@const m = page.data.results}
-  {@const rep = reportFor(m)}
+  {@const rep = reportFor(m, page.data.screen)}
   {#if page.data.sample}<Status {phone} {theme} kind="preview" inline message="Sample data: a made-up review that shows the design. Your own reviews read their results from the server." back={to("home")} backLabel="Home" />{/if}
   {#if !rep && !m.held && page.data.screen !== "results-held"}
-    <Status {phone} {theme} kind="not_built" message={`No report has been built for ${m.review.title} yet. ${m.canBuild ? "Building reads the answers collected so far and keeps that report." : "An owner or member of the review builds it."}${page.data.refreshed ? ` ${page.data.refreshed}` : ""}`} inline back={to("collect", route.params)} backLabel="Back to Collect" />
-    {#if m.canBuild}<div class="l-page">{#if build}{@render buildConfirm(true)}{:else}<button class="btn btn-primary btn-lg" type="button" onclick={refreshResults} disabled={building || undefined}>{building ? "Building the results…" : "Build the report"}</button>{/if}</div>{/if}
+    <NotBuilt {chrome} {phone} {theme} crumbs={[{ label: m.review.project, href: m.review.projectId ? to("project", { pid: m.review.projectId }) : to("home") }, { label: m.review.title }]} message={`No report has been built for ${m.review.title} yet. ${m.canBuild ? "Building reads the answers collected so far and keeps that report." : "An owner or member of the review builds it."}${page.data.refreshed ? ` ${page.data.refreshed}` : ""}`} back={to("collect", route.params)} backLabel="Back to Collect">
+      {#if m.canBuild}{#if build}{@render buildConfirm(true)}{:else}<Row gap={2}><button class="btn btn-primary btn-lg" type="button" onclick={refreshResults} disabled={building || undefined}>{building ? "Building the results…" : "Build the report"}</button></Row>{/if}{/if}
+    </NotBuilt>
   {:else if !rep || page.data.screen === "results-held"}
     {@const Held = REGISTRY["results-held"]}
-    <Held {phone} {theme} report={{ review: m.review, counts: m.counts, payload: m.payload ?? { lenses: [] }, held: m.held }} onreopen={reopenCollection} />
+    <Held {phone} {theme} report={{ review: m.review, counts: m.counts, sent: m.sent, payload: m.payload ?? { lenses: [] }, held: m.held }} onreopen={reopenCollection} />
   {:else if page.data.screen === "results-answers"}
     {@const C = REGISTRY["results-answers"]}
     {#if page.data.answers?.suppressed}
@@ -423,11 +430,10 @@
     {/if}
   {:else if page.data.screen === "results"}
     {@const C = REGISTRY.results}
-    <C {phone} {theme} report={rep} onrefresh={refreshResults} refreshed={building ? "Building the results…" : page.data.refreshed ?? ""} />
-    {#if build}<div class="l-page">{@render buildConfirm(false)}</div>{/if}
+    <C {phone} {theme} report={rep} onrefresh={refreshResults} refreshed={building ? "Building the results…" : page.data.refreshed ?? ""}>{#if build}{@render buildConfirm(false)}{/if}</C>
   {:else}
     {@const C = REGISTRY[page.data.screen]}
-    <C {phone} {theme} report={rep} />
+    <C {phone} {theme} report={rep} state={route.query.get("state") ?? undefined} />
   {/if}
 {:else if page.data.screen === "explore"}
   {@const C = REGISTRY.explore}

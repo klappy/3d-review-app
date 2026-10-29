@@ -35,7 +35,21 @@ describe("Home renders each state", () => {
     expect([...a.querySelectorAll("section.l-section > h2.h2")].map((h) => h.textContent)).toEqual(["Results ready", "Collecting", "Setting up", "Completed"]);
     expect([...a.querySelectorAll(".pill")].map((p) => p.getAttribute("data-stage"))).toEqual(["results", "collecting", "setup"]);
     expect([...a.querySelectorAll("a.card-link.glass")].map((c) => c.querySelector(".btn")!.textContent)).toEqual(["Read the results", "Share the survey", "Continue setup"]);
-    expect([...a.querySelectorAll(".lvl-name")].map((l) => l.textContent)).toEqual(["Growing", "Needs support", "Growing"]);
+    // every action link ends in the arrow glyph, desktop (.btn) and phone (.link), as the boards draw "Share the survey →" (parity R60)
+    const ph = home({ state: "reviews", phone: true });
+    const links = [...ph.querySelectorAll("a.card-link span.link")];
+    expect(links.length).toBeGreaterThan(0);
+    for (const l of links) expect(l.lastElementChild?.querySelector("path")?.getAttribute("d")).toBe("M5 12h14M13 6l6 6-6 6");
+    for (const b of a.querySelectorAll("a.card-link.glass .btn")) expect(b.lastElementChild?.tagName.toLowerCase()).toBe("svg");
+    // design-system.md phone invitation banner and "Explore all →"
+    const inv = ph.querySelector("a.card-link.glass.l-card.l-row.inv-banner[data-pad=bar][data-gap='3']")!;
+    expect([...inv.children].map((k) => k.tagName.toLowerCase() + (k.className && typeof k.className === "string" ? `.${k.className.split(" ").join(".")}` : ""))).toEqual(["span.icn", "span.small", "svg"]);
+    expect([inv.children[0].getAttribute("data-size"), inv.children[0].getAttribute("data-lens"), inv.children[2].querySelector("path")!.getAttribute("d")]).toEqual(["32", "church", "M6 9l6 6 6-6"]);
+    const all = [...ph.querySelectorAll("a.link")].find((l) => (l.textContent ?? "").trim() === "Explore all")!;
+    expect(all.lastElementChild?.querySelector("path")?.getAttribute("d")).toBe("M5 12h14M13 6l6 6-6 6");
+    expect([...a.querySelectorAll(".lvl-word")].map((l) => l.textContent)).toEqual(["Growing", "Needs support", "Growing"]);
+    // Codex P2 on 992b610: each level carries its respondent count, so a low-evidence level never shows bare
+    expect([...a.querySelectorAll(".lvl-pair [data-coverage] [data-short]")].map((c) => (c.textContent ?? "").replace(/\s+/g, " ").trim())).toEqual(["Well filled · 9", "Well filled · 10", "Filling up · 5"]);
     expect(a.querySelector("main .tag")!.textContent).toBe("Not yet reviewed");
     expect([...a.querySelectorAll("input.cb")].map((c) => (c as HTMLInputElement).checked)).toEqual([true, true, true, false]);
     expect(a.querySelector("details:not(.dd)")!.hasAttribute("open")).toBe(false);
@@ -53,6 +67,22 @@ describe("Home renders each state", () => {
   it("dark theme sets data-theme on the shell; unknown state throws", () => {
     expect(home({ theme: "dark" }).getAttribute("data-theme")).toBe("dark");
     expect(() => render(Home, { props: { state: "empty" } })).toThrow(/unknown state/);
+  });
+});
+
+describe("signed-in home keeps the public website home one visible link away (cookbook work/active/2026-10-26-3d-logged-in-home)", () => {
+  it.each(STATES)("%s: a visible link to the public website home (#landing, the router's /welcome)", (_, props) => {
+    const a = home(props);
+    const link = a.querySelector("[data-website-home] a.link") as HTMLAnchorElement;
+    expect(link).not.toBeNull();
+    expect(link.getAttribute("href")).toBe("#landing");
+    expect(link.textContent).toBe("See the public website home");
+  });
+  it("the router resolves #landing to the public website home, and Home stays the signed-in root", async () => {
+    // @ts-expect-error -- plain .js module, no type declarations
+    const { parse } = await import("../ui-next/src/app/router.js");
+    expect(parse("#landing").name).toBe("landing");
+    expect(parse("#/").name).toBe("home");
   });
 });
 

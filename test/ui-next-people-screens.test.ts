@@ -134,6 +134,11 @@ describe("Workspace and the group dialog", () => {
     expect(a.querySelectorAll('.av[data-size="28"][data-logo]').length).toBeGreaterThan(0);
     expect([...a.querySelectorAll("a.card-link .pill")].map((x) => x.getAttribute("data-stage"))).toEqual(["collecting", "setup", "collecting", "done", "setup"]);
     expect(a.querySelectorAll(".lvl").length).toBe(9);
+    // Codex P2 on 992b610: a count beside every level (ISL Mark's church reads its zero beside More input needed)
+    expect([...a.querySelectorAll("a.card-link [data-coverage] [data-short]")].map((c) => (c.textContent ?? "").replace(/\s+/g, " ").trim())).toEqual(["9", "10", "5", "8", "7", "0", "5", "4", "3"]);
+    // the third-width cell keeps the drops and the count on one line; the words are the title (tooltip)
+    expect([...a.querySelectorAll("a.card-link [data-coverage]")].map((c) => c.getAttribute("title")).slice(3, 6)).toEqual(["Well filled · 8 responses", "Well filled · 7 responses", "No drops yet · 0 responses"]);
+    expect([...a.querySelectorAll("a.card-link [data-coverage]")].map((c) => c.getAttribute("data-coverage")).slice(3, 6)).toEqual(["3", "3", "0"]);
     expect(a.querySelector(".btn-primary")!.textContent).toBe("New project");
     expect(a.querySelector("dialog")).toBeNull();
   });
