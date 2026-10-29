@@ -30,6 +30,8 @@
   import { collectModel as collectView } from "../screens/collect/model.js";
   import Card from "../Card.svelte";
   import Row from "../Row.svelte";
+  import Tag from "../Tag.svelte";
+  import Button from "../Button.svelte";
   import { systemTheme } from "../theme.svelte.js";
   import NotBuilt from "./NotBuilt.svelte";
   import { buildConfirmText } from "../../../ui/assess/report-build.js";
@@ -62,7 +64,7 @@
   const PARTICIPANT = new Set(["p-entry", "p-code", "p-welcome", "p-passage", "p-about", "p-question", "p-review", "p-receipt", "p-problem"]);
   const PUBLIC = new Set(["landing", "about", "sign-in", "sign-in-check", "help", "feedback", "external", "sample"]);
   const SAMPLE = new Set(["results", "results-gaps", "results-answers", "report", "report-detailed", "next-step", "action-plan"]);
-  // The sample review (fixture report.json, the boards' data): the results lane renders it read-only with a "Sample data" line; no API.
+  // The sample review (fixture report.json, the boards' data): the results lane renders it read-only under a plain "Sample review" tag; no API.
   const sampleModel = () => { const f = SAMPLE_REPORT.desktop; return { aid: SAMPLE_AID, review: { ...f.review }, counts: f.counts, payload: f.payload, reportId: null, held: null, results: null, serverStage: "understand", canBuild: false, canReadResponses: false, canReopen: false, sample: true }; };
   const SETUP = new Set(["setup", "setup1", "setup2", "setup3", "setup4", "setup5"]);
   // Which route needs which data. Every loader resolves to the props its screen takes.
@@ -73,7 +75,7 @@
     if (name === "external") { globalThis.location.assign(params.href); return { screen: null }; } // the sample review in the current design
     // The sample review is a closed world (captain 2026-10-22 10:36 ET: a clickable journey across every screen, nothing live): any
     // route carrying the sample id — review, project, setup ?review=, people ?review= — renders its approved fixture with the
-    // "Sample data" line and never calls the API. The results lane keeps its fixture report; everything else draws its own fixture.
+    // plain "Sample review" tag and never calls the API. The results lane keeps its fixture report; everything else draws its own fixture.
     const inSample = params.aid === SAMPLE_AID || params.pid === SAMPLE_AID || params.wid === SAMPLE_AID || route.query.get("review") === SAMPLE_AID;
     if (inSample) setLiveContext({ ...liveContext(), aid: SAMPLE_AID, pid: SAMPLE_AID, wid: SAMPLE_AID }); // every link from a sample screen stays in the sample
     if (inSample && !SAMPLE.has(name)) { if (name === "review") return { redirect: to("setup5", {}, { review: SAMPLE_AID }) }; if (name === "setup") return { redirect: to("setup1", {}, { review: SAMPLE_AID }) }; return { screen: name, sample: true, fixture: true }; }
@@ -345,13 +347,20 @@
   </Card>
 {/snippet}
 
+<!-- The one sample marker: a plain "Sample review" tag above any sample screen (the boards draw made-up names with no other label),
+     in a Row so it keeps its natural width; `link` ({ href, label }) adds one quiet link beside it. The centred rhythm pads the band
+     equally above and below (no screen's 56/120px foot); on a phone the .l-page column keeps the tag at the left gutter. -->
+{#snippet sampleMark(link)}
+  <div class="app" data-theme={theme} data-w={phone ? "phone" : undefined}><div class="layer"><main class="l-main" data-rhythm="center" data-sample-mark><div class={phone ? "l-page" : undefined}><Row gap={2}><Tag label="Sample review" />{#if link}<Button label={link.label} variant="quiet" href={link.href} />{/if}</Row></div></main></div></div>
+{/snippet}
+
 {#if page.status === "loading"}
   <Status {phone} {theme} kind="loading" />
 {:else if page.status === "error"}
   <Status {phone} {theme} kind={page.error.kind} message={page.error.message} onretry={load} />
 {:else if page.data.fixture}
   {@const C = REGISTRY[page.data.screen]}
-  <Status {phone} {theme} kind="preview" inline message="Sample data: a made-up review that shows the design. Nothing here is saved." back={to("home")} backLabel="Home" />
+  {@render sampleMark()}
   <C {phone} {theme} state={route.query.get("state") ?? undefined} />
 {:else if page.data.screen === "landing"}
   <Landing {phone} {theme} home={session ? to("home") : undefined} />
@@ -379,7 +388,7 @@
   <Status {phone} {theme} kind="unavailable" message={page.data.message} back={page.data.assessment ? to("collect", { aid: page.data.assessment.id }) : to("home")} backLabel={page.data.assessment ? "Back to Collect" : "Home"} />
 {:else if page.data.screen === "next-step" || page.data.screen === "action-plan"}
   {@const m = page.data.results}
-  {#if page.data.sample}<Status {phone} {theme} kind="preview" inline message="Sample data: a made-up review that shows the design." back={to("home")} backLabel="Home" />{/if}
+  {#if page.data.sample}{@render sampleMark()}{/if}
   {#if !page.data.plan}
     <Status {phone} {theme} kind="not_built" message={`No report has been built for ${m.review.title} yet, so there is nothing to plan from. ${m.canBuild ? "Build it on Results first." : "An owner or member of the review builds it."}`} back={to("results", route.params)} backLabel="Go to Results" />
   {:else}
@@ -413,7 +422,7 @@
 {:else if page.data.screen === "results" || page.data.screen === "results-gaps" || page.data.screen === "results-answers" || page.data.screen === "report" || page.data.screen === "report-detailed" || page.data.screen === "results-held"}
   {@const m = page.data.results}
   {@const rep = reportFor(m, page.data.screen)}
-  {#if page.data.sample}<Status {phone} {theme} kind="preview" inline message="Sample data: a made-up review that shows the design. Your own reviews read their results from the server." back={to("home")} backLabel="Home" />{/if}
+  {#if page.data.sample}{@render sampleMark()}{/if}
   {#if !rep && !m.held && page.data.screen !== "results-held"}
     <NotBuilt {chrome} {phone} {theme} crumbs={[{ label: m.review.project, href: m.review.projectId ? to("project", { pid: m.review.projectId }) : to("home") }, { label: m.review.title }]} message={`No report has been built for ${m.review.title} yet. ${m.canBuild ? "Building reads the answers collected so far and keeps that report." : "An owner or member of the review builds it."}${page.data.refreshed ? ` ${page.data.refreshed}` : ""}`} back={to("collect", route.params)} backLabel="Back to Collect">
       {#if m.canBuild}{#if build}{@render buildConfirm(true)}{:else}<Row gap={2}><button class="btn btn-primary btn-lg" type="button" onclick={refreshResults} disabled={building || undefined}>{building ? "Building the results…" : "Build the report"}</button></Row>{/if}{/if}
@@ -455,7 +464,7 @@
   <C {phone} {theme} data={page.data.data} onaccept={acceptInvite} />
 {:else if page.data.preview}
   {@const C = REGISTRY[page.data.screen]}
-  <Status {phone} {theme} kind="preview" message={`This screen is a design preview with sample data${page.data.assessment ? ` (your review: ${page.data.assessment.name})` : ""}. ${page.data.previewNote ?? (page.data.editHref ? "Editing a review's details, surveys, passage and dates happens in the current design for now." : "The current design still does this for real.")}`} inline back={page.data.editHref ?? (page.data.assessment ? to("review", { aid: page.data.assessment.id }) : to("home"))} backLabel={page.data.previewNote ? "Send feedback in the current design" : page.data.editHref ? `Edit ${page.data.assessment?.name ?? "this review"} in the current design` : page.data.assessment ? "Back to the review" : "Home"} />
+  {@render sampleMark({ href: page.data.editHref ?? (page.data.assessment ? to("review", { aid: page.data.assessment.id }) : to("home")), label: page.data.previewNote ? "Send feedback in the current design" : page.data.editHref ? `Edit ${page.data.assessment?.name ?? "this review"} in the current design` : page.data.assessment ? "Back to the review" : "Home" })}
   <C {phone} {theme} state={route.query.get("state") ?? undefined} />
 {:else if page.data.screen === "p-code"}
   {@const C = REGISTRY["p-code"]}

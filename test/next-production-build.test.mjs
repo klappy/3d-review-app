@@ -33,7 +33,9 @@ test("WORKERS_CI_BRANCH=production: the guarded build emits ui/next/index.html, 
       assert.ok(dev.js.includes(s), `non-production bundle keeps the harness: ${s}`);
       assert.ok(!prod.js.includes(s), `production bundle drops the harness: ${s}`);
     }
-    assert.ok(prod.js.includes("Sample data: a made-up review"), "the live app's sample data stays labelled");
+    assert.ok(prod.js.includes("Sample review"), "the live app's sample data stays labelled");
+    assert.ok(!prod.js.includes("Sample data: a made-up review"), "no developer design-preview card copy ships");
+    assert.ok(!prod.js.includes("Design preview"), "no Design preview card title ships");
   } finally {
     rmSync(prod.out, { recursive: true, force: true });
     rmSync(dev.out, { recursive: true, force: true });
