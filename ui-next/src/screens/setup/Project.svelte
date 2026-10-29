@@ -34,6 +34,7 @@
   const to = (screen) => href(screen, W);
   const go = (key) => out(key, W);
   const START = $derived(to("setup1"));
+  const SETTINGS = $derived(data.project.id ? to("project-settings") : undefined);
   // "Over time" chart geometry (viewBox 420x190, rows every 30 from y30; board: a review every 110 from x40, labels from x8). Port: the
   // plot starts at x60 (labels end-anchored at x52), a review every 110 from x70, so the last point (x400, r5) stays inside the viewBox.
   const Y = { strong: 30, growing: 60, support: 90, urgent: 120, more: 150 };
@@ -54,7 +55,7 @@
     <a class="link small" href={go("workspace")}>{ws.short}</a>
     <Row wrap gap={2}><h1 class="title-phone">{p.name}</h1><Pill stage={p.stage} /></Row>
     <p class="small">{p.phoneMeta}</p>
-    <Row gap={2}><Button label="People" href={go("people")} lead={people} block /><Button label="Settings" href={START} lead={pen} block /></Row>
+    <Row gap={2}><Button label="People" href={go("people")} lead={people} block /><Button label="Settings" href={SETTINGS} disabled={!SETTINGS} lead={pen} block /></Row>
     <section class="glass l-card" data-pad="list" aria-labelledby="revs-h">
       <Row split gap={3}><span class="micro" id="revs-h">Reviews over time</span><span class="small">newest first</span></Row>
       {#each reviews as r}
@@ -68,7 +69,7 @@
     <Page gap={5}>
       <Row split wrap gap={4}>
         <Stack gap={1}><a class="link small" href={go("workspace")}>{ws.name}</a><h1 class="title-page">{p.name}</h1><p class="small t-15">{p.meta}</p></Stack>
-        <Row gap={2}><Button icon={dots} ariaLabel="Project settings" /><Button label="People" href={go("people")} lead={people} /><Button label="Start a 3D Review" variant="primary" href={START} lead={plus} /></Row>
+        <Row gap={2}><Button icon={dots} ariaLabel="Project settings" href={SETTINGS} disabled={!SETTINGS} /><Button label="People" href={go("people")} lead={people} /><Button label="Start a 3D Review" variant="primary" href={START} lead={plus} /></Row>
       </Row>
       <div class="l-grid" data-tpl="su-project" data-gap="5">
         <div class="l-stack" data-gap="3">

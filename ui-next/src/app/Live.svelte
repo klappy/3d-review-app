@@ -26,6 +26,8 @@
   import Landing from "../screens/Landing.svelte";
   import Home from "../screens/Home.svelte";
   import SignInLive from "./SignInLive.svelte";
+  import ProjectSettings from "./ProjectSettings.svelte";
+  import { loadProjectSettings } from "./project-settings.js";
   import Status from "./Status.svelte";
   import { collectModel as collectView } from "../screens/collect/model.js";
   import Card from "../Card.svelte";
@@ -103,6 +105,7 @@
     if (name === "people") { if (!reviewQ) return { screen: name, empty: true, emptyText: "Open People from a review's page: this page lists who has access to one review." }; return { screen: name, data: await D.peopleModel({ type: "assessment", id: reviewQ }, me) }; }
     if (name === "invitations") return { screen: name, data: await D.invitationsModel(me) };
     if (name === "project") return { screen: "project", data: await D.projectModel(params.pid) };
+    if (name === "project-settings") return { screen: name, project: await loadProjectSettings(params.pid) };
     // A review's own page is the board for its stage: Setup 5 (ready to launch) while preparing, Collect while collecting, Results after.
     if (name === "review") { const { assessment } = await D.assessment(params.aid); if (assessment.stage === "collect") return { redirect: to("collect", params) }; if (assessment.stage !== "prepare") return { redirect: to("results", params) }; return { screen: "setup5", data: await D.setupModel(params.aid) }; }
     if (name === "collect" || name === "close-collection") { const m = await D.attachLinks(await D.collectModel(params.aid), { full: true }); return { screen: name, data: m }; }
@@ -348,7 +351,9 @@
 {#if page.status === "loading"}
   <Status {phone} {theme} kind="loading" />
 {:else if page.status === "error"}
-  <Status {phone} {theme} kind={page.error.kind} message={page.error.message} onretry={load} />
+  <Status {phone} {theme} kind={page.error.kind} message={page.error.message} onretry={load} back={route.name === "project-settings" ? to("home") : undefined} backLabel={route.name === "project-settings" ? "Home" : undefined} />
+{:else if page.data.screen === "project-settings" && page.data.sample}
+  <ProjectSettings {phone} {theme} project={{ id: "sample", name: "Sample project", organization: "", role: "viewer" }} sample />
 {:else if page.data.fixture}
   {@const C = REGISTRY[page.data.screen]}
   <Status {phone} {theme} kind="preview" inline message="Sample data: a made-up review that shows the design. Nothing here is saved." back={to("home")} backLabel="Home" />
@@ -388,6 +393,10 @@
   {/if}
 {:else if page.data.screen === "home"}
   <Home {phone} {theme} data={page.data.home} state={phone ? "reviews" : page.data.state} />
+{:else if page.data.screen === "project-settings"}
+  {#if page.data.project.id !== route.params.pid}<Status {phone} {theme} kind="loading" back={to("home")} />{:else}
+    {#key page.data.project.id}<ProjectSettings {phone} {theme} project={page.data.project} />{/key}
+  {/if}
 {:else if page.data.screen === "project"}
   {@const C = REGISTRY.project}
   <C {phone} {theme} data={page.data.data} />

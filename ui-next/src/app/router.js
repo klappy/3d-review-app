@@ -30,6 +30,7 @@ export const ROUTES = Object.freeze([
   ["setup4", "/setup/4"],
   ["setup5", "/setup/5"],
   ["project", "/project/:pid"],
+  ["project-settings", "/project/:pid/settings"],
   ["review", "/review/:aid"],
   ["collect", "/review/:aid/collect"],
   ["qr-room", "/review/:aid/collect/qr"],
