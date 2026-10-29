@@ -8,22 +8,24 @@
   import { copyText } from "./copy.js";
   let { aid = liveContext()?.aid, requestFactory = codeRequest } = $props();
   let surveys = $state([]), sid = $state(""), count = $state(20), role = $state(""), stage = $state("loading"), message = $state(""), codes = $state([]), batch = $state(null);
-  let owner, bearer, request, alive = true, generation = 0;
+  let owner, bearer, request, mountedHash, alive = true, generation = 0;
   const name = $derived(surveys.find(s => s.id === sid)?.name ?? "Survey");
   const busy = $derived(stage === "busy");
   function clear() { codes = []; batch = null; }
+  function sameContext() { const ctx = liveContext(); return alive && bearer === token() && (ctx === null || ctx.aid === aid) && (globalThis.location?.hash ?? "") === mountedHash; }
   async function current() {
-    if (!alive || bearer !== token() || (liveContext()?.aid && liveContext().aid !== aid)) return false;
+    if (!sameContext()) return false;
     const me = (await request("/v2/me")).result;
-    return alive && bearer === token() && me?.principal?.id === owner;
+    return sameContext() && me?.principal?.id === owner;
   }
   async function load() {
     const gen = ++generation; clear(); stage = "loading"; message = "";
-    bearer = token(); request = requestFactory(bearer);
+    bearer = token(); mountedHash = globalThis.location?.hash ?? ""; request = requestFactory(bearer);
     try {
       const me = (await request("/v2/me")).result;
       const model = (await request(`/v2/assessments/${encodeURIComponent(aid)}`)).result;
-      if (!alive || gen !== generation || bearer !== token()) return;
+      if (!alive || gen !== generation) return;
+      if (bearer !== token()) { stage = "changed"; message = "Your sign-in changed. Reload this page to continue."; return; }
       owner = me?.principal?.id; role = model.assessment.role;
       surveys = (model.surveys ?? []).filter(s => s.state === "selected" && !s.archived_at).map(s => ({ id: s.id, name: s.display_name || s.name || s.template_name || s.id }));
       sid = surveys[0]?.id ?? ""; stage = "idle";
@@ -33,9 +35,9 @@
     if (stage !== "confirm" || !CAN_SHARE.has(role)) return;
     stage = "busy"; message = "Issuing and exporting codes. Keep this page open…";
     const result = await issueCodeBatch({ aid, sid, count: Number(count), request, current });
-    if (!alive) { if (result.batch && !result.batch.undone) await undoCodeBatch(request, result.batch); return; }
+    if (!alive) { if (result.stage === "shown" && result.batch) await undoCodeBatch(request, result.batch); return; }
     clear();
-    if (!(await current().catch(() => false))) { if (result.batch && !result.batch.undone) await undoCodeBatch(request, result.batch); stage = "changed"; message = "Your sign-in changed. Codes were cleared; an unseen batch was undone where possible."; return; }
+    if (!sameContext()) { if (result.stage === "shown" && result.batch) await undoCodeBatch(request, result.batch); stage = "changed"; message = "Your sign-in changed. Codes were cleared; an unseen batch was undone where possible."; return; }
     stage = result.stage; batch = result.batch ?? null; codes = result.codes ?? []; message = result.message;
     if (stage === "unseen") { stage = batch.undone ? "idle" : "undo-required"; message = batch.undone ? "The codes could not be shown, so the batch was undone; no codes remain active from it." : "The codes could not be shown and undo was not confirmed. Retry undo before issuing another batch."; if (batch.undone) batch = null; }
   }
@@ -44,7 +46,9 @@
     const priorCodes = codes; stage = "busy"; codes = [];
     const ok = await undoCodeBatch(request, batch);
     if (!alive) return;
-    if (!(await current().catch(() => false))) { clear(); stage = "changed"; message = "Your sign-in changed. Code values were cleared."; return; }
+    let same = sameContext();
+    if (same && !ok) { try { same = await current(); } catch (e) { if (e?.status === 401 || e?.status === 403) same = false; } }
+    if (!same) { clear(); stage = "changed"; message = "Your sign-in changed. Code values were cleared."; return; }
     stage = ok ? "idle" : priorCodes.length ? "shown" : "undo-required"; if (!ok) codes = priorCodes; message = ok ? "Undone; no codes are active from that batch." : "Undo did not go through. Codes may still be active (redeemed codes cannot be undone). Try undo again."; if (ok) batch = null;
   }
   function download() {
@@ -55,7 +59,12 @@
   onMount(() => {
     if (!aid || aid === "sample") { stage = "fixture"; return; }
     load();
-    const recheck = async () => { if (!(await current().catch(() => false))) { generation++; clear(); stage = "changed"; message = "Your sign-in changed. Code values were cleared. Reload this page to continue."; } };
+    const recheck = async () => {
+      if (stage === "loading" || !owner) return;
+      try { if (await current()) return; }
+      catch (e) { if (e?.status !== 401 && e?.status !== 403) { if (alive) message = "Your sign-in could not be checked. Your code values are still here; check the connection before continuing."; return; } }
+      if (alive) { generation++; clear(); stage = "changed"; message = "Your sign-in changed. Code values were cleared. Reload this page to continue."; }
+    };
     globalThis.addEventListener("focus", recheck);
     return () => { alive = false; generation++; globalThis.removeEventListener("focus", recheck); clear(); };
   });

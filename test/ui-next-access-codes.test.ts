@@ -1,6 +1,8 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, fireEvent, waitFor } from "@testing-library/svelte";
+// @ts-expect-error plain JS context helper
+import { setLiveContext } from "../ui-next/src/screens/href.js";
 import AccessCodes from "../ui-next/src/screens/actions/AccessCodes.svelte";
 // @ts-expect-error plain JS controller
 import { issueCodeBatch, codesCsv } from "../ui-next/src/app/access-codes.js";
@@ -9,7 +11,7 @@ const preview = { result: { confirm_token: "confirm_batch" } };
 const exported = { result: { codes: [{ id: "code_a", code: "AAAA1111" }, { id: "code_b", code: "BBBB2222" }] } };
 const undo = { result: { undone: "cap.survey.issue_codes" } };
 const args = (request: any, current = async () => true) => ({ aid: "a", sid: "s", count: 2, request, current });
-beforeEach(() => sessionStorage.clear());
+beforeEach(() => { sessionStorage.clear(); setLiveContext(null); history.replaceState(null, "", "/"); });
 describe("one-time code escrow controller", () => {
  it("uses actual returned IDs, export preview token and exact codes once", async () => {
   const request = vi.fn().mockResolvedValueOnce(issue).mockResolvedValueOnce(preview).mockResolvedValueOnce(exported);
@@ -83,4 +85,22 @@ it('keeps the already shown values available when undo is refused',async()=>{
  const view=render(AccessCodes,{aid:'a',requestFactory:()=>request});await view.findByRole('button',{name:'Make access codes'});await fireEvent.input(view.getByLabelText('Number of codes'),{target:{value:'2'}});await fireEvent.click(view.getByRole('button',{name:'Make access codes'}));await fireEvent.click(view.getByRole('button',{name:'Issue and show codes'}));
  await view.findByRole('button',{name:'Undo this batch'});await fireEvent.click(view.getByRole('button',{name:'Undo this batch'}));await view.findByText(/Undo did not go through/);
  expect((view.getByLabelText('Access codes',{selector:'textarea'}) as HTMLTextAreaElement).value).toContain('AAAA1111');
+});
+
+it('preserves shown values and undo controls on a transient focus check failure',async()=>{
+ let offline=false;const request=client();const base=request.getMockImplementation()!;request.mockImplementation((url,opts)=>url==='/v2/me'&&offline?Promise.reject({status:503}):base(url,opts));
+ const view=render(AccessCodes,{aid:'a',requestFactory:()=>request});await view.findByRole('button',{name:'Make access codes'});await fireEvent.input(view.getByLabelText('Number of codes'),{target:{value:'2'}});await fireEvent.click(view.getByRole('button',{name:'Make access codes'}));await fireEvent.click(view.getByRole('button',{name:'Issue and show codes'}));await view.findByRole('button',{name:'Undo this batch'});
+ offline=true;await fireEvent.focus(window);await view.findByText(/Your sign-in could not be checked/);expect((view.getByLabelText('Access codes',{selector:'textarea'}) as HTMLTextAreaElement).value).toContain('AAAA1111');expect(view.getByRole('button',{name:'Undo this batch'})).toBeTruthy();
+});
+it('navigation to Home invalidates pending issue and undoes the unseen batch',async()=>{
+ setLiveContext({aid:'a'});let resolveIssue:any;const pending=new Promise(resolve=>{resolveIssue=resolve});const request=client();const base=request.getMockImplementation()!;request.mockImplementation((url,opts)=>url.endsWith('/codes')&&opts?.method==='POST'?pending:base(url,opts));
+ const view=render(AccessCodes,{aid:'a',requestFactory:()=>request});await view.findByRole('button',{name:'Make access codes'});await fireEvent.input(view.getByLabelText('Number of codes'),{target:{value:'2'}});await fireEvent.click(view.getByRole('button',{name:'Make access codes'}));await fireEvent.click(view.getByRole('button',{name:'Issue and show codes'}));
+ await waitFor(()=>expect(request.mock.calls.some(c=>c[0].endsWith('/codes'))).toBe(true));setLiveContext({});resolveIssue(issue);
+ await waitFor(()=>expect(request.mock.calls.some(c=>c[0].startsWith('/v2/undo/'))).toBe(true));expect(view.queryByRole('button',{name:'Download as CSV'})).toBeNull();setLiveContext(null);
+});
+
+it('same-review route changes invalidate an unseen batch too',async()=>{
+ history.replaceState(null,'','/#/review/a/share');setLiveContext({aid:'a'});let resolveIssue:any;const pending=new Promise(resolve=>{resolveIssue=resolve});const request=client();const base=request.getMockImplementation()!;request.mockImplementation((url,opts)=>url.endsWith('/codes')&&opts?.method==='POST'?pending:base(url,opts));
+ const view=render(AccessCodes,{aid:'a',requestFactory:()=>request});await view.findByRole('button',{name:'Make access codes'});await fireEvent.input(view.getByLabelText('Number of codes'),{target:{value:'2'}});await fireEvent.click(view.getByRole('button',{name:'Make access codes'}));await fireEvent.click(view.getByRole('button',{name:'Issue and show codes'}));await waitFor(()=>expect(request.mock.calls.some(c=>c[0].endsWith('/codes'))).toBe(true));
+ history.replaceState(null,'','/#/review/a/collect');resolveIssue(issue);await waitFor(()=>expect(request.mock.calls.some(c=>c[0].startsWith('/v2/undo/'))).toBe(true));expect(view.queryByRole('button',{name:'Download as CSV'})).toBeNull();setLiveContext(null);
 });

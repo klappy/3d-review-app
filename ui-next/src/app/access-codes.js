@@ -23,9 +23,10 @@ export async function undoCodeBatch(request, batch) {
 export async function issueCodeBatch({ aid, sid, count, request, current }) {
   if (!Number.isInteger(count) || count < 1 || count > 100) throw new Error("Choose between 1 and 100 codes.");
   const base = `/v2/assessments/${enc(aid)}/surveys/${enc(sid)}/codes`;
-  let batch = null, shown = false;
+  let batch = null, shown = false, started = false;
   try {
     if (!(await current())) return { stage: "changed", message: "Your sign-in or review changed; no codes were issued." };
+    started = true;
     const issued = await request(base, { method: "POST", body: { count } });
     const ids = issued?.result?.ids;
     batch = { undo: issued?.receipt?.undo_token ?? null, ids: Array.isArray(ids) ? ids : [], count };
@@ -41,6 +42,7 @@ export async function issueCodeBatch({ aid, sid, count, request, current }) {
     shown = true;
     return { stage: "shown", codes: codes.map(c => ({ id: c.id, code: c.code })), batch, message: "Codes are shown once. Download or copy them before leaving this page." };
   } catch (e) {
+    if (!started) return { stage: "refused", message: "Your sign-in could not be checked; no codes were requested. Check the connection and try again." };
     if (!batch) return { stage: e?.status >= 400 ? "refused" : "uncertain", message: e?.status >= 400 ? "Codes were refused. Check your sign-in, role and survey state before trying again." : "Issuance could not be confirmed. Codes may exist; do not create another batch until this is resolved." };
     return { stage: "unseen", batch, message: "The codes could not be shown." };
   } finally {
@@ -48,6 +50,6 @@ export async function issueCodeBatch({ aid, sid, count, request, current }) {
   }
 }
 export function codesCsv(name, codes) {
-  const cell = value => { const raw = String(value); return `"${(/^[=+@\-\t\r]/.test(raw) ? "'" + raw : raw).replaceAll('"', '""')}"`; };
+  const cell = value => { const raw = String(value); return `"${(/^[=+@\-\t\r\n]/.test(raw) ? "'" + raw : raw).replaceAll('"', '""')}"`; };
   return `Survey,Access code\r\n${codes.map(c => `${cell(name)},${cell(c.code)}`).join("\r\n")}\r\n`;
 }

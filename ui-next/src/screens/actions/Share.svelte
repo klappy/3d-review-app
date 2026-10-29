@@ -50,6 +50,7 @@
 {#snippet download()}<Ico d={A.download} />{/snippet}
 
 <AppShell {phone} {theme} screen {top} {bar}>
+  <Page gap={5}>
   {#if phone}
     <ReviewHead phone {theme} title={R.review.title} project={R.project} stage={R.review.stage ?? "collecting"} viewed="collect" live="collect" canClose={role === "owner" || role === "member"} />
     <p class="small">{D.phoneLead}</p>
@@ -66,13 +67,9 @@
       {/each}
       {#if !canShare}<p class="small">{READ_ONLY}</p>{/if}
     </Card>
-    <Card gap={2} label="Access codes">
-      <Disclosure label="Access codes, for people who lose the link" solid={false}><AccessCodes /></Disclosure>
-    </Card>
     {#if canShare && R.surveys.length}<EmailDraft subject={`Survey links: ${R.review.title}`} body={emailBody} label="Email the links to someone" />{/if}
     <a class="link" href={`${href("collect", at)}#offline`}>Meeting offline? Print and paper</a>
   {:else}
-    <Page gap={5}>
       <ReviewHead {theme} title={R.review.title} stage={R.review.stage ?? "collecting"} {meta} viewed="collect" live="collect" done={["prepare"]} deleteRefused={R.deleteRefused} action={{ label: "Done", variant: "primary", href: href("collect", at), trail: "check" }} />
       <div class="glass-hi l-card l-stack" data-pad="work" data-gap="5" role="group" aria-label="Share the survey">
         <div><h2 class="h2 t-24">Share the survey</h2><p class="small t-15">{D.lead}</p></div>
@@ -92,8 +89,9 @@
         <Row wrap gap={3}><Button label="Show QR codes for the room" href={href("qr-room", at)} lead={qr} /></Row>
         {#if canShare && R.surveys.length}<EmailDraft subject={`Survey links: ${R.review.title}`} body={emailBody} label="Email the links to someone" />{/if}
         <p class="small">Meeting offline? Paper surveys and QR pages print from the <a class="link" href={`${href("collect", at)}#offline`}>Meeting offline? card on Collect</a>.</p>
-        <Disclosure label="Access codes, for people who lose the link" gap={3}><AccessCodes /></Disclosure>
       </div>
-    </Page>
   {/if}
+    <!-- One stable instance survives responsive layout changes; one-time code values are never discarded by a breakpoint. -->
+    <Card gap={3} label="Access codes"><Disclosure label="Access codes, for people who lose the link" gap={3}><AccessCodes /></Disclosure></Card>
+  </Page>
 </AppShell>
