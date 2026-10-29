@@ -1,23 +1,30 @@
 {
-  "version": "0.37.0",
+  "version": "0.37.2",
   "cookbook_repo": "klappy/3d-review-cookbook",
-  "cookbook_commit": "be9a0a3a6ddb4efe931776d594e531b8e15c088f",
+  "cookbook_commit": "84dd71208a8e4e03e3b05749a5a2f28446ab91c9",
   "records": [
     {
-      "path": "planning/2026-09-16-parity-build/releases/0.37.0.md",
-      "blob_sha": "e531b509c8bc2e835b30982b8ad74f16400c92af",
-      "sha256": "fdded099db82e77b06fdc452c769631cf80c4695472e1e0c82fe04023a8ceed8"
+      "path": "planning/2026-09-16-parity-build/releases/0.37.2.md",
+      "blob_sha": "105e0287666e70832e51efcd6a1e2bf0446ec82b",
+      "sha256": "728f8d4d015b7e4520dc85ce20fa3011ff85e3c0d8b324aed06f7dbee184d26f"
     },
     {
       "path": "planning/2026-09-16-parity-build/releases/releases.json",
-      "blob_sha": "ce2e4e5cf54e25a700ae433b2d4f1c5aeaa48613",
-      "sha256": "49e858525e2faa65dbe96a1811147d4bff7acd9279ad34cc3013cc9e6dd30200"
+      "blob_sha": "33262904d27d8f88b643cfc0039b26437d413700",
+      "sha256": "ab5773c05ac1f3927ebde5ba0257e4346e8a4efe0a9082ad165b03c09baeb516"
     }
   ],
   "changelog": {
     "sections": {
+      "fixed": [
+        "UI Next screens at `/next/` (Landing, About, Home and lane screens) now use the phone layout on viewports narrower than 720px instead of only when the link carries `?w=phone`, and switch when the window crosses that width; `?w=phone` and `?w=desktop` still force a layout.",
+        "Next UI results and report navigation starts independent reads together, and following an in-page anchor no longer repeats data reads. Existing access checks, required-read errors, explicit report-build confirmation and current UI default are preserved. Automated and local synthetic evidence is distinct from pending DEV and production verification."
+      ],
       "changed": [
-        "The app no longer blocks requests because of app-level request-rate limits or missing limiter bindings. This supports workshops where many participants share one connection. The existing per-address sign-in-link and collaborator-invitation product caps remain, along with upstream translation 429 responses and the MCP batch-size limit."
+        "The UI Next preview at `/next/` is built by the standard typecheck and test steps on all branches, including production. Production compiles out fixture galleries and mounts the live app; the current UI at `/` stays the default, with an explicit “Try the new design” menu opt-in.",
+        "Cumulative source includes the existing PR554 build integration, PR574 responsive layout and PR576 production opt-in alongside PR581 navigation performance. Workspace inheritance from the separate unmerged 0.37.1 candidate is excluded. Automated/local evidence and unmeasured physical-device or real-human outcomes remain distinct from pending deployed acceptance.",
+        "Inherited PR576 report behavior is unchanged from the existing production source: DEV uses one-response report/per-perspective floors; production retains its existing disclosure gates and thresholds. Report-build admission, member grants, viewer eligibility, pre-close access and coverage cues remain source- and environment-specific; their six-scenario fresh acceptance denominator is explicitly untested here.",
+        "At app c88df937, Operator automated/local production-build and menu-opt-in checks passed 2/2; Facilitator automated/local responsive-layout checks passed 15/15, with zero failures. The six inherited report scenarios (Facilitator/member: DEV floors, member build admission, pre-close access and coverage cues; Facilitator/viewer: eligibility; Operator: production disclosure and threshold retention) have 0 attempted, 0 passed, 0 failed, 6 untested. Operator/Facilitator hosted standard-build, responsive and opt-in scenarios have 0 attempted, 0 passed, 0 failed, 3 untested. No real-human study; satisfaction, confusion and frustration NOT MEASURED."
       ]
     }
   }
