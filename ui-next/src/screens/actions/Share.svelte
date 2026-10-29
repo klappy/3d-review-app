@@ -3,8 +3,7 @@
      Share.dc.html (desktop), SharePhone.dc.html (phone, ?w=phone). Who may copy links comes from the current UI's share rules
      (ui/assess/share.js CAN_SHARE, the issue_link roles, and copy.readOnly, through the lane adapter ./legacy.js, which a test holds
      equal to share.js); a role outside it sees the readOnly line instead of the copy actions. Copy controls copy (./CopyButton.svelte); the phone
-     share-out icon opens the share sheet, else copies (./ShareOut.svelte). Access codes "Make more codes" / "Download as CSV" (phone
-     #codes / #csv) wait on the codes API (cap.survey.issue_codes / export_codes): RESULTS debt.
+     share-out icon opens the share sheet, else copies (./ShareOut.svelte). Access codes use existing issue_codes/export_codes with explicit confirmation and one-time disclosure (AccessCodes.svelte).
      Work card: the pinned .glass-hi.l-card[data-pad=work]. Link rows: Grid barbell (220px 1fr 220px) stands in for the board's
      240px 1fr auto auto (no contract row: generator line); the rows sit in the work card's 20px gap, as drawn. Access codes: §2 Disclosure. Links: ../href.js href() with this screen's w/theme.
      One .btn-primary per page: desktop "Done" (page head), phone "Show QR codes for the room" (phone-bar). -->
@@ -26,6 +25,7 @@
   import CopyButton from "./CopyButton.svelte";
   import ShareOut from "./ShareOut.svelte";
   import EmailDraft from "./EmailDraft.svelte";
+  import AccessCodes from "./AccessCodes.svelte";
   import { CAN_SHARE, READ_ONLY } from "./legacy.js";
   import { href } from "../href.js";
   import { carry } from "./links.js";
@@ -67,7 +67,7 @@
       {#if !canShare}<p class="small">{READ_ONLY}</p>{/if}
     </Card>
     <Card gap={2} label="Access codes">
-      <Disclosure label="Access codes, for people who lose the link" solid={false}><p class="small">{D.codes.unused}{#if D.codes.code} · <a class="link" href="#codes">Make more</a> · <a class="link" href="#csv">Download CSV</a>{/if}</p></Disclosure>
+      <Disclosure label="Access codes, for people who lose the link" solid={false}><AccessCodes /></Disclosure>
     </Card>
     {#if canShare && R.surveys.length}<EmailDraft subject={`Survey links: ${R.review.title}`} body={emailBody} label="Email the links to someone" />{/if}
     <a class="link" href={`${href("collect", at)}#offline`}>Meeting offline? Print and paper</a>
@@ -92,10 +92,7 @@
         <Row wrap gap={3}><Button label="Show QR codes for the room" href={href("qr-room", at)} lead={qr} /></Row>
         {#if canShare && R.surveys.length}<EmailDraft subject={`Survey links: ${R.review.title}`} body={emailBody} label="Email the links to someone" />{/if}
         <p class="small">Meeting offline? Paper surveys and QR pages print from the <a class="link" href={`${href("collect", at)}#offline`}>Meeting offline? card on Collect</a>.</p>
-        <Disclosure label="Access codes, for people who lose the link" gap={3}>
-          {#if D.codes.code}<p class="small">A code opens the same survey from the home page. Codes are printed on paper surveys automatically.</p>{/if}
-          {#if D.codes.code}<Row wrap gap={3}><span class="kbd">{D.codes.code}</span><span class="small">{D.codes.line}</span><Button label="Make more codes" /><Button label="Download as CSV" lead={download} /></Row>{:else}<p class="small">{D.codes.unused}</p>{/if}
-        </Disclosure>
+        <Disclosure label="Access codes, for people who lose the link" gap={3}><AccessCodes /></Disclosure>
       </div>
     </Page>
   {/if}

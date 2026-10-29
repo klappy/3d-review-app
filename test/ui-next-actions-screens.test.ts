@@ -499,10 +499,6 @@ describe("actions lane controls act, and the ones that cannot yet are named debt
       'NextStep.svelte "Not this one"',
       'NextStep.svelte "Not this one"',
       'NextStep.svelte {it.inPlan ? "In the plan" : "Add to plan"}',
-      'Share.svelte "Download as CSV"', // the codes API (cap.survey.issue_codes / export_codes)
-      'Share.svelte "Make more codes"',
-      "Share.svelte #codes",
-      "Share.svelte #csv",
     ]);
   });
 
@@ -632,7 +628,7 @@ describe("actions lane controls act, and the ones that cannot yet are named debt
     const withLink = { ...base, surveys: [{ lens: "community", name: "Written", code: "http://x/next/?ui_next=on#survey=link_1", n: 0, of: "—", pages: 0 }], noLinks: "" };
     const b = render(Share, { props: { phone: false, data: withLink, share } }).container;
     expect((b.querySelector("input.in[readonly]") as HTMLInputElement).value).toBe("http://x/next/?ui_next=on#survey=link_1");
-    expect(text(b)).toContain("no codes yet"); expect(b.querySelector("button[aria-label='Copy link for Written']")).not.toBeNull();
+    expect(text(b)).toContain("Open a real review to issue access codes."); expect(b.querySelector("button[aria-label='Copy link for Written']")).not.toBeNull();
   });
 });
 
