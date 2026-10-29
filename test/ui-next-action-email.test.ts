@@ -56,3 +56,17 @@ for (const phone of [false, true]) describe(phone ? "phone email handoff" : "des
     expect(draft.textContent).toContain("Nothing is sent from 3D Review.");
   });
 });
+
+// A long multi-survey draft stays complete; mail-handler limits have the selectable/copy fallback.
+it("retains all links and special characters in a long multi-survey draft without sending", async () => {
+  const surveys = Array.from({ length: 100 }, (_, i) => ({ ...review.surveys[0], name: `Survey ${i} & team`, code: `issued_${i}_${"x".repeat(80)}` }));
+  const view = render(Share, { data: { ...review, surveys }, role: "owner" });
+  await fireEvent.click(view.getByRole("button", { name: "Email the links to someone" }));
+  const draft = view.getByRole("dialog", { name: "Email draft" });
+  const body = (draft.querySelector("textarea") as HTMLTextAreaElement).value;
+  const mail = new URL((view.getByRole("link", { name: "Open email app" }) as HTMLAnchorElement).href);
+  expect(body.length).toBeGreaterThan(12000);
+  expect(mail.searchParams.get("body")).toBe(body);
+  expect(body).toContain("Survey 99 & team: https://review.example/#survey=issued_99_");
+  expect(draft.textContent).toContain("If your email app does not open, copy the message into your email.");
+});

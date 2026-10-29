@@ -25,8 +25,3 @@
     <p class="small" role="status">{status}</p>
   </div>
 </dialog>
-
-<style>
-  dialog { color: var(--ink); width: min(34rem, calc(100vw - 2rem)); max-height: calc(100dvh - 2rem); overflow: auto; padding: var(--sp-5); border: 1px solid var(--field-edge); border-radius: var(--r-card, 16px); }
-  textarea { display: block; width: 100%; resize: vertical; white-space: pre-wrap; overflow-wrap: anywhere; }
-</style>
