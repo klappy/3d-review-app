@@ -120,15 +120,19 @@ async function linkToken(secret:string|undefined,id:string):Promise<string|null>
  * One helper, one sort (rowid ASC, #415 review): the pre-insert lookup and the post-insert race check agree on a single
  * winner, so a third concurrent caller never gets a racer's row that the racer then deletes. No LIMIT: the rows are
  * already filtered to this survey's live links, and a window could hide the new row from the race check. */
-async function activeLink(ctx:Ctx,sid:string,expires_at:string|null,at:string):Promise<{id:string;token:string}|null> {
+async function activeLink(ctx:Ctx,sid:string,expires_at:string|null|undefined,at:string):Promise<{id:string;token:string}|null> {
   const {results}=await ctx.db.prepare("SELECT id, token_hash, expires_at FROM invitation WHERE assessment_survey_id = ? AND scope_type = 'survey' AND role = 'participant' AND status IN ('pending','accepted') AND (expires_at IS NULL OR expires_at > ?) ORDER BY rowid ASC")
     .bind(sid,at).all<{id:string;token_hash:string;expires_at:string|null}>();
   for(const row of results){
-    if(row.expires_at!==expires_at) continue;
+    if(expires_at!==undefined && row.expires_at!==expires_at) continue;
     const token=await linkToken(ctx.env.SESSION_SECRET,row.id);
     if(token && await sha256(token)===row.token_hash) return {id:row.id,token};
   }
   return null;
+}
+/** PDF paper may reuse an existing unexpired shared link; it never issues or refreshes one. Caller first authorizes print. */
+export async function existingBlankPrintLink(ctx:Ctx,sid:string):Promise<string|null> {
+  return (await activeLink(ctx,sid,undefined,nowIso(ctx)))?.token??null;
 }
 export const issue_link:Handler=async(ctx,params,opts)=>{
   only(params,["aid","sid","expires_at"]);

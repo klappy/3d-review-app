@@ -20,6 +20,7 @@ import { unnamedLinkPage, verifiedAddress, badLinkPage, checkEmailPage, magicLin
 import { installRoadmapStream } from "./roadmap/stream";
 import { installTranslate } from "./translate";
 import { installPassages } from "./passages";
+import { installPdf } from "./pdf";
 
 const app = new Hono<{ Bindings: Env }>();
 const json = (value: unknown, status: number) => new Response(JSON.stringify(value), {
@@ -39,6 +40,7 @@ installRoadmapStream(app, contextForRequest);
 installTranslate(app);
 // Passage files and links on an assessment (captain 2026-09-29; Lovable parity). Registered before the capability twins.
 installPassages(app);
+installPdf(app, contextForRequest);
 
 for (const cap of capabilities) for (const twin of [cap.http, ...(cap.http_alt ?? [])]) {
   if (cap.tool === "danger" && twin.method.toUpperCase() === "GET")
