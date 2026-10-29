@@ -8,10 +8,17 @@
   const flow = controller ?? createAccessCodesState({ aid, requestFactory });
   const c = flow.state;
   const name = $derived(flow.name());
-  onMount(() => owned ? flow.mount() : undefined);
+  let panel;
+  onMount(() => {
+    const dispose = owned ? flow.mount() : null;
+    const disclosure = panel.closest("details");
+    const remember = () => flow.setExpanded(disclosure.open);
+    if (disclosure) { disclosure.open = c.expanded; disclosure.addEventListener("toggle", remember); }
+    return () => { disclosure?.removeEventListener("toggle", remember); dispose?.(); };
+  });
 </script>
 
-<div class="l-stack" data-gap="3" role="group" aria-label="Access codes">
+<div bind:this={panel} class="l-stack" data-gap="3" role="group" aria-label="Access codes">
   {#if c.stage === "fixture"}<p class="small">Open a real review to issue access codes.</p>
   {:else if c.stage === "loading"}<p class="small" role="status">Loading access-code options…</p>
   {:else if c.stage === "load-error"}<p class="small">{c.message}</p><button class="btn" type="button" onclick={flow.load}>Try again</button>

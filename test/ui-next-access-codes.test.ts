@@ -121,3 +121,9 @@ it('keeps the one-time batch when a responsive view is replaced under Share owne
  view.unmount();const phone=render(AccessCodes,{controller:flow});expect((phone.getByLabelText('Access codes',{selector:'textarea'}) as HTMLTextAreaElement).value).toBe('AAAA1111\nBBBB2222');expect(phone.getByText('2 access codes in this batch · shown once. Download or copy before leaving.')).toBeTruthy();
  phone.unmount();dispose();expect(flow.state.codes).toHaveLength(0);
 });
+
+it('restores disclosure expansion when its responsive view is remounted',async()=>{
+ const {createAccessCodesState}=await import('../ui-next/src/app/access-codes.svelte.js');const flow=createAccessCodesState({aid:'a',requestFactory:()=>client()});const dispose=flow.mount();
+ const first=document.createElement('details');document.body.append(first);const desk=render(AccessCodes,{props:{controller:flow},target:first});await desk.findByRole('button',{name:'Make access codes',hidden:true});first.open=true;await fireEvent(first,new Event('toggle'));expect(flow.state.expanded).toBe(true);desk.unmount();
+ const second=document.createElement('details');document.body.append(second);const phone=render(AccessCodes,{props:{controller:flow},target:second});expect(second.open).toBe(true);phone.unmount();dispose();first.remove();second.remove();
+});

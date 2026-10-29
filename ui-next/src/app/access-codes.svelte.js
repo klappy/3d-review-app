@@ -7,7 +7,7 @@ import { codeRequest, issueCodeBatch, undoCodeBatch, codesCsv } from "./access-c
 import { CAN_SHARE } from "../screens/actions/legacy.js";
 import { copyText } from "../screens/actions/copy.js";
 export function createAccessCodesState({ aid = liveContext()?.aid, requestFactory = codeRequest } = {}) {
-  const state = $state({ surveys: [], sid: "", count: 20, role: "", stage: "loading", message: "", codes: [], batch: null });
+  const state = $state({ expanded: false, surveys: [], sid: "", count: 20, role: "", stage: "loading", message: "", codes: [], batch: null });
   let owner, bearer, request, mountedHash, alive = true, generation = 0;
   const name = () => state.surveys.find(s => s.id === state.sid)?.name ?? "Survey";
   function clear() { state.codes = []; state.batch = null; }
@@ -95,6 +95,7 @@ export function createAccessCodesState({ aid = liveContext()?.aid, requestFactor
     aid = route.params.aid; load();
   }
   return { state, name, mount, load, issue, undo, download, copy, prepare,
+    setExpanded: value => { state.expanded = value; },
     setCount: value => { state.count = value; }, setSurvey: value => { state.sid = value; },
     cancel: () => { state.stage = "idle"; state.message = "Cancelled; no codes were issued."; },
     done: () => { clear(); state.stage = "idle"; state.message = "Code values cleared from this page. The issued codes remain active."; } };
