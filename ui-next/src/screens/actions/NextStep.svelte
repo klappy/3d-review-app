@@ -77,7 +77,7 @@
           </Stack>
           <Stack gap={2}>
             <Row gap={3}><span class="h3">Weakest areas</span><span class="small">Needs support or urgent attention</span></Row>
-            {#if live && !D.weak.length}<p class="small">No area is at Needs support or Needs urgent attention in the built report.</p>{/if}
+            {#if live && !D.weak.length}<p class="small">No low-scoring areas are available to show from this report.</p>{/if}
             {#each D.weak as a}
               <label class="row-opt l-row" data-split><span class="l-row" data-gap="3"><input class="cb" type="checkbox" checked={a.checked} /><LensDot lens={a.lens} decorative /><b>{a.label}</b></span><Level level={a.level} /></label>
             {/each}
