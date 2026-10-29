@@ -104,3 +104,7 @@ it('same-review route changes invalidate an unseen batch too',async()=>{
  const view=render(AccessCodes,{aid:'a',requestFactory:()=>request});await view.findByRole('button',{name:'Make access codes'});await fireEvent.input(view.getByLabelText('Number of codes'),{target:{value:'2'}});await fireEvent.click(view.getByRole('button',{name:'Make access codes'}));await fireEvent.click(view.getByRole('button',{name:'Issue and show codes'}));await waitFor(()=>expect(request.mock.calls.some(c=>c[0].endsWith('/codes'))).toBe(true));
  history.replaceState(null,'','/#/review/a/collect');resolveIssue(issue);await waitFor(()=>expect(request.mock.calls.some(c=>c[0].startsWith('/v2/undo/'))).toBe(true));expect(view.queryByRole('button',{name:'Download as CSV'})).toBeNull();setLiveContext(null);
 });
+
+it('treats server5xx issuance outcomes as uncertain rather than claiming refusal',async()=>{
+ const request=vi.fn().mockRejectedValue({status:503});const out=await issueCodeBatch(args(request));expect(out.stage).toBe('uncertain');expect(out.message).toContain('Codes may exist');expect(request).toHaveBeenCalledTimes(1);
+});

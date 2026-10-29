@@ -43,7 +43,7 @@ export async function issueCodeBatch({ aid, sid, count, request, current }) {
     return { stage: "shown", codes: codes.map(c => ({ id: c.id, code: c.code })), batch, message: "Codes are shown once. Download or copy them before leaving this page." };
   } catch (e) {
     if (!started) return { stage: "refused", message: "Your sign-in could not be checked; no codes were requested. Check the connection and try again." };
-    if (!batch) return { stage: e?.status >= 400 ? "refused" : "uncertain", message: e?.status >= 400 ? "Codes were refused. Check your sign-in, role and survey state before trying again." : "Issuance could not be confirmed. Codes may exist; do not create another batch until this is resolved." };
+    if (!batch) { const refused = e?.status >= 400 && e?.status < 500; return { stage: refused ? "refused" : "uncertain", message: refused ? "Codes were refused. Check your sign-in, role and survey state before trying again." : "Issuance could not be confirmed. Codes may exist; do not create another batch until this is resolved." }; }
     return { stage: "unseen", batch, message: "The codes could not be shown." };
   } finally {
     if (batch && !shown) batch.undone = await undoCodeBatch(request, batch);
