@@ -8,6 +8,8 @@
      240px 1fr auto auto (no contract row: generator line); the rows sit in the work card's 20px gap, as drawn. Access codes: §2 Disclosure. Links: ../href.js href() with this screen's w/theme.
      One .btn-primary per page: desktop "Done" (page head), phone "Show QR codes for the room" (phone-bar). -->
 <script>
+  import { onMount } from "svelte";
+  import { createAccessCodesState } from "../../app/access-codes.svelte.js";
   import AppShell from "../../AppShell.svelte";
   import Page from "../../Page.svelte";
   import Card from "../../Card.svelte";
@@ -34,6 +36,8 @@
 
   // data/share: the fixture shapes (gallery) or app/data.js shareModel (live: real links, this review's surveys, the signed-in user).
   let { phone = false, theme = "light", data = R0, share = D0, role = data.role } = $props();
+  const codeFlow = createAccessCodesState();
+  onMount(() => codeFlow.mount());
   const R = $derived(data);
   const D = $derived(share);
   const at = $derived(carry(phone, theme));
@@ -50,7 +54,6 @@
 {#snippet download()}<Ico d={A.download} />{/snippet}
 
 <AppShell {phone} {theme} screen {top} {bar}>
-  <Page gap={5}>
   {#if phone}
     <ReviewHead phone {theme} title={R.review.title} project={R.project} stage={R.review.stage ?? "collecting"} viewed="collect" live="collect" canClose={role === "owner" || role === "member"} />
     <p class="small">{D.phoneLead}</p>
@@ -67,9 +70,11 @@
       {/each}
       {#if !canShare}<p class="small">{READ_ONLY}</p>{/if}
     </Card>
+    <Card gap={2} label="Access codes"><Disclosure label="Access codes, for people who lose the link" solid={false}><AccessCodes controller={codeFlow} /></Disclosure></Card>
     {#if canShare && R.surveys.length}<EmailDraft subject={`Survey links: ${R.review.title}`} body={emailBody} label="Email the links to someone" />{/if}
     <a class="link" href={`${href("collect", at)}#offline`}>Meeting offline? Print and paper</a>
   {:else}
+    <Page gap={5}>
       <ReviewHead {theme} title={R.review.title} stage={R.review.stage ?? "collecting"} {meta} viewed="collect" live="collect" done={["prepare"]} deleteRefused={R.deleteRefused} action={{ label: "Done", variant: "primary", href: href("collect", at), trail: "check" }} />
       <div class="glass-hi l-card l-stack" data-pad="work" data-gap="5" role="group" aria-label="Share the survey">
         <div><h2 class="h2 t-24">Share the survey</h2><p class="small t-15">{D.lead}</p></div>
@@ -89,9 +94,8 @@
         <Row wrap gap={3}><Button label="Show QR codes for the room" href={href("qr-room", at)} lead={qr} /></Row>
         {#if canShare && R.surveys.length}<EmailDraft subject={`Survey links: ${R.review.title}`} body={emailBody} label="Email the links to someone" />{/if}
         <p class="small">Meeting offline? Paper surveys and QR pages print from the <a class="link" href={`${href("collect", at)}#offline`}>Meeting offline? card on Collect</a>.</p>
+        <Disclosure label="Access codes, for people who lose the link" gap={3}><AccessCodes controller={codeFlow} /></Disclosure>
       </div>
+    </Page>
   {/if}
-    <!-- One stable instance survives responsive layout changes; one-time code values are never discarded by a breakpoint. -->
-    <Card gap={3} label="Access codes"><Disclosure label="Access codes, for people who lose the link" gap={3}><AccessCodes /></Disclosure></Card>
-  </Page>
 </AppShell>

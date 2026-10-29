@@ -1,110 +1,36 @@
-<!-- Existing survey code escrow, role/confirmation and one-time-export semantics. Contract classes only. -->
+<!-- Presentation only: Share owns the ephemeral controller across responsive card placement. -->
 <script>
-  import { onMount, tick } from "svelte";
-  import { liveContext } from "../href.js";
-  import { token } from "../../app/api.js";
-  import { parse } from "../../app/router.js";
-  import { codeRequest, issueCodeBatch, undoCodeBatch, codesCsv } from "../../app/access-codes.js";
+  import { onMount } from "svelte";
+  import { createAccessCodesState } from "../../app/access-codes.svelte.js";
   import { CAN_SHARE } from "./legacy.js";
-  import { copyText } from "./copy.js";
-  let { aid = liveContext()?.aid, requestFactory = codeRequest } = $props();
-  let surveys = $state([]), sid = $state(""), count = $state(20), role = $state(""), stage = $state("loading"), message = $state(""), codes = $state([]), batch = $state(null);
-  let owner, bearer, request, mountedHash, alive = true, generation = 0;
-  const name = $derived(surveys.find(s => s.id === sid)?.name ?? "Survey");
-  const busy = $derived(stage === "busy");
-  function clear() { codes = []; batch = null; }
-  function sameContext() { const ctx = liveContext(); return alive && bearer === token() && (ctx === null || ctx.aid === aid) && (globalThis.location?.hash ?? "") === mountedHash; }
-  async function current() {
-    if (!sameContext()) return false;
-    const me = (await request("/v2/me")).result;
-    return sameContext() && me?.principal?.id === owner;
-  }
-  async function load() {
-    const gen = ++generation; clear(); stage = "loading"; message = "";
-    bearer = token(); mountedHash = globalThis.location?.hash ?? ""; request = requestFactory(bearer);
-    try {
-      const me = (await request("/v2/me")).result;
-      const model = (await request(`/v2/assessments/${encodeURIComponent(aid)}`)).result;
-      if (!alive || gen !== generation) return;
-      if (bearer !== token()) { stage = "changed"; message = "Your sign-in changed. Reload this page to continue."; return; }
-      owner = me?.principal?.id; role = model.assessment.role;
-      surveys = (model.surveys ?? []).filter(s => s.state === "selected" && !s.archived_at).map(s => ({ id: s.id, name: s.display_name || s.name || s.template_name || s.id }));
-      sid = surveys[0]?.id ?? ""; stage = "idle";
-    } catch { if (alive && gen === generation) { stage = "load-error"; message = "Access-code options could not be loaded. Check your sign-in and try again."; } }
-  }
-  async function issue() {
-    if (stage !== "confirm" || !CAN_SHARE.has(role)) return;
-    const gen = generation, opRequest = request;
-    stage = "busy"; message = "Issuing and exporting codes. Keep this page open…";
-    const opCurrent = async () => gen === generation && await current() && gen === generation;
-    const result = await issueCodeBatch({ aid, sid, count: Number(count), request: opRequest, current: opCurrent });
-    if (!alive || gen !== generation) { if (result.stage === "shown" && result.batch) await undoCodeBatch(opRequest, result.batch); return; }
-    clear();
-    if (!sameContext()) { if (result.stage === "shown" && result.batch) await undoCodeBatch(request, result.batch); stage = "changed"; message = "Your sign-in changed. Codes were cleared; an unseen batch was undone where possible."; return; }
-    stage = result.stage; batch = result.batch ?? null; codes = result.codes ?? []; message = result.message;
-    if (stage === "unseen") { stage = batch.undone ? "idle" : "undo-required"; message = batch.undone ? "The codes could not be shown, so the batch was undone; no codes remain active from it." : "The codes could not be shown and undo was not confirmed. Retry undo before issuing another batch."; if (batch.undone) batch = null; }
-  }
-  async function undo() {
-    if (!batch || busy) return;
-    const gen = generation, opRequest = request, priorCodes = codes; stage = "busy"; codes = [];
-    const ok = await undoCodeBatch(opRequest, batch);
-    if (!alive || gen !== generation) return;
-    let same = sameContext();
-    if (same && !ok) { try { same = await current(); } catch (e) { if (e?.status === 401 || e?.status === 403) same = false; } }
-    if (!alive || gen !== generation) return;
-    if (!same) { clear(); stage = "changed"; message = "Your sign-in changed. Code values were cleared."; return; }
-    stage = ok ? "idle" : priorCodes.length ? "shown" : "undo-required"; if (!ok) codes = priorCodes; message = ok ? "Undone; no codes are active from that batch." : "Undo did not go through. Codes may still be active (redeemed codes cannot be undone). Try undo again."; if (ok) batch = null;
-  }
-  function download() {
-    const blob = new Blob([codesCsv(name, codes)], { type: "text/csv;charset=utf-8" });
-    const url = URL.createObjectURL(blob), a = document.createElement("a"); a.href = url; a.download = "survey-access-codes.csv"; a.click(); setTimeout(() => URL.revokeObjectURL(url), 0);
-  }
-  async function copy() { message = await copyText(codes.map(c => c.code).join("\n")) ? "Codes copied. Keep them private." : "Copy failed. Select the codes below and copy them."; }
-  onMount(() => {
-    if (!aid || aid === "sample") { stage = "fixture"; return; }
-    load();
-    const recheck = async () => {
-      const gen = generation;
-      if (stage === "loading" || !owner) return;
-      try { if (await current()) return; }
-      catch (e) { if (e?.status !== 401 && e?.status !== 403) { if (alive && gen === generation) message = "Your sign-in could not be checked. Your code values are still here; check the connection before continuing."; return; } }
-      if (alive && gen === generation) { generation++; clear(); stage = "changed"; message = "Your sign-in changed. Code values were cleared. Reload this page to continue."; }
-    };
-    const routeChanged = async () => {
-      if ((globalThis.location?.hash ?? "") === mountedHash) return;
-      generation++; clear(); owner = null; stage = "loading";
-      const route = parse(globalThis.location?.hash ?? "");
-      if (route.name !== "share" || !route.params.aid || route.params.aid === "sample") { stage = "changed"; message = "The review changed. Code values were cleared."; return; }
-      const gen = generation;
-      await tick();
-      if (!alive || gen !== generation) return;
-      aid = route.params.aid; load();
-    };
-    globalThis.addEventListener("focus", recheck);
-    globalThis.addEventListener("hashchange", routeChanged);
-    return () => { alive = false; generation++; globalThis.removeEventListener("focus", recheck); globalThis.removeEventListener("hashchange", routeChanged); clear(); };
-  });
+  let { controller = null, aid, requestFactory } = $props();
+  const owned = controller === null;
+  const flow = controller ?? createAccessCodesState({ aid, requestFactory });
+  const c = flow.state;
+  const name = $derived(flow.name());
+  onMount(() => owned ? flow.mount() : undefined);
 </script>
 
 <div class="l-stack" data-gap="3" role="group" aria-label="Access codes">
-  {#if stage === "fixture"}<p class="small">Open a real review to issue access codes.</p>
-  {:else if stage === "loading"}<p class="small" role="status">Loading access-code options…</p>
-  {:else if stage === "load-error"}<p class="small">{message}</p><button class="btn" type="button" onclick={load}>Try again</button>
-  {:else if !CAN_SHARE.has(role)}<p class="small">Only an owner or member can issue or export access codes.</p>
-  {:else if !surveys.length}<p class="small">Select a survey in Prepare before issuing access codes.</p>
+  {#if c.stage === "fixture"}<p class="small">Open a real review to issue access codes.</p>
+  {:else if c.stage === "loading"}<p class="small" role="status">Loading access-code options…</p>
+  {:else if c.stage === "load-error"}<p class="small">{c.message}</p><button class="btn" type="button" onclick={flow.load}>Try again</button>
+  {:else if !CAN_SHARE.has(c.role)}<p class="small">Only an owner or member can issue or export access codes.</p>
+  {:else if !c.surveys.length}<p class="small">Select a survey in Prepare before issuing access codes.</p>
   {:else}
-    <p class="small">A code opens one survey. Codes are shown once: download or copy them before leaving. Keep this page open until the batch is shown.</p>
-    {#if ["idle", "refused"].includes(stage)}
-      <label class="small l-stack" data-gap="1">Survey<select class="in" bind:value={sid}>{#each surveys as s}<option value={s.id}>{s.name}</option>{/each}</select></label>
-      <label class="small l-stack" data-gap="1">Number of codes<input class="in" type="number" min="1" max="100" step="1" bind:value={count} /></label>
-      <button class="btn" type="button" onclick={() => { if (!Number.isInteger(Number(count)) || count < 1 || count > 100) { message = "Choose between 1 and 100 codes."; return; } stage = "confirm"; message = ""; }}>Make access codes</button>
-    {:else if stage === "confirm"}
-      <p class="small">Issue and reveal {count} one-time access codes for {name}? Anyone with a code can answer this survey. No codes have been issued yet.</p>
-      <div class="l-row" data-wrap data-gap="2"><button class="btn" type="button" onclick={issue}>Issue and show codes</button><button class="btn" type="button" onclick={() => { stage = "idle"; message = "Cancelled; no codes were issued."; }}>Cancel</button></div>
-    {:else if stage === "shown"}
-      <label class="small l-stack" data-gap="1">Access codes<textarea class="in" readonly rows="6" value={codes.map(c => c.code).join("\n")}></textarea></label>
-      <div class="l-row" data-wrap data-gap="2"><button class="btn" type="button" onclick={download}>Download as CSV</button><button class="btn" type="button" onclick={copy}>Copy codes</button><button class="btn" type="button" onclick={undo}>Undo this batch</button><button class="btn" type="button" onclick={() => { clear(); stage = "idle"; message = "Code values cleared from this page. The issued codes remain active."; }}>Done with this batch</button></div>
-    {:else if stage === "undo-required"}<button class="btn" type="button" onclick={undo}>Retry undo</button>{/if}
-    <p class="small" role="status">{message}</p>
+    <p class="small">Make a new batch when you need access codes for paper surveys. Codes are shown only when you issue a batch.</p>
+    {#if ["idle", "refused"].includes(c.stage)}
+      <label class="small l-stack" data-gap="1">Survey<select class="in" value={c.sid} onchange={e => flow.setSurvey(e.currentTarget.value)}>{#each c.surveys as s}<option value={s.id}>{s.name}</option>{/each}</select></label>
+      <label class="small l-stack" data-gap="1">Number of codes<input class="in" type="number" min="1" max="100" step="1" value={c.count} oninput={e => flow.setCount(e.currentTarget.valueAsNumber)} /></label>
+      <button class="btn" type="button" onclick={flow.prepare}>Make access codes</button>
+    {:else if c.stage === "confirm"}
+      <p class="small">Issue and reveal {c.count} one-time access codes for {name}? Anyone with a code can answer this survey. No codes have been issued yet.</p>
+      <div class="l-row" data-wrap data-gap="2"><button class="btn" type="button" onclick={flow.issue}>Issue and show codes</button><button class="btn" type="button" onclick={flow.cancel}>Cancel</button></div>
+    {:else if c.stage === "shown"}
+      <p class="small">{c.codes.length} access code{c.codes.length === 1 ? "" : "s"} in this batch · shown once. Download or copy before leaving.</p>
+      <label class="small l-stack" data-gap="1">Access codes<textarea class="in" readonly rows="6" value={c.codes.map(c => c.code).join("\n")}></textarea></label>
+      <div class="l-row" data-wrap data-gap="2"><button class="btn" type="button" onclick={flow.download}>Download as CSV</button><button class="btn" type="button" onclick={flow.copy}>Copy codes</button><button class="btn" type="button" onclick={flow.undo}>Undo this batch</button><button class="btn" type="button" onclick={flow.done}>Done with this batch</button></div>
+    {:else if c.stage === "undo-required"}<button class="btn" type="button" onclick={flow.undo}>Retry undo</button>{/if}
+    <p class="small" role="status">{c.message}</p>
   {/if}
 </div>

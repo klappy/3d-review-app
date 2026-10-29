@@ -114,3 +114,10 @@ it('same Share component clears and reloads when the review hash changes',async(
  const view=render(AccessCodes,{aid:'a',requestFactory:()=>request});await view.findByRole('button',{name:'Make access codes'});await fireEvent.input(view.getByLabelText('Number of codes'),{target:{value:'2'}});await fireEvent.click(view.getByRole('button',{name:'Make access codes'}));await fireEvent.click(view.getByRole('button',{name:'Issue and show codes'}));await view.findByRole('button',{name:'Download as CSV'});
  history.replaceState(null,'','/#/review/b/share');setLiveContext({aid:'b'});await fireEvent(window,new HashChangeEvent('hashchange'));await view.findByText('Only an owner or member can issue or export access codes.');expect(view.queryByRole('textbox',{name:'Access codes'})).toBeNull();expect(request.mock.calls.some(c=>c[0]==='/v2/assessments/b')).toBe(true);setLiveContext(null);
 });
+it('keeps the one-time batch when a responsive view is replaced under Share ownership',async()=>{
+ const {createAccessCodesState}=await import('../ui-next/src/app/access-codes.svelte.js');
+ const request=client();const flow=createAccessCodesState({aid:'a',requestFactory:()=>request});const dispose=flow.mount();
+ const view=render(AccessCodes,{controller:flow});await view.findByRole('button',{name:'Make access codes'});await fireEvent.input(view.getByLabelText('Number of codes'),{target:{value:'2'}});await fireEvent.click(view.getByRole('button',{name:'Make access codes'}));await fireEvent.click(view.getByRole('button',{name:'Issue and show codes'}));await view.findByRole('button',{name:'Download as CSV'});
+ view.unmount();const phone=render(AccessCodes,{controller:flow});expect((phone.getByLabelText('Access codes',{selector:'textarea'}) as HTMLTextAreaElement).value).toBe('AAAA1111\nBBBB2222');expect(phone.getByText('2 access codes in this batch · shown once. Download or copy before leaving.')).toBeTruthy();
+ phone.unmount();dispose();expect(flow.state.codes).toHaveLength(0);
+});
