@@ -27,6 +27,7 @@
   import Home from "../screens/Home.svelte";
   import SignInLive from "./SignInLive.svelte";
   import Status from "./Status.svelte";
+  import LoadingFrame from "./LoadingFrame.svelte";
   import { collectModel as collectView } from "../screens/collect/model.js";
   import Card from "../Card.svelte";
   import Row from "../Row.svelte";
@@ -46,6 +47,7 @@
   let page = $state({ status: "loading", key: "", data: null, error: null });
   let pstate = $state(P.snapshot()); // participant journey snapshot
   let seq = 0;
+  let sessionCredential = token();
   const go = (h) => { if (globalThis.location.hash !== h) globalThis.location.hash = h; else load(); };
   const replace = (h) => { history.replaceState(null, "", globalThis.location.pathname + globalThis.location.search + h); hash = h; };
 
@@ -159,15 +161,23 @@
   async function load() {
     const my = ++seq;
     const r = route;
+    const credential = token();
+    if (credential !== sessionCredential) { S.forget(); sessionCredential = credential; }
+    // Clear the old route before changing its context. Pending UI never borrows another review's body or account chrome,
+    // even for fast reads; the skeleton keeps neutral navigation until this load resolves the current session.
+    page = { status: "loading", key: r.name, data: null, error: null };
+    session = undefined; applyChrome(null);
     build = null; uncertainBuild = null; // a pending build preview never outlives the route; a reload re-reads the report list, which clears the uncertain lock
     setLiveContext({ ...r.params, ...(r.query.get("review") && !r.params.aid ? { aid: r.query.get("review") } : {}) }); // a setup screen's review (router.linkFor)
-    if (!PARTICIPANT.has(r.name)) { try { session = await S.me(); } catch { session = null; } applyChrome(session); }
-    // The loading screen shows only when a read takes longer than a blink, so walking questions never flashes.
-    const slow = setTimeout(() => { if (my === seq) page = { status: "loading", key: r.name, data: null, error: null }; }, 180);
     try {
+      if (!PARTICIPANT.has(r.name)) {
+        let current;
+        try { current = await S.me(); } catch { current = null; }
+        if (my !== seq || credential !== token()) return;
+        session = current; applyChrome(current);
+      }
       const data = await loader(r);
-      clearTimeout(slow);
-      if (my !== seq) return;
+      if (my !== seq || credential !== token()) return;
       if (data.redirect) { replace(data.redirect); return; }
       if (data.screen === null) return;
       // Review-scoped screens draw project crumbs (href("project") needs :pid): the loaded model's project joins the live context.
@@ -175,10 +185,9 @@
       if (pid && !r.params.pid) setLiveContext({ ...liveContext(), pid });
       page = { status: "ready", key: r.name, data, error: null };
     } catch (e) {
-      clearTimeout(slow);
-      if (my !== seq) return;
+      if (my !== seq || credential !== token()) return;
       const kind = classify(e);
-      if (kind === "unauthenticated") { S.forget(); page = { status: "ready", key: r.name, data: { screen: "sign-in", next: hash }, error: null }; return; }
+      if (kind === "unauthenticated") { S.forget(); session = null; applyChrome(null); page = { status: "ready", key: r.name, data: { screen: "sign-in", next: hash }, error: null }; return; }
       page = { status: "error", key: r.name, data: null, error: { kind, message: String(e?.message || "Request could not be completed.") } };
     }
   }
@@ -217,7 +226,6 @@
   $effect(() => { void dataRoute; untrack(() => load()); });
   // An in-page anchor (`collect#offline`) scrolls to its element once the screen is ready; the hash still names the route, so back/forward work.
   $effect(() => { if (page.status === "ready" && route.anchor) tick().then(() => document.getElementById(route.anchor)?.scrollIntoView({ block: "start" })); });
-  $effect(() => { if (session === undefined) S.me().then((m) => { session = m; }).catch(() => { session = null; }); });
 
   // Participant actions (the journey owns persistence; these only navigate on its answer).
   let busy = $state(false), codeError = $state("");
@@ -349,7 +357,7 @@
 {/snippet}
 
 {#if page.status === "loading"}
-  <Status {phone} {theme} kind="loading" />
+  <LoadingFrame {phone} {theme} {chrome} kind={page.key} />
 {:else if page.status === "error"}
   <Status {phone} {theme} kind={page.error.kind} message={page.error.message} onretry={load} />
 {:else if page.data.fixture}
