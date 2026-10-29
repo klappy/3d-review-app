@@ -108,3 +108,9 @@ it('same-review route changes invalidate an unseen batch too',async()=>{
 it('treats server5xx issuance outcomes as uncertain rather than claiming refusal',async()=>{
  const request=vi.fn().mockRejectedValue({status:503});const out=await issueCodeBatch(args(request));expect(out.stage).toBe('uncertain');expect(out.message).toContain('Codes may exist');expect(request).toHaveBeenCalledTimes(1);
 });
+
+it('same Share component clears and reloads when the review hash changes',async()=>{
+ history.replaceState(null,'','/#/review/a/share');setLiveContext({aid:'a'});const request=client();const base=request.getMockImplementation()!;request.mockImplementation((url,opts)=>url==='/v2/assessments/b'?Promise.resolve(model('viewer')):base(url,opts));
+ const view=render(AccessCodes,{aid:'a',requestFactory:()=>request});await view.findByRole('button',{name:'Make access codes'});await fireEvent.input(view.getByLabelText('Number of codes'),{target:{value:'2'}});await fireEvent.click(view.getByRole('button',{name:'Make access codes'}));await fireEvent.click(view.getByRole('button',{name:'Issue and show codes'}));await view.findByRole('button',{name:'Download as CSV'});
+ history.replaceState(null,'','/#/review/b/share');setLiveContext({aid:'b'});await fireEvent(window,new HashChangeEvent('hashchange'));await view.findByText('Only an owner or member can issue or export access codes.');expect(view.queryByRole('textbox',{name:'Access codes'})).toBeNull();expect(request.mock.calls.some(c=>c[0]==='/v2/assessments/b')).toBe(true);setLiveContext(null);
+});

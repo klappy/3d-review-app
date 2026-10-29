@@ -1,8 +1,9 @@
 <!-- Existing survey code escrow, role/confirmation and one-time-export semantics. Contract classes only. -->
 <script>
-  import { onMount } from "svelte";
+  import { onMount, tick } from "svelte";
   import { liveContext } from "../href.js";
   import { token } from "../../app/api.js";
+  import { parse } from "../../app/router.js";
   import { codeRequest, issueCodeBatch, undoCodeBatch, codesCsv } from "../../app/access-codes.js";
   import { CAN_SHARE } from "./legacy.js";
   import { copyText } from "./copy.js";
@@ -33,9 +34,11 @@
   }
   async function issue() {
     if (stage !== "confirm" || !CAN_SHARE.has(role)) return;
+    const gen = generation, opRequest = request;
     stage = "busy"; message = "Issuing and exporting codes. Keep this page open…";
-    const result = await issueCodeBatch({ aid, sid, count: Number(count), request, current });
-    if (!alive) { if (result.stage === "shown" && result.batch) await undoCodeBatch(request, result.batch); return; }
+    const opCurrent = async () => gen === generation && await current() && gen === generation;
+    const result = await issueCodeBatch({ aid, sid, count: Number(count), request: opRequest, current: opCurrent });
+    if (!alive || gen !== generation) { if (result.stage === "shown" && result.batch) await undoCodeBatch(opRequest, result.batch); return; }
     clear();
     if (!sameContext()) { if (result.stage === "shown" && result.batch) await undoCodeBatch(request, result.batch); stage = "changed"; message = "Your sign-in changed. Codes were cleared; an unseen batch was undone where possible."; return; }
     stage = result.stage; batch = result.batch ?? null; codes = result.codes ?? []; message = result.message;
@@ -43,11 +46,12 @@
   }
   async function undo() {
     if (!batch || busy) return;
-    const priorCodes = codes; stage = "busy"; codes = [];
-    const ok = await undoCodeBatch(request, batch);
-    if (!alive) return;
+    const gen = generation, opRequest = request, priorCodes = codes; stage = "busy"; codes = [];
+    const ok = await undoCodeBatch(opRequest, batch);
+    if (!alive || gen !== generation) return;
     let same = sameContext();
     if (same && !ok) { try { same = await current(); } catch (e) { if (e?.status === 401 || e?.status === 403) same = false; } }
+    if (!alive || gen !== generation) return;
     if (!same) { clear(); stage = "changed"; message = "Your sign-in changed. Code values were cleared."; return; }
     stage = ok ? "idle" : priorCodes.length ? "shown" : "undo-required"; if (!ok) codes = priorCodes; message = ok ? "Undone; no codes are active from that batch." : "Undo did not go through. Codes may still be active (redeemed codes cannot be undone). Try undo again."; if (ok) batch = null;
   }
@@ -60,13 +64,25 @@
     if (!aid || aid === "sample") { stage = "fixture"; return; }
     load();
     const recheck = async () => {
+      const gen = generation;
       if (stage === "loading" || !owner) return;
       try { if (await current()) return; }
-      catch (e) { if (e?.status !== 401 && e?.status !== 403) { if (alive) message = "Your sign-in could not be checked. Your code values are still here; check the connection before continuing."; return; } }
-      if (alive) { generation++; clear(); stage = "changed"; message = "Your sign-in changed. Code values were cleared. Reload this page to continue."; }
+      catch (e) { if (e?.status !== 401 && e?.status !== 403) { if (alive && gen === generation) message = "Your sign-in could not be checked. Your code values are still here; check the connection before continuing."; return; } }
+      if (alive && gen === generation) { generation++; clear(); stage = "changed"; message = "Your sign-in changed. Code values were cleared. Reload this page to continue."; }
+    };
+    const routeChanged = async () => {
+      if ((globalThis.location?.hash ?? "") === mountedHash) return;
+      generation++; clear(); owner = null; stage = "loading";
+      const route = parse(globalThis.location?.hash ?? "");
+      if (route.name !== "share" || !route.params.aid || route.params.aid === "sample") { stage = "changed"; message = "The review changed. Code values were cleared."; return; }
+      const gen = generation;
+      await tick();
+      if (!alive || gen !== generation) return;
+      aid = route.params.aid; load();
     };
     globalThis.addEventListener("focus", recheck);
-    return () => { alive = false; generation++; globalThis.removeEventListener("focus", recheck); clear(); };
+    globalThis.addEventListener("hashchange", routeChanged);
+    return () => { alive = false; generation++; globalThis.removeEventListener("focus", recheck); globalThis.removeEventListener("hashchange", routeChanged); clear(); };
   });
 </script>
 
