@@ -34,6 +34,7 @@
 
   // data/share: the fixture shapes (gallery) or app/data.js shareModel (live: real links, this review's surveys, the signed-in user).
   let { phone = false, theme = "light", data = R0, share = D0, role = data.role } = $props();
+  let emailOpen = $state(false);
   const R = $derived(data);
   const D = $derived(share);
   const at = $derived(carry(phone, theme));
@@ -43,7 +44,7 @@
 </script>
 
 {#snippet top()}{#if phone}<PhoneHeader state="nested" title="Share the survey" parent="Collect" back={href("collect", at)} initials={R.user.initials} menuHref={href("menu", at)} />{:else}<TopBar home={href("home", at)} who={R.user.first} initials={R.user.initials} workspace={R.workspace} {crumbs} />{/if}{/snippet}
-{#snippet bar()}{#if phone}<PhoneBar label="Show QR codes for the room" href={href("qr-room", at)} />{/if}{/snippet}
+{#snippet bar()}{#if phone}<PhoneBar demoted={emailOpen} label="Show QR codes for the room" href={href("qr-room", at)} />{/if}{/snippet}
 {#snippet meta()}{R.project} · {R.review.language} · {R.review.modality} · Updated {R.review.updated ?? "just now"}{/snippet}
 {#snippet qr()}<Ico d={A.qr} />{/snippet}
 {#snippet mail()}<Ico d={A.mail} />{/snippet}
@@ -69,11 +70,11 @@
     <Card gap={2} label="Access codes">
       <Disclosure label="Access codes, for people who lose the link" solid={false}><p class="small">{D.codes.unused}{#if D.codes.code} · <a class="link" href="#codes">Make more</a> · <a class="link" href="#csv">Download CSV</a>{/if}</p></Disclosure>
     </Card>
-    {#if canShare && R.surveys.length}<EmailDraft {phone} subject={`Survey links: ${R.review.title}`} body={emailBody} label="Email the links to someone" />{/if}
+    {#if canShare && R.surveys.length}<EmailDraft {phone} bind:opened={emailOpen} subject={`Survey links: ${R.review.title}`} body={emailBody} label="Email the links to someone" />{/if}
     <a class="link" href={`${href("collect", at)}#offline`}>Meeting offline? Print and paper</a>
   {:else}
     <Page gap={5}>
-      <ReviewHead {theme} title={R.review.title} stage={R.review.stage ?? "collecting"} {meta} viewed="collect" live="collect" done={["prepare"]} deleteRefused={R.deleteRefused} action={{ label: "Done", variant: "primary", href: href("collect", at), trail: "check" }} />
+      <ReviewHead {theme} title={R.review.title} stage={R.review.stage ?? "collecting"} {meta} viewed="collect" live="collect" done={["prepare"]} deleteRefused={R.deleteRefused} action={{ label: "Done", variant: emailOpen ? "secondary" : "primary", href: href("collect", at), trail: "check" }} />
       <div class="glass-hi l-card l-stack" data-pad="work" data-gap="5" role="group" aria-label="Share the survey">
         <div><h2 class="h2 t-24">Share the survey</h2><p class="small t-15">{D.lead}</p></div>
         {#if R.noLinks}<p class="small">{R.noLinks}</p>{/if}
@@ -90,7 +91,7 @@
         {#if !canShare}<p class="small">{READ_ONLY}</p>{/if}
         <hr class="hr" />
         <Row wrap gap={3}><Button label="Show QR codes for the room" href={href("qr-room", at)} lead={qr} /></Row>
-        {#if canShare && R.surveys.length}<EmailDraft {phone} subject={`Survey links: ${R.review.title}`} body={emailBody} label="Email the links to someone" />{/if}
+        {#if canShare && R.surveys.length}<EmailDraft {phone} bind:opened={emailOpen} subject={`Survey links: ${R.review.title}`} body={emailBody} label="Email the links to someone" />{/if}
         <p class="small">Meeting offline? Paper surveys and QR pages print from the <a class="link" href={`${href("collect", at)}#offline`}>Meeting offline? card on Collect</a>.</p>
         <Disclosure label="Access codes, for people who lose the link" gap={3}>
           {#if D.codes.code}<p class="small">A code opens the same survey from the home page. Codes are printed on paper surveys automatically.</p>{/if}

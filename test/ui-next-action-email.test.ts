@@ -8,7 +8,7 @@ import R from "../ui-next/fixtures/actions/review.json";
 
 beforeEach(() => {
   HTMLDialogElement.prototype.showModal = function () { this.setAttribute("open", ""); };
-  HTMLDialogElement.prototype.close = function () { this.removeAttribute("open"); };
+  HTMLDialogElement.prototype.close = function () { this.removeAttribute("open"); this.dispatchEvent(new Event("close")); };
 });
 const review = { ...R, host: "https://review.example/#survey=", shortHost: "https://review.example/#survey=", review: { ...R.review, title: "Luke & Acts?" }, surveys: [{ ...R.surveys[0], name: "Team & translators", code: "real-issued-token" }] };
 const plan = { doc: "Next steps", meta: "Current report", talk: [["Trust & feedback", "2 levels apart"], ["Translation brief", "Needs support"]], review: { title: "Luke & Acts?", project: "Project", builtOn: "Today", responses: 7 }, stage: "reviewed", foot: "From the built report" };
@@ -74,7 +74,7 @@ it("retains all links and special characters in a long multi-survey draft withou
 
 it("reuses the dialog title row and phone sheet with unique accessible titles",async()=>{
  const view=render(Share,{phone:true,data:review,role:'owner'});const trigger=view.getByRole('button',{name:'Email the links to someone'});expect(trigger.classList.contains('btn-block')).toBe(true);await fireEvent.click(trigger);
- const dialog=view.getByRole('dialog',{name:'Email draft'});expect(dialog.classList.contains('sheet')).toBe(true);expect(dialog.getAttribute('closedby')).toBe('any');expect(dialog.querySelector('.sheet-handle')).not.toBeNull();expect(dialog.querySelector('.l-row .btn-icon[aria-label="Close"]')).not.toBeNull();expect(dialog.querySelectorAll('.btn-primary')).toHaveLength(1);expect(dialog.querySelector('.btn-primary')?.textContent).toBe('Open email app');
+ const dialog=view.getByRole('dialog',{name:'Email draft'});expect(dialog.classList.contains('sheet')).toBe(true);expect(dialog.getAttribute('closedby')).toBe('any');expect(dialog.querySelector('.sheet-handle')).not.toBeNull();expect(dialog.querySelector('.l-row .btn-icon[aria-label="Close"]')).not.toBeNull();expect(dialog.querySelectorAll('.btn-primary')).toHaveLength(1);expect(view.container.querySelectorAll('.btn-primary')).toHaveLength(1);expect(dialog.querySelector('.btn-primary')?.textContent).toBe('Open email app');
  const other=render(EmailDraft,{subject:'Other',body:'Other'});expect(other.container.querySelector('dialog')?.getAttribute('aria-labelledby')).not.toBe(dialog.getAttribute('aria-labelledby'));
 });
 it("keeps the draft closed until requested and reuses backdrop dismissal",async()=>{
