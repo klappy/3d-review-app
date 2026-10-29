@@ -7,7 +7,9 @@ export const VERSIONS = {
    "added": [],
    "changed": [
     "The UI Next preview at `/next/` is built by the standard typecheck and test steps on all branches, including production. Production compiles out fixture galleries and mounts the live app; the current UI at `/` stays the default, with an explicit “Try the new design” menu opt-in.",
-    "Cumulative source includes the existing PR554 build integration, PR574 responsive layout and PR576 production opt-in alongside PR581 navigation performance. Workspace inheritance from the separate unmerged 0.37.1 candidate is excluded. Automated/local evidence and unmeasured physical-device or real-human outcomes remain distinct from pending deployed acceptance."
+    "Cumulative source includes the existing PR554 build integration, PR574 responsive layout and PR576 production opt-in alongside PR581 navigation performance. Workspace inheritance from the separate unmerged 0.37.1 candidate is excluded. Automated/local evidence and unmeasured physical-device or real-human outcomes remain distinct from pending deployed acceptance.",
+    "Inherited PR576 report behavior is unchanged from the existing production source: DEV uses one-response report/per-perspective floors; production retains its existing disclosure gates and thresholds. Report-build admission, member grants, viewer eligibility, pre-close access and coverage cues remain source- and environment-specific; their six-scenario fresh acceptance denominator is explicitly untested here.",
+    "At app c88df937, automated local production-build/opt-in checks passed 2/2 and responsive-layout checks passed 15/15, with zero failures. Six inherited report scenarios and three hosted baseline scenarios have zero attempted and remain untested in this repair; no real-human study, satisfaction/confusion/frustration NOT MEASURED."
    ],
    "fixed": [
     "UI Next screens at `/next/` (Landing, About, Home and lane screens) now use the phone layout on viewports narrower than 720px instead of only when the link carries `?w=phone`, and switch when the window crosses that width; `?w=phone` and `?w=desktop` still force a layout.",

@@ -62,7 +62,8 @@ const cmp = (a, b) => { const pa = a.split(".").map(Number), pb = b.split(".").m
 const keys = ["added", "changed", "fixed", "security"];
 // Plain text only: reject HTML elements/comments (placeholders like <version>+<sha7> are prose, not markup).
 const HTML_TAG = /<\/?(?:script|style|iframe|object|embed|svg|img|a|link|meta|html|body|div|span|p|br|b|i|em|strong|u|ul|ol|li|h[1-6]|table|tr|td|th|form|input|button)(?:[\s>\/])|<!--/i;
-const versions = [...releases.versions].sort((a, b) => cmp(a.version, b.version)).map((v) => {
+// Historical candidates excluded from this product source stay indexed canonically, but are not this build’s changelog.
+const versions = releases.versions.filter((v) => !v.excluded_from?.includes(releases.current)).sort((a, b) => cmp(a.version, b.version)).map((v) => {
   const sections = {};
   for (const k of keys) {
     const arr = Array.isArray(v.sections?.[k]) ? v.sections[k] : [];
