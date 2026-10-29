@@ -21,6 +21,7 @@
   import Level from "../../Level.svelte";
   import LensDot, { LENSES } from "../../LensDot.svelte";
   import ReviewHead from "./ReviewHead.svelte";
+  import ReviewResources from "./ReviewResources.svelte";
   import GapBar from "./GapBar.svelte";
   import Ico from "./Ico.svelte";
   import { A } from "./icons.js";
@@ -59,6 +60,7 @@
         {#if live}<p class="small">{D.notesNote}</p>{:else}<Row gap={2}><Button label={it.inPlan ? "In the plan" : "Add to plan"} lead={it.inPlan ? check : plus} block /><Button label="Not this one" variant="quiet" /></Row>{/if}
       </Card>
     {/each}
+    {#if live}<Card gap={3} label="Resources for weakest areas"><ReviewResources weak={D.weak} /></Card>{/if}
     <Row wrap gap={2}><Button label="See all results" href={href("results", at)} lead={list} block /><Button label="Print or share the plan" href={href("action-plan", at)} lead={print} block /></Row>
   {:else}
     <Page gap={5}>
@@ -75,10 +77,11 @@
           </Stack>
           <Stack gap={2}>
             <Row gap={3}><span class="h3">Weakest areas</span><span class="small">Needs support or urgent attention</span></Row>
-            {#if live && !D.weak.length}<p class="small">No area is at Needs support or Needs urgent attention in the built report.</p>{/if}
+            {#if live && !D.weak.length}<p class="small">No low-scoring areas are available to show from this report.</p>{/if}
             {#each D.weak as a}
               <label class="row-opt l-row" data-split><span class="l-row" data-gap="3"><input class="cb" type="checkbox" checked={a.checked} /><LensDot lens={a.lens} decorative /><b>{a.label}</b></span><Level level={a.level} /></label>
             {/each}
+            {#if live}<ReviewResources weak={D.weak} />{/if}
             <input class="in" placeholder="Something else" aria-label="Something else" disabled={live} />
           </Stack>
           {#if live}<p class="small" role="status" id="ns-notes-why">{D.notesNote}</p>{/if}
