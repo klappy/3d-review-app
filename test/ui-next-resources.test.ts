@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, expect, it, vi } from 'vitest';
-import { render, waitFor } from '@testing-library/svelte';
+import { fireEvent, render, waitFor } from '@testing-library/svelte';
 import ReviewResources from '../ui-next/src/screens/actions/ReviewResources.svelte';
 import Live from '../ui-next/src/app/Live.svelte';
 // @ts-expect-error plain JS
@@ -70,6 +70,10 @@ for (const phone of [false, true]) {
 it('report-load failure exposes retry and does not render stale resource suggestions', async () => {
   serve(true); globalThis.location.hash = `#/review/${aid}/next-step`;
   const { container } = render(Live);
-  await waitFor(() => expect(container.textContent).toContain('Try again'));
+  await waitFor(() => expect(container.textContent).toContain('Retry'));
   expect(container.querySelector('[data-resources-for]')).toBeNull();
+  serve(false);
+  await fireEvent.click([...container.querySelectorAll('button')].find(b => b.textContent === 'Retry')!);
+  await waitFor(() => expect(container.querySelector('[data-resources-for]')).not.toBeNull());
+  expect(container.querySelector('[data-resources-for]')!.textContent).toContain('More resources coming.');
 });
