@@ -4,7 +4,7 @@
      and retry states are drawn here once; the lane screens draw the data. Screens with no live store yet are drawn from their fixture
      and labelled as a preview (never hidden): the receipt lists them. -->
 <script>
-  import { tick } from "svelte";
+  import { tick, untrack } from "svelte";
   import { openQrPrint, preparePapers, openPapersPrint, paperPreview, printOpenedLine, printAllowed } from "./print.js";
   import { loadBlankPrint } from "../../../ui/stage-screens.js";
   import { SAMPLE_HREF, SAMPLE_AID } from "./router.js";
@@ -211,7 +211,10 @@
       throw new Error("We could not confirm whether your feedback was recorded. Your text is still here. Sending again may create a duplicate; nothing will retry automatically.");
     }
   }
-  $effect(() => { void route; load(); });
+  // Anchor changes scroll the current screen. Only the data route drives this effect; direct load() calls after actions/retry
+  // still refresh the same route. Keep query changes in the key (setup review, response filters and other loader inputs).
+  const dataRoute = $derived(JSON.stringify([route.name, route.params, route.query.toString()]));
+  $effect(() => { void dataRoute; untrack(() => load()); });
   // An in-page anchor (`collect#offline`) scrolls to its element once the screen is ready; the hash still names the route, so back/forward work.
   $effect(() => { if (page.status === "ready" && route.anchor) tick().then(() => document.getElementById(route.anchor)?.scrollIntoView({ block: "start" })); });
   $effect(() => { if (session === undefined) S.me().then((m) => { session = m; }).catch(() => { session = null; }); });
