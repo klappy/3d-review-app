@@ -1,0 +1,14 @@
+
+.top-end{margin-left:auto;display:flex;align-items:center;gap:4px;position:relative}
+.crumb{min-width:0}
+.crumb ol{display:flex;align-items:center;gap:8px;list-style:none;margin:0;padding:0;white-space:nowrap;min-width:0}
+.crumb li{display:flex;align-items:center;gap:8px;min-width:0}
+.crumb li+li::before{content:"›";color:var(--ink-3)}
+.crumb a,.crumb [aria-current]{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.crumb [aria-current]{color:var(--ink);font-weight:600}
+/* Menus above the page (live QA Q7): the glass top bar and an open menu each form a stacking context; lift both over later page
+   cards (which also blur, so also stack) so a menu never opens under them. */
+.app .top{position:relative;z-index:30}
+.dd[data-menu][open]{z-index:30}
+/* Live QA N3: a printed report is its paper sheets only; the document bar (and its controls) never prints. */
+@media print{.app header.top[data-variant=document]{display:none}}

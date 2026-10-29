@@ -1,0 +1,21 @@
+{
+  "_note": "UI Next Home mock data (provisional). Values from cookbook design/2026-10-15-glass-redesign/canvas Home.dc.html, HomeFirst.dc.html, HomePhone.dc.html. No real people or projects.",
+  "user": { "first": "Bincy", "name": "Bincy Kurian", "initials": "BK" },
+  "workspace": "BCS · India",
+  "invitation": { "from": "Andy", "project": "Odia New Testament", "role": "As a member — you can run reviews in it.", "phone": "Seed Company · partners" },
+  "groups": [
+    { "stage": "results", "heading": "Results ready", "help": "read and plan the next step",
+      "reviews": [{ "project": "Hindi New Testament", "language": "Hindi", "title": "Luke 1–2 community review", "meta": "24 responses · closed 12 Sep",
+        "levels": [["team", "growing", 9], ["community", "support", 10], ["church", "growing", 5]], "tag": "Not yet reviewed", "action": "Read the results", "href": "#results" }] },
+    { "stage": "collecting", "heading": "Collecting", "help": "links are live",
+      "reviews": [{ "project": "Hindi New Testament", "language": "Hindi", "title": "Mark 1–4 draft", "meta": "18 of 30 responses", "phoneMeta": "18 of 30 responses · open until 31 Oct",
+        "counts": [["team", "6/8"], ["community", "8/15"], ["church", "4/7"]], "until": "· Open until 31 Oct", "action": "Share the survey", "href": "#collect" }] },
+    { "stage": "setup", "heading": "Setting up", "help": "not launched yet",
+      "reviews": [{ "project": "Lao Old Testament", "language": "Lao", "title": "Genesis audio check", "meta": "Step 3 of 5 · Who will participate? · Draft saved 26 Sep", "phoneMeta": "Step 3 of 5 · Who will participate?", "action": "Continue setup", "href": "#setup" }] }
+  ],
+  "phoneOrder": ["collecting", "setup", "results"],
+  "completed": [
+    { "title": "Acts listening review", "meta": "Hindi New Testament · completed 3 Aug" },
+    { "title": "Psalms reading group", "meta": "Lao Old Testament · completed 19 Jul" }
+  ]
+}

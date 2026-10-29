@@ -362,3 +362,39 @@ test('U43: the build confirm is one sentence with the response count', async () 
   const counts = new Map([['a', { status: 'loaded', responses: 2 }], ['b', { status: 'failed' }], ['c', { status: 'loaded', responses: 4 }]]);
   assert.equal(responsesOf({ counts }), 6); assert.equal(responsesOf({ counts: new Map([['b', { status: 'failed' }]]) }), null); assert.equal(responsesOf({}), null);
 });
+
+// Codex P2 4384990149: the served per-perspective level minimum (GET /results level_minimum_responses; DEV 1, otherwise 3)
+// drives "Build the results" and the band gate; absent, invalid or a failed read stays at the safe 3.
+test('Codex P2 4384990149: the served level minimum gates Build and the bands; absent or invalid is 3', async () => {
+  const { buildResultsCta, levelMinimumFor } = await import('./views.js');
+  const report = { id: 'r', created_at: '2026-09-18', payload: { lenses: [{ lens: 'Community', score: 80, sub_dimensions: [{ sub_dimension: 'Use', score: 50 }] }] } };
+  const mk = (results, { built = false, me } = {}) => ({ enc: encodeURIComponent, esc: s => String(s ?? ''), state: { levelMinimum: me }, current: { assessment: { id: 'a', role: 'owner', stage: 'understand' }, surveys: [{ id: 's1', template_id: 't', template_name: 'C', perspective: 'Community', state: 'selected', archived_at: null }] }, isCurrent: () => true, routes: { assessment: () => '#x', survey: () => '#s' }, go() {}, api: async url => {
+    if (url === '/v2/reports/r') return { assessment_id: 'a', suppressed: false, report };
+    if (url.endsWith('/reports')) return { assessment_id: 'a', suppressed: false, reports: built ? [{ id: 'r', created_at: report.created_at }] : [] };
+    if (url.includes('/surveys/s1')) return { survey: { id: 's1' }, counts: { responses: 1, respondents: 1 } };
+    if (url.endsWith('/results')) { if (results instanceof Error) throw results; return results; }
+    throw err('NOT_FOUND_OR_NOT_VISIBLE', 404);
+  } });
+  const held = extra => ({ status: 'held', reason: 'x', ...extra });
+  const page = async ctx => views.understand.render(ctx, await views.understand.load(ctx, { aid: 'a' }));
+  // Served 1: Build is offered with one response, and a built lens is banded, not "More input needed".
+  assert.match(await page(mk(held({ level_minimum_responses: 1 }))), /data-results-build/);
+  const one = await page(mk(held({ level_minimum_responses: 1 }), { built: true }));
+  assert.match(one, /data-v3-band="Community" data-v3-band-word="Strong"/); assert.match(one, /Use · <strong>Needs support/); assert.doesNotMatch(one, /Fewer than/);
+  assert.match(one, /At least 1 response per perspective/);
+  // Absent, invalid or a failed read: 3 as before (no Build with one response; the built lens holds at More input needed).
+  for (const r of [held(), held({ level_minimum_responses: 0 }), held({ level_minimum_responses: '1' }), held({ level_minimum_responses: 1.5 }), held({ level_minimum_responses: -1 }), err('INTERNAL', 500)]) {
+    assert.doesNotMatch(await page(mk(r)), /data-results-build/);
+    const html = await page(mk(r, { built: true }));
+    assert.match(html, /data-v3-band="Community" data-v3-band-word="More input needed"/); assert.match(html, /Fewer than 3 responses/); assert.match(html, /At least 3 responses per perspective/);
+  }
+  // No served value on /results (or a failed read) falls back to the session's /v2/me value, validated the same way.
+  assert.match(await page(mk(held(), { me: 1 })), /data-results-build/);
+  assert.match(await page(mk(err('INTERNAL', 500), { built: true, me: 1 })), /data-v3-band="Community" data-v3-band-word="Strong"/);
+  assert.doesNotMatch(await page(mk(held(), { me: 'x' })), /data-results-build/);
+  assert.equal(levelMinimumFor({ status: 'loaded', value: { level_minimum_responses: 3 } }, { state: { levelMinimum: 1 } }), 3, 'the review read wins over the session value');
+  // buildResultsCta default stays 3; an explicit served 1 opens it.
+  const none = { status: 'loaded', value: { reports: [] } }, oneResp = { Community: { responses: 1 } }, esc = s => String(s);
+  assert.equal(buildResultsCta({ role: 'owner', bandScores: null, reports: none }, oneResp, esc), '');
+  assert.match(buildResultsCta({ role: 'owner', bandScores: null, reports: none }, oneResp, esc, 1), /data-results-build/);
+});

@@ -1,0 +1,131 @@
+{
+  "workspace": {
+    "name": "Bridge Connectivity Solutions · India",
+    "short": "BCS · India"
+  },
+  "project": {
+    "name": "Hindi New Testament",
+    "meta": "Hindi (hin · Deva) · Written · lead organisation BCS · 4 reviews since May 2026",
+    "phoneMeta": "Hindi (hin) · Written · 4 reviews since May 2026",
+    "stage": "collecting"
+  },
+  "reviews": [
+    {
+      "when": "Oct 2026",
+      "title": "Mark 1–4 draft",
+      "stage": "collecting",
+      "to": "collect",
+      "note": "No results yet"
+    },
+    {
+      "when": "Sep 2026",
+      "title": "Luke 1–2 community review",
+      "stage": "results",
+      "to": "results",
+      "levels": [
+        [
+          "team",
+          "growing",
+          9
+        ],
+        [
+          "community",
+          "support",
+          10
+        ],
+        [
+          "church",
+          "growing",
+          5
+        ]
+      ],
+      "overall": "growing"
+    },
+    {
+      "when": "Aug 2026",
+      "title": "Acts listening review",
+      "stage": "done",
+      "to": "nextStep",
+      "levels": [
+        [
+          "team",
+          "growing",
+          7
+        ],
+        [
+          "community",
+          "support",
+          6
+        ],
+        [
+          "church",
+          "support",
+          2
+        ]
+      ],
+      "overall": "growing"
+    },
+    {
+      "when": "May 2026",
+      "title": "Workshop 1 · Mark 1",
+      "stage": "done",
+      "to": "nextStep",
+      "levels": [
+        [
+          "team",
+          "support",
+          4
+        ],
+        [
+          "community",
+          "more",
+          0
+        ],
+        [
+          "church",
+          "support",
+          3
+        ]
+      ],
+      "overall": "support"
+    }
+  ],
+  "trend": {
+    "heading": "Over time",
+    "help": "Each perspective's overall level, review by review. The direction is what matters, not the exact point.",
+    "months": [
+      "May",
+      "Aug",
+      "Sep",
+      "Oct"
+    ],
+    "rows": [
+      "Strong",
+      "Growing",
+      "Support",
+      "Urgent",
+      "—"
+    ],
+    "lines": {
+      "team": [
+        "urgent",
+        "support",
+        "growing",
+        "growing"
+      ],
+      "community": [
+        "more",
+        "support",
+        "support",
+        "support"
+      ],
+      "church": [
+        "support",
+        "support",
+        "growing",
+        "growing"
+      ]
+    },
+    "read": "Community has stayed at Needs support overall across three reviews while the team climbed — the gap is widening, not closing."
+  }
+}

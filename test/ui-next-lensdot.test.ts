@@ -65,7 +65,7 @@ describe("lensdot.css", () => {
   const css = read("components/lensdot.css");
   const body = noComments(css);
   it("the dot is --dot square and round", () => {
-    expect(body).toMatch(/\.lensdot \{[^}]*width: var\(--dot\);[^}]*height: var\(--dot\);[^}]*border-radius: 50%;/);
+    expect(read("components/base.css")).toMatch(/\.lensdot\{[^}]*width:var\(--dot\);height:var\(--dot\);border-radius:50%/); // generated helmet
   });
   it.each(KEYS)("binds data-lens=%s to its perspective token on .lensdot and .pt", (lens) => {
     expect(body).toContain(`.lensdot[data-lens=${lens}], .pt[data-lens=${lens}] { background: var(--${lens}); }`);

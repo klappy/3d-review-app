@@ -1,0 +1,150 @@
+{
+ "_source": "Mock data for the actions lane. Boards: cookbook design/2026-10-15-glass-redesign/canvas NextStep, Print, Share, Sandbox, PaperEntry (+Phone). Status: provisional. Links are not data: screens build them with ui-next/src/screens/href.js.",
+ "user": {
+  "first": "Bincy",
+  "initials": "BK"
+ },
+ "workspace": "BCS · India",
+ "project": "Hindi New Testament",
+ "role": "owner",
+ "review": {
+  "title": "Mark 1–4 draft",
+  "language": "Hindi",
+  "modality": "Written",
+  "responses": 18
+ },
+ "deleteRefused": "Reviews with responses can't be deleted. This one has 18.",
+ "groups": [
+  {
+   "lens": "team",
+   "name": "Translation team",
+   "count": "2 surveys",
+   "expected": "6 of 8 expected",
+   "surveys": [
+    0,
+    1
+   ]
+  },
+  {
+   "lens": "community",
+   "name": "Community",
+   "count": "1 survey",
+   "expected": "8 of 15 expected",
+   "surveys": [
+    2
+   ]
+  },
+  {
+   "lens": "church",
+   "name": "Church",
+   "count": "2 surveys",
+   "expected": "4 of 7 expected",
+   "surveys": [
+    3,
+    4
+   ]
+  }
+ ],
+ "surveys": [
+  {
+   "lens": "team",
+   "name": "Translators",
+   "code": "K7Q4F2",
+   "n": 4,
+   "of": 5,
+   "pages": 3
+  },
+  {
+   "lens": "team",
+   "name": "Team leaders & mentors",
+   "code": "M3X9A1",
+   "n": 2,
+   "of": 3,
+   "pages": 3
+  },
+  {
+   "lens": "community",
+   "name": "Community",
+   "code": "P8L2W4",
+   "n": 8,
+   "of": 15,
+   "pages": 3
+  },
+  {
+   "lens": "church",
+   "name": "Pastor involved in the work",
+   "code": "R5T7N2",
+   "n": 3,
+   "of": 5,
+   "pages": 2
+  },
+  {
+   "lens": "church",
+   "name": "Denominational leader",
+   "code": "D2C6H9",
+   "n": 1,
+   "of": 2,
+   "pages": 2
+  }
+ ],
+ "host": "3dreview.app/s/",
+ "shortHost": "3dr.app/s/",
+ "lwc": {
+  "assessment": [
+   "hi"
+  ],
+  "project": [
+   "or"
+  ]
+ },
+ "qr": {
+  "survey": "111111110100111111111100000101100001000001101110101000001011101101110110011001011101101110100001011011101100000100111011000001111111101011001111111000000100000100110010111001010100001101110110100100000000101100011010010001001100100111101101001101110111010110001101001100011101111101100010010000111111111110101000000100000110110010011000101110111001000010011101110110100111110010101110111100111100111100000110010011001001111111100111001001010",
+  "plan": "111111110001111111111100000110101111000001101110100111001011101101110100000101011101101110100011111011101100000110000001000001111111110111011111111001101111100100110001100010101000100010111011100011111011101010110000011000100101111111100101001111010111111100101010011101011010000010000110001011111111111010000100010100000111001001111010101110101000100011010101110110110100001001101110101010110010010100000111011101001000111111100000110010000"
+ },
+ "paper": {
+  "title": "Community survey",
+  "line": "3D Review · Mark 1–4 draft · Hindi New Testament · printed in Hindi",
+  "code": "K7Q 4F2",
+  "codeLine": "Your answers are confidential · Please read Mark 1–4 first",
+  "questions": [
+   {
+    "n": 1,
+    "type": "single",
+    "text": "As a group, how would we describe how easy or difficult this translation is to understand?",
+    "options": [
+     "Very easy to understand",
+     "Most of it is easy, but some parts are hard",
+     "Much of it is difficult to understand",
+     "We cannot understand it",
+     "I don't know"
+    ]
+   },
+   {
+    "n": 2,
+    "type": "multi",
+    "text": "Where we find it difficult, what makes it hard?",
+    "options": [
+     "Some words are unfamiliar or strange",
+     "Some sentences are too long or complicated",
+     "It is not our dialect",
+     "It doesn't sound like the way we normally speak",
+     "Other (please describe)",
+     "I don't know"
+    ],
+    "lines": 2
+   },
+   {
+    "n": 3,
+    "type": "single",
+    "text": "How does this translation sound to us?",
+    "options": [
+     "It sounds like our language — natural and beautiful",
+     "Some parts sound good, some parts don't sound that good",
+     "It does not sound very good. This is not how our language sounds.",
+     "This is not our dialect",
+     "I don't know"
+    ]
+   }
+  ]
+ }
+}

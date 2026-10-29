@@ -79,10 +79,13 @@ export const V3_LEGEND = BAND_LEGEND;
 // survey response counts for that perspective. Below the minimum count → "More input needed". Read-only; no contract change.
 export const V3_BAND_CUTOFFS = Object.freeze({ provisional: true, strong: 75, growing: 60, needsSupport: 40, minResponses: 3 });
 export const V3_BAND_PROVISIONAL = 'Provisional bands: 75 and above Strong · 60–74 Growing · 40–59 Needs support · below 40 Needs urgent attention. At least 3 responses per perspective, otherwise More input needed.';
-/** Score → band word. `responses` null/undefined or below the minimum → "More input needed". */
-export function v3ScoreBand(score, responses, c = V3_BAND_CUTOFFS) {
+/** The served per-perspective level minimum (GET /results or /v2/me `level_minimum_responses`; DEV 1, otherwise 3): a
+ *  positive integer, else the safe V3_BAND_CUTOFFS.minResponses (absent, invalid or a failed read). Never lowers a server floor. */
+export const v3LevelMinimum = served => (Number.isInteger(served) && served >= 1 ? served : V3_BAND_CUTOFFS.minResponses);
+/** Score → band word. `responses` null/undefined or below the minimum (`min`, default the cut-offs' own) → "More input needed". */
+export function v3ScoreBand(score, responses, c = V3_BAND_CUTOFFS, min = c.minResponses) {
   const n = num(responses), s = scoreOf(score);
-  if (n === null || n < c.minResponses || !Number.isFinite(s)) return 'More input needed';
+  if (n === null || n < min || !Number.isFinite(s)) return 'More input needed';
   return s >= c.strong ? 'Strong' : s >= c.growing ? 'Growing' : s >= c.needsSupport ? 'Needs support' : 'Needs urgent attention';
 }
 /** Per-perspective scores from a built report ({payload:{lenses:[{lens,score,sub_dimensions:[{sub_dimension,score}]}]}}). */
@@ -99,7 +102,7 @@ export function v3ReportScores(report) {
  *  from v3ReportScores) each card is banded by the provisional cut-offs, gated on the perspective's server response count
  *  (`groups`); each sub-dimension gets its own band word under the same gate. Without scores a held result renders every
  *  card as an evidence gap with the server's reason — no band is invented. */
-export function v3BandsMarkup(results, lenses, esc = esc0, groups = null, scores = null) {
+export function v3BandsMarkup(results, lenses, esc = esc0, groups = null, scores = null, min = V3_BAND_CUTOFFS.minResponses) {
   const r = results || {};
   const given = Array.isArray(r.bands) ? r.bands : [];
   const scored = !!(scores && lenses.some(l => scores[l]));
@@ -107,9 +110,9 @@ export function v3BandsMarkup(results, lenses, esc = esc0, groups = null, scores
   const cards = lenses.map(lens => {
     const sc = scored ? scores[lens] : null, g = groups && groups[lens], n = g && g.loaded ? g.responses : null;
     const b = given.find(x => x && x.perspective === lens);
-    const word = sc ? v3ScoreBand(sc.score, n) : !held && b && BAND_WORDS.has(b.band) ? b.band : 'More input needed';
+    const word = sc ? v3ScoreBand(sc.score, n, V3_BAND_CUTOFFS, min) : !held && b && BAND_WORDS.has(b.band) ? b.band : 'More input needed';
     const suppressed = !sc && b && b.state === 'suppressed';
-    const note = sc ? (sc.subs.length ? `<ul class="v3-band-subs small">${sc.subs.map(x => `<li data-v3-sub="${esc(x.name)}">${bandImagery(v3ScoreBand(x.score, n))}${esc(x.name)} · <strong>${esc(v3ScoreBand(x.score, n))}</strong></li>`).join('')}</ul>` : '')
+    const note = sc ? (sc.subs.length ? `<ul class="v3-band-subs small">${sc.subs.map(x => `<li data-v3-sub="${esc(x.name)}">${bandImagery(v3ScoreBand(x.score, n, V3_BAND_CUTOFFS, min))}${esc(x.name)} · <strong>${esc(v3ScoreBand(x.score, n, V3_BAND_CUTOFFS, min))}</strong></li>`).join('')}</ul>` : '')
       : scored ? '<p class="muted">Not in the latest report.</p>'
       : held ? '' // lane 9 L9-24: the held reason is said once under the cards, not once per card (U05: one plain line, never the server's policy code)
       : suppressed ? '<div class="note">Withheld to protect a small group. This is an evidence gap, not a poor result.</div>'
@@ -118,7 +121,7 @@ export function v3BandsMarkup(results, lenses, esc = esc0, groups = null, scores
     return bandCard({ lens, word, bodyHtml: note, countHtml: count }, esc);
   }).join('');
   const legend = bandLegend(V3_LEGEND, esc);
-  const prov = scored && V3_BAND_CUTOFFS.provisional ? learnMore(`<p class="small muted" data-v3-provisional>${esc(V3_BAND_PROVISIONAL)}</p>`) : ''; // lane 9 L9-24: cut-offs behind Learn more
+  const prov = scored && V3_BAND_CUTOFFS.provisional ? learnMore(`<p class="small muted" data-v3-provisional>${esc(min === V3_BAND_CUTOFFS.minResponses ? V3_BAND_PROVISIONAL : V3_BAND_PROVISIONAL.replace(`At least ${V3_BAND_CUTOFFS.minResponses} responses`, `At least ${min} response${min === 1 ? '' : 's'}`))}</p>`) : ''; // lane 9 L9-24: cut-offs behind Learn more
   const heldLine = held ? `<p class="muted" data-v3-band-held>${esc(v3HeldText(r))}</p>` : '';
   return `<div class="v3-band-imagery" data-band-style="signal" data-provenance="report-imagery-adapter"><style>${bandVisualCSS}</style><label class="band-visual-control">Band visual <select data-band-visual><option value="signal">Signal bars</option><option value="faces">Faces</option><option value="container">Jars</option><option value="plant">Plants</option></select></label><div class="v3-bands three" data-v3-bands="${scored ? 'provisional' : held ? 'held' : 'shown'}">${cards}</div>${heldLine}${legend}${prov}</div>`;
 }
@@ -134,14 +137,14 @@ export function v3GroupCountText(g) {
   return g.loaded === g.surveys ? base : `${base} so far (${g.loaded} of ${g.surveys} survey counts loaded)`;
 }
 /** One evidence row per perspective. The result read is held until D7, so "what we can say" is the held state, never a band. */
-export function v3EvidenceRows(results, lenses, groups = {}, scores = null) {
+export function v3EvidenceRows(results, lenses, groups = {}, scores = null, min = V3_BAND_CUTOFFS.minResponses) {
   const r = results || {}, held = !(Array.isArray(r.bands) && r.bands.length) || r.status === 'held';
   return lenses.map(lens => {
     const g = groups[lens], counted = v3GroupCountText(g);
     if (!g || !g.surveys) return [lens, 'Not asked in this review', 'Missing data is not a low result'];
     const sc = scores && scores[lens];
-    if (sc) { const n = g.loaded ? g.responses : null, w = v3ScoreBand(sc.score, n);
-      return [lens, `${w} (provisional) · score ${Number.isFinite(scoreOf(sc.score)) ? Math.floor(scoreOf(sc.score)) : sc.score} · ${counted}`, w === 'More input needed' ? `Fewer than ${V3_BAND_CUTOFFS.minResponses} responses` : 'Provisional cut-offs; people who did not answer may see it differently']; }
+    if (sc) { const n = g.loaded ? g.responses : null, w = v3ScoreBand(sc.score, n, V3_BAND_CUTOFFS, min);
+      return [lens, `${w} (provisional) · score ${Number.isFinite(scoreOf(sc.score)) ? Math.floor(scoreOf(sc.score)) : sc.score} · ${counted}`, w === 'More input needed' ? `Fewer than ${min} response${min === 1 ? '' : 's'}` : 'Provisional cut-offs; people who did not answer may see it differently']; }
     const b = !held && Array.isArray(r.bands) ? r.bands.find(x => x && x.perspective === lens) : null;
     const say = b && BAND_WORDS.has(b.band) ? b.band : held ? 'Held · no band yet' : 'More input needed';
     const limit = held ? V3_HELD_LIMIT : !g.loaded ? 'Count not loaded yet' : (num(g.responses) ?? 0) === 0 ? 'No responses yet' : 'People who did not answer may see it differently';
@@ -196,15 +199,15 @@ export const V3_SUGGEST = Object.freeze({
 const SUGGEST_BANDS = new Set(['Needs support', 'Needs urgent attention']);
 /** Areas the built report bands Needs support / Needs urgent attention, from v3ReportScores + per-perspective counts
  *  (same provisional cut-offs and response gate as the band cards). Nothing is written: band words only. */
-export function v3SuggestedAreas(scores, lenses, groups = {}) {
+export function v3SuggestedAreas(scores, lenses, groups = {}, min = V3_BAND_CUTOFFS.minResponses) {
   const out = [];
   if (!scores) return out;
   for (const lens of lenses) {
     const sc = scores[lens]; if (!sc) continue;
     const g = groups && groups[lens], n = g && g.loaded ? g.responses : null;
-    const w = v3ScoreBand(sc.score, n);
+    const w = v3ScoreBand(sc.score, n, V3_BAND_CUTOFFS, min);
     if (SUGGEST_BANDS.has(w)) out.push({ area: v3AreaLabel(lens), band: w });
-    for (const s of sc.subs || []) { const sw = v3ScoreBand(s.score, n); if (SUGGEST_BANDS.has(sw)) out.push({ area: v3AreaLabel(`${lens} · ${s.name}`), band: sw }); }
+    for (const s of sc.subs || []) { const sw = v3ScoreBand(s.score, n, V3_BAND_CUTOFFS, min); if (SUGGEST_BANDS.has(sw)) out.push({ area: v3AreaLabel(`${lens} · ${s.name}`), band: sw }); }
   }
   return out;
 }

@@ -1,0 +1,270 @@
+// UI Next live acceptance (status: provisional; cookbook work/active/2026-10-21-ui-next-demo-wiring). Real-journey probe for /next/ against a running Worker (local or DEV). Signs in as a synthetic sandbox account, walks
+// home -> project -> review -> collection room (real link + QR) -> participant journey in a second context (answers persist across
+// reload, submit, receipt) -> results (real report). Prints one line per step; exits 1 on the first failure.
+import { chromium } from "playwright";
+const BASE = process.env.BASE ?? "http://127.0.0.1:8787";
+const EMAIL = process.env.EMAIL ?? "uinext.demo@example.invalid";
+const SHOTS = process.env.SHOTS ?? "";
+const PHONE = { width: 390, height: 844 };
+const ok = (m) => console.log("✅", m);
+const fail = (m) => { console.log("❌", m); process.exit(1); };
+const browser = await chromium.launch({ executablePath: process.env.CHROMIUM || "/opt/pw-browsers/chromium-1194/chrome-linux/chrome" }) // CHROMIUM: another machine's Chromium binary (README);
+const shot = async (page, name) => { if (SHOTS) await page.screenshot({ path: `${SHOTS}/${name}.png`, fullPage: true }); };
+const errors = [];
+// A screen counts as loaded only when it is not the shell's Status card (app/Status.svelte: "Loading…", "Something went wrong", "Not found").
+const loaded = async (page, what) => { await page.waitForTimeout(300); /* Status defers "Loading…" 180ms (app/Live.svelte), so a fresh load is briefly blank */ await page.waitForFunction(() => !/Loading…/.test(document.body.textContent ?? ""), null, { timeout: 30000 }).catch(() => {}); const t = (await page.textContent("body")) ?? ""; if (/Loading…|Something went wrong|Could not load|Try again/.test(t) && !/Question \d+ of/.test(t)) fail(`${what}: screen is the Status card, not the page: ${t.replace(/\s+/g, " ").slice(0, 160)}`); };
+// Page exceptions and console errors fail the run. The one accepted line: the browser's own "Failed to load resource … 401" for the
+// signed-out session probe (GET /v2/me before sign-in), which the app makes on purpose; any other failed request is recorded by URL.
+const watch = (page, tag) => {
+  page.on("pageerror", (e) => errors.push(`${tag}: ${e.message}`));
+  page.on("console", (m) => { if (m.type() === "error" && !/Failed to load resource/.test(m.text())) errors.push(`${tag} console: ${m.text()}`); });
+  page.on("response", (r) => { const u = r.url().replace(BASE, ""); if (r.status() >= 400 && !(r.status() === 401 && u === "/v2/me")) errors.push(`${tag} HTTP ${r.status()} ${r.request().method()} ${u}`); });
+};
+
+// --- facilitator ---
+const fac = await browser.newContext({ viewport: { width: 1280, height: 800 } });
+const f = await fac.newPage(); watch(f, "fac");
+await f.goto(`${BASE}/next/?ui_next=on`); // the documented opt-in (route.js); the current UI's account menu links here
+await f.waitForSelector("text=Sign in", { timeout: 15000 });
+ok(`entry ${BASE}/next/ -> landing (signed out)`);
+await f.click("text=Sign in");
+await f.waitForURL(/#\/?signin/);
+await f.fill("#si-email", EMAIL);
+await f.click("button[type=submit]");
+await f.waitForSelector("#si-code", { timeout: 15000 });
+const code = await f.inputValue("#si-code");
+if (!code) fail("no sandbox code filled in");
+await f.click("button[type=submit]");
+await f.waitForSelector("text=Your reviews", { timeout: 15000 });
+ok("sign-in (sandbox code) -> home with real reviews");
+await shot(f, "home");
+
+// Seed: a project + review of our own if none exist (through the same /v2 the current UI uses; bearer this tab holds).
+const token = await f.evaluate(() => sessionStorage.getItem("facilitatorToken"));
+const api = async (path, body, method = body ? "POST" : "GET") => {
+  const r = await fetch(`${BASE}${path}`, { method, headers: { accept: "application/json", "content-type": "application/json", authorization: `Bearer ${token}` }, body: body ? JSON.stringify(body) : undefined });
+  const j = await r.json(); if (!r.ok || !j.ok) throw new Error(`${method} ${path}: ${j.error?.code} ${j.error?.message}`); return j.result;
+};
+let projects = (await api("/v2/projects")).projects;
+let ws = (await api("/v2/workspaces")).workspaces;
+if (!ws.length) { ws = [(await api("/v2/workspaces", { name: "UI Next demo workspace" })).workspace]; }
+if (!projects.length) { projects = [(await api("/v2/projects", { workspace_id: ws[0].id, name: "UI Next demo project", organization: "Demo" })).project]; }
+const pid = projects[0].id;
+let as = (await api(`/v2/projects/${pid}/assessments`)).assessments.filter((a) => !a.archived_at);
+let a = as.find((x) => x.stage === "collect") ?? as[0];
+if (!a) {
+  const langs = (await api(`/v2/projects/${pid}/languages`)).languages ?? [];
+  const lang = langs[0] ?? (await api(`/v2/projects/${pid}/languages`, { name: "Demo language" })).language;
+  a = (await api(`/v2/projects/${pid}/assessments`, { name: `UI Next demo ${new Date().toISOString().slice(0, 16)}`, language_id: lang.id })).assessment;
+}
+const { surveys } = await api(`/v2/assessments/${a.id}`);
+if (!surveys.filter((s) => !s.archived_at).length) {
+  const tpls = (await api("/v2/templates")).templates ?? [];
+  const pick = ["tpl_written", "tpl_involved_pastor", "tpl_validation"].map((id) => tpls.find((t) => t.id === id)).filter(Boolean).slice(0, 2);
+  for (const t of pick.length ? pick : tpls.slice(0, 2)) await api(`/v2/assessments/${a.id}/surveys`, { template_id: t.id, version: t.version ?? 1 });
+}
+ok(`data: project ${pid} · review ${a.id} (${a.stage})`);
+
+await f.goto(`${BASE}/next/#/project/${pid}`);
+await f.waitForSelector("h1", { timeout: 15000 }); await loaded(f, "project");
+// The project's review link is stage-aware (collecting -> …/collect, results -> …/results, preparing -> the review page).
+await f.click(`a[href^="#/review/${encodeURIComponent(a.id)}"]`);
+await f.waitForURL(new RegExp(`#/review/${a.id}(/collect|/results)?$`));
+await f.waitForSelector("h1"); await loaded(f, "review");
+ok(`project -> review (in-app link, hash route): ${f.url().replace(/.*#/, "#")}`);
+if ((await f.textContent("body")).includes("Open collection")) {
+  await f.click("button:has-text('Open collection')"); // Setup5 launch (POST /stage) when the review is still preparing
+  await f.waitForURL(/collect$/, { timeout: 15000 });
+  ok("stage prepare -> collect (POST /stage) from the review page");
+}
+await f.goto(`${BASE}/next/#/review/${a.id}/collect`); await f.waitForSelector("h1", { timeout: 30000 }); await loaded(f, "collect");
+const collectText = (await f.textContent("body")).replace(/\s+/g, " ");
+if (!/#survey=/.test(await f.evaluate(() => [...document.querySelectorAll(".kbd")].map((e) => e.textContent).join(" ")))) fail("collect: no real survey link under a survey row");
+ok(`collect page: real per-survey links; ${/Active until|Closed on/.test(collectText) ? "period shown" : "no period set on this review"}; language ${/Hindi|English|Demo language/.test(collectText) ? "shown" : "not shown (none on the review)"}`);
+// Owner count before the participant submits (same /v2 the facilitator UI reads).
+const openIds = (await api(`/v2/assessments/${a.id}`)).surveys.filter((s) => !s.archived_at && s.collection_status === "open").map((s) => s.id);
+const countOf = async (sid) => Number((await api(`/v2/assessments/${a.id}/surveys/${sid}`)).counts?.responses ?? 0); // the same GET the UI reads (app/data.js surveyCounts)
+const before = Object.fromEntries(await Promise.all(openIds.map(async (sid) => [sid, await countOf(sid)])));
+// The collect page prints every open survey's full link (the row's .kbd); the participant opens the first one.
+const firstLink = await f.evaluate(() => [...document.querySelectorAll(".kbd")].map((e) => e.textContent.trim()).find((t) => t.includes("#survey=")) ?? null);
+if (!firstLink) fail("collect: no full survey link printed");
+await f.goto(`${BASE}/next/#/review/${a.id}/collect/qr`); await f.waitForSelector(".qr", { timeout: 30000 });
+await f.click("text=Meeting offline? Print and paper"); await f.waitForURL(/collect#offline$/); await f.waitForSelector("#offline", { timeout: 15000 }); await loaded(f, "collect#offline");
+ok("QR room -> Meeting offline? lands on collect#offline (in-page anchor, not home)");
+await f.goBack(); await f.waitForURL(/collect\/qr$/); await f.waitForSelector(".qr", { timeout: 30000 }); ok("browser back restores the QR room");
+await f.goto(`${BASE}/next/#/review/${a.id}`); await f.waitForURL(/collect$/); await f.waitForSelector("h1"); await loaded(f, "review -> collect");
+ok("review page redirects to Collect while collecting");
+await f.click('[aria-label^="QR code for"], [aria-label^="QR for"]'); // the row's QR button (collect/SurveyGroups.svelte)
+await f.waitForURL(/#\/review\/.*\/collect\/qr(\?state=\d+)?$/);
+await f.waitForSelector(".qr", { timeout: 30000 });
+// The room prints the host under each code; the full link is what the code encodes (app/data.js attachLinks). Take the first tile's.
+const link = firstLink; // the collect row's printed full link (the room prints only the host under each code)
+if (!link) fail("no survey link on the QR room");
+ok(`QR room shows a real link + QR: ${link.replace(/#survey=.*/, "#survey=…")}`);
+await shot(f, "qr-room");
+await f.goBack(); await f.waitForURL(new RegExp(`#/review/${a.id}/collect$`)); await f.waitForSelector("h1"); await loaded(f, "back -> collect"); ok("browser back works (room -> collect)");
+await f.goForward(); await f.waitForURL(/collect\/qr(\?state=\d+)?$/); await f.waitForSelector(".qr"); ok("browser forward works (collect -> room)");
+
+// --- participant on a phone, new context (no facilitator cookie) ---
+const part = await browser.newContext({ viewport: PHONE, isMobile: true, hasTouch: true });
+const p = await part.newPage(); watch(p, "part");
+await p.goto(link);
+await p.waitForSelector("text=We'd like your perspective", { timeout: 20000 });
+ok("participant: link opens -> welcome (real form)");
+const langs = await p.locator("#p-lang option").count(); ok(`participant: language picker ${langs ? `offers ${langs - 1} language(s) besides English` : "not shown (the form offers no other language)"}`);
+await shot(p, "p-welcome");
+await p.click("text=Start"); await p.waitForURL(/#\/p\/passage/);
+await p.click("text=I've read it"); await p.waitForURL(/#\/p\/(q\/1|about)/);
+if (/#\/p\/about/.test(p.url())) { await p.click("text=Next"); await p.waitForURL(/#\/p\/q\/1/); }
+ok("participant: passage -> question 1");
+// answer the first question (choice or text), then the next
+for (let n = 1; n <= 2; n++) {
+  await p.waitForSelector(`text=Question ${n} of`, { timeout: 15000 }); await p.waitForSelector("fieldset.opts, textarea.in, input[type=number].in", { timeout: 15000 });
+  const radio = p.locator("input.rd, input.cb").first(); const num = p.locator("input[type=number].in");
+  if (await radio.count()) await radio.check(); else if (await num.count()) await num.fill("3"); else await p.fill("textarea", `answer ${n}`);
+  await p.waitForTimeout(300);
+  await p.click("text=Next");
+  await p.waitForURL(new RegExp(`#/p/(q/${n + 1}|review)`));
+}
+ok("participant: answered q1-q2, Next walks the questions");
+// An Other option's description survives Back/Next (captain CUA regression: onother was not a prop) — exercised when the form has one.
+await p.goto(`${BASE}/next/#/p/q/1`); await p.waitForSelector("text=Question 1 of", { timeout: 15000 });
+for (let n = 1; n <= 3; n++) {
+  const otherOpt = p.locator('input.rd[value="other"], input.cb[value="other"]').first();
+  if (await otherOpt.count()) {
+    await otherOpt.check(); await p.waitForSelector(`input[name="${await otherOpt.getAttribute("name")}::other"]`, { timeout: 5000 });
+    const box = p.locator('input[name$="::other"]'); await box.fill("described here"); await p.waitForTimeout(200);
+    await p.click("text=Next"); await p.waitForTimeout(300); await p.goBack(); await p.waitForSelector('input[name$="::other"]', { timeout: 10000 });
+    const kept = await p.locator('input[name$="::other"]').inputValue(); if (kept !== "described here") fail(`Other description lost after Back: "${kept}"`);
+    ok(`participant: Other description survives Next/Back on question ${n}`); break;
+  }
+  if (!(await p.locator("text=Next").count())) break; await p.click("text=Next"); await p.waitForTimeout(200); if (!/#\/p\/q\//.test(p.url())) break;
+}
+if (errors.some((e) => /onother|ReferenceError/.test(e))) fail("participant: a ReferenceError fired while answering");
+await shot(p, "p-question");
+await p.reload();
+await p.waitForSelector("h1", { timeout: 15000 });
+await p.goto(`${BASE}/next/#/p/q/1`); await p.waitForSelector("text=Question 1 of", { timeout: 15000 });
+const kept = await p.$("input:checked, textarea:not(:placeholder-shown), input[type=number].in:not([value=''])");
+if (!kept) fail("after reload the answer did not come back");
+ok("participant: reload keeps the page and the draft (persisted)");
+// answer the rest, then send from the review
+for (let i = 0; i <= 40; i++) {
+  if (/#\/p\/review/.test(p.url())) break;
+  const n = Number(/q\/(\d+)/.exec(p.url())?.[1] ?? 1);
+  await p.waitForSelector(`text=Question ${n} of`, { timeout: 15000 }); await p.waitForSelector("fieldset.opts, textarea.in, input[type=number].in", { timeout: 15000 });
+  const radio = p.locator("input.rd, input.cb").first(); const num = p.locator("input[type=number].in");
+  if (await radio.count()) await radio.check(); else if (await num.count()) await num.fill("3"); else await p.locator("textarea.in").fill(`answer ${n}`);
+  await p.waitForTimeout(200);
+  await p.click("text=Next");
+  await p.waitForURL(new RegExp(`#/p/(q/${n + 1}|review)`));
+}
+await p.goto(`${BASE}/next/#/p/review`);
+await p.waitForSelector("text=Check your answers", { timeout: 15000 });
+await shot(p, "p-review");
+await p.click("text=Send my answers");
+await p.waitForSelector("text=Thank you", { timeout: 20000 });
+const receipt = await p.textContent(".receipt");
+if (!receipt?.trim()) fail("no receipt code shown");
+const shown = receipt.trim().replace(/\s+/g, "");
+// Independent readback: exactly one open survey's owner count moved, by exactly one; the receipt the server stored for this
+// submission is the one on the phone (the participant controller keeps it per device; /v2 shows the response count only).
+const after = Object.fromEntries(await Promise.all(openIds.map(async (sid) => [sid, await countOf(sid)])));
+const moved = openIds.filter((sid) => after[sid] !== before[sid]);
+if (moved.length !== 1 || after[moved[0]] !== before[moved[0]] + 1) fail(`owner counts did not move by exactly +1 on exactly one survey: before ${JSON.stringify(before)} after ${JSON.stringify(after)}`);
+ok(`participant: submitted -> receipt ${shown}; owner count for ${moved[0]} ${before[moved[0]]} -> ${after[moved[0]]} (exactly +1, read back from /v2 counts)`);
+// Independent server read of the receipt: the participant session's bearer (ui/shared-link.js scopedStorage "<namespace>bearer",
+// tab storage) against GET /v2/participate/receipt from this process — response_id comes from the response row, not the DOM.
+// Owner-side row listing is deliberately suppressed (src/handlers/response.ts list, D7), so this is the only server record readable.
+const bearer = await p.evaluate(() => { try { const k = Object.keys(sessionStorage).find((x) => x.endsWith("bearer")); return k ? sessionStorage.getItem(k) : null; } catch { return null; } });
+if (!bearer) fail("participant: no session bearer in tab storage to read the receipt back");
+const rr = await fetch(`${BASE}/v2/participate/receipt`, { headers: { accept: "application/json", authorization: `Bearer ${bearer}` } }); const rj = await rr.json();
+if (!rr.ok || !rj.ok || !rj.result?.submitted || rj.result.response_id !== shown) fail(`server receipt ${JSON.stringify(rj.result ?? rj.error)} does not match the displayed ${shown}`);
+ok(`participant: GET /v2/participate/receipt (independent read) returns response_id ${rj.result.response_id} = the displayed receipt, submitted_at ${rj.result.submitted_at}`);
+// Server/display receipt: a NEW tab has no tab storage, only the device's remembered session (ui/shared-link.js remember), so the
+// receipt it shows comes from the server's session — it must be the same id.
+const p2 = await part.newPage(); watch(p2, "part2"); await p2.goto(link); await p2.waitForSelector("text=Thank you", { timeout: 20000 });
+const shown2 = ((await p2.textContent(".receipt")) ?? "").trim().replace(/\s+/g, "");
+if (shown2 !== shown) fail(`new tab shows receipt ${shown2}, the submit showed ${shown}`);
+await p2.close(); ok("participant: a new tab on the same link resumes the server's session and shows the same receipt id");
+await shot(p, "p-receipt");
+await p.reload(); await p.waitForSelector("text=Thank you", { timeout: 15000 }); ok("participant: reload after submit shows the receipt again (receipt per device)");
+await p.goto(`${BASE}/next/#/p/code`); await p.waitForSelector("#p-code"); await p.fill("#p-code", "NOPE00");
+const n0 = errors.length; await p.click("text=Open my survey");
+await p.waitForSelector("[role=alert]", { timeout: 15000 });
+const expected404 = errors.splice(n0).filter((e) => !/HTTP 404 POST \/v2\/participate\/code/.test(e)); errors.push(...expected404); // the bad code's 404 is the point
+ok("participant: a bad code shows the inline error (server 404, expected)");
+
+// --- facilitator: results ---
+await f.goto(`${BASE}/next/#/review/${a.id}/results`);
+await f.waitForSelector("h1", { timeout: 60000 }); await loaded(f, "results");
+const body = await f.textContent("body");
+ok(`results page rendered: ${/Nothing here yet|More input needed|results can|held/i.test(body) ? "held (too few responses)" : "report built from real answers"}`);
+// A still-collecting review's held screen says Collecting (no "Results ready"/"Closed"), shows the server's global hold, and offers no "without the X" escape.
+if (a.stage === "collect" || /Collecting/.test(body)) {
+  if (/Results ready|Collection closed|Closed \w/.test(body)) fail("results-held: a collecting review is shown as ready/closed");
+  if (/Show results without/.test(body) && /holds this report|responses so far/.test(body)) fail("results-held: a server-wide hold offers a per-perspective escape");
+  ok("results-held: collecting review shows its real stage and the server's hold, no fictional escape");
+}
+await shot(f, "results");
+// Answers (TICKET done-when 3): the server holds row-level answers for everyone (D7); the screen shows that real state, no sample rows.
+await f.goto(`${BASE}/next/#/review/${a.id}/results/answers`); await f.waitForSelector("h1, [role=status]", { timeout: 60000 }); await loaded(f, "results-answers");
+const ans = (await f.textContent("body")).replace(/\s+/g, " ");
+if (!/Held by policy/.test(ans) || /Mark 1–4|Hindi New Testament/.test(ans)) fail("results-answers: expected the real held state, no sample rows");
+ok("results-answers: real server suppression shown (D7), no sample data");
+await f.goto(`${BASE}/next/#/review/${a.id}/report`); await f.waitForSelector("h1", { timeout: 60000 }); await loaded(f, "report"); ok("report page rendered");
+await f.goto(`${BASE}/next/#/review/${a.id}/collect`); await f.waitForSelector("h1"); await loaded(f, "collect"); ok("collect page rendered");
+// Prepare (TICKET done-when 4, read-only tonight): the stage tab carries the review; Setup 5 shows THIS review's data, no
+// fixture, and a collecting review's primary goes to Collect (never a second launch); steps 1-4 hand editing to the current design.
+await f.goto(`${BASE}/next/#/review/${a.id}/collect`); await f.waitForSelector("h1"); await loaded(f, "collect");
+const prepHref = await f.evaluate(() => [...document.querySelectorAll("a")].map((x) => x.getAttribute("href")).find((h) => /#\/setup\/5\?review=/.test(h)));
+if (!prepHref) fail("collect: the Prepare tab does not carry the review");
+await f.click(`a[href="${prepHref}"]`); await f.waitForURL(/setup\/5\?review=/); await f.waitForSelector("h1"); await loaded(f, "setup5");
+const s5 = (await f.textContent("body")).replace(/\s+/g, " ");
+if (!s5.includes(a.name)) fail("setup5: this review's name is missing"); if (/Mark 1–4|Hindi New Testament|Puri/.test(s5)) fail("setup5: fixture data on the live screen");
+const prim = await f.evaluate(() => [...document.querySelectorAll(".btn-primary")].map((b) => b.textContent.trim() + " -> " + (b.getAttribute("href") ?? "button")));
+if (!prim.some((x) => /Go to Collect -> #\/review\/.*\/collect$/.test(x))) fail(`setup5: primary is not "Go to Collect" for a collecting review: ${JSON.stringify(prim)}`);
+await f.goto(`${BASE}/next/#/setup/1?review=${a.id}`); await f.waitForTimeout(800); await loaded(f, "setup1");
+const s1name = await f.inputValue("#name").catch(() => null);
+if (s1name !== a.name) fail(`setup1: the live step does not carry this review's name (got ${JSON.stringify(s1name)})`);
+if ((await f.textContent("body")).includes("design preview")) fail("setup1: still a labelled preview");
+// A real edit through the live step: rename, Continue writes PATCH /v2/assessments/{id} (wizard.js contract), the server row shows it.
+const renamed = `${a.name} ✎`;
+await f.fill("#name", renamed);
+if (!(await f.inputValue("#close"))) await f.fill("#close", new Date(Date.now() + 30 * 86400e3).toISOString().slice(0, 10)); // the wizard's rule: an active-until date is required
+await f.click(".btn-primary"); await f.waitForURL(/\/review\/[^/]+\/collect$/); await loaded(f, "collect"); // a launched review edits details only, then returns to its page (steps 2–4 could archive a live survey)
+const s1row = await api(`/v2/assessments/${a.id}`);
+if (s1row?.assessment?.name !== renamed) fail(`setup1: Continue did not save the name (server has ${JSON.stringify(s1row?.assessment?.name)})`);
+await api(`/v2/assessments/${a.id}`, { name: a.name }, "PATCH"); // put the name back for the rest of the run
+ok(`prepare: Setup 5 shows ${a.name} read-only (primary "Go to Collect"); Setup 1 is live: renaming it and pressing Continue wrote the server row (PATCH) and returned to the review page (launched: steps 2–4 closed), then restored`);
+// Print QR pages: "Print N page(s)" opens the print document in its own tab (app/print.js, the current UI's sheets) and that
+// document calls print() itself — verified by stubbing print() in the new tab, not by the modal rendering.
+await f.goto(`${BASE}/next/#/review/${a.id}/collect/print`); await f.waitForSelector(".qr", { timeout: 30000 }); await loaded(f, "print-qr");
+const printBtn = f.locator('button:has-text("Print ")').first(); if (!(await printBtn.count())) fail("print-qr: no Print button for the chosen pages");
+await fac.addInitScript(() => { window.__printed = 0; window.print = () => { window.__printed++; }; });
+const [printTab] = await Promise.all([fac.waitForEvent("page", { timeout: 15000 }), printBtn.click()]);
+await printTab.waitForLoadState("load").catch(() => {}); await printTab.waitForFunction(() => window.__printed > 0, null, { timeout: 15000 }).catch(() => {});
+const printed = await printTab.evaluate(() => window.__printed), sheets = await printTab.evaluate(() => [...document.querySelectorAll(".share-sheet-url")].map((e) => e.textContent.trim())), svgs = await printTab.evaluate(() => document.querySelectorAll("svg").length);
+if (!printed) fail("print-qr: the print document never called print()");
+if (!sheets.length || !sheets.every((u) => u.startsWith(`${BASE}/next/?ui_next=on#survey=`)) || svgs < sheets.length) fail(`print-qr: sheets are not this review's links with QR: ${JSON.stringify(sheets)} svgs=${svgs}`);
+await printTab.close(); ok(`print-qr: Print opened the print document (${sheets.length} sheet(s), real links + QR) and it called print() ${printed}x`);
+// Share: the primary sharing action shows THIS review's real links (no sample data), and the copy control copies them.
+await f.goto(`${BASE}/next/#/review/${a.id}/collect`); await f.waitForSelector("h1"); await loaded(f, "collect (before share)");
+await f.click("text=Share the survey"); await f.waitForURL(/\/share$/); await f.waitForSelector("input.in[readonly]", { timeout: 30000 }); await loaded(f, "share");
+const shareLinks = await f.evaluate(() => [...document.querySelectorAll("input.in[readonly]")].map((i) => i.value));
+if (!shareLinks.length || !shareLinks.every((l) => l.startsWith(`${BASE}/next/?ui_next=on#survey=`))) fail(`share: links are not this review's real links: ${JSON.stringify(shareLinks)}`);
+if (/3dreview\.app|Mark 1–4|Hindi New Testament/.test(await f.textContent("body"))) fail("share: sample data on the live screen");
+await fac.grantPermissions(["clipboard-read", "clipboard-write"]).catch(() => {});
+const copyBtn = f.locator('button[aria-label^="Copy link for"]').first(); if (!(await copyBtn.count())) fail("share: no copy control for the signed-in role");
+await copyBtn.click(); await f.waitForTimeout(300);
+const clip = await f.evaluate(() => navigator.clipboard.readText().catch(() => "")).catch(() => "");
+const copiedShown = await f.evaluate(() => /Link copied/.test(document.body.textContent ?? ""));
+if (clip && !shareLinks.includes(clip)) fail(`share: clipboard holds ${clip}, not one of the review's links`);
+if (!copiedShown && !clip) fail("share: copy neither reported success nor wrote the clipboard");
+ok(`share: ${shareLinks.length} real link(s) for this review; copy ${clip ? "wrote the clipboard with a real link" : "reported Link copied"}`);
+await f.goto(`${BASE}/next/#/nowhere/at/all`); await f.waitForSelector("text=Your reviews"); ok("unknown deep link falls back to home");
+// sign out from the account menu
+await f.click("summary:has-text('Account menu'), #acct summary, [aria-label^='Account menu']").catch(() => {});
+await browser.close();
+if (errors.length) { console.log("❌ page errors (the run fails):"); for (const e of errors) console.log("  ", e.slice(0, 300)); process.exit(1); }
+console.log("DONE clean");

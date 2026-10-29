@@ -1,0 +1,49 @@
+// UI Next (v4) live data helpers (status: provisional): QR modules for a real survey link, gap names from a built report, stage words.
+import { describe, expect, it } from "vitest";
+// @ts-expect-error -- plain .js module, no type declarations
+import { qrModules, gapsOf, radarOf, STAGE_OF, lensKeyOf, shortDate } from "../ui-next/src/app/data.js";
+import { qrPrintHtml, openQrPrint } from "../ui-next/src/app/print.js";
+
+describe("live data helpers", () => {
+  it("a date-only period day is read as that calendar day in every timezone, never shifted through UTC (captain CUA: Oct 22 showed as Oct 21 in America/New_York)", () => {
+    const tz = process.env.TZ; process.env.TZ = "America/New_York";
+    try { expect(shortDate("2026-10-22")).toBe("Oct 22"); expect(shortDate("2026-11-22")).toBe("Nov 22"); } finally { if (tz === undefined) delete process.env.TZ; else process.env.TZ = tz; }
+    expect(shortDate("not a date")).toBe("");
+  });
+  it("encodes a survey link as a square module grid larger than the boards' 21x21", () => {
+    const { n, cells } = qrModules("https://dev.3dreview.app/next/#survey=link_GbXohvv-fTJm2GksjCwoFsuTza5vXqxl");
+    expect(n).toBeGreaterThan(21);
+    expect(cells).toMatch(/^[01]+$/);
+    expect(cells.length).toBe(n * n);
+  });
+  it("names the widest gaps and the same-band areas from cross_lens_multi", () => {
+    // Codex P2 4383879670: from the placed scores (post-suppression), not agreement_range: biggest = gapRows' first three (a band or
+    // more apart, widest placed spread first); agree (QA-LIVE Q13) = every area whose two or more placed perspectives share a band
+    // (A 60/65 and D 62/63 are Growing/Growing; C and E are one band apart, so a gap and never agreement)
+    const area = (name: string, team: number, community: number) => ({ construct_name: name, agreement_range: Math.abs(team - community), lens_scores: [{ lens: "team", score: team }, { lens: "community", score: community }] });
+    const payload = { cross_lens_multi: [area("A", 60, 65), area("B", 80, 55), area("C", 77, 60), area("D", 62, 63), area("E", 70, 79)] };
+    expect(gapsOf(payload, { team: 5, community: 5, church: 0 })).toEqual({ biggest: ["B", "C", "E"], agree: ["A", "D"] });
+    // every compared area apart: no agreement at all (and no >3-area prerequisite either way)
+    expect(gapsOf({ cross_lens_multi: [area("X", 90, 30), area("Y", 76, 70)] }, { team: 5, community: 5, church: 0 })).toEqual({ biggest: ["X", "Y"], agree: [] });
+    expect(gapsOf({ cross_lens_multi: [area("Z", 62, 70)] }, { team: 5, community: 5, church: 0 })).toEqual({ biggest: [], agree: ["Z"] });
+    expect(radarOf(payload)).toEqual(["A", "B", "C", "D", "E"]);
+    expect(gapsOf(null, {})).toEqual({ biggest: [], agree: [] });
+  });
+  it("maps server stages and perspectives to the lanes' words", () => {
+    expect(STAGE_OF.prepare).toBe("setup"); expect(STAGE_OF.collect).toBe("collecting"); expect(STAGE_OF.understand).toBe("results");
+    expect(lensKeyOf("Translation Team")).toBe("team"); expect(lensKeyOf("Church")).toBe("church"); expect(lensKeyOf("Other")).toBeNull();
+  });
+  it("Print QR pages: the print document carries each chosen survey's real link and QR (ui/assess/share.js sheets), one page per survey or all on one, prints itself, and reports a blocked tab", () => {
+    const surveys = [{ name: "Written", fullLink: "http://x/next/?ui_next=on#survey=link_1" }, { name: "Involved-Pastor", fullLink: "http://x/next/?ui_next=on#survey=link_2" }, { name: "held", fullLink: null }];
+    const one = qrPrintHtml({ title: "Mark 1–4 draft", surveys, per: "survey", paper: "A4", autoPrint: true });
+    expect(one.match(/class="share-sheet-print"/g)).toHaveLength(2); expect(one).toContain("link_1"); expect(one).toContain("link_2"); expect(one).toContain("<svg"); expect(one).toContain("@page{size:A4}"); expect(one).toContain("print()},300)");
+    const all = qrPrintHtml({ title: "Mark 1–4 draft", surveys, per: "one", paper: "Letter" });
+    expect(all).toContain("data-print-all-sheet"); expect(all.match(/<li class="share-all-item"/g)).toHaveLength(2); expect(all).not.toContain("print()},300)");
+    expect(qrPrintHtml({ title: "t", surveys: [{ name: "x", fullLink: null }] })).toBe("");
+    const sheet = qrPrintHtml({ title: "Mark 1–4 draft", surveys, per: "sheet", paper: "Letter" }); // hand-out cards: one page per survey, six cards each
+    expect(sheet.match(/class="share-sheet-print share-all share-cards"/g)).toHaveLength(2); expect(sheet.match(/<li class="share-all-item"/g)).toHaveLength(12); expect(sheet.match(/link_1/g)!.length).toBe(6);
+    const written: string[] = []; const fake = { open: () => ({ document: { open() {}, write: (h: string) => written.push(h), close() {} } }) };
+    expect(openQrPrint(fake as never, { title: "t", surveys, per: "survey", paper: "Letter" })).toBe(true); expect(written[0]).toContain("link_1");
+    expect(openQrPrint({ open: () => null } as never, { title: "t", surveys, per: "survey", paper: "Letter" })).toBe(false);
+  });
+});

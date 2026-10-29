@@ -1,0 +1,6 @@
+
+.menu[data-align=start]{left:0;right:auto}
+.mi[aria-disabled=true],.mi[aria-disabled=true]:hover{color:var(--ink-3);background:transparent;box-shadow:none;cursor:not-allowed}
+.mi-why{margin:0;padding:4px 12px 8px;font-size:var(--t-13);line-height:20px;color:var(--ink-2)}
+.mi-head{padding:10px 12px 8px}
+.mi .tag{margin-left:auto}

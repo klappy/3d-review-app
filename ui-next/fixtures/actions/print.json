@@ -1,0 +1,27 @@
+{
+ "_source": "Mock data for Print / PrintPhone (cookbook design/2026-10-15-glass-redesign/canvas). Status: provisional.",
+ "checked": [
+  2,
+  3
+ ],
+ "phoneChecked": [
+  0,
+  2
+ ],
+ "phoneStatus": [
+  "Hindi ✓",
+  "",
+  "Hindi ✓",
+  "Odia · translating…",
+  ""
+ ],
+ "sizes": [
+  "A4",
+  "Letter"
+ ],
+ "missing": {
+  "title": "2 phrases are not translated into Hindi yet",
+  "text": "They print in English, marked."
+ },
+ "preview": "Preview · Community, in Hindi · A4 · 3 pages"
+}

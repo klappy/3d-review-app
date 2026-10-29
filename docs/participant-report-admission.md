@@ -8,6 +8,8 @@ Production activation was explicitly approved on October 14 and made durable in 
 
 The existing assessment-wide minimum of five responses, refusal of mixed pinned fixtures/participant captures, exact assessment grants, preview/confirmation, immutable snapshots and source-derived scoring remain. The three-response per-perspective minimum controls overview bands only. Full reports can contain smaller-group aggregates; five and three are existing working defaults, not a validated privacy guarantee. The owner accepted this disclosure shape for activation; this document does not change it.
 
+DEV only (`ENVIRONMENT=dev`): the server-owned floor is one participant response (`src/report-admission.ts` `participantReportMinimum`), and UI Next bands a perspective from its first response with a coverage jar beside the level (3d-review-cookbook `work/active/2026-10-26-3d-report-threshold-coverage`). Every other environment, production included, keeps the five-response floor above; lowering it there needs its own disclosure decision.
+
 Raw response lists, demographic breakdowns and row-level exports remain held. No new scoring formula or global quality average is introduced.
 
 ## Verification boundaries and documentation debt

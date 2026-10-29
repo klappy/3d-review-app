@@ -1,0 +1,17 @@
+/* The pinned board CSS positions chrome inside a fixed drawing. Live pages
+   scroll: keep phone actions in the viewport and respect the device safe area. */
+.app.l-screen{overflow:clip}
+.phone-bar{position:fixed;padding-bottom:calc(28px + env(safe-area-inset-bottom))}/* design-system.md §9 phone-bar: fixed to the viewport foot (left/right/bottom 0 from base.css); main.l-phone's 120px bottom padding (§8.3) keeps the last content clear of it */
+/* The phone screen is the board's frame (design-system.md §9 Phone frame; Codex P2 4383334410): exactly one dynamic viewport tall,
+   the shell fills it, and main.l-page.l-phone.phone-main (base.css .phone-main: flex 1 1 0, min-height 0, overflow-y auto) scrolls
+   inside it, so the header stays put; short pages still put the bar at the viewport foot, and .l-phone's 120px bottom padding is the
+   bar's clearance. Desktop screens are unchanged. (cookbook VALIDATION-integration.md B1) */
+.app.l-screen[data-w=phone]{display:flex;flex-direction:column;height:100dvh}
+.app.l-screen[data-w=phone]>.l-shell{flex:1 1 0;min-height:0}
+
+.phone-top .btn,.phone-top .menu-btn{min-width:44px}
+.phone-top .menu-btn{padding:0;justify-content:center}
+.phone-title{flex-grow:1;min-width:0;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--ink);font-size:var(--t-14);line-height:20px}
+.phone-step{color:var(--ink);font-weight:600;font-size:var(--t-14)}
+.phone-top>:last-child:not(:first-child){margin-left:auto}
+.phone-bar .btn-primary{flex-grow:1}

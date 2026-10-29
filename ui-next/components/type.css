@@ -1,0 +1,22 @@
+
+/* The board frame is a fixed 1280x800 drawing, so .l-shell's height:100% fills it. Live desktop pages have no frame: .app is at least
+   one viewport tall, the shell grows to fill it, and main.l-main[data-rhythm=center] (QR room) centres its stack the way the board
+   does. Same mechanism phone.css already gives the phone screen. */
+.app.l-screen{display:flex;flex-direction:column;min-height:100vh}
+.app.l-screen>.l-shell{flex:1 0 auto}
+/* Script focus targets (design-system.md section 2 "Dialog and sheet states", R14 Focus on open and Focus return): a dialog or page
+   title with tabindex="-1" takes focus so a screen reader starts there (Print, PrintQR). It is a heading, not a control, and never
+   in the Tab order, so it draws no ring: not the browser's default ring (a black or white box on arrival), not the kit's. Tab moves
+   on to the first control, which draws the kit's 3px --focus ring on :focus-visible (base.css, button.css; never removed).
+   Headings only: a roving-tabindex tab or row with tabindex="-1" is a control and keeps its ring. (cookbook VALIDATION-integration N2) */
+.app :is(h1,h2,h3,h4,h5,h6)[tabindex="-1"]:focus{outline:none}
+.app[data-w=phone] .display{font-size:var(--t-36);line-height:40px}
+.app .l-row[data-wrap]{flex-wrap:wrap}
+.app .l-row[data-split]{justify-content:space-between}
+.app details > summary{cursor:pointer}
+/* Text summaries shrink to their label; an icon-only summary (.btn-icon) keeps the contract 44x44 target (design-system.md section 2 Button row). */
+.app details > summary:not(.btn-icon){width:max-content}
+.card-link.l-stack{display:flex}
+
+/* Landing perspective chip (boards_fac.py landing(), f56a751): 40px, --radius-m, lens-soft ground, lens-coloured icon. */
+.icn.icn-lens{width:40px;height:40px;background:var(--lens-soft);color:var(--lens)}

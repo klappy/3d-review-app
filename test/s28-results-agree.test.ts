@@ -1,5 +1,8 @@
 import {readFileSync} from 'node:fs';
-import {beforeAll,afterAll,describe,it,expect} from 'vitest';
+import {beforeAll,afterAll,describe,it,expect,vi} from 'vitest';
+// Render-failure seam for the hold-reason test below: off by default, so every other test renders for real.
+const renderFault=vi.hoisted(()=>({on:false}));
+vi.mock('../src/synthetic-report-renderer',async(orig)=>{const m:any=await orig();return {...m,renderAttestedCapture:(c:unknown)=>{if(renderFault.on)throw new Error('render fault (test)');return m.renderAttestedCapture(c);}};});
 import {Miniflare,convertV4MiniflareOptions} from 'miniflare';
 import {summary} from '../src/handlers/results';
 import {list as responseList} from '../src/handlers/response';
@@ -12,8 +15,9 @@ import type {Ctx} from '../src/handlers/types';
 // how many responses are in, how many are needed, scores held — and no report is scored from too few answers.
 const mf=new Miniflare(convertV4MiniflareOptions({workers:[{name:'s28-results-agree',modules:true,script:"export default {fetch(){return new Response('x')}}",d1Databases:{DB:'s28-fixture'}}]}));
 let db:D1Database;
-const src='assess_syn_earning-trust-2026-01', one='assess_s28_one', full='assess_s28_full';
-const ctx=():Ctx=>({env:{DB:db,SESSION_SECRET:'s28-test',ENVIRONMENT:'dev'} as unknown as Ctx['env'],db,principal:{id:'person_mara',kind:'user'},traceId:'tr_s28',now:()=>new Date('2026-09-30T16:00:00.000Z'),log:()=>{}});
+const src='assess_syn_earning-trust-2026-01', one='assess_s28_one', full='assess_s28_full', zero='assess_s28_zero', three='assess_s28_three';
+// production (reports enabled) keeps the five-response floor; DEV's floor is one response (report-admission.ts participantReportMinimum).
+const ctx=(ENVIRONMENT='dev'):Ctx=>({env:{DB:db,SESSION_SECRET:'s28-test',ENVIRONMENT,PARTICIPANT_REPORTS:'enabled'} as unknown as Ctx['env'],db,principal:{id:'person_mara',kind:'user'},traceId:'tr_s28',now:()=>new Date('2026-09-30T16:00:00.000Z'),log:()=>{}});
 const run=(sql:string,...a:unknown[])=>db.prepare(sql).bind(...a).run();
 async function clone(aid:string,limit:number){
  await run(`INSERT INTO assessment (id,project_id,language_id,name,purpose,period,format,stage,created_at,created_by) SELECT ?1,project_id,language_id,name||' (participant)',purpose,period,format,stage,created_at,created_by FROM assessment WHERE id=?2`,aid,src);
@@ -27,21 +31,90 @@ beforeAll(async()=>{
   const sql=readFileSync(new URL('../'+file,import.meta.url),'utf8').split('\n').filter(l=>!l.trimStart().startsWith('--')).join('\n');
   const statements=sql.split(';\n').map(s=>s.trim()).filter(Boolean);for(let i=0;i<statements.length;i+=50)await db.batch(statements.slice(i,i+50).map(s=>db.prepare(s)));
  }
- await clone(one,1);await clone(full,50);
+ await clone(one,1);await clone(full,50);await clone(zero,0);await clone(three,3);
 },60000);
 afterAll(()=>mf.dispose());
 const reports=async(aid:string)=>Number((await db.prepare('SELECT count(*) AS n FROM synthetic_report WHERE assessment_id=?').bind(aid).first<{n:number}>())?.n);
 describe('S28: Results, responses list and report agree below the D7 minimum',()=>{
  it('below the minimum: all three are held and name the same numbers; no report is built',async()=>{
   const want={suppressed:true,status:'held',responses_in:1,responses_needed:SUPPRESSION_THRESHOLD};
-  const r:any=(await summary(ctx(),{aid:one})).result, l:any=(await responseList(ctx(),{aid:one})).result;
-  const preview:any=(await build(ctx(),{aid:one},{dryRun:true} as any)).result, made:any=(await build(ctx(),{aid:one})).result;
-  const listed:any=(await reportList(ctx(),{aid:one})).result;
+  const P=ctx('production');
+  const r:any=(await summary(P,{aid:one})).result, l:any=(await responseList(P,{aid:one})).result;
+  const preview:any=(await build(P,{aid:one},{dryRun:true} as any)).result, made:any=(await build(P,{aid:one})).result;
+  const listed:any=(await reportList(P,{aid:one})).result;
   for(const view of [r,l,preview,made,listed])expect(view).toMatchObject(want);
   expect(new Set([r,l,preview,made,listed].map(v=>v.reason)).size).toBe(1);
   expect(r.reason).toBe(`1 response so far; at least ${SUPPRESSION_THRESHOLD} are needed before any score is shown. Scores are held until then.`);
   expect(r.summary).toBeNull();expect(l.responses).toEqual([]);expect(made.report).toBeNull();expect(listed.reports).toEqual([]);
   expect(await reports(one)).toBe(0);
+  // the per-perspective level minimum rides on Results only, and is 3 outside DEV; the overall floor of 5 above is unchanged
+  expect(r.level_minimum_responses).toBe(3);expect((await summary(ctx('dev'),{aid:one})).result).toMatchObject({level_minimum_responses:1});
+ },60000);
+ it('Codex P2s 4383266687, 4383599307: report_build_allowed on Results is the store\'s own build eligibility, in every environment',async()=>{
+  // the flag off (production without PARTICIPANT_REPORTS, an unknown environment) holds every participant build whatever the count,
+  // while a trusted pinned synthetic capture still builds (participant=false): Results must answer exactly what the build decides.
+  const off=(ENVIRONMENT:string):Ctx=>{const c=ctx(ENVIRONMENT);return {...c,env:{...c.env,PARTICIPANT_REPORTS:undefined}} as Ctx;};
+  const cases:[string,Ctx,string,boolean][]=[['production, flag off, 50 participant responses',off('production'),full,false],['unknown environment, 50 participant responses',off('staging'),full,false],
+   ['production, flag on, 50 participant responses',ctx('production'),full,true],['production, flag on, 1 participant response',ctx('production'),one,false],['DEV, 1 participant response',ctx('dev'),one,true],
+   ['production, flag off, trusted synthetic capture',off('production'),src,true]];
+  for(const [name,c,aid,want] of cases){
+   const r:any=(await summary(c,{aid})).result, dry:any=(await build(c,{aid},{dryRun:true} as any)).result;
+   expect(r.report_build_allowed,name).toBe(want);
+   expect(dry.status,name).toBe(want?'ready':'held');
+  }
+  // and the synthetic capture really builds there, the production participant floor (5) unchanged
+  const made:any=(await build(off('production'),{aid:src})).result;expect(made.suppressed).toBe(false);expect(made.report?.id).toMatch(/^sreport_/);
+  expect(SUPPRESSION_THRESHOLD).toBe(5);
+ },60000);
+ it('Codex P2 4383751986: report_hold_reason is the same decision\'s reason; environment never reads as a count to collect',async()=>{
+  const off=(ENVIRONMENT:string):Ctx=>{const c=ctx(ENVIRONMENT);return {...c,env:{...c.env,PARTICIPANT_REPORTS:undefined}} as Ctx;};
+  const cases:[string,Ctx,string,boolean,string|null][]=[
+   ['production, flag off, 3 participant responses',off('production'),three,false,'environment'],
+   ['production, flag off, 50 participant responses',off('production'),full,false,'environment'],
+   ['unknown environment, 3 participant responses',off('staging'),three,false,'environment'],
+   ['production, flag on, 3 participant responses',ctx('production'),three,false,'count'],
+   ['DEV, 0 responses',ctx('dev'),zero,false,'count'],
+   ['DEV, 1 participant response',ctx('dev'),one,true,null],
+   ['production, flag off, trusted synthetic capture',off('production'),src,true,null]];
+  for(const [name,c,aid,allowed,why] of cases){
+   const r:any=(await summary(c,{aid})).result, dry:any=(await build(c,{aid},{dryRun:true} as any)).result;
+   expect([r.report_build_allowed,r.report_hold_reason],name).toEqual([allowed,why]);
+   expect(dry.status,name).toBe(allowed?'ready':'held');
+  }
+  // the count fields stay on the response (the UI ignores them under "environment")
+  expect((await summary(off('production'),{aid:three})).result).toMatchObject({responses_in:3,responses_needed:SUPPRESSION_THRESHOLD,report_hold_reason:'environment'});
+ },60000);
+ it('Codex P2 4383879675: report_build_allowed is "this caller can build now"; the hold reason is the capture\'s, whatever the role',async()=>{
+  // an eligible capture (DEV, one participant response): an owner/member can build; a viewer, and global support without an
+  // assessment grant, read the same null reason (the capture is eligible) but not allowed, and their dry run is refused as the store
+  // refuses them; a held capture names its reason to a viewer too.
+  await run(`INSERT INTO principal (id,email_hash,provisioned,support,created_at) VALUES ('person_s28_viewer','s28_viewer',0,0,'2026-09-30T00:00:00.000Z'),('person_s28_member','s28_member',0,0,'2026-09-30T00:00:00.000Z'),('person_s28_support','s28_support',0,1,'2026-09-30T00:00:00.000Z')`);
+  for(const aid of [one,zero])await run(`INSERT INTO "grant" (id,principal_id,scope_type,scope_id,role,created_at) VALUES (?1||'_v','person_s28_viewer','assessment',?1,'viewer','2026-09-30T00:00:00.000Z'),(?1||'_m','person_s28_member','assessment',?1,'member','2026-09-30T00:00:00.000Z')`,aid);
+  const as=(id:string,kind:'user'|'support'='user'):Ctx=>({...ctx('dev'),principal:{id,kind} as Ctx['principal']});
+  const cases:[string,Ctx,string,boolean,string|null][]=[
+   ['owner, eligible capture',ctx('dev'),one,true,null],
+   ['member, eligible capture',as('person_s28_member'),one,true,null],
+   ['viewer, eligible capture',as('person_s28_viewer'),one,false,null],
+   ['support without an assessment grant, eligible capture',as('person_s28_support','support'),one,false,null],
+   ['viewer, 0 responses',as('person_s28_viewer'),zero,false,'count'],
+   ['member, 0 responses',as('person_s28_member'),zero,false,'count']];
+  for(const [name,c,aid,allowed,why] of cases){
+   const r:any=(await summary(c,{aid})).result;
+   expect([r.report_build_allowed,r.report_hold_reason],name).toEqual([allowed,why]);
+   const dry=await build(c,{aid},{dryRun:true} as any).then((x:any)=>x.result.status,()=>'refused');
+   // the dry run itself needs the builder grant: refused for a viewer or support whatever the capture, else ready or held as allowed says
+   expect(dry,name).toBe(/^(viewer|support)/.test(name)?'refused':allowed?'ready':'held');
+  }
+ },60000);
+ it('DEV: one response is enough to build; zero responses hold and name a floor of one',async()=>{
+  // 3d-review-cookbook work/active/2026-10-26-3d-report-threshold-coverage: >=1 response in each included lens builds the report.
+  const z:any=(await summary(ctx(),{aid:zero})).result, zb:any=(await build(ctx(),{aid:zero},{dryRun:true} as any)).result;
+  for(const v of [z,zb])expect(v).toMatchObject({suppressed:true,status:'held',responses_in:0,responses_needed:1});
+  expect(z.reason).toBe('0 responses so far; at least 1 is needed before any score is shown. Scores are held until then.');
+  const preview:any=(await build(ctx(),{aid:one},{dryRun:true} as any)).result;expect(preview).toMatchObject({suppressed:false,status:'ready'});
+  const made:any=(await build(ctx(),{aid:one})).result;expect(made.suppressed).toBe(false);expect(made.report?.id).toMatch(/^sreport_/);
+  const listed:any=(await reportList(ctx(),{aid:one})).result;expect(listed.reports.map((x:any)=>x.id)).toContain(made.report.id);
+  const held:any=(await reportGet(ctx('production'),{id:made.report.id})).result;expect(held).toMatchObject({suppressed:true,status:'held',responses_needed:SUPPRESSION_THRESHOLD});
  },60000);
  it('a stored or listed participant report re-attests through the same minimum, so reads hold too',async()=>{
   // get and list re-attest the capture before disclosure; the minimum lives in that one attestation step.
@@ -58,5 +131,24 @@ describe('S28: Results, responses list and report agree below the D7 minimum',()
   for(const v of [r,l]){expect(v).not.toHaveProperty('responses_in');expect(v).not.toHaveProperty('responses_needed');}
   const preview:any=(await build(ctx(),{aid:full},{dryRun:true} as any)).result;expect(preview).toMatchObject({suppressed:false,status:'ready'});
   const made:any=(await build(ctx(),{aid:full})).result;expect(made.suppressed).toBe(false);expect(made.report?.id).toMatch(/^sreport_/);
+ },60000);
+ it('Codex P2 4406305544: "count" only for the below-minimum refusal; a mixed-source or unrenderable capture is "capture"',async()=>{
+  const P=ctx('production');
+  const reason=async(aid:string)=>{const r:any=(await summary(P,{aid})).result;return [r.report_build_allowed,r.report_hold_reason];};
+  // pure participant below the floor: collect more
+  expect(await reason(three)).toEqual([false,'count']);
+  // render failure on an attested capture (50 participant responses, above the floor): not a count to collect
+  renderFault.on=true;try{expect(await reason(full)).toEqual([false,'capture']);}finally{renderFault.on=false;}
+  expect(await reason(full)).toEqual([true,null]);
+  // mixed source below the floor: one pinned synthetic response plus one participant response (2 < 5). Move the other synthetic
+  // rows to a spill review's surveys, then add a participant row; attestCapture refuses MIXED_SOURCE, which more responses never fix.
+  const spill='assess_s28_spill';await clone(spill,0);
+  const ids=(await db.prepare(`SELECT r.id FROM response r JOIN assessment_survey s ON s.id=r.assessment_survey_id WHERE s.assessment_id=? ORDER BY r.id`).bind(src).all<{id:string}>()).results.map(x=>x.id);
+  expect(ids.length).toBeGreaterThan(1);
+  for(const id of ids.slice(1))await run(`UPDATE response SET assessment_survey_id=?1||assessment_survey_id WHERE id=?2`,spill,id);
+  await run(`INSERT INTO response (id,assessment_survey_id,respondent_id,idempotency_key,answers_json,template_id,template_version,source,submitted_at) SELECT 's28p_'||id,assessment_survey_id,'s28p_'||respondent_id,'s28p_'||idempotency_key,answers_json,template_id,template_version,'participant',submitted_at FROM response WHERE id=?1`,ids[0]);
+  const c=await captureForBuild(P,src);expect(c.eligible).toBe(false);
+  expect(await reason(src)).toEqual([false,'capture']);
+  expect((await build(P,{aid:src},{dryRun:true} as any)).result).toMatchObject({status:'held'});
  },60000);
 });
