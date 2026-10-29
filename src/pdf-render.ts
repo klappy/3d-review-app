@@ -11,26 +11,31 @@ export async function pdfBytes(html: string, paper: 'letter'|'a4', env: PdfEnv, 
   if (signal?.aborted) throw new PdfError('PDF_INTERRUPTED','PDF download interrupted. Try again.',499);
   let timer: ReturnType<typeof setTimeout>;
   let abort: () => void = () => {};
+  let stoppedReason: PdfError | undefined;
+  let reader: ReadableStreamDefaultReader<Uint8Array> | undefined;
   const stopped = new Promise<never>((_,reject) => {
-    timer = setTimeout(() => reject(new PdfError('PDF_TIMEOUT','PDF generation took too long. Try again or use Print.',504)),timeoutMs);
-    abort = () => reject(new PdfError('PDF_INTERRUPTED','PDF download interrupted. Try again.',499));
+    const stop = (reason:PdfError) => { stoppedReason=reason; void reader?.cancel().catch(()=>{}); reject(reason); };
+    timer = setTimeout(() => stop(new PdfError('PDF_TIMEOUT','PDF generation took too long. Try again or use Print.',504)),timeoutMs);
+    abort = () => stop(new PdfError('PDF_INTERRUPTED','PDF download interrupted. Try again.',499));
     signal?.addEventListener('abort',abort,{once:true});
   });
   const render = async () => {
     const response = await env.PDF_BROWSER!.quickAction('pdf',{
       html, rejectRequestPattern:['/^https?:/','/^file:/','/^ftp:/','/^wss?:/'],
-      pdfOptions:{format:paper==='a4'?'a4':'letter',preferCSSPageSize:true,printBackground:true,waitForFonts:true,timeout:25_000},
+      pdfOptions:{format:paper==='a4'?'a4':'letter',preferCSSPageSize:true,printBackground:true,timeout:25_000},
       gotoOptions:{waitUntil:'load',timeout:25_000},
     });
+    // The binding has no AbortSignal parameter. A late response is cancelled immediately; it is never drained after stop.
+    if(stoppedReason) { await response.body?.cancel().catch(()=>{}); throw stoppedReason; }
     if (!response.ok || !response.headers.get('content-type')?.toLowerCase().startsWith('application/pdf')) {
       await response.body?.cancel(); throw new PdfError('PDF_FAILED','PDF generation failed. Try again or use Print.');
     }
     if (Number(response.headers.get('content-length')) > PDF_LIMITS.pdfBytes) { await response.body?.cancel(); throw new PdfError('PDF_TOO_LARGE','The generated PDF is too large.',413); }
-    const reader = response.body?.getReader();
+    reader = response.body?.getReader();
     if (!reader) throw new PdfError('PDF_FAILED','PDF generation returned no file. Try again.');
     const chunks:Uint8Array[]=[]; let size=0;
     try {
-      for (;;) { const {done,value}=await reader.read(); if(done)break; size+=value.length; if(size>PDF_LIMITS.pdfBytes)throw new PdfError('PDF_TOO_LARGE','The generated PDF is too large.',413); chunks.push(value); }
+      for (;;) { const {done,value}=await reader.read(); if(stoppedReason)throw stoppedReason; if(done)break; size+=value.length; if(size>PDF_LIMITS.pdfBytes)throw new PdfError('PDF_TOO_LARGE','The generated PDF is too large.',413); chunks.push(value); }
     } catch(e) { await reader.cancel().catch(()=>{}); throw e; }
     const bytes = new Uint8Array(size); let at=0; for(const c of chunks){bytes.set(c,at);at+=c.length;}
     if (new TextDecoder().decode(bytes.slice(0,5))!=='%PDF-') throw new PdfError('PDF_FAILED','PDF generation returned an invalid file. Try again.');

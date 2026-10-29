@@ -1,6 +1,6 @@
 <!-- Isolated binary-PDF control; shared Print/Results/Live integration remains with its file owner. -->
 <script>
-  import { onDestroy } from 'svelte';
+  import { onDestroy, untrack } from 'svelte';
   import Row from '../../Row.svelte';
   import Stack from '../../Stack.svelte';
   import { fetchPdf, pdfLoader, pdfObjectUrl, canSharePdf, sharePdf } from '../../../../ui/pdf/download.js';
@@ -9,6 +9,11 @@
   const loader = pdfLoader(fetchPdf);
   let generation = 0;
   const clear = () => {ready?.dispose();ready=null;file=null;shareable=false;};
+  $effect(()=>{
+    // A retained control must discard a previous report/session's prepared file immediately.
+    const identity=url,credential=token;
+    untrack(()=>{void identity;void credential;generation++;loader.cancel();clear();busy=false;status='';});
+  });
   const cancel = () => {generation++;loader.cancel();busy=false;status='PDF preparation cancelled. You can retry or use Print.';};
   async function prepare() {
     if(busy)return;

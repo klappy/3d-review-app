@@ -23,3 +23,10 @@ it('cancel interrupts the request and allows another preparation',async()=>{
   render(PdfActions,{url:'/v2/survey.pdf',fetchImpl});await fireEvent.click(screen.getByRole('button',{name:'Download PDF'}));
   await fireEvent.click(screen.getByRole('button',{name:'Cancel'}));expect(aborted).toBe(true);expect((screen.getByRole('button',{name:'Download PDF'}) as HTMLButtonElement).disabled).toBe(false);
 });
+it('discards a prepared file when its report URL or session changes',async()=>{
+  const fetchImpl=vi.fn(async()=>new Response('%PDF-1.7\nfixture',{headers:{'content-type':'application/pdf'}}));
+  const view=render(PdfActions,{url:'/v2/reports/first/pdf',token:'first',fetchImpl});
+  await fireEvent.click(screen.getByRole('button',{name:'Download PDF'}));await waitFor(()=>expect(screen.queryByRole('link',{name:'Save PDF'})).not.toBeNull());
+  await view.rerender({url:'/v2/reports/second/pdf',token:'second',fetchImpl});
+  expect(screen.queryByRole('link',{name:'Save PDF'})).toBeNull();expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:local-pdf');expect(screen.getByRole('status').textContent).toBe('');
+});
