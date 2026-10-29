@@ -1,0 +1,8 @@
+/* Static, token-only pending shapes. No shimmer, transition or animation, including reduced-motion mode. */
+.loading-content{min-width:0}
+.loading-shapes{pointer-events:none}
+.loading-bar{height:var(--sp-4);width:100%;max-width:100%;border-radius:var(--radius-s);background:var(--line-2)}
+.loading-bar.loading-title{height:var(--sp-6);width:60%}
+.loading-bar.loading-subtitle{width:45%}
+.loading-bar.loading-short{width:75%}
+.loading-bar.loading-value{height:var(--sp-7);width:35%}
