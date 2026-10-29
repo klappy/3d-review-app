@@ -5,17 +5,13 @@ export const VERSIONS = {
   {
    "version": "0.37.2",
    "added": [],
-   "changed": [],
+   "changed": [
+    "The UI Next preview at `/next/` is built by the standard typecheck and test steps on all branches, including production. Production compiles out fixture galleries and mounts the live app; the current UI at `/` stays the default, with an explicit “Try the new design” menu opt-in.",
+    "Cumulative source includes the existing PR554 build integration, PR574 responsive layout and PR576 production opt-in alongside PR581 navigation performance. Workspace inheritance from the separate unmerged 0.37.1 candidate is excluded. Automated/local evidence and unmeasured physical-device or real-human outcomes remain distinct from pending deployed acceptance."
+   ],
    "fixed": [
+    "UI Next screens at `/next/` (Landing, About, Home and lane screens) now use the phone layout on viewports narrower than 720px instead of only when the link carries `?w=phone`, and switch when the window crosses that width; `?w=phone` and `?w=desktop` still force a layout.",
     "Next UI results and report navigation starts independent reads together, and following an in-page anchor no longer repeats data reads. Existing access checks, required-read errors, explicit report-build confirmation and current UI default are preserved. Automated and local synthetic evidence is distinct from pending DEV and production verification."
-   ]
-  },
-  {
-   "version": "0.37.1",
-   "added": [],
-   "changed": [],
-   "fixed": [
-    "Workspace roles now reach contained assessments and permitted reports without per-assessment invitations. Direct project grants alone do not open assessments; direct-grant delegation and deletion checks, viewer restrictions and report privacy/admission remain. Automated isolated authentication/report scenarios are recorded separately from pending review, DEV and production validation."
    ]
   },
   {
@@ -49,26 +45,19 @@ export const VERSIONS = {
    "fixed": [
     "Report summary: when perspectives disagree about an area with no name, the summary sentence now names it with a dash instead of the word \"undefined\" or \"null\" or a blank. Areas with names are unchanged."
    ]
+  },
+  {
+   "version": "0.35.26",
+   "added": [],
+   "changed": [],
+   "fixed": [
+    "Full report: an area with no name now shows a dash everywhere it appears — beside its radar spoke, in the score tooltip and in the \"Do the perspectives agree?\" list — instead of the words \"undefined\" or \"null\" or a blank. Areas with names are unchanged."
+   ]
   }
  ],
  "forecast": {
-  "version": "0.37.3",
-  "bump": "patch",
-  "units": [
-   {
-    "file": "554-1641.md",
-    "bump": "patch",
-    "lane": 554,
-    "section": "Changed",
-    "text": "The UI Next preview at `/next/` is now built by the standard build itself (the `typecheck` and `test` steps), so DEV keeps serving it without a custom build command; production builds (branch `production`) skip it until the production ruling."
-   },
-   {
-    "file": "574-2108.md",
-    "bump": "patch",
-    "lane": 574,
-    "section": "Fixed",
-    "text": "UI Next screens at `/next/` (Landing, About, Home and lane screens) now use the phone layout on viewports narrower than 720px instead of only when the link carries `?w=phone`, and switch when the window crosses that width; `?w=phone` and `?w=desktop` still force a layout."
-   }
-  ]
+  "version": null,
+  "bump": null,
+  "units": []
  }
 };

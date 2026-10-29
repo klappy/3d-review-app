@@ -1,23 +1,28 @@
 {
   "version": "0.37.2",
   "cookbook_repo": "klappy/3d-review-cookbook",
-  "cookbook_commit": "ccc107e04675750cdd1c8ebcbcfbc0191df42b73",
+  "cookbook_commit": "23c005dc3c881ae654ac81bc98c3a3429b185ecb",
   "records": [
     {
       "path": "planning/2026-09-16-parity-build/releases/0.37.2.md",
-      "blob_sha": "b11fc51e1d3d3d2d721ee4ab05b078cf5c6c7de5",
-      "sha256": "d301d7b5023e94c07992ddf69b515e050283abc22d156e26d9b7b2dcee50337f"
+      "blob_sha": "31e96eccb201daf4672e5b920930b9872e129f7a",
+      "sha256": "b8399b6ed320cefeade8625c387e04a6e46bce0ee35b719c5b34f93f97c9c30f"
     },
     {
       "path": "planning/2026-09-16-parity-build/releases/releases.json",
-      "blob_sha": "cc1df2ff73a9a8598134e2bbf574322055d8dba8",
-      "sha256": "f77bede89b670fbd95ac1dbf37fbab178e06bfcdc4fd14f40595b3d7b76c1834"
+      "blob_sha": "ffcc582e2d6d7cc3b82391d6f1e529d95d771c76",
+      "sha256": "ee4fc87944ac26a26d318d41b548ee292ed0f309830e80d67fff34b5c39dafb4"
     }
   ],
   "changelog": {
     "sections": {
       "fixed": [
+        "UI Next screens at `/next/` (Landing, About, Home and lane screens) now use the phone layout on viewports narrower than 720px instead of only when the link carries `?w=phone`, and switch when the window crosses that width; `?w=phone` and `?w=desktop` still force a layout.",
         "Next UI results and report navigation starts independent reads together, and following an in-page anchor no longer repeats data reads. Existing access checks, required-read errors, explicit report-build confirmation and current UI default are preserved. Automated and local synthetic evidence is distinct from pending DEV and production verification."
+      ],
+      "changed": [
+        "The UI Next preview at `/next/` is built by the standard typecheck and test steps on all branches, including production. Production compiles out fixture galleries and mounts the live app; the current UI at `/` stays the default, with an explicit “Try the new design” menu opt-in.",
+        "Cumulative source includes the existing PR554 build integration, PR574 responsive layout and PR576 production opt-in alongside PR581 navigation performance. Workspace inheritance from the separate unmerged 0.37.1 candidate is excluded. Automated/local evidence and unmeasured physical-device or real-human outcomes remain distinct from pending deployed acceptance."
       ]
     }
   }
