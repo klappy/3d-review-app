@@ -1,30 +1,37 @@
 {
-  "version": "0.37.2",
+  "version": "0.38.0",
   "cookbook_repo": "klappy/3d-review-cookbook",
-  "cookbook_commit": "84dd71208a8e4e03e3b05749a5a2f28446ab91c9",
+  "cookbook_commit": "2f278db7aba72680fdb420d217071524233ce547",
   "records": [
     {
-      "path": "planning/2026-09-16-parity-build/releases/0.37.2.md",
-      "blob_sha": "105e0287666e70832e51efcd6a1e2bf0446ec82b",
-      "sha256": "728f8d4d015b7e4520dc85ce20fa3011ff85e3c0d8b324aed06f7dbee184d26f"
+      "path": "planning/2026-09-16-parity-build/releases/0.38.0.md",
+      "blob_sha": "50053c16f4529c3c0effa6b724c914b7f78fe06a",
+      "sha256": "f5f775c9979cb916587ace49c003aaa623d9a23b4a3d5443bf5122b823a37f07"
     },
     {
       "path": "planning/2026-09-16-parity-build/releases/releases.json",
-      "blob_sha": "33262904d27d8f88b643cfc0039b26437d413700",
-      "sha256": "ab5773c05ac1f3927ebde5ba0257e4346e8a4efe0a9082ad165b03c09baeb516"
+      "blob_sha": "02d0ecefabd8956ec24b47fb27a1f9d15b652411",
+      "sha256": "0655dd9390fcb1a89253cde2294dc8bef37ef33afd20808f959df97e786b55fe"
     }
   ],
   "changelog": {
     "sections": {
+      "added": [
+        "Integrated Next project and workspace discovery, scoped saved views, contextual account and People navigation, persisted review plans and durable completion, selected-report history and complete saved report details, confirmed lifecycle and invitation workflows, survey-link management, and explicit print return paths.",
+        "Workspace roles reach contained assessments and permitted reports without per-assessment invitations. Direct project grants alone do not open assessments; direct-owner delegation/deletion, viewer restrictions, report-build policy and production disclosure thresholds remain enforced.",
+        "Next sharing includes existing email drafts, survey-link previews/revocation and one-time access-code issue, copy, export and same-session print with context/principal checks and plaintext-window cleanup. Survey/report PDF downloads use the configured renderer with an honest print fallback."
+      ],
       "fixed": [
-        "UI Next screens at `/next/` (Landing, About, Home and lane screens) now use the phone layout on viewports narrower than 720px instead of only when the link carries `?w=phone`, and switch when the window crosses that width; `?w=phone` and `?w=desktop` still force a layout.",
-        "Next UI results and report navigation starts independent reads together, and following an in-page anchor no longer repeats data reads. Existing access checks, required-read errors, explicit report-build confirmation and current UI default are preserved. Automated and local synthetic evidence is distinct from pending DEV and production verification."
+        "Retained survey selections follow survey IDs across review changes. Async completion stays with its initiating review and principal, rereads current cookie-session identity before mutations and preserves notes saved during stage advancement.",
+        "Access/history controls render inside the themed screen shell; loading uses scoped skeletons. Printed reports include supplied provenance without expanding the on-screen disclosure."
       ],
       "changed": [
-        "The UI Next preview at `/next/` is built by the standard typecheck and test steps on all branches, including production. Production compiles out fixture galleries and mounts the live app; the current UI at `/` stays the default, with an explicit “Try the new design” menu opt-in.",
-        "Cumulative source includes the existing PR554 build integration, PR574 responsive layout and PR576 production opt-in alongside PR581 navigation performance. Workspace inheritance from the separate unmerged 0.37.1 candidate is excluded. Automated/local evidence and unmeasured physical-device or real-human outcomes remain distinct from pending deployed acceptance.",
-        "Inherited PR576 report behavior is unchanged from the existing production source: DEV uses one-response report/per-perspective floors; production retains its existing disclosure gates and thresholds. Report-build admission, member grants, viewer eligibility, pre-close access and coverage cues remain source- and environment-specific; their six-scenario fresh acceptance denominator is explicitly untested here.",
-        "At app c88df937, Operator automated/local production-build and menu-opt-in checks passed 2/2; Facilitator automated/local responsive-layout checks passed 15/15, with zero failures. The six inherited report scenarios (Facilitator/member: DEV floors, member build admission, pre-close access and coverage cues; Facilitator/viewer: eligibility; Operator: production disclosure and threshold retention) have 0 attempted, 0 passed, 0 failed, 6 untested. Operator/Facilitator hosted standard-build, responsive and opt-in scenarios have 0 attempted, 0 passed, 0 failed, 3 untested. No real-human study; satisfaction, confusion and frustration NOT MEASURED."
+        "Compatible additive MINOR candidate from the 0.37.2 DEV baseline. The workspace-inheritance source previously excluded from 0.37.2 is included in this product; the unshipped 0.37.1 version identity remains historical and is not separately published as released.",
+        "The current UI at / remains the default; /next/ retains the existing explicit opt-in. No default rollout, production promotion, schema migration, seed replay or report-scoring policy change is introduced by this packaging correction.",
+        "Facilitator automated/local persistent D1 qualification at app d85c023db50d2d79812a35046f44a824fac1a434: two fixed journeys attempted, two passed, zero failed and zero untested, covering create/edit/readback, repeated completion, runtime reopen and authorization negatives. This bypasses HTTP authentication at the synthetic dispatcher fixture boundary and is not hosted/browser-reload/device acceptance.",
+        "Operator automated/local aggregate at the same product source: 2111 tests passed and three skipped; separate legacy suite 948 passed; additional Node suite 101 passed and six skipped. These overlapping software suites are not combined or counted as persona/UI completion. Twelve bounded mock layout scenes passed their layout checks at 169713228d739e345c5193100ce8aa15fddd4f99; no satisfaction, confusion or frustration study was performed: NOT MEASURED.",
+        "Built: implemented product source with local evidence. Reviewed: independent source/delta findings corrected, formal exact-head approval pending. DEV live: pending; Production live: pending. Hosted persisted-write/readback/reload, installed-phone PWA, external PDF binding and full 262-action qualification remain unverified.",
+        "Remaining boundaries: N05 isolated persistent practice-copy capability; N06 copy-specific simulation/clear/delete and retention contract; N08 reserved recommendation proposal/review service; N09 supplied curated resource rows absent; N17 assisted collector authorization held under D6. Static samples and responsive screenshots do not satisfy real-store or installed-PWA outcomes."
       ]
     }
   }
