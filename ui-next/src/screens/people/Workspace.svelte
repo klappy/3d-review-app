@@ -41,7 +41,7 @@
   // ?state=: no board draws one, so any value (the route passes it as state) renders the default; the prop is not read.
   // data: the fixture, or the live workspace in the same shape (app/data.js workspaceModel); ongroup (live): groups the picked project
   // for real (POST /v2/workspaces/{id}/projects/{pid}) when the dialog's primary is pressed; without it the primary stays the board's link.
-  let { group = false, phone = false, theme = "light", data = fixture, ongroup, onrename, onungroup } = $props();
+  let { group = false, phone = false, theme = "light", data = fixture, ongroup, onrename, onungroup, undo = null, onundo } = $props();
   const d = $derived(data);
   let query = $state("");
   let view = $state("Active");
@@ -50,17 +50,25 @@
   let name = $state("");
   let busy = $state(false);
   let message = $state("");
+  let mustReload = $state(false);
   const beginRename = () => { name = d.name; message = ""; edit = { kind: "rename" }; };
   const beginUngroup = (project) => { message = ""; edit = { kind: "ungroup", project }; };
   async function save() {
-    if (busy || !edit) return;
+    if (busy || mustReload || !edit) return;
     busy = true; message = "";
     try {
       if (edit.kind === "rename") await onrename(name);
       else await onungroup(edit.project);
       edit = null;
       message = "Saved and verified.";
-    } catch (e) { message = `${e.message || "The change could not be confirmed."} Reload before trying again if the outcome is uncertain.`; }
+    } catch (e) { message = `${e.message || "The change could not be confirmed."} Reload before trying again if the outcome is uncertain.`; mustReload = true; }
+    finally { busy = false; }
+  }
+  async function undoRename() {
+    if (busy || mustReload || !undo || undo.used) return;
+    busy = true;
+    try { await onundo(undo); message = "Workspace name restored and verified."; }
+    catch(e) { message = `${e.message || "The undo could not be confirmed."} Reload before trying again.`; mustReload = true; }
     finally { busy = false; }
   }
   const canUngroup = (p) => !!onungroup && (d.role === "owner" || (d.role === "member" && p.directRole === "owner"));
@@ -93,15 +101,16 @@
 {#snippet bar()}{#if phone}<PhoneBar label="New project" lead="plus" href={SETUP} demoted={open} />{/if}{/snippet}
 
 <AppShell {phone} {theme} screen {top} {bar}>
-  {#if onrename && d.role === "owner"}<button class="btn btn-quiet" type="button" onclick={beginRename}>Rename workspace</button>{/if}
+  {#if onrename && d.role === "owner"}<button class="btn btn-quiet" type="button" onclick={beginRename} disabled={busy || mustReload}>Rename workspace</button>{/if}
   {#if phone}<label class="lbl">Find a project<input class="in" type="search" bind:value={query} /></label><label class="lbl">Show projects<select class="in" bind:value={view}>{#each d.views as v}<option>{v}</option>{/each}</select></label>{/if}
+  {#if undo && !undo.used && onundo}<button class="btn" type="button" onclick={undoRename} disabled={busy || mustReload}>Undo workspace rename</button>{/if}
   {#if !visible.length}<p class="small" role="status">No projects match this view.</p>{/if}
   {#if message}<p class="small" role="status">{message}</p>{/if}
   {#if edit}
     <section class="glass-hi l-card l-stack" data-pad="work" data-gap="3" aria-label={edit.kind === "rename" ? "Rename workspace" : "Remove project from workspace"}>
       {#if edit.kind === "rename"}<label class="lbl">Workspace name<input class="in" bind:value={name} disabled={busy} /></label>
       {:else}<h2 class="h3">Remove {edit.project.title} from {d.name}?</h2><p class="small">The project and its reviews remain. People whose access comes only from this workspace lose that access. Direct project grants remain.</p>{/if}
-      <Row gap={2}><button class="btn" type="button" onclick={save} disabled={busy}>{busy ? "Saving…" : edit.kind === "rename" ? "Save workspace name" : "Confirm removal"}</button><button class="btn btn-quiet" type="button" disabled={busy} onclick={() => { edit = null; message = ""; }}>Cancel</button></Row>
+      <Row gap={2}><button class="btn" type="button" onclick={save} disabled={busy || mustReload}>{busy ? "Saving…" : edit.kind === "rename" ? "Save workspace name" : "Confirm removal"}</button><button class="btn btn-quiet" type="button" disabled={busy} onclick={() => { edit = null; message = ""; }}>Cancel</button></Row>
     </section>
   {/if}
   {#if phone}
@@ -115,7 +124,7 @@
           <div class="list-body"><div class="list-title">{p.title}</div><div class="small">{STAGE_LABELS[p.stage]} · {p.phone}</div></div>
           <Pill stage={p.stage} />
         </a>
-        {#if canUngroup(p)}<button class="btn btn-quiet" type="button" onclick={() => beginUngroup(p)}>Remove {p.title} from workspace</button>{/if}
+        {#if canUngroup(p)}<button class="btn btn-quiet" type="button" onclick={() => beginUngroup(p)} disabled={busy || mustReload}>Remove {p.title} from workspace</button>{/if}
       {/each}
     </section>
     <a class="link" href={HOME}>Your reviews across workspaces <Icon d={I.arrow} /></a>
@@ -157,7 +166,7 @@
               <span class="small l-row" data-gap="2"><Icon d={I.clock} />No results yet</span>
             {/if}
           </Card>
-          {#if canUngroup(p)}<button class="btn btn-quiet" type="button" onclick={() => beginUngroup(p)}>Remove {p.title} from workspace</button>{/if}
+          {#if canUngroup(p)}<button class="btn btn-quiet" type="button" onclick={() => beginUngroup(p)} disabled={busy || mustReload}>Remove {p.title} from workspace</button>{/if}
         {/each}
       </Grid>
       <p class="small">Looking for your own reviews across projects? <a class="link" href={HOME}>Your reviews</a> lists everything you facilitate.</p>
