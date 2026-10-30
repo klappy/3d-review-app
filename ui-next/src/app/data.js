@@ -121,8 +121,8 @@ export async function homeModel(me) {
     return { ...base, meta: `Setup not finished · started ${shortDate(a.created_at)}`, phoneMeta: "Setup not finished", action: "Continue setup", href: to("review", { aid: a.id }) };
   };
   const HEAD = { results: ["Results ready", "read and plan the next step"], collecting: ["Collecting", "share the link or QR, watch the counts"], setup: ["Setting up", "pick up where you left off"] };
-  const groups = ["results", "collecting", "setup"].map((stage) => ({ stage, heading: HEAD[stage][0], help: HEAD[stage][1], reviews: all.filter(({ a }) => (STAGE_OF[a.stage] ?? "setup") === stage && a.stage !== "improve").map(row) })).filter((g) => g.reviews.length);
-  const completed = all.filter(({ a }) => a.stage === "improve").map(({ a, p }) => ({ title: a.name, meta: `${p.name} · reviewed`, href: to("results", { aid: a.id }) }));
+  const groups = ["results", "collecting", "setup"].map((stage) => ({ stage, heading: HEAD[stage][0], help: HEAD[stage][1], reviews: all.filter(({ a }) => (STAGE_OF[a.stage] ?? "setup") === stage && !v3IsComplete(a)).map(row) })).filter((g) => g.reviews.length);
+  const completed = all.filter(({ a }) => v3IsComplete(a)).map(({ a, p }) => ({ title: a.name, meta: `${p.name} · reviewed`, href: to("results", { aid: a.id }) }));
   const first = String(me?.principal?.display_name || "").trim().split(/\s+/)[0] || "You";
   const initials = (String(me?.principal?.display_name || "").trim().split(/\s+/).slice(0, 2).map((w) => w[0]?.toUpperCase() ?? "").join("")) || "";
   return { user: { first, name: me?.principal?.display_name || "", initials }, workspace: ws[0]?.name ?? "Your workspace", workspaces: ws, projects: ps, invitation: null, phoneOrder: ["collecting", "setup", "results"], groups, completed, empty: !all.length, start: to("setup1"), rows: all };
@@ -362,7 +362,7 @@ export async function resultsModel(aid, { build = false, reportId = null } = {})
   // left out rather than mislabelled. Language resolves as Collect does (language_name, else language_id via the project's languages).
   const review = { id: a.id, project: p.name, projectId: a.project_id, language, modality: a.format ? a.format[0].toUpperCase() + a.format.slice(1) : "", title: a.name, stage: a.stage === "collect" ? "collecting" : built ? "results" : "closed", closed: "", closedLong: "", builtOn: built ? shortDate(built.created_at) : "", responses, liveResponses, canReadResponses: member, canReopen: member }; // results lane StagePill: the review's real state — collecting | closed (no report yet) | results
   // Role flags (src/handlers: report build, stage and the response list need owner/member; viewers read results and reports only).
-  return { aid, review, reports: list, created_at: built?.created_at, notes: { notes_reflection: a.notes_reflection, notes_next_steps: v3NextParse(a.notes_next_steps).text }, canEditNotes: member, counts, sent: sentLenses(live), payload: built?.payload ?? null, reportId: built?.id ?? null, held: held ?? (built ? null : buildHold(res)), results: res, serverStage: a.stage, canBuild: member && buildAllowed(res), canReadResponses: member, canReopen: member }; // D7: /results is held for everyone until a report exists; a member's first Build must not be hidden behind it (Codex P1 on 26a86937)
+  return { aid, review, complete: a.complete === true, reports: list, created_at: built?.created_at, notes: { notes_reflection: a.notes_reflection, notes_next_steps: v3NextParse(a.notes_next_steps).text }, canEditNotes: member, counts, sent: sentLenses(live), payload: built?.payload ?? null, reportId: built?.id ?? null, held: held ?? (built ? null : buildHold(res)), results: res, serverStage: a.stage, canBuild: member && buildAllowed(res), canReadResponses: member, canReopen: member }; // D7: /results is held for everyone until a report exists; a member's first Build must not be hidden behind it (Codex P1 on 26a86937)
 }
 
 // Gap names for ResultsGaps/Report (results/data.js bandRows reads the payload's cross-perspective areas by construct name), after
@@ -510,7 +510,7 @@ export function nextStepModel(m) {
   const talk = [...gaps.map((g) => [`${g.area} — ${g.dots.map((d) => `${d.lens} ${LEVEL_WORD[d.level]}`).join(" · ")}`, g.apart]), ...weak.map((w) => [w.label, LEVEL_WORD[w.level]])];
   const stage = m.serverStage === "improve" ? "reviewed" : "results";
   return {
-    review: m.review, stage, gaps, weak, glance, talk, notes: m.notes, noticed: m.notes?.notes_reflection ?? "", next: m.notes?.notes_next_steps ?? "", recs: [], recsNote: RECS_UNAVAILABLE, notesNote: "Notes are saved on this review. Automated recommendations are not available.",
+    review: m.review, complete: m.complete === true, stage, gaps, weak, glance, talk, notes: m.notes, noticed: m.notes?.notes_reflection ?? "", next: m.notes?.notes_next_steps ?? "", recs: [], recsNote: RECS_UNAVAILABLE, notesNote: "Notes are saved on this review. Automated recommendations are not available.",
     phone: { title: m.review.title, stage, lead: gaps.length ? "Where the perspectives pull apart, from the built report." : "The built report shows no area two perspectives both scored.", items: gaps.map((g) => ({ kind: "Tension", title: g.area, text: `${g.dots.map((d) => `${NAME[d.lens]} ${LEVEL_WORD[d.level]}`).join(" · ")} — ${g.apart}.`, inPlan: false })) },
     doc: `Next steps · 1 page · ${m.review.title}`,
     meta: [m.review.project, m.review.language, "3D Review next steps", m.review.closed ? `closed ${m.review.closed}` : "", `${m.review.responses} response${m.review.responses === 1 ? "" : "s"}`].filter(Boolean).join(" · "),

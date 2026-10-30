@@ -63,7 +63,7 @@
       </Card>
     {/each}
     {#if live}<Card gap={3} label="Resources for weakest areas"><ReviewResources weak={D.weak} /></Card>{/if}
-    {#if live}<Card gap={3} label="Notes and plan"><PlanEditor notes={D.notes} suggestions={D.talk.map(([topic]) => topic)} {onsave} {oncomplete} /></Card>{/if}
+    {#if live}<Card gap={3} label="Notes and plan"><PlanEditor completed={D.complete} notes={D.notes} suggestions={D.talk.map(([topic]) => topic)} {onsave} {oncomplete} /></Card>{/if}
     <Row wrap gap={2}><Button label="See all results" href={href("results", at)} lead={list} block /><Button label="Print or share the plan" href={href("action-plan", at)} lead={print} block /></Row>
   {:else}
     <Page gap={5}>
@@ -87,7 +87,7 @@
             {#if live}<ReviewResources weak={D.weak} />{/if}
             <input class="in" placeholder="Something else" aria-label="Something else" disabled={live} />
           </Stack>
-          {#if live}<PlanEditor notes={D.notes} suggestions={D.talk.map(([topic]) => topic)} {onsave} {oncomplete} />{:else}
+          {#if live}<PlanEditor completed={D.complete} notes={D.notes} suggestions={D.talk.map(([topic]) => topic)} {onsave} {oncomplete} />{:else}
           <div><label class="lbl" for="ns-noticed">What you noticed</label><textarea class="in" id="ns-noticed" disabled={live} aria-describedby={live ? "ns-notes-why" : undefined}>{D.noticed ?? ""}</textarea></div>
           <div><label class="lbl" for="ns-next">The next step</label><textarea class="in" id="ns-next" disabled={live} aria-describedby={live ? "ns-notes-why" : undefined}>{D.next ?? ""}</textarea></div>
           <Grid cols={2} gap={4}>
