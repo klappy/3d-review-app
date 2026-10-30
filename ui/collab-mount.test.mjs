@@ -29,9 +29,9 @@ test('app.js lifecycle: reset first on identity change; identity/projects snapsh
   assert.ok(app.includes("function resetClientIdentity() {\n  collab.reset();"),'reset() is the first statement of resetClientIdentity');
   assert.ok(app.includes("showAuthorizedWork(result);\n  collab.identity(result);"));
   assert.ok(app.includes("collab.projects(result.projects);"));
-  assert.ok(app.includes("collab.setScope({ type: 'project', id: result.project.id, role: result.project.role });"));
-  assert.ok(app.includes("collab.setScope({ type: 'assessment', id: result.assessment.id, role: result.assessment.role });"));
-  assert.ok(app.includes("if (state.projectView) collab.setScope({ type: 'project', id: state.projectView.id, role: state.projectView.role });"),'leaving an assessment restores the still-selected project');
+  assert.ok(app.includes("collab.setScope({ type: 'project', id: result.project.id, role: result.project.direct_role ?? null });"));
+  assert.ok(app.includes("collab.setScope({ type: 'assessment', id: result.assessment.id, role: result.assessment.direct_role ?? null });"));
+  assert.ok(app.includes("if (state.projectView) collab.setScope({ type: 'project', id: state.projectView.id, role: state.projectView.direct_role ?? null });"),'leaving an assessment restores the still-selected project');
   assert.ok(app.includes("if (ws) collab.setScope({ type: 'workspace', id: ws.id, role: ws.role })"),'leaving a project restores the still-selected workspace');
   assert.ok(app.includes("createCollabHooks({ document, api, sharedMode,"));
   const mount=read('./collab-mount.js');

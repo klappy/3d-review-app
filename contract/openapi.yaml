@@ -921,7 +921,7 @@ paths:
     get:
       operationId: cap.me.invitations
       summary: 'cap.me.invitations — read — roles: any signed-in (own invitations only)'
-      description: Pending collaborator invitations addressed to the signed-in person, matched by hashed email. Each item is id, scope {type, id, name, path}, role, inviter_display_name (null — no name is stored), invited_at, expires_at. scope.name is the scope's name and scope.path its names outermost first (assessment — workspace, project, assessment; project — workspace, project; workspace — its name); names only, for these own live invitations only, never parent ids or other scope contents; name null and path empty when the scope row is gone. Never the token, never the invitee hash; anyone else's invitations are simply absent. The invitation-link token path discloses no name. Accept one with POST /v2/me/invitations/{invitation_id}/accept (cap.grant.accept).
+      description: "pending acceptable collaborator invitations addressed to the signed-in person; child invitations currently blocked by inherited workspace access are omitted; matched by hashed email: id, scope {type, id, name, path}, role, inviter_display_name (null — no name is stored), invited_at, expires_at; never the token, never the invitee hash; others' invitations are simply absent (captain ruling 2026-09-28 15:27 ET k0015). S19 (captain 2026-09-29): for these own, live invitations only, scope.name is the scope's name and scope.path its names outermost first (assessment: workspace › project › assessment; project: workspace › project; workspace: its name) — names only, no parent ids, no other scope contents; name null and path [] when the scope row is gone. The #invite= token path (cap.grant.accept) still discloses no name Pending collaborator invitations addressed to the signed-in person, matched by hashed email. Each item is id, scope {type, id, name, path}, role, inviter_display_name (null — no name is stored), invited_at, expires_at. scope.name is the scope's name and scope.path its names outermost first (assessment — workspace, project, assessment; project — workspace, project; workspace — its name); names only, for these own live invitations only, never parent ids or other scope contents; name null and path empty when the scope row is gone. Never the token, never the invitee hash; anyone else's invitations are simply absent. The invitation-link token path discloses no name. Accept one with POST /v2/me/invitations/{invitation_id}/accept (cap.grant.accept)."
       x-capability: cap.me.invitations
       x-class: read
       x-tool: read
@@ -1320,6 +1320,7 @@ paths:
     post:
       operationId: cap.workspace.add_project
       summary: 'cap.workspace.add_project — write.reversible — roles: O, M with share authority (D2)'
+      description: "Grouping shares project and contained assessment access with workspace grantees. Requires workspace member-or-owner access, direct project ownership and direct ownership of every contained assessment, including archived assessments. Empty projects may be grouped. Authority is rechecked in the containment write."
       x-capability: cap.workspace.add_project
       x-class: write.reversible
       x-tool: write
@@ -1371,6 +1372,7 @@ paths:
     delete:
       operationId: cap.workspace.remove_project
       summary: 'cap.workspace.remove_project — write.reversible — roles: O, M with share authority (D2)'
+      description: "preview shows affected grants"
       x-capability: cap.workspace.remove_project
       x-class: write.reversible
       x-tool: write
@@ -2052,6 +2054,7 @@ paths:
     delete:
       operationId: cap.assessment.delete
       summary: 'cap.assessment.delete — write.dangerous — roles: O'
+      description: "D5; requires a direct assessment-owner grant; inherited workspace ownership alone cannot delete the assessment"
       x-capability: cap.assessment.delete
       x-class: write.dangerous
       x-tool: danger
@@ -2143,6 +2146,7 @@ paths:
     post:
       operationId: cap.assessment.archive
       summary: 'cap.assessment.archive — write.reversible — roles: project O, M'
+      description: "03 project add/remove assessments; needs a direct assessment grant (member+), then member+ at the assessment's project (effective project role), so a workspace role alone never reaches archive; undo=cap.assessment.unarchive"
       x-capability: cap.assessment.archive
       x-class: write.reversible
       x-tool: write
@@ -2190,6 +2194,7 @@ paths:
     post:
       operationId: cap.assessment.unarchive
       summary: 'cap.assessment.unarchive — write.reversible — roles: project O, M'
+      description: "same authority as archive: direct assessment member-or-owner grant plus effective member-or-owner access at the assessment project; inherited workspace access alone cannot unarchive"
       x-capability: cap.assessment.unarchive
       x-class: write.reversible
       x-tool: write
@@ -2907,7 +2912,8 @@ paths:
   /v2/{scope}/{id}/invitations:
     post:
       operationId: cap.grant.invite
-      summary: 'cap.grant.invite — write.effect — roles: O, M(≤M); project scope needs a direct project grant (an inherited workspace role is refused)'
+      summary: "cap.grant.invite — write.effect — roles: O, M(≤M); project and assessment scopes need a direct member-or-owner grant at that scope (an inherited workspace role is refused)"
+      description: "invitation **mail sent** → effect; viewers cannot invite; D3 (proposed); compensate=cap.grant.revoke_invitation"
       x-capability: cap.grant.invite
       x-class: write.effect
       x-tool: danger
@@ -2915,7 +2921,7 @@ paths:
       x-inverse:
         kind: none
         compensating_control: cap.grant.revoke_invitation
-      x-roles: 'O, M(≤M); project scope needs a direct project grant (an inherited workspace role is refused)'
+      x-roles: "O, M(≤M); project and assessment scopes need a direct member-or-owner grant at that scope (an inherited workspace role is refused)"
       x-path-inferred: false
       tags:
       - F. Invitations, codes, collaborators
@@ -2956,7 +2962,8 @@ paths:
   /v2/invitations/{id}:
     delete:
       operationId: cap.grant.revoke_invitation
-      summary: 'cap.grant.revoke_invitation — write.reversible — roles: O, M(≤M); project scope needs a direct project grant (an inherited workspace role is refused)'
+      summary: "cap.grant.revoke_invitation — write.reversible — roles: O, M(≤M); project and assessment scopes need a direct member-or-owner grant at that scope (an inherited workspace role is refused)"
+      description: "compensating control (does not unsend); revoking an owner invitation requires a direct owner grant; the direct-role ceiling and invitation state are rechecked inside the guarded update"
       x-capability: cap.grant.revoke_invitation
       x-class: write.reversible
       x-tool: write
@@ -2964,7 +2971,7 @@ paths:
       x-inverse:
         kind: none
         compensating_control: 're-invite (04: does not unsend)'
-      x-roles: 'O, M(≤M); project scope needs a direct project grant (an inherited workspace role is refused)'
+      x-roles: "O, M(≤M); project and assessment scopes need a direct member-or-owner grant at that scope (an inherited workspace role is refused)"
       x-path-inferred: false
       tags:
       - F. Invitations, codes, collaborators
@@ -2995,6 +3002,7 @@ paths:
     post:
       operationId: cap.grant.accept
       summary: 'cap.grant.accept — write.effect — roles: invitee'
+      description: "**grant released** → effect (disclosure of scope contents begins); compensate=cap.grant.revoke; name the invitation by `token` (mailed link, unchanged) or by `invitation_id` (signed-in invitee, listed by cap.me.invitations; http_alt POST /v2/me/invitations/{invitation_id}/accept) — both require the caller's email hash == invitee_hash; every miss is NOT_FOUND_OR_NOT_VISIBLE (captain ruling 2026-09-28 15:27 ET, B04 step c); 0.35.23 (ASK-f4-finding4 default 1): every invitation, workspace and assessment included, is accepted only while its inviter holds a direct grant at its scope (member or above; owner for an owner invitation); project/assessment acceptance also rechecks that the invitee has no inherited workspace access, both before confirmation and inside the guarded grant/invitation writes, so an older invitation cannot materialize inherited access as a permanent child grant"
       x-capability: cap.grant.accept
       x-class: write.effect
       x-tool: danger
@@ -3039,7 +3047,7 @@ paths:
     post:
       operationId: cap.grant.accept.by_invitation_id
       summary: 'cap.grant.accept (by invitation id, no token) — write.effect — roles: invitee'
-      description: Same capability, handler and receipt as POST /v2/invitations/{token}/accept, for the signed-in invitee who never opened the mailed link. The caller's email hash must equal the invitation's invitee hash; any miss (unknown, withdrawn, someone else's) is NOT_FOUND_OR_NOT_VISIBLE.
+      description: "**grant released** → effect (disclosure of scope contents begins); compensate=cap.grant.revoke; name the invitation by `token` (mailed link, unchanged) or by `invitation_id` (signed-in invitee, listed by cap.me.invitations; http_alt POST /v2/me/invitations/{invitation_id}/accept) — both require the caller's email hash == invitee_hash; every miss is NOT_FOUND_OR_NOT_VISIBLE (captain ruling 2026-09-28 15:27 ET, B04 step c); 0.35.23 (ASK-f4-finding4 default 1): every invitation, workspace and assessment included, is accepted only while its inviter holds a direct grant at its scope (member or above; owner for an owner invitation); project/assessment acceptance also rechecks that the invitee has no inherited workspace access, both before confirmation and inside the guarded grant/invitation writes, so an older invitation cannot materialize inherited access as a permanent child grant Same capability, handler and receipt as POST /v2/invitations/{token}/accept, for the signed-in invitee who never opened the mailed link. The caller's email hash must equal the invitation's invitee hash; any miss (unknown, withdrawn, someone else's) is NOT_FOUND_OR_NOT_VISIBLE."
       x-capability: cap.grant.accept
       x-class: write.effect
       x-tool: danger
@@ -3125,6 +3133,7 @@ paths:
     patch:
       operationId: cap.grant.update_role
       summary: 'cap.grant.update_role — write.effect — roles: O'
+      description: "elevation = grant release (effect); demotion is the compensating control; member cannot elevate above self (D3 proposed); noop (0.35.16): when the grant already holds the requested role (at first read, or set there by another writer before this write), the result, the dry_run result and impact, and the receipt carry noop: true; the impact then names no effect and no compensating control, and the receipt credits the caller with no change (no undo token, no compensating control); confirm (0.35.17): the dry_run binds the role it read into the confirm token, and an execute that reads another role is refused with CONFIRM_REQUIRED (dry_run again); 0.35.19: the token also binds the revoked_invitations count a downgrade preview showed; 0.35.20: it binds the swept invitation id set (not only the count), and the UPDATE re-checks that set in its own WHERE (a same-count swap of the holder's open invitations between preview, token check and write is refused with CONFIRM_REQUIRED and changes nothing); 0.35.23 (ASK-f4-finding4 default 1): at a project or assessment any role change needs a direct owner at that scope; an inherited workspace owner is NOT_AUTHORIZED_AT_SCOPE"
       x-capability: cap.grant.update_role
       x-class: write.effect
       x-tool: danger
@@ -3178,6 +3187,7 @@ paths:
     delete:
       operationId: cap.grant.revoke
       summary: 'cap.grant.revoke — write.reversible — roles: O, M(≤M)'
+      description: "Assessment scope requires a direct assessment member-or-owner grant, rechecked inside the guarded delete; inherited workspace access alone cannot revoke child grants. cannot remove owner; last-owner protected; undo=null (what was seen stays seen) — re-invite instead"
       x-capability: cap.grant.revoke
       x-class: write.reversible
       x-tool: write
@@ -3226,6 +3236,7 @@ paths:
     post:
       operationId: cap.grant.transfer_owner
       summary: 'cap.grant.transfer_owner — write.dangerous — roles: O'
+      description: "D3; confirm (0.35.18): the dry_run binds the owner set and the recipient's direct role it read into the confirm token, and an execute that reads either changed is refused with CONFIRM_REQUIRED (dry_run again); 0.35.19: the token also binds the revoked_invitations count, and the write re-checks the bound state in its own WHERE (a change between token check and write is refused the same way); 0.35.20: the owner set is compared as group_concat ordered in the aggregate itself; the step-down preview binds the swept invitation id set (not only the count) and the INSERT re-checks it; a write refused because the caller lost the direct owner grant in the window is NOT_AUTHORIZED_AT_SCOPE, otherwise CONFIRM_REQUIRED; 0.35.21: a step-down write refused because the swept invitation set moved in the window is CONFIRM_REQUIRED naming the invitations (as update_role), otherwise \"the target changed\""
       x-capability: cap.grant.transfer_owner
       x-class: write.dangerous
       x-tool: danger

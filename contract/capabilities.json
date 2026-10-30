@@ -560,7 +560,7 @@
       "slice": "v2.0-bcs",
       "section": "B. Workspace",
       "ui_surface": "sharing preview",
-      "notes": "preview shows affected grants",
+      "notes": "Grouping shares project and contained assessment access with workspace grantees. Requires workspace member-or-owner access, direct project ownership and direct ownership of every contained assessment, including archived assessments. Empty projects may be grouped. Authority is rechecked in the containment write.",
       "status": "target",
       "inverse": {
         "kind": "true",
@@ -990,7 +990,7 @@
       "slice": "v2.0-bcs",
       "section": "D. Assessment (main page)",
       "ui_surface": "menu",
-      "notes": "same project grant as archive",
+      "notes": "same authority as archive: direct assessment member-or-owner grant plus effective member-or-owner access at the assessment project; inherited workspace access alone cannot unarchive",
       "status": "target",
       "inverse": {
         "kind": "true",
@@ -1013,7 +1013,7 @@
       "slice": "v2.0-bcs",
       "section": "D. Assessment (main page)",
       "ui_surface": "danger",
-      "notes": "D5",
+      "notes": "D5; requires a direct assessment-owner grant; inherited workspace ownership alone cannot delete the assessment",
       "status": "target",
       "inverse": {
         "kind": "none",
@@ -1506,7 +1506,7 @@
         "path": "/v2/{scope}/{id}/invitations",
         "path_inferred": false
       },
-      "roles": "O, M(≤M); project scope needs a direct project grant (an inherited workspace role is refused)",
+      "roles": "O, M(≤M); project and assessment scopes need a direct member-or-owner grant at that scope (an inherited workspace role is refused)",
       "slice": "v2.0-bcs",
       "section": "F. Invitations, codes, collaborators",
       "ui_surface": "\"Invite collaborator\" + impact preview → confirm",
@@ -1537,11 +1537,11 @@
         "path": "/v2/invitations/{id}",
         "path_inferred": false
       },
-      "roles": "O, M(≤M); project scope needs a direct project grant (an inherited workspace role is refused)",
+      "roles": "O, M(≤M); project and assessment scopes need a direct member-or-owner grant at that scope (an inherited workspace role is refused)",
       "slice": "v2.0-bcs",
       "section": "F. Invitations, codes, collaborators",
       "ui_surface": "collaborators panel",
-      "notes": "compensating control (does not unsend)",
+      "notes": "compensating control (does not unsend); revoking an owner invitation requires a direct owner grant; the direct-role ceiling and invitation state are rechecked inside the guarded update",
       "status": "target",
       "inverse": {
         "kind": "none",
@@ -1563,7 +1563,7 @@
       "slice": "v2.0-bcs",
       "section": "F. Invitations, codes, collaborators",
       "ui_surface": "",
-      "notes": "**grant released** → effect (disclosure of scope contents begins); compensate=cap.grant.revoke; name the invitation by `token` (mailed link, unchanged) or by `invitation_id` (signed-in invitee, listed by cap.me.invitations; http_alt POST /v2/me/invitations/{invitation_id}/accept) — both require the caller's email hash == invitee_hash; every miss is NOT_FOUND_OR_NOT_VISIBLE (captain ruling 2026-09-28 15:27 ET, B04 step c); 0.35.23 (ASK-f4-finding4 default 1): every invitation, workspace and assessment included, is accepted only while its inviter holds a direct grant at its scope (member or above; owner for an owner invitation)",
+      "notes": "**grant released** → effect (disclosure of scope contents begins); compensate=cap.grant.revoke; name the invitation by `token` (mailed link, unchanged) or by `invitation_id` (signed-in invitee, listed by cap.me.invitations; http_alt POST /v2/me/invitations/{invitation_id}/accept) — both require the caller's email hash == invitee_hash; every miss is NOT_FOUND_OR_NOT_VISIBLE (captain ruling 2026-09-28 15:27 ET, B04 step c); 0.35.23 (ASK-f4-finding4 default 1): every invitation, workspace and assessment included, is accepted only while its inviter holds a direct grant at its scope (member or above; owner for an owner invitation); project/assessment acceptance also rechecks that the invitee has no inherited workspace access, both before confirmation and inside the guarded grant/invitation writes, so an older invitation cannot materialize inherited access as a permanent child grant",
       "status": "target",
       "inverse": {
         "kind": "none",
@@ -1612,7 +1612,7 @@
       "slice": "v2.0-bcs",
       "section": "F. Invitations, codes, collaborators",
       "ui_surface": "sign-in landing: \"Accept invitation\" first (B04 step c)",
-      "notes": "pending collaborator invitations addressed to the signed-in person, matched by hashed email: id, scope {type,id,name,path}, role, inviter_display_name (null — no name is stored), invited_at, expires_at; never the token, never the invitee hash; others' invitations are simply absent (captain ruling 2026-09-28 15:27 ET k0015). S19 (captain 2026-09-29): for these own, live invitations only, scope.name is the scope's name and scope.path its names outermost first (assessment: workspace › project › assessment; project: workspace › project; workspace: its name) — names only, no parent ids, no other scope contents; name null and path [] when the scope row is gone. The #invite= token path (cap.grant.accept) still discloses no name",
+      "notes": "pending acceptable collaborator invitations addressed to the signed-in person; child invitations currently blocked by inherited workspace access are omitted; matched by hashed email: id, scope {type, id, name, path}, role, inviter_display_name (null — no name is stored), invited_at, expires_at; never the token, never the invitee hash; others' invitations are simply absent (captain ruling 2026-09-28 15:27 ET k0015). S19 (captain 2026-09-29): for these own, live invitations only, scope.name is the scope's name and scope.path its names outermost first (assessment: workspace › project › assessment; project: workspace › project; workspace: its name) — names only, no parent ids, no other scope contents; name null and path [] when the scope row is gone. The #invite= token path (cap.grant.accept) still discloses no name",
       "status": "target",
       "inverse": { "kind": "n/a" },
       "public": false,
@@ -1632,7 +1632,7 @@
       "slice": "v2.0-bcs",
       "section": "F. Invitations, codes, collaborators",
       "ui_surface": "impact preview → confirm",
-      "notes": "elevation = grant release (effect); demotion is the compensating control; member cannot elevate above self (D3 proposed); noop (0.35.16): when the grant already holds the requested role (at first read, or set there by another writer before this write), the result, the dry_run result and impact, and the receipt carry noop: true; the impact then names no effect and no compensating control, and the receipt credits the caller with no change (no undo token, no compensating control); confirm (0.35.17): the dry_run binds the role it read into the confirm token, and an execute that reads another role is refused with CONFIRM_REQUIRED (dry_run again); 0.35.19: the token also binds the revoked_invitations count a downgrade preview showed; 0.35.20: it binds the swept invitation id set (not only the count), and the UPDATE re-checks that set in its own WHERE (a same-count swap of the holder's open invitations between preview, token check and write is refused with CONFIRM_REQUIRED and changes nothing); 0.35.23 (ASK-f4-finding4 default 1): at a project any role change needs a direct project owner; an inherited workspace owner is NOT_AUTHORIZED_AT_SCOPE",
+      "notes": "elevation = grant release (effect); demotion is the compensating control; member cannot elevate above self (D3 proposed); noop (0.35.16): when the grant already holds the requested role (at first read, or set there by another writer before this write), the result, the dry_run result and impact, and the receipt carry noop: true; the impact then names no effect and no compensating control, and the receipt credits the caller with no change (no undo token, no compensating control); confirm (0.35.17): the dry_run binds the role it read into the confirm token, and an execute that reads another role is refused with CONFIRM_REQUIRED (dry_run again); 0.35.19: the token also binds the revoked_invitations count a downgrade preview showed; 0.35.20: it binds the swept invitation id set (not only the count), and the UPDATE re-checks that set in its own WHERE (a same-count swap of the holder's open invitations between preview, token check and write is refused with CONFIRM_REQUIRED and changes nothing); 0.35.23 (ASK-f4-finding4 default 1): at a project or assessment any role change needs a direct owner at that scope; an inherited workspace owner is NOT_AUTHORIZED_AT_SCOPE",
       "status": "target",
       "inverse": {
         "kind": "none",
@@ -1663,7 +1663,7 @@
       "slice": "v2.0-bcs",
       "section": "F. Invitations, codes, collaborators",
       "ui_surface": "",
-      "notes": "cannot remove owner; last-owner protected; undo=null (what was seen stays seen) — re-invite instead",
+      "notes": "Assessment scope requires a direct assessment member-or-owner grant, rechecked inside the guarded delete; inherited workspace access alone cannot revoke child grants. cannot remove owner; last-owner protected; undo=null (what was seen stays seen) — re-invite instead",
       "status": "target",
       "inverse": {
         "kind": "none",
@@ -2150,7 +2150,7 @@
       "slice": "v2.0-bcs",
       "section": "H. Results, reports, recommendations (all rows in the whole-product denominator; summary is `v2.0-bcs`, the rest `v2.1-oct`)",
       "ui_surface": "(Oct)",
-      "notes": "Synthetic-only source-backed immutable reports; exact assessment grant and current/original attestation required. Real-data reporting remains held.",
+      "notes": "Synthetic-only source-backed immutable reports; effective assessment access (direct assessment grant or containing workspace membership) and current/original attestation required. Real-data reporting remains held.",
       "status": "implemented-synthetic-only",
       "inverse": {
         "kind": "none",
@@ -2424,7 +2424,7 @@
       "slice": "v2.0-bcs",
       "section": "H. Results, reports, recommendations (all rows in the whole-product denominator; summary is `v2.0-bcs`, the rest `v2.1-oct`)",
       "ui_surface": "viewer link",
-      "notes": "Synthetic-only source-backed immutable reports; exact assessment grant and current/original attestation required. Real-data reporting remains held.",
+      "notes": "Synthetic-only source-backed immutable reports; effective assessment access (direct assessment grant or containing workspace membership) and current/original attestation required. Real-data reporting remains held.",
       "status": "implemented-synthetic-only",
       "inverse": {
         "kind": "n/a"
@@ -2549,7 +2549,7 @@
       "slice": "v2.0-bcs",
       "section": "H. Results, reports, recommendations (all rows in the whole-product denominator; summary is `v2.0-bcs`, the rest `v2.1-oct`)",
       "ui_surface": "viewer link",
-      "notes": "Synthetic-only source-backed immutable reports; exact assessment grant and current/original attestation required. Real-data reporting remains held.",
+      "notes": "Synthetic-only source-backed immutable reports; effective assessment access (direct assessment grant or containing workspace membership) and current/original attestation required. Real-data reporting remains held.",
       "status": "implemented-synthetic-only",
       "inverse": {
         "kind": "n/a"

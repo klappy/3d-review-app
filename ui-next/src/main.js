@@ -1,8 +1,10 @@
+import "../components/accessibility.css";
 // UI Next (v4) /next/ entry. Status: provisional. Loads the external contract CSS; mounts Home when the ui_next flag is on, else the gallery (route.js);
 // lane screens come from screens/registry.js (one screens/<lane>/index.js per lane).
 import { mount, unmount } from "svelte";
 import "../tokens.css";
 import "../components/base.css";
+import "../components/pdf.css";
 import "../components/button.css";
 import "../components/pill.css";
 import "../components/lensdot.css";

@@ -1,4 +1,4 @@
-<!-- UI Next (v4) live status screens: loading, empty, error (with Retry), refused, and the "design preview" banner. Status: provisional.
+<!-- UI Next (v4) live status screens: loading, empty, error (with Retry), refused, held, not built and unavailable. Status: provisional.
      One place for every non-data state so each lane screen draws only data (design-system.md §2 Card, Button). -->
 <script>
   import AppShell from "../AppShell.svelte";
@@ -7,7 +7,7 @@
   import Row from "../Row.svelte";
   import Button from "../Button.svelte";
   let { phone = false, theme = "light", kind = "loading", message = "", onretry, back, backLabel = "Home", inline = false } = $props();
-  const TITLE = { loading: "Loading…", empty: "Nothing here yet", failed: "Something went wrong", refused: "Not visible to you", not_built: "Not built yet", preview: "Design preview", held: "Held by policy", unavailable: "Not available yet" };
+  const TITLE = { loading: "Loading…", empty: "Nothing here yet", failed: "Something went wrong", refused: "Not visible to you", not_built: "Not built yet", held: "Held by policy", unavailable: "Not available yet" };
   const title = $derived(TITLE[kind] ?? TITLE.failed);
   const text = $derived(message || (kind === "loading" ? "Reading from the server." : kind === "refused" ? "Either this does not exist or your account has no role on it. Ask an owner to invite you." : kind === "failed" ? "The server could not be reached or did not answer." : ""));
 </script>

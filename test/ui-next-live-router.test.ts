@@ -1,7 +1,7 @@
 // UI Next (v4) live router and the href bridge (status: provisional). Cookbook work/active/2026-10-21-ui-next-demo-wiring.
 import { afterEach, describe, expect, it } from "vitest";
 // @ts-expect-error -- plain .js module, no type declarations
-import { parse, to, linkFor, ROUTES, needs } from "../ui-next/src/app/router.js";
+import { parse, to, linkFor, ROUTES, needs, legacyHref, contextForRoute } from "../ui-next/src/app/router.js";
 // @ts-expect-error -- plain .js module, no type declarations
 import { href, setLiveContext } from "../ui-next/src/screens/href.js";
 // @ts-expect-error -- plain .js module, no type declarations
@@ -83,5 +83,43 @@ describe("href bridge", () => {
     expect(r.name).toBe("collect"); expect(r.params).toEqual({ aid: "asm_9" }); expect(r.anchor).toBe("offline");
     expect(parse("#/review/asm_9/collect?state=menu#offline")).toMatchObject({ name: "collect", anchor: "offline" });
     expect(parse("#/review/asm_9/collect").anchor).toBe("");
+  });
+});
+
+
+describe("context-preserving account navigation", () => {
+  it("preserves originating scope through phone menu reload and People", () => {
+    const route = parse(linkFor("menu", {}, { aid: "review / 1", pid: "project_2", wid: "workspace_3" }));
+    const context = contextForRoute(route);
+    expect(context).toMatchObject({ aid: "review / 1", pid: "project_2", wid: "workspace_3" });
+    expect(linkFor("people", {}, context)).toBe("#/people?review=review+%2F+1");
+    expect(legacyHref(route)).toBe("/#assessment/review%20%2F%201");
+  });
+  it("chooses project or workspace People without inventing a review", () => {
+    expect(linkFor("people", {}, { pid: "p" })).toBe("#/people?project=p");
+    expect(linkFor("people", {}, { wid: "w" })).toBe("#/workspace/w/people");
+    expect(legacyHref(parse("#/people?project=p"))).toBe("/#permissions/projects/p");
+    expect(legacyHref(parse("#/workspace/w/people"))).toBe("/#permissions/workspaces/w");
+  });
+  it("returns to matching review stage independently of browser history", () => {
+    for (const [screen, expected] of [["results", "understand"], ["report-detailed", "understand"], ["next-step", "improve"], ["action-plan", "improve"], ["share", "collect"], ["print", "collect"], ["people", "permissions"]]) {
+      expect(legacyHref({ name: screen, params: { aid: "a" } })).toBe(`/#assessment/a/${expected}`);
+    }
+    expect(legacyHref(parse("#/project/p"))).toBe("/#project/p");
+    expect(legacyHref(parse("#/workspace/w"))).toBe("/#workspace/w");
+    expect(legacyHref(parse("#/projects"))).toBe("/#projects");
+  });
+  it("preserves a selected report only inside its result and plan journey", () => {
+    const ctx = { aid: "a", report: "report_1" };
+    expect(linkFor("report-detailed", {}, ctx)).toBe("#/review/a/report/detailed?report=report_1");
+    expect(linkFor("next-step", {}, ctx)).toBe("#/review/a/next-step?report=report_1");
+    expect(linkFor("people", {}, ctx)).toBe("#/people?review=a");
+    expect(linkFor("collect", {}, ctx)).toBe("#/review/a/collect");
+  });
+  it("keeps sample separate and never carries arbitrary credentials or URLs", () => {
+    expect(legacyHref(parse("#/review/sample/results"))).toBe("/?demo=1#assessment/demo-assessment/results");
+    expect(legacyHref(parse("#/menu?token=secret&next=https%3A%2F%2Fother.example"))).toBe("/#projects");
+    expect(linkFor("menu", {}, { token: "secret", aid: "a" })).toBe("#/menu?review=a");
+    expect(contextForRoute(parse("#/menu?token=secret"))).not.toHaveProperty("token");
   });
 });
