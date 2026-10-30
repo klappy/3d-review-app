@@ -152,14 +152,18 @@ export async function saveDetails(st) {
   return st.aid;
 }
 // The receipt is one-use and retained only in this tab's matching setup state. No inverse PATCH is synthesized.
-export async function undoDetails(st) {
+export async function undoDetails(st, { isCurrent = () => true } = {}) {
+  const assertCurrent = (principal) => { if (!isCurrent(principal)) throw new Error("The review context changed. Reopen the review before trying Undo again."); };
+  assertCurrent();
   const undo = st.undo;
   if (!undo || undo.aid !== st.aid) throw new Error("There is no undo receipt for this review.");
   st.undo = null; // Consume locally before any await; uncertain writes and double clicks cannot replay it.
   const me = await api("/v2/me");
+  assertCurrent(me?.principal);
   if (me?.principal?.id !== undo.actor) throw new Error("This undo belongs to another signed-in account.");
   const path = `/v2/assessments/${enc(undo.aid)}`;
   const before = (await api(path)).assessment;
+  assertCurrent();
   if (st.aid !== undo.aid || before?.id !== undo.aid || v3IsComplete(before) || !["owner", "member"].includes(before.role) || !undo.fields.every(k => (before[k] ?? null) === (undo.saved[k] ?? null))) throw new Error("The review changed after this save. Reload before changing it again.");
   const result = await api(`/v2/undo/${enc(undo.token)}`, { method: "POST" });
   if (result.undone !== "cap.assessment.update") throw new Error("The undo could not be confirmed. Reload before trying again.");

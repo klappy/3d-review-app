@@ -438,9 +438,22 @@
   };
   const suGroups = { ongroup: (tid, version, on) => { SU.setGroup(suSt, tid, version, on); suError = ""; bump(); }, onexpected: (tid, v) => { SU.setExpected(suSt, tid, v); bump(); } };
   const suContext = { oncontext: (key, field, v) => { const tid = SU.tidOfKey(suSt, key); if (tid) SU.setContext(suSt, tid, field, v); }, ondemographics: (on) => { suSt.draft.demographics = on; bump(); } };
+  // A read-only Setup 5 does not open a draft: never borrow another review's retained receipt.
+  const metadataUndo = $derived.by(() => {
+    void suRev;
+    const aid = route.query.get("review") || route.params.aid, receipt = suSt?.undo;
+    if (page.status !== "ready" || !SETUP.has(page.data?.screen) || !aid || suSt?.aid !== aid || receipt?.aid !== aid || receipt.actor !== session?.principal?.id) return null;
+    return { state: suSt, receipt, aid, generation: seq, credential: token(), principal: session.principal.id, mode: session.principal.access_mode };
+  });
+  async function undoSavedDetails(context) {
+    const current = (fresh) => !!context && (!fresh || (context.principal === fresh.id && context.mode === fresh.access_mode)) && metadataUndo === context && context.generation === seq && context.credential === token() && context.state === suSt && context.aid === (route.query.get("review") || route.params.aid) && context.principal === session?.principal?.id && context.mode === session?.principal?.access_mode;
+    if (!current() || context.state.undo !== context.receipt) return;
+    await SU.undoDetails(context.state, { isCurrent: current });
+    if (current()) await load();
+  }
   // The built report for this screen (app/data.js liveReport: full snapshot for the readers, compact payload for phone Results only).
   const reportFor = (m, screen) => D.liveReport(m, { phone, screen });
-  setContext("next-review-utilities", { visible: () => page.status === "ready" && (!!(session?.principal?.super_admin && !page.data?.sample) || !!page.data?.results?.reports?.length || !!(SETUP.has(page.data?.screen) && suSt?.undo)), render: () => utilities });
+  setContext("next-review-utilities", { visible: () => page.status === "ready" && (!!(session?.principal?.super_admin && !page.data?.sample) || !!page.data?.results?.reports?.length || !!metadataUndo), render: () => utilities });
 </script>
 
 <!-- The build confirm (report-build.js: one plain sentence with the response count, confirm "Build the results", cancel "Not now").
@@ -463,7 +476,7 @@
 {#snippet utilities()}
   <AccessMode principal={session?.principal} sample={!!page.data?.sample} oninvalidate={() => { D.clearLinks(); SU.forgetAll(); S.forget(); page = { status: "loading", key: route.name, data: null, error: null }; }} />
   {#if page.data?.results?.reports?.length}<ReportHistory aid={page.data.results.aid} reports={page.data.results.reports} selected={page.data.results.reportId} screen={page.data.screen} />{/if}
-  {#if SETUP.has(page.data?.screen) && suSt?.undo}<UndoNotice undo={suSt.undo} onundo={async () => { await SU.undoDetails(suSt); await load(); }} />{/if}
+  {#if metadataUndo}{@const context = metadataUndo}<UndoNotice undo={context.receipt} onundo={() => undoSavedDetails(context)} />{/if}
 {/snippet}
 
 {#if page.status === "loading"}
