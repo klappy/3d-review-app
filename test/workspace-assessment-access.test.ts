@@ -183,9 +183,10 @@ describe('authenticated workspace membership reaches contained assessments and r
       await run('DELETE FROM "grant" WHERE id=?','docs_direct');
     }
   });
-  it('grouping rechecks both authorities and expected containment inside the write', async () => {
+  it('grouping rechecks project/workspace authorities and expected containment inside the write', async () => {
     const original=env.DB;
     const endpoint='/v2/workspaces/ws_other/projects/'+pid;
+    await run("INSERT INTO \"grant\"(id,principal_id,scope_type,scope_id,role,created_at) SELECT 'group_child_owner_' || id,'project_only','assessment',id,'owner','2026-10-27' FROM assessment WHERE project_id=?",pid);
     try {
       for(const change of ['project-remove','project-demote','workspace-remove','workspace-demote','regroup']) {
         await run('UPDATE project SET workspace_id=NULL WHERE id=?',pid);
@@ -215,7 +216,7 @@ describe('authenticated workspace membership reaches contained assessments and r
       await run("UPDATE \"grant\" SET role='member' WHERE id='group_workspace'");
       expect((await http(endpoint,'project_only',{})).body).toMatchObject({ok:true,result:{grouped:true}});
       expect((await http('/v2/assessments/'+aid,'outsider')).body.ok).toBe(true);
-    } finally {env.DB=original;await run('UPDATE project SET workspace_id=? WHERE id=?','ws_inherited',pid);await run('DELETE FROM "grant" WHERE id=?','group_workspace');}
+    } finally {env.DB=original;await run('UPDATE project SET workspace_id=? WHERE id=?','ws_inherited',pid);await run('DELETE FROM "grant" WHERE id=?','group_workspace');await run("DELETE FROM \"grant\" WHERE id LIKE 'group_child_owner_%'");}
   });
   it('invitation revocation uses direct-role ceiling and retains it at write time', async () => {
     const original=env.DB;

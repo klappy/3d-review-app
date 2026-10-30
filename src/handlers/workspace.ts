@@ -108,15 +108,28 @@ export const del: Handler = async (ctx, params, opts) => {
  * Share authority over a project (D2). Grouping hands the project's roles to every workspace grantee, so the
  * project-side condition reads the DIRECT project grant only — an inherited role can never satisfy it
  * (HOLD #483 c6204382554: member → self-service workspace owner → add_project → inherited project owner).
- * - add: workspace member+ AND direct project owner.
+ * Grouping also shares contained assessments. Project ownership does not imply assessment share authority:
+ * the actor must directly own EVERY contained assessment, including archived assessments. Recheck the same
+ * predicate inside the containment UPDATE so a concurrent revocation/new assessment cannot widen access.
+ * - add: workspace member+ AND direct project owner AND direct owner of every contained assessment.
  * - remove: workspace owner (ungrouping only narrows access), or workspace member+ with direct project owner.
  */
+const assessmentShareAuthority = (projectId: string, actor: string) =>
+  `NOT EXISTS (SELECT 1 FROM assessment shared_a WHERE shared_a.project_id = ${projectId}
+    AND NOT EXISTS (SELECT 1 FROM "grant" shared_g WHERE shared_g.principal_id = ${actor}
+      AND shared_g.scope_type = 'assessment' AND shared_g.scope_id = shared_a.id AND shared_g.role = 'owner'))`;
+
 async function shareAuthority(ctx: Parameters<Handler>[0], wid: string, pid: string, op: "add" | "remove"): Promise<{ w: WorkspaceRow; p: ProjectRow }> {
   const { row: w, role: wRole } = await loadWorkspace(ctx, wid, "member");
   const { row: p } = await loadProject(ctx, pid, "viewer");
   const directOwner = await isDirectOwner(ctx, "project", pid);
   const ok = op === "add" ? directOwner : wRole === "owner" || directOwner;
   if (!ok) throw new CapError("NOT_AUTHORIZED_AT_SCOPE", "a direct owner grant on the project is required", "D2: share authority needs a direct project owner grant, not an inherited one");
+  if (op === "add") {
+    const authority = await ctx.db.prepare(`SELECT ${assessmentShareAuthority("?1", "?2")} AS allowed`)
+      .bind(pid, ctx.principal.id).first<{ allowed: number }>();
+    if (!authority?.allowed) throw new CapError("NOT_AUTHORIZED_AT_SCOPE", "grouping requires direct ownership of every review in the project", "Ask the project and review owners to share this project with the workspace.");
+  }
   return { w, p };
 }
 
@@ -127,7 +140,8 @@ export const add_project: Handler = async (ctx, params) => {
   if (p.workspace_id && p.workspace_id !== wid) throw new CapError("INVALID_PARAMS", "project already grouped in another workspace", "remove_project first");
   const written = await ctx.db.prepare(`UPDATE project SET workspace_id = ?1 WHERE id = ?2 AND workspace_id IS ?3
     AND EXISTS (SELECT 1 FROM "grant" pg WHERE pg.principal_id = ?4 AND pg.scope_type = 'project' AND pg.scope_id = project.id AND pg.role = 'owner')
-    AND EXISTS (SELECT 1 FROM "grant" wg WHERE wg.principal_id = ?4 AND wg.scope_type = 'workspace' AND wg.scope_id = ?1 AND wg.role IN ('member','owner'))`)
+    AND EXISTS (SELECT 1 FROM "grant" wg WHERE wg.principal_id = ?4 AND wg.scope_type = 'workspace' AND wg.scope_id = ?1 AND wg.role IN ('member','owner'))
+    AND ${assessmentShareAuthority("project.id", "?4")}`)
     .bind(wid, pid, p.workspace_id, ctx.principal.id).run();
   if (!written.meta.changes) {
     await shareAuthority(ctx, wid, pid, "add");

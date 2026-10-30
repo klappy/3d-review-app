@@ -1320,7 +1320,7 @@ paths:
     post:
       operationId: cap.workspace.add_project
       summary: 'cap.workspace.add_project — write.reversible — roles: O, M with share authority (D2)'
-      description: "preview shows affected grants"
+      description: "Grouping shares project and contained assessment access with workspace grantees. Requires workspace member-or-owner access, direct project ownership and direct ownership of every contained assessment, including archived assessments. Empty projects may be grouped. Authority is rechecked in the containment write."
       x-capability: cap.workspace.add_project
       x-class: write.reversible
       x-tool: write

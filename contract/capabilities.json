@@ -560,7 +560,7 @@
       "slice": "v2.0-bcs",
       "section": "B. Workspace",
       "ui_surface": "sharing preview",
-      "notes": "preview shows affected grants",
+      "notes": "Grouping shares project and contained assessment access with workspace grantees. Requires workspace member-or-owner access, direct project ownership and direct ownership of every contained assessment, including archived assessments. Empty projects may be grouped. Authority is rechecked in the containment write.",
       "status": "target",
       "inverse": {
         "kind": "true",
