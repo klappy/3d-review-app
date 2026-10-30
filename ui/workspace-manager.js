@@ -123,7 +123,7 @@ export function mountWorkspaceManager({ document: doc, root, request, getContext
       section.append(nameForm('Rename workspace', w.name, name => mutation(`/v2/workspaces/${enc(w.id)}`, 'PATCH', { name })));
       section.append(button(w.archived_at ? 'Unarchive workspace' : 'Archive workspace', () => mutation(`/v2/workspaces/${enc(w.id)}/${w.archived_at ? 'unarchive' : 'archive'}`, 'POST')));
     }
-    section.append(node('h4', 'Grouped projects'), node('p', 'Grouping lists project names. Access to each project is separate.'));
+    section.append(node('h4', 'Grouped projects'), node('p', 'Grouping gives everyone in this workspace access to the project, its assessments and their available reports at their workspace role. Removing it ends inherited access; people added to a project directly keep their access.'));
     const authorized = Array.isArray(context().authorizedProjects) ? context().authorizedProjects : [];
     const projects = Array.isArray(detail.projects) ? detail.projects : [];
     for (const p of projects) {

@@ -1,10 +1,10 @@
 // cap.workspace.* — optional invite-only grouping of projects (03). A workspace grant inherits to every grouped project
-// (cookbook work/active/2026-10-15-3d-workspace-permissions); assessments still need their own grant (D9).
+// (cookbook work/active/2026-10-15-3d-workspace-permissions); workspace roles also reach contained assessments.
 import type { Handler, Role } from "./types";
 import { requireConfirmedState } from "../receipt";
 import { CapError, notVisible } from "./errors";
 import {
-  countScalar, loadProject, loadWorkspace, newId, nowIso, patchOf, reqStr, requireUser, isDirectOwner,
+  grantApplies, countScalar, loadProject, loadWorkspace, newId, nowIso, patchOf, reqStr, requireUser, isDirectOwner,
   type ProjectRow, type WorkspaceRow,
 } from "./common";
 
@@ -39,7 +39,7 @@ export const list: Handler = async (ctx) => {
   const { results } = await ctx.db
 // L1-23 (captain 14:52): read-only child counts for cards, one correlated aggregate per row — no N+1.
 // project_count = every grouped project (each one is reachable through the workspace grant).
-    .prepare('SELECT w.*, g.role AS role, (SELECT COUNT(*) FROM project p2 WHERE p2.workspace_id = w.id) AS project_count, (SELECT COUNT(*) FROM assessment a2 JOIN project p2 ON p2.id = a2.project_id WHERE p2.workspace_id = w.id AND EXISTS (SELECT 1 FROM "grant" gassessment WHERE gassessment.scope_type = \'assessment\' AND gassessment.scope_id = a2.id AND gassessment.principal_id = ?)) AS assessment_count, (SELECT COUNT(*) FROM response r JOIN assessment_survey s ON s.id = r.assessment_survey_id JOIN assessment a2 ON a2.id = s.assessment_id JOIN project p2 ON p2.id = a2.project_id WHERE p2.workspace_id = w.id AND EXISTS (SELECT 1 FROM "grant" gassessment WHERE gassessment.scope_type = \'assessment\' AND gassessment.scope_id = a2.id AND gassessment.principal_id = ?)) AS response_count FROM workspace w JOIN "grant" g ON g.scope_type = ? AND g.scope_id = w.id WHERE g.principal_id = ? ORDER BY w.created_at')
+    .prepare(`SELECT w.*, g.role AS role, (SELECT COUNT(*) FROM project p2 WHERE p2.workspace_id = w.id) AS project_count, (SELECT COUNT(*) FROM assessment a2 JOIN project p2 ON p2.id = a2.project_id WHERE p2.workspace_id = w.id AND EXISTS (SELECT 1 FROM "grant" gassessment WHERE ${grantApplies("gassessment", "'assessment'", "a2.id")} AND gassessment.principal_id = ?)) AS assessment_count, (SELECT COUNT(*) FROM response r JOIN assessment_survey s ON s.id = r.assessment_survey_id JOIN assessment a2 ON a2.id = s.assessment_id JOIN project p2 ON p2.id = a2.project_id WHERE p2.workspace_id = w.id AND EXISTS (SELECT 1 FROM "grant" gassessment WHERE ${grantApplies("gassessment", "'assessment'", "a2.id")} AND gassessment.principal_id = ?)) AS response_count FROM workspace w JOIN "grant" g ON g.scope_type = ? AND g.scope_id = w.id WHERE g.principal_id = ? ORDER BY w.created_at`)
     .bind(actor, actor, "workspace", actor)
     .all<WorkspaceRow & { role: Role; project_count: number; assessment_count: number; response_count: number }>();
   return { result: { workspaces: results.map((w) => ({ ...view(w, w.role), project_count: Number(w.project_count) || 0, assessment_count: Number(w.assessment_count) || 0, response_count: Number(w.response_count) || 0 })) } };
@@ -50,7 +50,7 @@ export const get: Handler = async (ctx, params) => {
   const { row, role } = await loadWorkspace(ctx, id);
   // listing of grouped projects only (notes) — names, not contents
   const global = ctx.principal.kind === "support";
-  const { results } = await ctx.db.prepare("SELECT p.id, p.name, p.organization, p.archived_at, (SELECT COUNT(*) FROM assessment a2 WHERE a2.project_id = p.id AND (? = 1 OR EXISTS (SELECT 1 FROM \"grant\" gassessment WHERE gassessment.scope_type = 'assessment' AND gassessment.scope_id = a2.id AND gassessment.principal_id = ?))) AS assessment_count, (SELECT COUNT(*) FROM response r JOIN assessment_survey s ON s.id = r.assessment_survey_id JOIN assessment a2 ON a2.id = s.assessment_id WHERE a2.project_id = p.id AND (? = 1 OR EXISTS (SELECT 1 FROM \"grant\" gassessment WHERE gassessment.scope_type = 'assessment' AND gassessment.scope_id = a2.id AND gassessment.principal_id = ?))) AS response_count FROM project p WHERE p.workspace_id = ? ORDER BY p.created_at").bind(global ? 1 : 0, ctx.principal.id, global ? 1 : 0, ctx.principal.id, id).all<Pick<ProjectRow, "id" | "name" | "organization" | "archived_at"> & { assessment_count: number; response_count: number }>();
+  const { results } = await ctx.db.prepare(`SELECT p.id, p.name, p.organization, p.archived_at, (SELECT COUNT(*) FROM assessment a2 WHERE a2.project_id = p.id AND (? = 1 OR EXISTS (SELECT 1 FROM "grant" gassessment WHERE ${grantApplies("gassessment", "'assessment'", "a2.id")} AND gassessment.principal_id = ?))) AS assessment_count, (SELECT COUNT(*) FROM response r JOIN assessment_survey s ON s.id = r.assessment_survey_id JOIN assessment a2 ON a2.id = s.assessment_id WHERE a2.project_id = p.id AND (? = 1 OR EXISTS (SELECT 1 FROM "grant" gassessment WHERE ${grantApplies("gassessment", "'assessment'", "a2.id")} AND gassessment.principal_id = ?))) AS response_count FROM project p WHERE p.workspace_id = ? ORDER BY p.created_at`).bind(global ? 1 : 0, ctx.principal.id, global ? 1 : 0, ctx.principal.id, id).all<Pick<ProjectRow, "id" | "name" | "organization" | "archived_at"> & { assessment_count: number; response_count: number }>();
   return { result: { workspace: view(row, role), projects: results }, scope: { type: "workspace", id } };
 };
 
@@ -125,7 +125,14 @@ export const add_project: Handler = async (ctx, params) => {
   const pid = reqStr(params, "pid");
   const { p } = await shareAuthority(ctx, wid, pid, "add");
   if (p.workspace_id && p.workspace_id !== wid) throw new CapError("INVALID_PARAMS", "project already grouped in another workspace", "remove_project first");
-  await ctx.db.prepare("UPDATE project SET workspace_id = ? WHERE id = ?").bind(wid, pid).run();
+  const written = await ctx.db.prepare(`UPDATE project SET workspace_id = ?1 WHERE id = ?2 AND workspace_id IS ?3
+    AND EXISTS (SELECT 1 FROM "grant" pg WHERE pg.principal_id = ?4 AND pg.scope_type = 'project' AND pg.scope_id = project.id AND pg.role = 'owner')
+    AND EXISTS (SELECT 1 FROM "grant" wg WHERE wg.principal_id = ?4 AND wg.scope_type = 'workspace' AND wg.scope_id = ?1 AND wg.role IN ('member','owner'))`)
+    .bind(wid, pid, p.workspace_id, ctx.principal.id).run();
+  if (!written.meta.changes) {
+    await shareAuthority(ctx, wid, pid, "add");
+    throw new CapError("STAGE_CONFLICT", "project grouping changed while access was being checked", "re-read the project before grouping again");
+  }
   const affectedGrants = await countScalar(ctx, 'SELECT COUNT(*) AS n FROM "grant" WHERE scope_type = ? AND scope_id = ?', "workspace", wid);
   return { result: { workspace_id: wid, project_id: pid, grouped: true, workspace_grantees_now_listing: affectedGrants }, scope: { type: "workspace", id: wid }, priorState: { workspace_id: p.workspace_id } };
 };

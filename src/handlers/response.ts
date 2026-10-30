@@ -2,7 +2,7 @@ import type { Ctx, Handler } from "./types";
 import { participantLanguages } from "../languages";
 import { participantPassages } from "../passages";
 import { CapError, notVisible } from "./errors";
-import { gate, isOtherOption, newId, nowIso, OTHER_TEXT_KEY, OTHER_TEXT_MAX, parseItems, participantLabels, renderItems, reqStr, roleAt, type TemplateItem } from "./common";
+import { gate, isOtherOption, newId, nowIso, OTHER_TEXT_KEY, OTHER_TEXT_MAX, parseItems, participantLabels, renderItems, reqStr, effectiveRoleAt, type TemplateItem } from "./common";
 
 import { collecting, sharedSession, submitShared } from "./shared-link";
 import { minimumHold } from "./results";
@@ -168,7 +168,7 @@ export const assisted_next: Handler = async (ctx) => {
 async function assessmentGrant(ctx: Ctx, aid: string, min: "viewer" | "member" | "owner") {
   const a = await ctx.db.prepare("SELECT id FROM assessment WHERE id = ?").bind(aid).first<{ id: string }>();
   if (!a) throw notVisible("assessment");
-  gate(await roleAt(ctx, "assessment", aid), min, "assessment");
+  gate(await effectiveRoleAt(ctx, "assessment", aid), min, "assessment");
 }
 
 export const list: Handler = async (ctx, params) => {

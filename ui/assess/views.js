@@ -3,7 +3,7 @@
 // ctx = { api, esc, enc, go, note, state, routes, cards, current, refresh? }; params = { aid, scope?, id? }.
 // Rules carried: per-survey counts only (respondents are NEVER summed across surveys); results render the server's held
 // literal; synthetic-only preview/confirmed build; recommendations are "not built" statically; RESERVED_NOT_BUILT/501 never hits
-// the generic retry; refusals read "Not visible to you"; permissions are per scope (nothing inherited); danger twins never GET.
+// the generic retry; refusals read "Not visible to you"; workspace roles follow project/assessment containment; delegation stays direct; danger twins never GET.
 import { reportBuildMarkup, bindReportBuild } from './report-build.js';
 import { renderReport } from '../report-view.js';
 import { lensesAgreeMarkup } from '../report-lenses.js'; // lenses agree / disagree block, overview + full report

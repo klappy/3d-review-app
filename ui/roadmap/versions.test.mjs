@@ -30,3 +30,11 @@ test('excluded candidate stays indexed but is not advertised in the current buil
  assert.deepEqual(includedVersions({...releases,current:'0.38.0',versions:[current,{...candidate,included_in_product:true}]}),[current,{...candidate,included_in_product:true}]);
  assert.equal(forecast(releases,[parseChange('1-1.md','bump: patch\nlane: 1\n- Fixed - Unmerged inheritance')]).units.length,1);
 });
+test('tracked roadmap version data includes the canonical current release and its notes',async()=>{
+ const {readFile}=await import('node:fs/promises');const {VERSIONS}=await import('./versions-data.js');
+ const canonical=JSON.parse(await readFile(new URL('../../release/cookbook/releases.json',import.meta.url),'utf8'));
+ assert.equal(VERSIONS.current,canonical.current);
+ const shown=VERSIONS.shipped.find(v=>v.version===canonical.current),record=canonical.versions.find(v=>v.version===canonical.current);
+ assert.ok(shown,'roadmap must include current release');
+ assert.deepEqual(shown.fixed,record.sections.fixed??[]);
+});

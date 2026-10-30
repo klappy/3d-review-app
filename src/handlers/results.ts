@@ -1,6 +1,6 @@
 import type { Ctx, Handler } from "./types";
 import { notVisible } from "./errors";
-import { gate, reqStr, responseCountForAssessment, roleAt } from "./common";
+import { gate, reqStr, responseCountForAssessment, effectiveRoleAt } from "./common";
 import { participantReportMinimum, perspectiveLevelMinimum } from "../report-admission";
 import { observeBuildDecision } from "../synthetic-report-store";
 import { demographicsEnabled, demographicsProjection } from "../context-fields";
@@ -24,7 +24,7 @@ export const summary: Handler = async (ctx, params) => {
   const assessment = await ctx.db.prepare("SELECT id, stage FROM assessment WHERE id = ?")
     .bind(aid).first<{ id: string; stage: string }>();
   if (!assessment) throw notVisible("assessment");
-  gate(await roleAt(ctx, "assessment", aid), "viewer", "assessment");
+  gate(await effectiveRoleAt(ctx, "assessment", aid), "viewer", "assessment");
   // S15c: demographic breakdowns (age range, gender) exist only when the facilitator turned demographics on.
   const { results } = await ctx.db.prepare("SELECT context_json FROM assessment_survey WHERE assessment_id = ? AND state = 'selected'")
     .bind(aid).all<{ context_json?: string }>().catch(() => ({ results: [] as { context_json?: string }[] }));

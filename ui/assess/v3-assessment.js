@@ -260,7 +260,8 @@ export function v3CompleteLock(a) {
  *  content gate keeps reading a.role, so content writes stay refused. */
 export function v3SettingsRole(a) {
   if (!a) return undefined;
-  return a.complete && a.granted_role === 'owner' ? 'owner' : a.role;
+  const direct = a.direct_role === undefined ? (a.granted_role || a.role) : a.direct_role;
+  return a.complete ? (direct === 'owner' ? 'owner' : 'viewer') : direct;
 }
 
 // component: Stepper (captain ruling 12:28 + 12:34). The assessment page's stage strip is the wizard's Stepper, imported
