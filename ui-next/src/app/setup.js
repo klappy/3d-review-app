@@ -10,7 +10,7 @@
 // demographics switch. Expected counts stay browser-local (v3:expected, ruling (a)) exactly as the wizard keeps them.
 // Plain JS, no Svelte import, so vitest can drive it with a mocked fetch. The view builders return the shapes the approved
 // screens/setup/Setup1-4.svelte compositions already draw (ui-next/fixtures/setup/setup.json), so the design stays fixed.
-import { api, enc } from "./api.js";
+import { api, apiFull, enc } from "./api.js";
 import { reconcile, refused } from "../../../ui/v3/wizard.js";
 import { packPeriod, parsePeriod, periodErrors, todayIso } from "../../../ui/v3/components/active-until.js";
 import { LWC_LANGUAGES, MAX_LWC } from "../../../ui/v3/lwc.js";
@@ -72,7 +72,7 @@ export async function openSetup(aid, { pid = "" } = {}) {
     const pre = [];
     for (const s of live) { if (d.groups[s.template_id]) continue; d.groups[s.template_id] = { checked: true, version: String(s.template_version), expected: expectedOf(s.id) ? String(expectedOf(s.id)) : "" }; pre.push({ id: s.id, context: heldContext(s), template: s.template_id, version: Number(s.template_version), name: s.template_name || s.template_id }); }
     if (!ps.some((x) => x.id === a.project_id)) ps.push({ id: a.project_id, name: "This project" });
-    st = { key, aid, role: v3IsComplete(a) ? "viewer" : a.role ?? "viewer", stage: a.stage, draft: prior ? { ...d, ...prior.draft, project: a.project_id, groups: { ...d.groups, ...prior.draft.groups }, context: { ...prior.draft.context } } : d, snap: { ...snapOf(d), demographics_enabled: a.demographics_enabled === true }, pre, projects: ps, templates: ts, languages: [], passages: pz.passages, fileStorage: pz.fileStorage };
+    st = { key, aid, undo: prior?.undo?.aid === aid && !v3IsComplete(a) ? prior.undo : null, role: v3IsComplete(a) ? "viewer" : a.role ?? "viewer", stage: a.stage, draft: prior ? { ...d, ...prior.draft, project: a.project_id, groups: { ...d.groups, ...prior.draft.groups }, context: { ...prior.draft.context } } : d, snap: { ...snapOf(d), demographics_enabled: a.demographics_enabled === true }, pre, projects: ps, templates: ts, languages: [], passages: pz.passages, fileStorage: pz.fileStorage };
     // A survey the server no longer holds is unticked here too; one it gained stays ticked (another device selected it).
     for (const tid of Object.keys(st.draft.groups)) if (prior && prior.pre.some((x) => x.template === tid) && !pre.some((x) => x.template === tid)) delete st.draft.groups[tid];
   } else {
@@ -109,6 +109,7 @@ export function validateDetails(d, today = todayIso()) {
 }
 // Step 1 Continue: the first save creates the review exactly as cap.assessment.create takes it (B06); later ones PATCH what changed.
 export async function saveDetails(st) {
+  if (st.role === "viewer") throw new Error("This review is read-only.");
   const d = st.draft;
   if (!st.aid) {
     const b = { name: d.name.trim(), language_id: d.language };
@@ -127,8 +128,44 @@ export async function saveDetails(st) {
     return st.aid;
   }
   const body = detailsPatch(st.snap, d);
-  if (body) { await api(`/v2/assessments/${enc(st.aid)}`, { method: "PATCH", body }); st.snap = { ...st.snap, ...body }; }
+  if (body) {
+    st.undo = null;
+    const aid = st.aid, path = `/v2/assessments/${enc(aid)}`;
+    const before = (await api(path)).assessment;
+    if (before?.id !== aid || v3IsComplete(before) || !["owner", "member"].includes(before.role)) throw new Error("This review cannot be edited here. Reload its current state.");
+    const fields = Object.keys(body);
+    // The existing backend receipt restores these metadata fields as a group, even when this PATCH changed only one.
+    // Guard the full receipt footprint so Undo cannot erase a later purpose/date/language edit from another step or device.
+    const undoFields = [...new Set(["name", "purpose", "period", "language_id", "format", ...fields])];
+    const prior = Object.freeze(Object.fromEntries(undoFields.map(k => [k, before[k] ?? null])));
+    const envelope = await apiFull(path, { method: "PATCH", body });
+    const saved = (await api(path)).assessment;
+    if (st.aid !== aid || saved?.id !== aid || !fields.every(k => (saved[k] ?? null) === (body[k] ?? null))) throw new Error("The saved review details could not be verified. Reload before trying again.");
+    st.snap = { ...st.snap, ...body };
+    const receipt = envelope.receipt;
+    if (envelope.capability === "cap.assessment.update" && receipt?.scope?.type === "assessment" && receipt.scope.id === aid && typeof receipt.actor === "string" && receipt.actor && !receipt.noop && receipt.inverse !== "none" && typeof receipt.undo_token === "string" && receipt.undo_token) {
+      st.undo = Object.freeze({ aid, actor: receipt.actor, token: receipt.undo_token, prior, saved: Object.freeze(Object.fromEntries(undoFields.map(k => [k, saved[k] ?? null]))), fields: Object.freeze(undoFields) });
+    }
+  }
   return st.aid;
+}
+// The receipt is one-use and retained only in this tab's matching setup state. No inverse PATCH is synthesized.
+export async function undoDetails(st) {
+  const undo = st.undo;
+  if (!undo || undo.aid !== st.aid) throw new Error("There is no undo receipt for this review.");
+  st.undo = null; // Consume locally before any await; uncertain writes and double clicks cannot replay it.
+  const me = await api("/v2/me");
+  if (me?.principal?.id !== undo.actor) throw new Error("This undo belongs to another signed-in account.");
+  const path = `/v2/assessments/${enc(undo.aid)}`;
+  const before = (await api(path)).assessment;
+  if (st.aid !== undo.aid || before?.id !== undo.aid || v3IsComplete(before) || !["owner", "member"].includes(before.role) || !undo.fields.every(k => (before[k] ?? null) === (undo.saved[k] ?? null))) throw new Error("The review changed after this save. Reload before changing it again.");
+  const result = await api(`/v2/undo/${enc(undo.token)}`, { method: "POST" });
+  if (result.undone !== "cap.assessment.update") throw new Error("The undo could not be confirmed. Reload before trying again.");
+  const restored = (await api(path)).assessment;
+  if (st.aid !== undo.aid || restored?.id !== undo.aid || !undo.fields.every(k => (restored[k] ?? null) === (undo.prior[k] ?? null))) throw new Error("The restored review details could not be verified. Reload before trying again.");
+  // Discard stale drafts so the caller's next openSetup reads the restored metadata.
+  STATES.delete(undo.aid);
+  return restored;
 }
 // Step 2 Continue: the passage name rides `purpose` and the answer languages `lwc` (the Prepare form's PATCH shape).
 export async function savePassage(st) {
