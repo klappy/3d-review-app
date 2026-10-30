@@ -738,7 +738,7 @@ describe("nesting (8.1), no inline style, one .btn-primary, dark theme", () => {
     const score = d.querySelector(".paper .score-track")!;
     expect([...new Set([...score.children].map((e) => e.className))]).toEqual(["score-line", "score-band", "score-val", "pt"]);
     expect(d.querySelectorAll(".paper .bb-verdict > span.nowrap").length).toBe(5);
-    expect([...d.querySelectorAll(".paper .sheet-head")].map((h) => h.getAttribute("data-v"))).toEqual(["4", "2", "2", "8", "0", "0", null]); // the board's 4/2 · 2/8 · 0 · 0 + In their words
+    expect([...d.querySelectorAll(".paper .sheet-head")].filter((h) => !h.closest('[aria-label="Saved report details"]')).map((h) => h.getAttribute("data-v"))).toEqual(["4", "2", "2", "8", "0", "0", null]); // the board's 4/2 · 2/8 · 0 · 0 + In their words
   });
   it("every route has exactly one h1", () => {
     for (const [board, , C, props] of BOARDS) expect(mount(C, props).querySelectorAll(H1).length, board).toBe(1);

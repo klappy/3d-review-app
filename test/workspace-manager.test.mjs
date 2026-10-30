@@ -85,3 +85,14 @@ test('explicit refresh clears host scope before pending list read and never rest
  assert.equal(f.selected.at(-1),null);assert.doesNotMatch(text(f.root),/Rename workspace|Preview deletion/);
  await f.click('Open workspace');assert.equal(f.selected.at(-1).id,'ws1');
 });
+
+test('legacy grouping discloses inherited project assessment and report access before action', async () => {
+ const f=fixture({projects:[{id:'owned',name:'Owned',role:'owner',direct_role:'owner'}]});await f.open();
+ const shown=text(f.root);
+ assert.match(shown,/Grouping gives everyone in this workspace access to the project, its assessments and their available reports at their workspace role/);
+ assert.match(shown,/Removing it ends inherited access; people added to a project directly keep their access/);
+ assert.doesNotMatch(shown,/Access to each project is separate/);
+ const nodes=walk(f.root), notice=nodes.findIndex(n=>n.textContent.startsWith('Grouping gives'));
+ const action=nodes.findIndex(n=>n.tagName==='button'&&n.textContent==='Add project to workspace');
+ assert.ok(notice>=0&&action>notice);
+});

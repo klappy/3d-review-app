@@ -62,3 +62,11 @@ test('invalid-code failure has a local, non-disclosing message', () => {
   assert.match(codeEntryFailure, /Check it and try again/);
   assert.doesNotMatch(codeEntryFailure, /NOT_FOUND|trace|code value/);
 });
+
+test('workspace-only noncreator can navigate inherited projects and reports', () => {
+  for (const role of ['viewer','member','owner']) {
+    const me={principal:{provisioned:false},grants:[{scope_type:'workspace',role}]};
+    assert.equal(hasProjectWork(me),true);
+    assert.equal(hasReportWork(me),true);
+  }
+});

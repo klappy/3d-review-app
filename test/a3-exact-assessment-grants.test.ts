@@ -13,7 +13,7 @@ function context(projectRole:"owner"|"member", assessmentRole:string|null): {ctx
         bind(...a:unknown[]){args=a;return this;},
         async first(){
           if(sql.includes("FROM assessment WHERE id")) return assessment;
-          if(sql.includes('FROM "grant"')) return args[1]==="assessment" ? (assessmentRole?{role:assessmentRole}:null) : {role:projectRole};
+          if(sql.includes('FROM "grant"')) return sql.includes('MAX(CASE g.role') || args[1]==="assessment" ? (assessmentRole?{role:assessmentRole}:null) : {role:projectRole};
           if(sql.includes("FROM project WHERE id")) return {id:"prj_x",name:"Synthetic",workspace_id:null,organization:null,archived_at:null,created_at:"2026-09-16T00:00:00Z",created_by:null};
           return null;
         },

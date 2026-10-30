@@ -8,11 +8,17 @@
      scrolls inside the viewport (base.css .phone-main, phone.css bounds the frame), so the header stays and the fixed bar keeps
      .l-phone's 120px clearance. A non-screen phone shell (the Layouts gallery) keeps its natural height. -->
 <script>
+  import { getContext } from "svelte";
+  import Page from "./Page.svelte";
   import { imagery } from "./imagery.svelte.js";
   import { themeOf } from "./theme.svelte.js";
   let { phone = false, theme, screen = false, rhythm, top, bar, children } = $props();
+  let main = $state();
+  const utilities = getContext("next-review-utilities");
+  const showUtilities = $derived(!!utilities?.visible?.());
+  const utilityContent = $derived(utilities?.render?.());
   if (rhythm !== undefined && !["marketing", "read", "center", "report"].includes(rhythm)) throw new TypeError(`AppShell: rhythm must be marketing, read, center or report, got ${String(rhythm)}`);
   if (theme !== undefined && theme !== "light" && theme !== "dark") throw new TypeError(`AppShell: theme must be light or dark, got ${String(theme)}`);
 </script>
 
-<div class={screen ? "app l-screen" : "app"} data-theme={themeOf(theme)} data-w={phone ? "phone" : undefined} data-imagery={imagery.skin}><div class="aurora" aria-hidden="true"><i></i><i></i><i></i></div><div class="layer l-shell">{@render top?.()}<main class={phone ? (screen ? "l-page l-phone phone-main" : "l-page l-phone") : "l-main"} data-rhythm={phone ? undefined : rhythm}>{@render children?.()}</main>{@render bar?.()}</div></div>
+<div class={screen ? "app l-screen" : "app"} data-theme={themeOf(theme)} data-w={phone ? "phone" : undefined} data-imagery={imagery.skin}><button class="btn skip-nav" type="button" onclick={() => main?.focus()}>Skip to main content</button><div class="aurora" aria-hidden="true"><i></i><i></i><i></i></div><div class="layer l-shell">{@render top?.()}<main bind:this={main} tabindex="-1" class={phone ? (screen ? "l-page l-phone phone-main" : "l-page l-phone") : "l-main"} data-rhythm={phone ? undefined : rhythm} data-has-utilities={showUtilities ? "" : undefined}>{#if showUtilities}{#if phone}<div class="l-stack" data-gap="3" data-next-utilities>{@render utilityContent?.()}</div>{:else}<Page gap={3}><div class="l-stack" data-gap="3" data-next-utilities>{@render utilityContent?.()}</div></Page>{/if}{/if}{@render children?.()}</main>{@render bar?.()}</div></div>

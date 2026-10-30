@@ -23,6 +23,7 @@
   {#if phone}
     <Field label="Name this review" id="n"><input class="in" id="n" value={d.name} oninput={set("name")} /></Field>
     <Field label="Project" id="p"><Select id="p" options={d.projects} value={d.phoneProject} onchange={(v) => onfield?.("project", v)} /></Field>
+    {#if onfield}<a class="link" href="#/projects?return=setup1">Create a project</a>{/if}
     <Field label="Language being reviewed" id="l" help="Search by name or code. Not listed? Add language."><LangSearch id="l" query={d.languageQuery} language={d.language} matches={d.matches} describedby="l-help" oninput={lang.oninput} onpick={lang.onpick} onremove={lang.onremove} onadd={lang.onadd} /></Field>
     <Field label="Location or community" id="lc" opt help="Where the sessions happen: a village, town or congregation."><input class="in" id="lc" value={d.location} aria-describedby="lc-help" oninput={set("location")} /></Field>
     <Field label="Facilitator" id="fc" opt help="The person who leads the sessions. Leave blank if it varies."><input class="in" id="fc" value={d.facilitator} placeholder="Who leads the sessions" aria-describedby="fc-help" oninput={set("facilitator")} /></Field>
@@ -35,6 +36,7 @@
         <Field label="Project" id="proj" help="A project is one translation. Put every review of it here so you can compare over time."><Select id="proj" options={d.projects} value={d.project} describedby="proj-help" onchange={(v) => onfield?.("project", v)} /></Field>
         <Field label="Language being reviewed" id="lang" help="Search by name or code, then choose one. Not listed? Add language."><LangSearch id="lang" query={d.languageQuery} language={d.language} matches={d.matches} describedby="lang-help" oninput={lang.oninput} onpick={lang.onpick} onremove={lang.onremove} onadd={lang.onadd} /></Field>
       </Grid>
+      {#if onfield}<a class="link" href="#/projects?return=setup1">Create a project</a>{/if}
       <Grid cols={2} gap={5}>
         <Field label="Location or community" id="loc" opt help="Where the sessions happen: a village, town or congregation."><input class="in" id="loc" value={d.location} aria-describedby="loc-help" oninput={set("location")} /></Field>
         <Field label="Facilitator" id="fac" opt help="The person who leads the sessions. Leave blank if it varies."><input class="in" id="fac" value={d.facilitator} placeholder="Who leads the sessions" aria-describedby="fac-help" oninput={set("facilitator")} /></Field>

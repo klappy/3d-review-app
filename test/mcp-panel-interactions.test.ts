@@ -9,13 +9,13 @@ const script = source.split('<script>')[2].split('</script>')[0].replace('/*__CA
   .replace('/*__ACTION_CARD__*/', readFileSync(new URL('../ui/mcp/action-card.js', import.meta.url), 'utf8').replace(/^export\s+(const|function)\s/gm, '$1 '))
   .replace(/\}\)\(\);\s*$/,  'window.review = { state, go, render };})();');
 const tick = () => new Promise(resolve => setTimeout(resolve, 0));
-function fixture({ deferGet = false, deferWrite = false, connect = false, deferredConnect = false } = {}) {
+function fixture({ deferGet = false, deferWrite = false, connect = false, deferredConnect = false, directRole = undefined as string | null | undefined, projects = [] as any[], projectFailure = false } = {}) {
   const dom = new JSDOM(source.split('<script>')[0], { runScripts: 'outside-only', url: 'https://panel.test' });
   const events = new Map<string, Function>();
   const w = dom.window, calls: any[] = [], pending: any[] = [], pendingGets: any[] = [], pendingWrites: any[] = [];
   let connectResolve: any, connectReject: any;
   const connection = new Promise((resolve,reject)=>{connectResolve=resolve;connectReject=reject;});
-  const assessment = (id: string) => ({ assessment: { id, name: id, role: 'owner', stage: 'permissions', project_id: 'p' }, surveys: [] });
+  const assessment = (id: string) => ({ assessment: { id, name: id, role: 'owner', ...(directRole === undefined ? {} : { direct_role: directRole }), stage: 'permissions', project_id: 'p' }, surveys: [] });
   w.McpApps = { App: class {
     addEventListener(name: string, fn: Function) { events.set(name, fn); } connect() { return deferredConnect ? connection : connect ? Promise.resolve() : new Promise(() => {}); } getHostCapabilities() { return {serverTools:{}}; }
     callServerTool(req: any) {
@@ -23,6 +23,9 @@ function fixture({ deferGet = false, deferWrite = false, connect = false, deferr
       if (req.name === 'danger') return new Promise(resolve => pending.push(resolve));
       if (req.name === 'write') return deferWrite ? new Promise(resolve => pendingWrites.push(resolve)) : Promise.resolve({ structuredContent: { ok: true, result: {} } });
       const { capability: cap, params: p } = req.arguments;
+      if (cap === 'cap.project.list') return Promise.resolve({structuredContent:projectFailure?{ok:false,error:{code:'UNAVAILABLE',message:'Project list unavailable'}}:{ok:true,result:{projects}}});
+      if (cap === 'cap.project.get' && projects.some(x=>x.id===p.id)) return Promise.resolve({structuredContent:{ok:true,result:{project:projects.find(x=>x.id===p.id),languages:[]}}});
+      if (cap === 'cap.assessment.list' && projects.some(x=>x.id===p.pid)) return Promise.resolve({structuredContent:{ok:true,result:{assessments:[assessment('A').assessment]}}});
       if (cap === 'cap.assessment.get') return deferGet ? new Promise(resolve => pendingGets.push({ id: p.id, resolve })) : Promise.resolve({ structuredContent: { ok: true, result: assessment(p.id) } });
       return Promise.resolve({ structuredContent: { ok: true, result: cap === 'cap.grant.list' ? { grants: [] } : {} } });
     }
@@ -131,7 +134,7 @@ it('surfaces assessment-only grants as reachable cards and crumbs', async () => 
 });
 
 it.each(['unrelated', 'p'])('keeps exact assessment entries with project grant %s and uses only accessible parent crumbs', async projectId => {
-  const f = fixture();
+  const f = fixture({projects:[{id:projectId,name:'Project',role:'owner'}]});
   try {
     f.r.state.me = { principal: { id: 'person_owner', kind: 'user' }, grants: [{ scope_type: 'project', scope_id: projectId, role: 'owner' }, { scope_type: 'assessment', scope_id: 'assess_shared', role: 'viewer' }] };
     f.r.go('#workspaces'); await tick();
@@ -271,4 +274,42 @@ it.each(['email', 'role'])('PR #508: editing %s after the inline invite preview 
     stale.click(); await tick();
     expect(f.calls.filter(x => x.name === 'danger' && x.arguments?.mode === 'execute')).toHaveLength(0);
   } finally { f.dom.window.close(); }
+});
+
+it('workspace-inherited owner has no direct invitation controls in the assessment panel', async () => {
+  const f = fixture({directRole:null});
+  try {
+    await f.go('A');
+    expect(f.w.document.querySelector('[data-invite-form]')).toBeNull();
+    expect(f.w.document.body.textContent).toContain('Members of the containing workspace also have access');
+  } finally { f.w.close(); }
+});
+
+it('workspace-only members follow effective project breadcrumbs and return to the assessment', async () => {
+  const f = fixture({directRole:null,projects:[{id:'p',name:'Accessible project',workspace_id:'w',role:'owner'}]});
+  try {
+    f.r.state.me={principal:{id:'workspace_owner',kind:'user'},grants:[{scope_type:'workspace',scope_id:'w',role:'owner'}]};
+    await f.go('A','prepare');
+    expect(f.w.document.querySelector('#crumbs a[href="#shared-assessments"]')).toBeNull();
+    const parent=f.w.document.querySelector('#crumbs a[href="#project/p"]');
+    expect(parent).not.toBeNull();parent.click();await tick();
+    expect(f.w.document.querySelector('h1').textContent).toBe('Accessible project');
+    const assessment=f.w.document.querySelector('a[href="#assessment/A"]');
+    expect(assessment).not.toBeNull();assessment.click();await tick();
+    expect(f.w.document.querySelector('h1').textContent).toBe('A');
+    expect(f.w.document.querySelector('#crumbs a[href="#project/p"]')).not.toBeNull();
+    expect(f.calls.some(x=>x.arguments.capability==='cap.project.list')).toBe(true);
+    expect(f.calls.some(x=>x.name==='danger'||x.name==='write')).toBe(false);
+  } finally {f.w.close();}
+});
+
+it('a failed parent lookup does not hide an authorized assessment or claim shared-only access', async () => {
+  const f=fixture({projectFailure:true});
+  try {
+    await f.go('A','prepare');
+    expect(f.w.document.querySelector('h1').textContent).toBe('A');
+    expect(f.w.document.querySelector('#crumbs a[href="#workspaces"]')).not.toBeNull();
+    expect(f.w.document.querySelector('#crumbs a[href="#shared-assessments"]')).toBeNull();
+    expect(f.w.document.querySelector('#crumbs a[href="#project/p"]')).toBeNull();
+  } finally {f.w.close();}
 });

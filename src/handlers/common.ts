@@ -1,11 +1,11 @@
 import { ensureLegacyTemplates, LEGACY_TEMPLATE_IDS } from "../legacy-templates";
 import { withDisplayName } from "../display-names";
 // Shared helpers for data handlers: ids, hashing, params, visibility/role checks.
-// Roles come from `grant` rows at the exact scope, with ONE inheritance edge
+// Roles come from `grant` rows at the exact scope, through containment
 // (3d-review-cookbook work/active/2026-10-15-3d-workspace-permissions): a workspace
 // grant (owner/member/viewer) applies to every project grouped in that workspace —
-// effective project role = max(project grant, workspace grant). Assessments still
-// open only by an explicit assessment grant (D9 unchanged).
+// effective project role = max(project grant, workspace grant). Workspace roles also
+// reach assessments contained in that workspace; direct project grants alone do not.
 import type { Ctx, Role, ScopeType } from "./types";
 import { CapError, notVisible } from "./errors";
 
@@ -102,22 +102,28 @@ export function requireSupport(ctx: Ctx): string {
 }
 export interface GrantRow { id: string; principal_id: string; scope_type: string; scope_id: string; role: Role; created_at: string }
 
-/** Direct role at exactly this scope, or null. */
-export async function roleAt(ctx: Ctx, scopeType: ScopeType, scopeId: string): Promise<Role | null> {
+/** Stored direct grant only; global support fallback is not a direct grant. */
+export async function directGrantRoleAt(ctx: Ctx, scopeType: ScopeType, scopeId: string): Promise<Role | null> {
   if (ctx.principal.kind !== "user" && ctx.principal.kind !== "support") return null;
   const row = await ctx.db
     .prepare('SELECT role FROM "grant" WHERE principal_id = ? AND scope_type = ? AND scope_id = ?')
     .bind(ctx.principal.id, scopeType, scopeId)
     .first<{ role: Role }>();
-  return row?.role ?? (ctx.principal.kind === "support" ? "viewer" : null);
+  return row?.role ?? null;
+}
+/** Exact-scope access retains the existing global-support viewer fallback. */
+export async function roleAt(ctx: Ctx, scopeType: ScopeType, scopeId: string): Promise<Role | null> {
+  return (await directGrantRoleAt(ctx, scopeType, scopeId)) ?? (ctx.principal.kind === "support" ? "viewer" : null);
 }
 /** THE inheritance rule as SQL (0.35.14, cookbook work/active/2026-10-18-3d-grant-write-guard-followups DoD (c)): grant row
  *  `g` (an alias) applies at scope (`scopeT`, `scopeI`, SQL expressions) when it is AT that scope, or, for a project, when it is
- *  on the workspace that groups it. projectRole (read time) and grant.ts callerHolds (inside a write) both use it, so the
- *  effective-role rule has one source. `scopeI` is evaluated twice: pass a column, a literal or a numbered parameter. */
+ *  on the workspace that groups it; assessments inherit from that same workspace. projectRole (read time) and grant.ts callerHolds (inside a write) both use it, so the
+ *  effective-role rule has one source. `scopeI` is evaluated more than once: pass a column, a literal or a numbered parameter. */
 export const grantApplies = (g: string, scopeT: string, scopeI: string) =>
   `((${g}.scope_type = ${scopeT} AND ${g}.scope_id = ${scopeI}) OR (${scopeT} = 'project' AND ${g}.scope_type = 'workspace'`
-  + ` AND ${g}.scope_id = (SELECT p.workspace_id FROM project p WHERE p.id = ${scopeI})))`;
+  + ` AND ${g}.scope_id = (SELECT p.workspace_id FROM project p WHERE p.id = ${scopeI}))`
+  + ` OR (${scopeT} = 'assessment' AND ${g}.scope_type = 'workspace' AND ${g}.scope_id = (`
+  + `SELECT inherited_p.workspace_id FROM assessment inherited_a JOIN project inherited_p ON inherited_p.id = inherited_a.project_id WHERE inherited_a.id = ${scopeI})))`;
 /** Effective project role: max(direct project grant, grant on the workspace that groups it). One query; null when neither. */
 export async function projectRole(ctx: Ctx, projectId: string): Promise<Role | null> {
   if (ctx.principal.kind !== "user" && ctx.principal.kind !== "support") return null;
@@ -127,9 +133,16 @@ export async function projectRole(ctx: Ctx, projectId: string): Promise<Role | n
     .all<{ role: Role }>();
   return (results ?? []).reduce<Role | null>((acc, r) => maxRole(acc, r.role), ctx.principal.kind === "support" ? "viewer" : null);
 }
-/** Role at a scope as authorization sees it: projects inherit from their workspace; other scopes are exact. */
+/** Effective access: workspace grants follow containment into projects and assessments. */
 export async function effectiveRoleAt(ctx: Ctx, scopeType: ScopeType, scopeId: string): Promise<Role | null> {
-  return scopeType === "project" ? projectRole(ctx, scopeId) : roleAt(ctx, scopeType, scopeId);
+  if (scopeType === "project") return projectRole(ctx, scopeId);
+  if (scopeType !== "assessment") return roleAt(ctx, scopeType, scopeId);
+  if (ctx.principal.kind !== "user" && ctx.principal.kind !== "support") return null;
+  const row = await ctx.db.prepare(`SELECT CASE MAX(CASE g.role WHEN 'owner' THEN 3 WHEN 'member' THEN 2 WHEN 'viewer' THEN 1 END)
+    WHEN 3 THEN 'owner' WHEN 2 THEN 'member' WHEN 1 THEN 'viewer' END AS role
+    FROM "grant" g WHERE g.principal_id = ?1 AND ${grantApplies("g", "'assessment'", "?2")}`)
+    .bind(ctx.principal.id, scopeId).first<{ role: Role | null }>();
+  return maxRole(row?.role ?? null, ctx.principal.kind === "support" ? "viewer" : null);
 }
 /** Direct-role authority (HOLD #483 c6204865181): the caller's DIRECT grant at exactly this scope must reach `min`. Used by
  *  invite, update_role (to owner, and any role change at a project since 0.35.23) and transfer_owner (grant.ts); accept checks the inviter's direct grant inline, and
@@ -186,9 +199,9 @@ export async function loadProject(ctx: Ctx, id: string, min: Role = "viewer"): P
   if (!row) throw notVisible("project");
   return { row, role: gate(role, min, "project") };
 }
-/** Role at an assessment = the direct assessment grant only (D9, settled): project and workspace roles never reach an assessment. A project grant lists, it does not open (Astra #14 c5704047932). */
+/** Assessment access = max(direct assessment role, containing workspace role). No direct project inheritance. */
 export async function assessmentRole(ctx: Ctx, a: { id: string; project_id: string }): Promise<Role | null> {
-  return roleAt(ctx, "assessment", a.id);
+  return effectiveRoleAt(ctx, "assessment", a.id);
 }
 export async function loadAssessment(ctx: Ctx, id: string, min: Role = "viewer"): Promise<{ row: AssessmentRow; role: Role }> {
   const row = await ctx.db.prepare("SELECT * FROM assessment WHERE id = ?").bind(id).first<AssessmentRow>();

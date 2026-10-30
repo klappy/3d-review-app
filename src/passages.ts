@@ -23,7 +23,7 @@
  */
 import type { Ctx, Env, Principal, Role } from "./handlers/types";
 import { resolvePrincipal } from "./auth";
-import { atLeast, auditRow, newId, roleAt } from "./handlers/common";
+import { atLeast, auditRow, newId, effectiveRoleAt } from "./handlers/common";
 import { newTraceId } from "./receipt";
 import { linkTitle } from "./link-title";
 import { bookOf, renderPassagePdf } from "./ptxprint";
@@ -92,7 +92,7 @@ async function staff(request: Request, env: Env, aid: string, min: Role): Promis
   const principal = await resolvePrincipal(request, env);
   if (principal.kind === "anonymous" || principal.kind === "participant") return fail(401, "NOT_AUTHENTICATED", "sign in first");
   const ctx = { env, db: env.DB, principal } as unknown as Ctx;
-  const role = await roleAt(ctx, "assessment", aid);
+  const role = await effectiveRoleAt(ctx, "assessment", aid);
   if (!role) return fail(404, "NOT_FOUND_OR_NOT_VISIBLE", "resource not found or not visible");
   if (!atLeast(role, min)) return fail(403, "NOT_AUTHORIZED_AT_SCOPE", `${min} role required at this assessment`);
   return { principal, role };

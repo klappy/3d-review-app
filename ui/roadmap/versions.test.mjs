@@ -1,5 +1,5 @@
 import test from 'node:test';import assert from 'node:assert/strict';import {JSDOM} from 'jsdom';
-import {renderVersions} from './versions.js';import {nextVersion,parseChange,parseLane,readChanges,forecast} from '../../scripts/roadmap-versions.mjs';
+import {renderVersions} from './versions.js';import {nextVersion,parseChange,parseLane,readChanges,forecast,includedVersions} from '../../scripts/roadmap-versions.mjs';
 test('any minor → next minor, else patch',()=>{assert.equal(nextVersion('0.21.0',['patch','patch']),'0.21.1');assert.equal(nextVersion('0.21.3',['patch','minor']),'0.22.0');});
 test('forecast counts only units not already shipped, sorted by section then lane',()=>{const rel={current:'0.21.0',versions:[{version:'0.21.0',sections:{added:['old thing shipped already here (#1)'],changed:[],fixed:[]}}]};
  const c=[parseChange('9-1.md','bump: patch\nlane: 9 · PR: #2\n- Fixed - b new fix'),parseChange('1-1.md','bump: minor\nlane: 1 · PR: #1\n- Added - old thing shipped already here'),parseChange('3-1.md','bump: patch\nlane: 3\n- Changed - a change')];
@@ -19,3 +19,22 @@ test('S11f: absent release/changes/ = zero pending, forecast none, no crash',asy
 test('lane must be numeric: parsed from the lane line or the filename prefix',()=>{assert.equal(parseChange('13-1854.md','bump: patch\nlane: 13 · PR: #372\n- Fixed - x').lane,13);assert.equal(parseLane('7-1200.md','bump: patch\n- Fixed - x'),7);assert.equal(parseLane('x.md','lane:13·PR: #1'),13);});
 test('non-numeric lane is refused loudly, never NaN or a digit prefix',()=>{assert.throws(()=>parseChange('s11f-roadmap-empty-changes-1854.md','bump: patch\nlane: 3d-review S11f · PR: (this PR)\n- Fixed - x'),/lane "3d-review" is not a number/);assert.throws(()=>parseChange('u07-0811.md','bump: patch\nlane: u07 · PR: #341\n- Fixed - x'),/u07-0811\.md: lane "u07"/);assert.throws(()=>parseChange('s9-me-1700.md','bump: patch\n- Fixed - x'),/lane "s9" is not a number/);});
 test('every pending change file in release/changes parses to a numeric lane',()=>{for(const c of readChanges())assert.ok(Number.isInteger(c.lane),c.file);});
+
+test('excluded candidate stays indexed but is not advertised in the current build',()=>{
+ const candidate={version:'0.37.1',included_in_product:false,excluded_from:['0.37.2'],sections:{fixed:['Unmerged inheritance']}};
+ const current={version:'0.37.2',sections:{fixed:['Navigation correction']}};
+ const releases={current:'0.37.2',versions:[current,candidate]};
+ assert.deepEqual(includedVersions(releases),[current]);
+ assert.equal(releases.versions[1],candidate);
+ assert.deepEqual(includedVersions({...releases,current:'0.38.0'}),[current]);
+ assert.deepEqual(includedVersions({...releases,current:'0.38.0',versions:[current,{...candidate,included_in_product:true}]}),[current,{...candidate,included_in_product:true}]);
+ assert.equal(forecast(releases,[parseChange('1-1.md','bump: patch\nlane: 1\n- Fixed - Unmerged inheritance')]).units.length,1);
+});
+test('tracked roadmap version data includes the canonical current release and its notes',async()=>{
+ const {readFile}=await import('node:fs/promises');const {VERSIONS}=await import('./versions-data.js');
+ const canonical=JSON.parse(await readFile(new URL('../../release/cookbook/releases.json',import.meta.url),'utf8'));
+ assert.equal(VERSIONS.current,canonical.current);
+ const shown=VERSIONS.shipped.find(v=>v.version===canonical.current),record=canonical.versions.find(v=>v.version===canonical.current);
+ assert.ok(shown,'roadmap must include current release');
+ assert.deepEqual(shown.fixed,record.sections.fixed??[]);
+});

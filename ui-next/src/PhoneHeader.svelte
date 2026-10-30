@@ -11,8 +11,10 @@
   import Icon from "./Icon.svelte";
   import { I } from "./icons.js";
   import { liveChrome } from "./app/chrome.js";
+  import { linkFor } from "./app/router.js";
+  import { liveContext } from "./screens/href.js";
   const L = liveChrome();
-  let { state = "root", title, parent = "Home", back = L?.home ?? "#home", step, steps = 5, signIn = true, initials = L?.initials ?? "BK", menuHref = "#menu", home = L?.home ?? "#home", onclose } = $props();
+  let { state = "root", title, parent = "Home", back = L?.home ?? "#home", step, steps = 5, signIn = true, initials = L?.initials ?? "BK", menuHref = L ? linkFor("menu", {}, liveContext() ?? {}) : "#menu", home = L?.home ?? "#home", onclose } = $props();
   if (!HEADER_STATES.includes(state)) throw new TypeError(`PhoneHeader: unknown state "${state}"`);
   if (state === "nested" && !(typeof title === "string" && title.trim())) throw new TypeError("PhoneHeader: a nested header needs the page title");
   if (state === "setup-step" && !(Number.isInteger(step) && step >= 1 && step <= steps)) throw new TypeError("PhoneHeader: setup-step needs step 1..steps");

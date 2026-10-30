@@ -1,7 +1,7 @@
 // node --test ui/assess/v3-assessment.test.mjs — lane 3: rulings a/b/c and the state-driven primary.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { v3StagePrimary, v3StageWord, v3CountLine, v3BandsMarkup, V3_SET_STAGE, V3_FLAGS, v3ExpectedFor, V3_EXPECTED_KEY } from './v3-assessment.js';
+import { v3StagePrimary, v3StageWord, v3CountLine, v3BandsMarkup, V3_SET_STAGE, V3_FLAGS, v3ExpectedFor, V3_EXPECTED_KEY, v3SettingsRole } from './v3-assessment.js';
 
 const L = ['Translation Team', 'Church', 'Community'];
 
@@ -183,4 +183,14 @@ test('S51 v3HeldText: API numbers when below the floor; the number-free line oth
   const h = v3BandsMarkup({ status: 'held', responses_in: 2, responses_needed: 5, reason: 'D7 x' }, ['Translation Team'], s => String(s));
   assert.match(h, /data-v3-band-held>Results appear after a report is built from enough responses\. 2 responses so far; at least 5 are needed/);
   assert.doesNotMatch(h, /D7 x/);
+});
+
+test('protected assessment settings follow direct authority while content can inherit', () => {
+  assert.equal(v3SettingsRole({role:'owner',direct_role:null}), null);
+  assert.equal(v3SettingsRole({role:'owner',direct_role:'member'}), 'member');
+  assert.equal(v3SettingsRole({role:'member',direct_role:null}), null);
+  assert.equal(v3SettingsRole({role:'owner',direct_role:'owner'}), 'owner');
+  assert.equal(v3SettingsRole({role:'viewer',granted_role:'owner',direct_role:'owner',complete:true}), 'owner');
+  assert.equal(v3SettingsRole({role:'viewer',granted_role:'owner',direct_role:null,complete:true}), 'viewer');
+  assert.equal(v3SettingsRole({role:'owner'}), 'owner'); // older exact-grant servers
 });

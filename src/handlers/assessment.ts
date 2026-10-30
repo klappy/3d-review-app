@@ -1,20 +1,21 @@
-// No grant inheritance: assessment reads/writes require an exact assessment grant.
+// Workspace membership inherits through containment; direct project grants alone do not.
 // Creation and archive membership are deliberately project-scoped per contract.
 import type { Ctx, Handler, Role } from "./types";
 import { requireConfirmedState } from "../receipt";
 import { templateDisplayName } from "../display-names";
 import { CapError, notVisible } from "./errors";
 import { DEMOGRAPHICS_KEY, demographicsEnabled, parseContextJson } from "../context-fields";
-import { STAGES, countScalar, gate, loadProject, newId, nowIso, patchOf, reqStr, roleAt, type AssessmentRow } from "./common";
+import { STAGES, countScalar, gate, loadProject, newId, nowIso, patchOf, reqStr, effectiveRoleAt, directGrantRoleAt, directRoleAt, grantApplies, type AssessmentRow } from "./common";
 import { lwcOf, saveLwc, saveLwcOnCreate, takeLwc } from "./lwc";
 import { missingTable as missingPassageTable } from "../passages";
 
 async function exact(ctx: Ctx, id: string, min: Role = "viewer") {
   const row = await ctx.db.prepare("SELECT * FROM assessment WHERE id = ?").bind(id).first<AssessmentRow>();
   if (!row) throw notVisible("assessment");
-  return { row, role: gate(await roleAt(ctx, "assessment", id), min, "assessment") };
+  const role = gate(await effectiveRoleAt(ctx, "assessment", id), min, "assessment");
+  return { row: { ...row, direct_role: await directGrantRoleAt(ctx, "assessment", id) }, role };
 }
-const view = (a: AssessmentRow, role: Role) => { const { lwc_json: _raw, ...rest } = a as AssessmentRow & { lwc_json?: unknown }; return { ...rest, lwc: lwcOf(a), role }; };
+const view = (a: AssessmentRow, role: Role) => { const { lwc_json: _raw, ...rest } = a as AssessmentRow & { lwc_json?: unknown }; return { ...rest, lwc: lwcOf(a), role, direct_role: (a as AssessmentRow & {direct_role?:Role|null}).direct_role ?? null }; };
 async function language(ctx: Ctx, pid: string, languageId: string) {
   const row = await ctx.db.prepare("SELECT id, archived_at FROM language WHERE id = ? AND project_id = ?").bind(languageId, pid).first<{id:string; archived_at: string | null}>();
   if (!row) throw notVisible("language");
@@ -57,18 +58,25 @@ export const create: Handler = async (ctx, params) => {
     await insert(true).catch(async (e) => { if (!b19Missing(e)) throw e; location = facilitator = null; await insert(false); });
   } else await insert(false);
   const saved = await saveLwcOnCreate(ctx, "assessment", id, lwc);
-  return { result: { assessment: { id, project_id: pid, language_id, name, purpose, period, format, location, facilitator, lwc: saved, stage: "prepare", archived_at: null, created_at: at, role: "owner" } }, scope: { type: "assessment", id } };
+  return { result: { assessment: { id, project_id: pid, language_id, name, purpose, period, format, location, facilitator, lwc: saved, stage: "prepare", archived_at: null, created_at: at, role: "owner", direct_role: "owner" } }, scope: { type: "assessment", id } };
 };
 export const list: Handler = async (ctx, params) => {
   const pid = reqStr(params, "pid");
   await loadProject(ctx, pid);
   if (ctx.principal.kind === "support") {
-    const {results} = await ctx.db.prepare(`SELECT a.*, COALESCE((SELECT g.role FROM "grant" g WHERE g.principal_id=?1 AND g.scope_type='assessment' AND g.scope_id=a.id),'viewer') AS role,
+    const {results} = await ctx.db.prepare(`SELECT a.*, COALESCE((SELECT CASE MAX(CASE g.role WHEN 'owner' THEN 3 WHEN 'member' THEN 2 ELSE 1 END) WHEN 3 THEN 'owner' WHEN 2 THEN 'member' WHEN 1 THEN 'viewer' END FROM "grant" g WHERE g.principal_id=?1 AND ${grantApplies("g", "'assessment'", "a.id")}), 'viewer') AS role,
+      (SELECT gd.role FROM "grant" gd WHERE gd.principal_id=?1 AND gd.scope_type='assessment' AND gd.scope_id=a.id) AS direct_role,
       (SELECT COUNT(*) FROM response r JOIN assessment_survey s ON s.id=r.assessment_survey_id WHERE s.assessment_id=a.id) AS response_count
       FROM assessment a WHERE a.project_id=?2 ORDER BY a.created_at`).bind(ctx.principal.id,pid).all<AssessmentRow & {role:Role;response_count:number}>();
     return {result:{assessments:results.map(a => ({...view(a,a.role),response_count:Number(a.response_count)||0}))},scope:{type:"project",id:pid}};
   }
-  const {results} = await ctx.db.prepare('SELECT a.*, g.role, (SELECT COUNT(*) FROM response r JOIN assessment_survey s ON s.id = r.assessment_survey_id WHERE s.assessment_id = a.id) AS response_count FROM assessment a JOIN "grant" g ON g.scope_type = ? AND g.scope_id = a.id WHERE a.project_id = ? AND g.principal_id = ? ORDER BY a.created_at').bind("assessment", pid, ctx.principal.id).all<AssessmentRow & {role:Role; response_count:number}>();
+  const {results} = await ctx.db.prepare(`SELECT a.*,
+    (SELECT gd.role FROM "grant" gd WHERE gd.principal_id=?1 AND gd.scope_type='assessment' AND gd.scope_id=a.id) AS direct_role,
+    (SELECT CASE MAX(CASE g.role WHEN 'owner' THEN 3 WHEN 'member' THEN 2 ELSE 1 END) WHEN 3 THEN 'owner' WHEN 2 THEN 'member' ELSE 'viewer' END
+     FROM "grant" g WHERE g.principal_id=?1 AND ${grantApplies("g", "'assessment'", "a.id")}) AS role,
+    (SELECT COUNT(*) FROM response r JOIN assessment_survey s ON s.id=r.assessment_survey_id WHERE s.assessment_id=a.id) AS response_count
+    FROM assessment a WHERE a.project_id=?2 AND EXISTS (SELECT 1 FROM "grant" g WHERE g.principal_id=?1 AND ${grantApplies("g", "'assessment'", "a.id")})
+    ORDER BY a.created_at`).bind(ctx.principal.id, pid).all<AssessmentRow & {role:Role; response_count:number}>();
   return { result: { assessments: results.map(a => ({ ...view(a, a.role), response_count: Number(a.response_count) || 0 })) }, scope: { type: "project", id: pid } };
 };
 // Survey rows carry the template's display name (Translators, Mid-Level Quality Roles (Facilitators, Team Leaders, CiTs)); the pinned name stays as source_name.
@@ -140,6 +148,7 @@ async function archiveChange(ctx: Ctx, params: Record<string,unknown>, archived:
   const id = reqStr(params, "id");
   const row = await ctx.db.prepare("SELECT * FROM assessment WHERE id = ?").bind(id).first<AssessmentRow>();
   if (!row) throw notVisible("assessment");
+  await directRoleAt(ctx, "assessment", id, "member");
   await loadProject(ctx, row.project_id, "member");
   const at = archived ? (row.archived_at ?? nowIso(ctx)) : null;
   await ctx.db.prepare("UPDATE assessment SET archived_at = ? WHERE id = ?").bind(at, id).run();
@@ -162,6 +171,7 @@ async function passageRows(ctx: Ctx, id: string): Promise<{ table: boolean; rows
 }
 export const del: Handler = async (ctx, params, opts) => {
   const id = reqStr(params,"id"), {row} = await exact(ctx,id,"owner");
+  await directRoleAt(ctx, "assessment", id, "owner");
   const surveys = await countScalar(ctx,"SELECT COUNT(*) AS n FROM assessment_survey WHERE assessment_id = ?",id);
   const responses = await countScalar(ctx,"SELECT COUNT(*) AS n FROM response r JOIN assessment_survey s ON s.id = r.assessment_survey_id WHERE s.assessment_id = ?",id);
   // Audit round 1 W3: assessment_passage.assessment_id REFERENCES assessment(id), so ANY passage row — a removed

@@ -28,19 +28,18 @@ async function callerAt(ctx: Ctx, scope: Scope, min: Role): Promise<Role> {
 /** ASK L1 default 1 (cookbook work/active/2026-10-15-3d-workspace-permissions/ASK.md): inviting at, or revoking an invitation
  *  at, ONE project needs the caller's own DIRECT project grant (member or above). An inherited workspace role no longer
  *  suffices, so removing a workspace grant ends every line of access that grant handed on. A caller with no role at all
- *  still gets NOT_FOUND_OR_NOT_VISIBLE (directRoleAt decides visibility on the effective role first). Workspace and
- *  assessment roles are exact, so inviting there already needs the caller's own grant at that scope. */
-const PROJECT_INVITE_HINT = "your role here comes from the workspace — invite them at the workspace instead (cap.grant.invite with scope workspace), or ask a direct project member";
-async function directAtProject(ctx: Ctx, scope: Scope) {
-  if (scope.type === "project") await directRoleAt(ctx, "project", scope.id, "member", PROJECT_INVITE_HINT);
+ *  still gets NOT_FOUND_OR_NOT_VISIBLE (directRoleAt decides visibility on the effective role first). Assessment invitations also require the direct child grant; workspace invitations stay exact. */
+const PROJECT_INVITE_HINT = "your role here comes from the workspace — invite them at the workspace instead (cap.grant.invite with scope workspace), or ask a direct member of this scope";
+async function directAtChildScope(ctx: Ctx, scope: Scope) {
+  if (scope.type === "project" || scope.type === "assessment") await directRoleAt(ctx, scope.type, scope.id, "member", PROJECT_INVITE_HINT);
 }
 /** update_role's direct-owner rule: raising anyone to owner needs a DIRECT owner at the scope (HOLD #483 c6204865181 #2), and
  *  since 0.35.23 (cookbook work/active/2026-10-15-3d-workspace-permissions/ASK-f4-finding4.md default 1, F4) ANY role change at a
  *  project needs a DIRECT project owner: an owner through the workspace manages project people at the workspace, or is added to
- *  the project directly. Workspace and assessment roles are direct only, so their callerAt check already is this rule. */
-const PROJECT_ROLE_HINT = "your owner role here comes from the workspace — ask a direct project owner, or get added to the project directly";
+ *  the project directly. Assessment role changes have the same direct-owner protection; workspace roles stay exact. */
+const PROJECT_ROLE_HINT = "your owner role here comes from the workspace — ask a direct owner of this scope, or get added directly";
 async function directOwnerFor(ctx: Ctx, scope: Scope, to: Role | undefined) {
-  if (scope.type === "project") await directRoleAt(ctx, "project", scope.id, "owner", PROJECT_ROLE_HINT);
+  if (scope.type === "project" || scope.type === "assessment") await directRoleAt(ctx, scope.type, scope.id, "owner", PROJECT_ROLE_HINT);
   else if (to === "owner") await directRoleAt(ctx, scope.type, scope.id, "owner");
 }
 /** D3: a member may act only up to member. */
@@ -56,9 +55,7 @@ async function refuseExistingAccess(ctx: Ctx, scope: Scope, inviteeHash: string)
   const me = await ctx.db.prepare("SELECT email_hash FROM principal WHERE id = ?").bind(ctx.principal.id).first<{ email_hash: string | null }>();
   if (me?.email_hash && me.email_hash === inviteeHash)
     throw new CapError("INVALID_PARAMS", "cannot invite yourself", "your access here comes from an existing grant; ask a direct owner if it should change", "cap.grant.invite");
-  const held = await ctx.db.prepare(`SELECT 1 FROM "grant" g JOIN principal pr ON pr.id = g.principal_id WHERE pr.email_hash = ?1 AND (
-      (g.scope_type = ?2 AND g.scope_id = ?3)
-      OR (?2 = 'project' AND g.scope_type = 'workspace' AND g.scope_id = (SELECT p.workspace_id FROM project p WHERE p.id = ?3))) LIMIT 1`)
+  const held = await ctx.db.prepare(`SELECT 1 FROM "grant" g JOIN principal pr ON pr.id = g.principal_id WHERE pr.email_hash = ?1 AND ${grantApplies("g", "?2", "?3")} LIMIT 1`)
     .bind(inviteeHash, scope.type, scope.id).first();
   if (held) throw new CapError("INVALID_PARAMS", "this person already has access at this scope", "change a direct grant with cap.grant.update_role; inherited access follows the workspace", "cap.grant.update_role");
 }
@@ -69,7 +66,7 @@ async function owners(ctx: Ctx, scope: Scope): Promise<string[]> {
 /** ASK L1 default 1 (follow-ups F3 and dead-invitations (2)/(3)): ONE predicate for "this invitation's inviter still stands
  *  behind it", over an invitation row aliased `i`. An owner invitation needs its inviter's DIRECT owner grant at the scope; any
  *  other project invitation needs the inviter's DIRECT project grant at member or above (the rule invite applies,
- *  directAtProject). 0.35.23 (cookbook work/active/2026-10-15-3d-workspace-permissions/ASK-f4-finding4.md default 1): the same
+ *  directAtChildScope). 0.35.23 (cookbook work/active/2026-10-15-3d-workspace-permissions/ASK-f4-finding4.md default 1): the same
  *  holds for workspace and assessment invitations — every invitation needs its inviter's DIRECT grant at its scope (member or
  *  above; owner for an owner invitation); there is no longer a scope that skips the check. accept refuses
  *  a row that fails it; cap.me.invitations and the roster's pending_invitations do not list it; invite de-duplication does not
@@ -175,7 +172,7 @@ export const invite: Handler = async (ctx, p, o) => {
   if (!email) throw new CapError("INVALID_PARAMS", "email must be one plain ASCII address", "letters, digits and . _ % + - before the @; no display names, lists, quotes or spaces", "cap.grant.invite");
   const caller = await callerAt(ctx, scope, "member");
   ceiling(caller, role, "invite");
-  await directAtProject(ctx, scope);
+  await directAtChildScope(ctx, scope);
   // Creating an owner needs a DIRECT owner at this scope; an inherited workspace owner cannot mint project owners.
   if (role === "owner") await directRoleAt(ctx, scope.type, scope.id, "owner");
   const inviteeHash = await sha256(email);
@@ -266,17 +263,31 @@ export const invite: Handler = async (ctx, p, o) => {
   return { result: { invitation_id: id, role, status: stored, accepted: true, delivered: delivery.delivered, delivery: { provider: delivery.provider ?? null, state: delivery.state, reason: delivery.reason ?? null, ...(delivery.provider_status !== undefined ? { provider_status: delivery.provider_status } : {}) }, note, ...(ctx.env.ENVIRONMENT === "dev" ? { dev_only_link_token: token } : {}) }, scope, impact };
 };
 
+async function invitationRevoker(ctx: Ctx, scope: Scope, role: Role) {
+  const caller = await callerAt(ctx, scope, "member");
+  ceiling(caller, role, "revoke invitations");
+  await directAtChildScope(ctx, scope);
+  if (role === "owner") await directRoleAt(ctx, scope.type, scope.id, "owner");
+}
 export const revoke_invitation: Handler = async (ctx, p) => {
   const id = reqStr(p, "id");
   const inv = await ctx.db.prepare("SELECT id, scope_type, scope_id, role, status FROM invitation WHERE id = ?").bind(id).first<any>();
   if (!inv) throw notVisible("invitation");
   const scope: Scope = { type: inv.scope_type, id: inv.scope_id };
-  const caller = await callerAt(ctx, scope, "member");
-  ceiling(caller, inv.role as Role, "revoke invitations");
-  await directAtProject(ctx, scope);
-  // 'unconfirmed' is revocable: it is the explicit human path out of an uncertain send (revoke, then invite anew).
+  await invitationRevoker(ctx, scope, inv.role);
+  // 'unconfirmed' is revocable: the explicit human path out of an uncertain send.
   if (inv.status === "accepted") throw new CapError("INVALID_PARAMS", "already accepted — revoke the grant instead", undefined, "cap.grant.revoke");
-  await ctx.db.prepare("UPDATE invitation SET status = 'revoked' WHERE id = ?").bind(id).run();
+  const min = inv.role === "owner" ? "owner" : "member";
+  const written = await ctx.db.prepare(`UPDATE invitation SET status = 'revoked' WHERE id = ?1 AND scope_type = ?2 AND scope_id = ?3 AND role = ?4 AND status != 'accepted'
+    AND ${callerHolds("?5", "?2", "?3", `'${min}'`, scope.type === "project" || scope.type === "assessment")}`)
+    .bind(id, scope.type, scope.id, inv.role, ctx.principal.id).run();
+  if (!written.meta.changes) {
+    await invitationRevoker(ctx, scope, inv.role);
+    const live = await ctx.db.prepare("SELECT status FROM invitation WHERE id = ?").bind(id).first<any>();
+    if (!live) throw notVisible("invitation");
+    if (live.status === "accepted") throw new CapError("INVALID_PARAMS", "already accepted — revoke the grant instead", undefined, "cap.grant.revoke");
+    throw new CapError("STAGE_CONFLICT", "invitation changed while revocation was being checked", "refresh invitations before retrying");
+  }
   return { result: { id, status: "revoked" }, scope };
 };
 
@@ -306,7 +317,8 @@ export const accept: Handler = async (ctx, p, o) => {
   if (!me?.email_hash || me.email_hash !== inv.invitee_hash) throw notVisible("invitation");
   await refuseDeadInvitation(ctx, inv);
   const scope: Scope = { type: inv.scope_type, id: inv.scope_id };
-  const existing = await roleAt(ctx, scope.type, scope.id);
+  await refuseInheritedAcceptance(ctx, scope);
+  const existing = await effectiveRoleAt(ctx, scope.type, scope.id);
   const impact = { affected: [{ scope, role: inv.role, currently: existing ?? "none" }], irreversible: true, effect: "disclosure" as const, compensating_control: "cap.grant.revoke (what was seen stays seen)" };
   // 0.35.18 (cookbook work/active/2026-10-18-3d-grant-noop-followups-3 DoD (a)): the preview's `currently` is bound into the token.
   if (o?.dryRun) return { result: {}, scope, impact, confirmState: { currently: existing ?? "none" } };
@@ -321,11 +333,11 @@ export const accept: Handler = async (ctx, p, o) => {
   const nowStr = nowIso(ctx);
   const [granted, used] = await ctx.db.batch([
     ctx.db.prepare(`INSERT INTO "grant" (id, principal_id, scope_type, scope_id, role, created_at) SELECT ?1, ?2, ?3, ?4, ?5, ?6
-        WHERE ${acceptable("?7", "?6")}
+        WHERE ${acceptable("?7", "?6", "?8")}
       ON CONFLICT(principal_id, scope_type, scope_id) DO UPDATE SET role = CASE WHEN ${roleRank("excluded.role")} > ${roleRank('"grant".role')} THEN excluded.role ELSE "grant".role END
       RETURNING role`)
-      .bind(newId("grant"), ctx.principal.id, scope.type, scope.id, inv.role, nowStr, inv.id),
-    ctx.db.prepare(`UPDATE invitation SET status = 'accepted', accepted_at = ?2 WHERE id = ?1 AND ${acceptable("?1", "?2")}`).bind(inv.id, nowStr),
+      .bind(newId("grant"), ctx.principal.id, scope.type, scope.id, inv.role, nowStr, inv.id, ctx.principal.id),
+    ctx.db.prepare(`UPDATE invitation SET status = 'accepted', accepted_at = ?2 WHERE id = ?1 AND ${acceptable("?1", "?2", "?3")}`).bind(inv.id, nowStr, ctx.principal.id),
   ]);
   if ((used.meta.changes ?? 0) !== 1) {
     // Refused inside the batch: report it with the same typed refusal the checks above give for that state (a revoked row is
@@ -333,6 +345,7 @@ export const accept: Handler = async (ctx, p, o) => {
     const row = await ctx.db.prepare("SELECT id, scope_type, scope_id, role, status, expires_at, invitee_hash, created_by FROM invitation WHERE id = ?").bind(inv.id).first<any>();
     if (!row || row.status === "revoked") throw notVisible("invitation");
     await refuseDeadInvitation(ctx, row);
+    await refuseInheritedAcceptance(ctx, {type:row.scope_type,id:row.scope_id});
     throw notVisible("invitation");
   }
   const held = ((granted.results?.[0] as { role?: Role } | undefined)?.role) ?? (inv.role as Role);
@@ -356,9 +369,19 @@ async function refuseDeadInvitation(ctx: Ctx, inv: any): Promise<void> {
 }
 /** The invitation `id` can still be accepted at `now` (bound SQL expressions): open, unexpired by the one expiry rule, and its
  *  inviter still stands behind it (inviterStands). accept's write batch gates both statements on it (0.35.10 DoD (a)). */
-const acceptable = (id: string, now: string) =>
+const inheritedWorkspaceAccess = (scopeT: string, scopeI: string, recipient: string) =>
+  `EXISTS (SELECT 1 FROM "grant" wg WHERE wg.principal_id = ${recipient} AND wg.scope_type = 'workspace'`
+  + ` AND ${scopeT} IN ('project','assessment') AND ${grantApplies("wg", scopeT, scopeI)})`;
+/** An older child invitation must not convert subsequently inherited workspace access into a permanent direct grant. */
+async function refuseInheritedAcceptance(ctx: Ctx, scope: Scope) {
+  if (scope.type !== "project" && scope.type !== "assessment") return;
+  const inherited = await ctx.db.prepare(`SELECT 1 AS inherited WHERE ${inheritedWorkspaceAccess("?2", "?3", "?1")}`)
+    .bind(ctx.principal.id, scope.type, scope.id).first();
+  if (inherited) throw new CapError("NOT_AUTHORIZED_AT_SCOPE", "workspace access already applies; this invitation cannot create a permanent child grant", "use your inherited access and manage membership at the workspace");
+}
+const acceptable = (id: string, now: string, recipient: string) =>
   `EXISTS (SELECT 1 FROM invitation i WHERE i.id = ${id} AND i.status IN (${LIVE_STATUSES.map((st) => `'${st}'`).join(",")})`
-  + ` AND ${unexpired("i", now)} AND ${inviterStands("i")})`;
+  + ` AND ${unexpired("i", now)} AND ${inviterStands("i")} AND NOT ${inheritedWorkspaceAccess("i.scope_type", "i.scope_id", recipient)})`;
 /** ROLE_RANK as a SQL expression over a role expression `r` (unknown roles rank 0). */
 const roleRank = (r: string) => `(CASE ${r} ${(Object.keys(ROLE_RANK) as Role[]).map((k) => `WHEN '${k}' THEN ${ROLE_RANK[k]}`).join(" ")} ELSE 0 END)`;
 
@@ -386,8 +409,9 @@ export const mine: Handler = async (ctx) => {
         LEFT JOIN project p2 ON p2.id = a2.project_id
         LEFT JOIN workspace w2 ON w2.id = p2.workspace_id
       WHERE i.invitee_hash = ? AND i.scope_type IN (${GRANT_SCOPES.map(() => "?").join(",")}) AND i.status IN (${LIVE_STATUSES.map(() => "?").join(",")})
-        AND ${unexpired("i", "?")} AND i.created_by IS NOT ? AND ${inviterStands("i")} ORDER BY i.created_at, i.id`)
-    .bind(me.email_hash, ...GRANT_SCOPES, ...LIVE_STATUSES, nowIso(ctx), ctx.principal.id).all<InvitationRow>();
+        AND ${unexpired("i", "?")} AND i.created_by IS NOT ? AND ${inviterStands("i")}
+        AND NOT ${inheritedWorkspaceAccess("i.scope_type", "i.scope_id", "?")} ORDER BY i.created_at, i.id`)
+    .bind(me.email_hash, ...GRANT_SCOPES, ...LIVE_STATUSES, nowIso(ctx), ctx.principal.id, ctx.principal.id).all<InvitationRow>();
   const invitations = r.results.map((i) => {
     const { name, path } = scopeNames(i);
     return { id: i.id, scope: { type: i.scope_type, id: i.scope_id, name, path }, role: i.role, inviter_display_name: null, invited_at: i.created_at, expires_at: i.expires_at };
@@ -464,7 +488,7 @@ export const update_role: Handler = async (ctx, p, o) => {
   const binds: unknown[] = [role, gid, g.role, ctx.principal.id, scope.type, scope.id];
   if (downgrade) binds.push(g.principal_id, nowIso(ctx), sweptIds.join(","));
   const stmts = [ctx.db.prepare(`UPDATE "grant" SET role = ?1 WHERE id = ?2 AND role = ?3 AND (role <> 'owner' OR ?1 = 'owner')`
-    + ` AND ${callerHolds("?4", "?5", "?6", "'owner'")} AND ((?1 <> 'owner' AND ?5 <> 'project') OR ${callerHolds("?4", "?5", "?6", "'owner'", true)})`
+    + ` AND ${callerHolds("?4", "?5", "?6", "'owner'")} AND ((?1 <> 'owner' AND ?5 NOT IN ('project','assessment')) OR ${callerHolds("?4", "?5", "?6", "'owner'", true)})`
     + (downgrade ? ` AND ${orphanedNow("?7", "?5", "?6", "?8", "?1")} = ?9` : ""))
     .bind(...binds)];
   if (downgrade) stmts.push(revokeOrphaned(ctx, g.principal_id, scope, true));
@@ -488,9 +512,15 @@ export const update_role: Handler = async (ctx, p, o) => {
   return { result: { grant: gid, role }, scope, impact, priorState: { role: g.role } };
 };
 
+/** Assessment grant revocation must not gain delegation authority through workspace inheritance. */
+async function directAssessmentRevoker(ctx: Ctx, scope: Scope) {
+  if (scope.type === "assessment") await directRoleAt(ctx, "assessment", scope.id, "member");
+}
+
 export const revoke: Handler = async (ctx, p) => {
   const scope = reqScope(p); const gid = reqStr(p, "gid");
   const caller = await callerAt(ctx, scope, "member");
+  await directAssessmentRevoker(ctx, scope);
   const g = await ctx.db.prepare('SELECT id, principal_id, role FROM "grant" WHERE id = ? AND scope_type = ? AND scope_id = ?').bind(gid, scope.type, scope.id).first<any>();
   if (!g) throw notVisible("grant");
   if (g.role === "owner") throw new CapError("NOT_AUTHORIZED_AT_SCOPE", "owners cannot be removed", "D3 — last owner is protected; transfer ownership first");
@@ -504,7 +534,7 @@ export const revoke: Handler = async (ctx, p) => {
   // Refused → no row changed (the sweep runs only when the DELETE removed its row, 0.35.14 DoD (a)), and the typed refusal
   // for the state the re-read finds (refuseGrantWrite).
   const [del, rev] = await ctx.db.batch([ctx.db.prepare(`DELETE FROM "grant" WHERE id = ?1 AND role <> 'owner'`
-    + ` AND ${callerHolds("?2", "?3", "?4", `(CASE WHEN ${roleRank('"grant".role')} > ${ROLE_RANK.member} THEN 'owner' ELSE 'member' END)`)}`)
+    + ` AND ${callerHolds("?2", "?3", "?4", `(CASE WHEN ${roleRank('"grant".role')} > ${ROLE_RANK.member} THEN 'owner' ELSE 'member' END)`)} AND (?3 <> 'assessment' OR ${callerHolds("?2", "?3", "?4", "'member'", true)})`)
     .bind(gid, ctx.principal.id, scope.type, scope.id), revokeOrphaned(ctx, g.principal_id, scope, true)]);
   if ((del.meta.changes ?? 0) !== 1) refuseGrantWrite(await reReadGrantWrite(ctx, scope, gid, "revoke"), "revoke");
   const revoked_invitations = rev.meta.changes ?? 0;
@@ -520,6 +550,7 @@ export const revoke: Handler = async (ctx, p) => {
 async function reReadGrantWrite(ctx: Ctx, scope: Scope, gid: string, op: "update_role" | "revoke", to?: Role): Promise<{ caller: Role; now: Role }> {
   const caller = await callerAt(ctx, scope, op === "update_role" ? "owner" : "member");
   if (op === "update_role") await directOwnerFor(ctx, scope, to);
+  else await directAssessmentRevoker(ctx, scope);
   const now = await ctx.db.prepare('SELECT role FROM "grant" WHERE id = ? AND scope_type = ? AND scope_id = ?').bind(gid, scope.type, scope.id).first<{ role: Role }>();
   if (!now) throw notVisible("grant");
   return { caller, now: now.role };

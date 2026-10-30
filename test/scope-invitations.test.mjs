@@ -18,6 +18,33 @@ function world(respond) {
  return{api,root,calls,get changes(){return changes},get ended(){return ended},ctx(c){ctx={...ctx,...c}},button(label){const n=walk(root).find(x=>x.tag==='button'&&x.textContent===label);assert.ok(n,`missing button ${label}: ${text(root)}`);return n},input(name){const n=walk(root).find(x=>x.name===name);assert.ok(n);return n},buttons(){return walk(root).filter(x=>x.tag==='button').map(x=>x.textContent)}};
 }
 const scope={type:'assessment',id:'a1',role:'owner'};
+test('legacy assessment entries use direct authority for collaborators while retaining effective content access', async () => {
+ const {readFileSync} = await import('node:fs');
+ const app = readFileSync(new URL('../ui/app.js', import.meta.url), 'utf8');
+ for (const name of ['chooseAssessment', 'chooseGrantedAssessment']) {
+  const start = app.indexOf('async function ' + name + '()');
+  const body = app.slice(start, app.indexOf('\n}\n', start));
+  const assignment = body.match(/collab\.setScope\((\{ type: 'assessment'[^;]+)\);/)[1];
+  for (const effective of ['member','owner']) {
+   const result = {assessment:{id:'a1',role:effective,direct_role:null}};
+   const passed = Function('result','return (' + assignment + ')')(result);
+   const w = world(() => {throw Error('inherited-only collaborator must not fetch grants')});
+   await w.api.setScope(passed);
+   assert.equal(w.calls.length,0);
+   assert.ok(!w.buttons().includes('Invite'));
+   assert.ok(!w.buttons().includes('Remove access'));
+   assert.ok(!w.buttons().includes('Preview role change'));
+   assert.ok(body.includes('state.assessmentRole = result.assessment.role'), 'content retains effective authority');
+  }
+  const result = {assessment:{id:'a1',role:'owner',direct_role:'member'}};
+  const passed = Function('result','return (' + assignment + ')')(result);
+  const w = world(() => ({scope:{type:'assessment',id:'a1'},grants:[],pending_invitations:[]}));
+  await w.api.setScope(passed);
+  assert.equal(passed.role,'member');
+  assert.ok(w.buttons().includes('Invite'), 'actual direct members retain permitted invitations');
+  assert.ok(!w.buttons().includes('Preview role change'));
+ }
+});
 const list=(s=scope)=>({scope:{type:s.type,id:s.id},grants:[],pending_invitations:[]});
 const confirmResult={confirm_token:'confirmation-secret',impact:{affected:[{scope:{type:'assessment',id:'a1'},role:'member',currently:'owner'}]}};
 async function emailPreview(w){w.input('invite-email').value='recipient@example.invalid';w.button('Invite').click();await flush()}

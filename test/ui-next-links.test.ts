@@ -12,6 +12,7 @@ import { join, relative, resolve } from "node:path";
 import { SCREENS } from "../ui-next/src/route.js";
 // @ts-expect-error -- plain .js module, no type declarations
 import { REGISTRY } from "../ui-next/src/screens/registry.js";
+import { ROUTES } from "../ui-next/src/app/router.js";
 
 const ROOT = resolve(__dirname, "..");
 const DIR = join(ROOT, "ui-next/src/screens");
@@ -54,7 +55,7 @@ describe("cross-screen links name a registered screen", () => {
     expect(files).not.toContain("href.js");
   });
   it("every screen name linked from ui-next/src/screens/**/*.svelte and *.js is registered or built in", () => {
-    const known = new Set<string>([...SCREENS, ...Object.keys(REGISTRY)]);
+    const known = new Set<string>([...SCREENS, ...Object.keys(REGISTRY), ...ROUTES.map(([name]) => name)]);
     const files = walk(DIR).filter(SCANNED);
     expect(files.length).toBeGreaterThan(0);
     const bad = files.flatMap((f) => screenLinks(readFileSync(f, "utf8")).filter((n) => !known.has(n)).map((n) => `${relative(ROOT, f)}: ?screen=${n}`));

@@ -467,3 +467,14 @@ test('E6: the Home Sign in href is computed from the email-links flag (off → A
   assert.equal(on.replace('href="#signin"', 'href="/v2/auth/access"'), off, 'only the href differs');
   assert.equal(navOf({ emailLinks: 'yes' }), off, 'only a literal true turns it on');
 });
+
+test('Add project discloses inherited project, assessment and report access before submission', () => {
+  const ctx=ctxWith({});
+  const html=pages.workspace.render(ctx,{workspace:{id:'w1',name:'Workspace',role:'owner',archived_at:null},projects:[],status:'loaded',candidatesStatus:'loaded',candidates:[{id:'p1',name:'Project',role:'owner',direct_role:'owner'}]});
+  assert.ok(html.includes('Adding a project gives everyone in this workspace access to the project, its assessments and their available reports at their workspace role.'));
+  assert.ok(html.includes('people added to a project directly keep their access'));
+  assert.ok(html.includes('id="add-project"'));
+  assert.doesNotMatch(html,/Grouping never grants access/);
+  assert.ok(html.indexOf('id="grouping-access-notice"') < html.indexOf('Add to workspace</button>'));
+  assert.ok(html.includes('aria-describedby="grouping-access-notice"'));
+});

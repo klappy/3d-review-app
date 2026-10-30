@@ -5,7 +5,8 @@
 // No token storage, implicit grants, project-content requests, or automatic retries.
 const enc = encodeURIComponent;
 // Mirrors src/handlers/workspace.ts shareAuthority: directProjectRole is the caller's DIRECT project grant (never the
-// inherited/effective role). Group: workspace member+ AND direct project owner. Ungroup: workspace owner OR direct project owner.
+// inherited/effective role). The project picker requires workspace member+ AND direct project owner; the server also
+// requires direct ownership of every contained review. Ungroup: workspace owner OR direct project owner.
 export function mayGroup(workspaceRole, directProjectRole, op = 'group') {
   const wsMember = workspaceRole === 'owner' || workspaceRole === 'member';
   if (op === 'ungroup') return wsMember && (workspaceRole === 'owner' || directProjectRole === 'owner');
@@ -123,7 +124,7 @@ export function mountWorkspaceManager({ document: doc, root, request, getContext
       section.append(nameForm('Rename workspace', w.name, name => mutation(`/v2/workspaces/${enc(w.id)}`, 'PATCH', { name })));
       section.append(button(w.archived_at ? 'Unarchive workspace' : 'Archive workspace', () => mutation(`/v2/workspaces/${enc(w.id)}/${w.archived_at ? 'unarchive' : 'archive'}`, 'POST')));
     }
-    section.append(node('h4', 'Grouped projects'), node('p', 'Grouping lists project names. Access to each project is separate.'));
+    section.append(node('h4', 'Grouped projects'), node('p', 'Grouping gives everyone in this workspace access to the project, its assessments and their available reports at their workspace role. You must own the project and every review it contains to share them with this workspace. Removing it ends inherited access; people added to a project directly keep their access.'));
     const authorized = Array.isArray(context().authorizedProjects) ? context().authorizedProjects : [];
     const projects = Array.isArray(detail.projects) ? detail.projects : [];
     for (const p of projects) {

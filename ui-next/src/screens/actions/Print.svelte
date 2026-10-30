@@ -35,12 +35,14 @@
   import { untrack } from "svelte";
   import R0 from "../../../fixtures/actions/review.json";
   import D0 from "../../../fixtures/actions/print.json";
+  import PdfActions from './PdfActions.svelte';
+  import { surveyPdfUrl } from '../../../../ui/pdf/download.js';
 
   // data: the fixture shape (gallery) or app/data.js printPageModel (live: this review's surveys, links and languages). onprint({ picked, lang,
   // paper }) prints for real (app/print.js preparePapers → openPapersPrint; live only): the primary is then a button, never a link to
   // Collect; status is the live run's line (preparing, translating, blocked tab, the ready line); previews: each survey's read form by
   // survey id (app/print.js paperPreview) for the sheet of the first ticked survey (live), else the board's paper.
-  let { phone = false, theme = "light", data = null, onprint, status = "", busy = false, previews = {} } = $props();
+  let { phone = false, theme = "light", data = null, onprint, status = "", busy = false, previews = {}, pdfEnabled = false, pdfToken = null } = $props();
   const live = $derived(!!data);
   const R = $derived(data ?? R0);
   const D = $derived(data ? { checked: data.checked, phoneChecked: data.checked, phoneStatus: data.surveys.map((s) => (s.open ? "" : "not collecting")), sizes: ["A4", "Letter"], missing: null, preview: "" } : D0);
@@ -53,21 +55,48 @@
   const options = $derived([{ code: "en", name: "English" }, ...langs.map((l) => ({ code: l.code, name: l.name }))]);
   let lang = $state(untrack(() => (data ? "en" : (printLanguages(R0.lwc.assessment, R0.lwc.project)[0]?.code ?? "en"))));
   let paper = $state("A4");
-  // The ticked surveys (indexes into R.surveys): the checkboxes are bound to this list, so the count follows every tick.
-  // Seeded once from the board's ticks for this width (phone is a route prop, fixed for the page's life).
-  let picked = $state(untrack(() => [...(data ? data.checked : phone ? D0.phoneChecked : D0.checked)]));
+  // Store identities, never array positions: a retained Print can receive another review or reordered surveys.
+  const surveyKey = (survey, index) => survey?.id ?? `fixture:${index}`;
+  const selectionContext = () => String(R.aid ?? "fixture");
+  const initialIds = () => (data ? data.checked : phone ? D0.phoneChecked : D0.checked)
+    .filter((i) => R.surveys[i]).map((i) => surveyKey(R.surveys[i], i));
+  let selection = $state(untrack(() => ({ context: selectionContext(), ids: initialIds() })));
+  const availableIds = $derived(R.surveys.map(surveyKey));
+  const picked = $derived((selection.context === selectionContext() ? selection.ids : initialIds()).filter((id) => availableIds.includes(id)));
+  const selectedSurveys = $derived(picked.map((id) => R.surveys.find((s, i) => surveyKey(s, i) === id)).filter(Boolean));
+  $effect(() => {
+    const context = selectionContext(), ids = availableIds;
+    untrack(() => {
+      const changed = selection.context !== context;
+      selection = { context, ids: changed ? initialIds() : selection.ids.filter((id) => ids.includes(id)) };
+      if (changed) { lang = "en"; paper = "A4"; }
+    });
+  });
+  function select(id, checked) {
+    selection = { context: selectionContext(), ids: checked ? [...new Set([...picked, id])] : picked.filter((value) => value !== id) };
+  }
   const count = $derived(picked.length);
   const printLabel = $derived(count === 0 ? "Print surveys" : count === 1 ? "Print 1 survey" : `Print ${count} surveys`);
   const NONE = "Tick at least one survey to print.";
-  const previewLine = $derived(live ? `Preview · ${R.surveys[picked[0]]?.name ?? "no survey ticked"} · ${paper}` : D.preview);
-  const preview = $derived(live ? previews[R.surveys[picked[0]]?.id] ?? null : null);
-  const print = () => onprint?.({ picked: picked.map((i) => R.surveys[i].id), lang, paper });
+  const previewLine = $derived(live ? `Preview · ${selectedSurveys[0]?.name ?? "no survey ticked"} · ${paper}` : D.preview);
+  const preview = $derived(live ? previews[selectedSurveys[0]?.id] ?? null : null);
+  const print = () => onprint?.({ picked: [...picked], lang, paper });
 </script>
 
 {#snippet top()}{#if phone}<PhoneHeader state="nested" title="Print paper surveys" parent="Collect" back={href("collect", at)} initials={R.user.initials} menuHref={href("menu", at)} />{:else}<TopBar home={href("home", at)} who={R.user.first} initials={R.user.initials} workspace={R.workspace} {crumbs} />{/if}{/snippet}
 {#snippet bar()}{#if phone}{#if onprint}<div class="glass phone-bar" role="group" aria-label="Page actions"><Button label="Cancel" variant="quiet" href={href("collect", at)} /><button class="btn btn-primary btn-lg" type="button" disabled={!count || busy} aria-describedby="pp-why" onclick={print}>{printLabel}</button></div>{:else}<PhoneBar label={printLabel} href={href("collect", at)} backHref={href("collect", at)} backLabel="Cancel" disabled={!count} ariaDescribedby="pp-why" />{/if}{/if}{/snippet}
 {#snippet meta()}{R.project} · {R.review.language} · {R.review.modality} · Updated {R.review.updated ?? "just now"}{/snippet}
 {#snippet printIco()}<Ico d={A.print} />{/snippet}
+{#snippet pdfDownloads()}
+  {#if live && pdfEnabled && count}
+    <Stack gap={2}>
+      <span class="micro">Download selected surveys</span>
+      {#each selectedSurveys as survey (`${selectionContext()}:${survey.id}`)}
+        <PdfActions url={surveyPdfUrl(R.aid,survey.id,{lang,paper})} token={pdfToken} primary={false} label={`Download ${survey.name} PDF`} />
+      {/each}
+    </Stack>
+  {/if}
+{/snippet}
 {#snippet language(id, label)}
   {#if showLanguage}<div><label class="lbl" for={id}>{label}</label><label class="sel"><select class="in" {id} bind:value={lang}>{#each options as o}<option value={o.code}>{o.name}</option>{/each}</select><Ico d={A.chev} /></label></div>{/if}
 {/snippet}
@@ -79,9 +108,10 @@
       <span class="micro">Paper surveys</span>
       <p class="small">Pick the surveys. Your phone opens its print or share sheet so you can send the PDF to a printer or to someone with one.<span role="status" id="pp-why">{#if !count} {NONE}{:else if status} {status}{/if}</span></p>
       {#each R.surveys as s, i}
-        <label class="row-opt l-row" data-split><span class="l-row" data-gap="3"><input class="cb" type="checkbox" value={i} bind:group={picked} /><b>{s.name}</b></span><span class="small">{D.phoneStatus[i]}</span></label>
+        <label class="row-opt l-row" data-split><span class="l-row" data-gap="3"><input class="cb" type="checkbox" value={surveyKey(s, i)} checked={picked.includes(surveyKey(s, i))} onchange={(event) => select(surveyKey(s, i), event.currentTarget.checked)} /><b>{s.name}</b></span><span class="small">{D.phoneStatus[i]}</span></label>
       {/each}
       {@render language("pp-lang", "Language")}
+      {@render pdfDownloads()}
     </Card>
   {:else}
     <Page gap={5}>
@@ -100,7 +130,7 @@
               <span class="lbl" id="pt-which">Which surveys</span>
               <Stack gap={2}>
                 {#each R.surveys as s, i}
-                  <label class="row-opt l-row" data-split><span class="l-row" data-gap="3"><input class="cb" type="checkbox" value={i} bind:group={picked} /><b>{s.name}</b></span><span class="small">{#if typeof s.pages === "string"}{s.pages}{:else if s.pages}{s.pages} {s.pages === 1 ? "page" : "pages"}{:else if s.linkError}{s.linkError}{:else if !s.open}not collecting{/if}</span></label>
+                  <label class="row-opt l-row" data-split><span class="l-row" data-gap="3"><input class="cb" type="checkbox" value={surveyKey(s, i)} checked={picked.includes(surveyKey(s, i))} onchange={(event) => select(surveyKey(s, i), event.currentTarget.checked)} /><b>{s.name}</b></span><span class="small">{#if typeof s.pages === "string"}{s.pages}{:else if s.pages}{s.pages} {s.pages === 1 ? "page" : "pages"}{:else if s.linkError}{s.linkError}{:else if !s.open}not collecting{/if}</span></label>
                 {/each}
               </Stack>
             </div>
@@ -117,8 +147,9 @@
             <div class="l-row" data-justify="end" data-gap="2"><p class="small" role="status" id="pt-why">{#if !count}{NONE}{:else}{status}{/if}</p><Button label="Cancel" variant="quiet" href={href("collect", at)} />{#if onprint}<button class="btn btn-primary btn-lg" type="button" disabled={!count || busy} aria-describedby="pt-why" onclick={print}><Ico d={A.print} />{printLabel}</button>{:else if count}<Button label={printLabel} variant="primary" lg href={href("collect", at)} lead={printIco} />{:else}<Button label={printLabel} variant="primary" lg disabled ariaDescribedby="pt-why" lead={printIco} />{/if}</div>
           </Stack>
           <Stack gap={2}>
+            {@render pdfDownloads()}
             <Row split gap={2}><span class="micro">{previewLine}</span><IconAction d={A.x} ariaLabel="Close" onclick={() => closeDialog(dialog)} /></Row>
-            {#if live}{#if preview}<Paper paper={preview} cells={R.surveys[picked[0]]?.qr ?? null} fit={paper === "Letter" ? "letter" : "a4"} page="" />{:else}<p class="small">{picked.length ? "The sheet is drawn once the form is read: press Print." : NONE}</p>{/if}{:else}<Paper paper={R.paper} qr={R.qr.survey} />{/if}
+            {#if live}{#if preview}<Paper paper={preview} cells={selectedSurveys[0]?.qr ?? null} fit={paper === "Letter" ? "letter" : "a4"} page="" />{:else}<p class="small">{picked.length ? "The sheet is drawn once the form is read: press Print." : NONE}</p>{/if}{:else}<Paper paper={R.paper} qr={R.qr.survey} />{/if}
           </Stack>
         </Grid>
       </dialog>
