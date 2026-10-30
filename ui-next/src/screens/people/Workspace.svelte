@@ -35,19 +35,42 @@
   import { href } from "../href.js";
   import { P } from "./people-icons.js";
   import { groupRows } from "./people-data.js";
+  import { workspaceProjects } from "../../app/workspace-actions.js";
   import fixture from "../../../fixtures/people/workspace.json";
 
   // ?state=: no board draws one, so any value (the route passes it as state) renders the default; the prop is not read.
   // data: the fixture, or the live workspace in the same shape (app/data.js workspaceModel); ongroup (live): groups the picked project
   // for real (POST /v2/workspaces/{id}/projects/{pid}) when the dialog's primary is pressed; without it the primary stays the board's link.
-  let { group = false, phone = false, theme = "light", data = fixture, ongroup } = $props();
-  const d = data;
+  let { group = false, phone = false, theme = "light", data = fixture, ongroup, onrename, onungroup } = $props();
+  const d = $derived(data);
+  let query = $state("");
+  let view = $state("Active");
+  const visible = $derived(workspaceProjects(d.projects, query, view));
+  let edit = $state(null);
+  let name = $state("");
+  let busy = $state(false);
+  let message = $state("");
+  const beginRename = () => { name = d.name; message = ""; edit = { kind: "rename" }; };
+  const beginUngroup = (project) => { message = ""; edit = { kind: "ungroup", project }; };
+  async function save() {
+    if (busy || !edit) return;
+    busy = true; message = "";
+    try {
+      if (edit.kind === "rename") await onrename(name);
+      else await onungroup(edit.project);
+      edit = null;
+      message = "Saved and verified.";
+    } catch (e) { message = `${e.message || "The change could not be confirmed."} Reload before trying again if the outcome is uncertain.`; }
+    finally { busy = false; }
+  }
+  const canUngroup = (p) => !!onungroup && (d.role === "owner" || (d.role === "member" && p.directRole === "owner"));
   const LENS_ICON = { team: I.pen, community: I.people, church: P.church };
   const HOME = href("home"), PEOPLE = href("people-workspace"), BACK = href("workspace");
   const PROJECT = href("project"), SETUP = href("setup1"), MENU = href("menu");
-  const rows = groupRows(d.group);
-  let picked = $state(rows.find((c) => c.can)?.id ?? rows.find((c) => c.can)?.title ?? null);
-  const grouping = (el) => { const f = (e) => { if (ongroup && e.target instanceof Element && e.target.closest(".btn-primary") && picked != null) { e.preventDefault(); ongroup(picked); } }; el.addEventListener("click", f); return () => el.removeEventListener("click", f); };
+  const rows = $derived(groupRows(d.group));
+  let picked = $state(null);
+  const selected = $derived(picked ?? rows.find((c) => c.can)?.id ?? rows.find((c) => c.can)?.title ?? null);
+  const grouping = (el) => { const f = (e) => { if (ongroup && e.target instanceof Element && e.target.closest(".btn-primary") && selected != null) { e.preventDefault(); ongroup(selected); } }; el.addEventListener("click", f); return () => el.removeEventListener("click", f); };
   const FIND = "Find a project or language";
   // Escape closes the native modal (close event): drop the dialog and restore New project as the primary, at the Cancel target's address.
   let closed = $state(false);
@@ -70,17 +93,29 @@
 {#snippet bar()}{#if phone}<PhoneBar label="New project" lead="plus" href={SETUP} demoted={open} />{/if}{/snippet}
 
 <AppShell {phone} {theme} screen {top} {bar}>
+  {#if onrename && d.role === "owner"}<button class="btn btn-quiet" type="button" onclick={beginRename}>Rename workspace</button>{/if}
+  {#if phone}<label class="lbl">Find a project<input class="in" type="search" bind:value={query} /></label><label class="lbl">Show projects<select class="in" bind:value={view}>{#each d.views as v}<option>{v}</option>{/each}</select></label>{/if}
+  {#if !visible.length}<p class="small" role="status">No projects match this view.</p>{/if}
+  {#if message}<p class="small" role="status">{message}</p>{/if}
+  {#if edit}
+    <section class="glass-hi l-card l-stack" data-pad="work" data-gap="3" aria-label={edit.kind === "rename" ? "Rename workspace" : "Remove project from workspace"}>
+      {#if edit.kind === "rename"}<label class="lbl">Workspace name<input class="in" bind:value={name} disabled={busy} /></label>
+      {:else}<h2 class="h3">Remove {edit.project.title} from {d.name}?</h2><p class="small">The project and its reviews remain. People whose access comes only from this workspace lose that access. Direct project grants remain.</p>{/if}
+      <Row gap={2}><button class="btn" type="button" onclick={save} disabled={busy}>{busy ? "Saving…" : edit.kind === "rename" ? "Save workspace name" : "Confirm removal"}</button><button class="btn btn-quiet" type="button" disabled={busy} onclick={() => { edit = null; message = ""; }}>Cancel</button></Row>
+    </section>
+  {/if}
   {#if phone}
     <h1 class="title-phone">{d.short}</h1>
     <Row gap={2}><Button label="People" href={PEOPLE} lead={people} block /><Button label="Switch workspace" href={MENU} lead={chev} block /></Row>
     <section class="glass l-card" data-pad="list" aria-label={`Projects · ${d.projects.length}`}>
       <span class="micro">Projects · {d.projects.length}</span>
-      {#each d.projects as p}
+      {#each visible as p}
         <a class="card-link list-row" href={p.href ?? PROJECT}>
           <span class="icn" data-size="36" data-tone="neutral" aria-hidden="true"><Icon d={P.file} /></span>
           <div class="list-body"><div class="list-title">{p.title}</div><div class="small">{STAGE_LABELS[p.stage]} · {p.phone}</div></div>
           <Pill stage={p.stage} />
         </a>
+        {#if canUngroup(p)}<button class="btn btn-quiet" type="button" onclick={() => beginUngroup(p)}>Remove {p.title} from workspace</button>{/if}
       {/each}
     </section>
     <a class="link" href={HOME}>Your reviews across workspaces <Icon d={I.arrow} /></a>
@@ -96,12 +131,12 @@
       <Row split gap={3}>
         <h2 class="h2">Projects</h2>
         <Row gap={3}>
-          <div class="seg" data-size="wide" role="radiogroup" aria-label="Show projects">{#each d.views as v, i}<label><input type="radio" name="ws-view" checked={i === 0} />{v}</label>{/each}</div>
-          <span class="in-search"><Icon d={P.search} /><input class="in" type="search" aria-label="Find a project" placeholder={FIND} size={FIND.length} /></span>
+          <div class="seg" data-size="wide" role="radiogroup" aria-label="Show projects">{#each d.views as v, i}<label><input type="radio" name="ws-view" checked={view === v} onchange={() => view = v} />{v}</label>{/each}</div>
+          <span class="in-search"><Icon d={P.search} /><input class="in" type="search" aria-label="Find a project" bind:value={query} placeholder={FIND} size={FIND.length} /></span>
         </Row>
       </Row>
       <Grid cols={2} gap={4}>
-        {#each d.projects as p}
+        {#each visible as p}
           <Card href={p.href ?? PROJECT} gap={4}>
             <Row split gap={3}><Row gap={3}><h3 class="h2">{p.title}</h3><Pill stage={p.stage} /></Row><span class="go" aria-hidden="true"><Icon d={I.arrow} /></span></Row>
             <Row split gap={4}>
@@ -122,6 +157,7 @@
               <span class="small l-row" data-gap="2"><Icon d={I.clock} />No results yet</span>
             {/if}
           </Card>
+          {#if canUngroup(p)}<button class="btn btn-quiet" type="button" onclick={() => beginUngroup(p)}>Remove {p.title} from workspace</button>{/if}
         {/each}
       </Grid>
       <p class="small">Looking for your own reviews across projects? <a class="link" href={HOME}>Your reviews</a> lists everything you facilitate.</p>
@@ -136,7 +172,7 @@
           <p class="small">Everyone in the workspace opens it at their workspace role, unless they already hold a higher project grant. Only a <b>direct project owner</b> can group it; a role inherited from a workspace is never enough.</p>{/if}
         <div class="l-stack" data-gap="2" role="radiogroup" aria-label="Projects you own">
           {#each rows as c, i}
-            <label class="row-opt"><input class="rd" type="radio" name="ws-group" value={c.id ?? c.title} checked={(c.id ?? c.title) === picked || (picked == null && i === 0)} disabled={!c.can} onchange={() => { picked = c.id ?? c.title; }} /><span class="l-stack" data-gap="1" data-grow=""><b>{c.title}</b><span class="small">{c.can ? "You own this project directly" : phone ? "Cannot group: your access comes from the workspace, not a project grant" : "Your access here comes from the workspace, not a project grant"}</span></span>{#if !phone}<Tag label={c.can ? "Direct owner" : "Inherited · cannot group"} />{/if}</label>
+            <label class="row-opt"><input class="rd" type="radio" name="ws-group" value={c.id ?? c.title} checked={(c.id ?? c.title) === selected} disabled={!c.can} onchange={() => { picked = c.id ?? c.title; }} /><span class="l-stack" data-gap="1" data-grow=""><b>{c.title}</b><span class="small">{c.can ? "You own this project directly" : phone ? "Cannot group: your access comes from the workspace, not a project grant" : "Your access here comes from the workspace, not a project grant"}</span></span>{#if !phone}<Tag label={c.can ? "Direct owner" : "Inherited · cannot group"} />{/if}</label>
           {/each}
         </div>
         {#if phone}
