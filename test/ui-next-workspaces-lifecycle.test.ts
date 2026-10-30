@@ -66,6 +66,34 @@ for(const phone of [false,true]) it(`directory cancel deletion and create/archiv
  expect(calls.filter(x=>x.method==='DELETE'&&x.body.mode==='execute')).toHaveLength(1);
  expect(v.getByRole('link',{name:'Created'})).toBeTruthy();
 });
+it('phone owner actions stay compact for long workspace names and retain distinct target context',async()=>{
+ const first={...owner,id:'first',name:'Bridge Connectivity Solutions · India'};
+ const second={...owner,id:'second',name:'Bridge Connectivity Solutions · partner organisations'};
+ let items=[first,second];const writes:any[]=[];
+ const request=vi.fn(async(url:string,init:any={})=>{
+  if(init.method) writes.push({url,...init});
+  if(init.method==='DELETE') return {...preview(),workspace:second,impact:{irreversible:true,affected:[{workspace:second.id,projects:0,assessments:0,responses:0,grants:1}]}};
+  if(url.endsWith('/archive')) {items=items.map(w=>w.id===second.id?{...w,archived_at:'today'}:w);return {workspace:items[1]};}
+  if(url.endsWith('/unarchive')) {items=items.map(w=>w.id===second.id?{...w,archived_at:null}:w);return {workspace:items[1]};}
+  return {workspace:items.find(w=>url.endsWith(w.id))};
+ });
+ const v=render(Workspaces,{phone:true,workspaces:items,request});
+ const archive=v.getByRole('button',{name:`Archive ${second.name}`});
+ const deletion=v.getByRole('button',{name:`Preview deletion of ${second.name}`});
+ expect(archive.textContent).toBe('Archive');expect(deletion.textContent).toBe('Preview deletion');
+ expect(v.getByRole('button',{name:`Archive ${first.name}`})).toBeTruthy();
+ await fireEvent.click(deletion);
+ await v.findByRole('heading',{name:`Delete ${second.name}?`});
+ await fireEvent.click(v.getByRole('button',{name:'Cancel deletion'}));
+ expect(writes).toEqual([{url:'/v2/workspaces/second',method:'DELETE',body:{mode:'dry_run'}}]);
+ await fireEvent.click(archive);
+ await waitFor(()=>expect(v.queryByRole('link',{name:second.name})).toBeNull());
+ await fireEvent.change(v.getByLabelText('Show workspaces'),{target:{value:'Archived'}});
+ const restore=v.getByRole('button',{name:`Restore ${second.name}`});expect(restore.textContent).toBe('Restore');
+ await fireEvent.click(restore);
+ await waitFor(()=>expect(v.queryByRole('link',{name:second.name})).toBeNull());
+ expect(writes.slice(1).map(w=>w.url)).toEqual(['/v2/workspaces/second/archive','/v2/workspaces/second/unarchive']);
+});
 it('uncertain create locks repeat writes until explicit reload; viewers get no write controls',async()=>{
  const request=vi.fn().mockRejectedValueOnce(new Error('Outcome unknown')).mockResolvedValueOnce({workspaces:[]});
  const v=render(Workspaces,{workspaces:[{...owner,role:'viewer'}],canCreate:true,request});

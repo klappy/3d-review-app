@@ -80,3 +80,18 @@ it.each(['mode','actor','credential'])('a pending Undo identity check rejects a 
  expect(f.writes.some(x=>x.url.startsWith('/v2/undo/'))).toBe(false);
  expect(f.saved().name).toBe('Review A revised');
 });
+
+it.each(['credential','receipt'])('a refused Undo after a changed %s never claims restoration',async change=>{
+ const f=harness(); const view=await saveA();
+ const receipt=f.state.undo;
+ const calls=f.calls.length;
+ if(change==='credential') setToken('synthetic-replacement-before-click');
+ else f.state.undo=null;
+ await fireEvent.click(view.getByRole('button',{name:'Undo saved details'}));
+ await waitFor(()=>expect(view.getByText(/Undo was not performed/)).toBeTruthy());
+ expect(view.queryByText('Review details restored and verified.')).toBeNull();
+ expect(f.writes.some(x=>x.url.startsWith('/v2/undo/'))).toBe(false);
+ expect(f.calls).toHaveLength(calls);
+ expect(f.saved().name).toBe('Review A revised');
+ if(change==='credential') expect(f.state.undo).toBe(receipt);
+});

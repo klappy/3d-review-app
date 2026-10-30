@@ -447,7 +447,7 @@
   });
   async function undoSavedDetails(context) {
     const current = (fresh) => !!context && (!fresh || (context.principal === fresh.id && context.mode === fresh.access_mode)) && metadataUndo === context && context.generation === seq && context.credential === token() && context.state === suSt && context.aid === (route.query.get("review") || route.params.aid) && context.principal === session?.principal?.id && context.mode === session?.principal?.access_mode;
-    if (!current() || context.state.undo !== context.receipt) return;
+    if (!current() || context.state.undo !== context.receipt) throw new Error("The review or sign-in changed. Undo was not performed.");
     await SU.undoDetails(context.state, { isCurrent: current });
     if (current()) await load();
   }
