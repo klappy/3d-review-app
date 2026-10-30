@@ -60,7 +60,7 @@ export function createAccessCodesState({ aid = liveContext()?.aid, requestFactor
     state.stage = ok ? "idle" : priorCodes.length ? "shown" : "undo-required";
     if (!ok) state.codes = priorCodes;
     state.message = ok ? "Undone; no codes are active from that batch." : "Undo did not go through. Codes may still be active (redeemed codes cannot be undone). Try undo again.";
-    if (ok) state.batch = null;
+    if (ok) clear();
   }
   function download() {
     const blob = new Blob([codesCsv(name(), state.codes)], { type: "text/csv;charset=utf-8" });

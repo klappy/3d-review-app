@@ -10,6 +10,7 @@ afterEach(() => { cleanup(); vi.restoreAllMocks(); setLiveContext(null); });
 function fixture() {
   let actor = 'owner';
   const request = vi.fn(async (url, options) => {
+    if (url.startsWith('/v2/undo/')) return { result: { undone: 'cap.survey.issue_codes' } };
     if (url === '/v2/me') return { result: { principal: { id: actor } } };
     if (url === '/v2/assessments/a') return { result: { assessment: { role: 'owner' }, surveys: [{ id: 's', state: 'selected', template_name: 'Current survey' }] } };
     if (url.endsWith('/export')) return options.body.mode === 'dry_run' ? { result: { confirm_token: 'local-confirm' } } : { result: { codes } };
@@ -35,6 +36,15 @@ it('prints all20 already-revealed values with survey and explicit return, withou
   expect(html).toContain('Current survey'); expect(html).toContain('/next/#/review/a/share');
   expect(f.request.mock.calls.filter(([url]) => url.includes('/codes'))).toHaveLength(before);
   flow.done(); expect(tab.close).toHaveBeenCalled(); expect(tab.document.body.textContent).not.toContain('SYNTHETIC');
+  dispose();
+});
+it('scrubs and closes retained print windows after successful undo', async () => {
+  const f = fixture(), flow = createAccessCodesState({ aid: 'a', requestFactory: () => f.request }); const dispose = flow.mount();
+  await waitFor(() => expect(flow.state.stage).toBe('idle')); flow.prepare(); await flow.issue();
+  const tab = { document: { open: vi.fn(), write: vi.fn(), close: vi.fn(), body: { textContent: 'SYNTHETIC000' } }, close: vi.fn() };
+  await flow.print({ open: () => tab }); expect(tab.document.write).toHaveBeenCalledOnce();
+  await flow.undo(); expect(flow.state.stage).toBe('idle'); expect(flow.state.batch).toBeNull();
+  expect(tab.close).toHaveBeenCalledOnce(); expect(tab.document.body.textContent).not.toContain('SYNTHETIC');
   dispose();
 });
 it('suppresses print disclosure after a cookie-only actor switch', async () => {
