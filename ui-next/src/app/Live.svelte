@@ -7,6 +7,7 @@
   import { tick, untrack } from "svelte";
   import { openQrPrint, preparePapers, openPapersPrint, paperPreview, printOpenedLine, printAllowed } from "./print.js";
   import { loadBlankPrint } from "../../../ui/stage-screens.js";
+  import { reportPdfUrl } from '../../../ui/pdf/download.js';
   import { SAMPLE_HREF, SAMPLE_AID } from "./router.js";
   import { REPORT as SAMPLE_REPORT } from "../screens/results/data.js";
   import { api, token } from "./api.js";
@@ -376,7 +377,7 @@
     <Status {phone} {theme} kind="refused" message="Your role here cannot print blank surveys (an owner or member can)." back={to("collect", route.params)} backLabel="Back to Collect" />
   {:else}
     {@const C = REGISTRY.print}
-    <C {phone} {theme} data={page.data.data} previews={page.data.previews} onprint={printPapers} status={printStatus} busy={printBusy} />
+    <C {phone} {theme} data={page.data.data} previews={page.data.previews} onprint={printPapers} status={printStatus} busy={printBusy} pdfEnabled pdfToken={token()} />
   {/if}
 {:else if page.data.unavailable}
   <Status {phone} {theme} kind="unavailable" message={page.data.message} back={page.data.assessment ? to("collect", { aid: page.data.assessment.id }) : to("home")} backLabel={page.data.assessment ? "Back to Collect" : "Home"} />
@@ -434,6 +435,9 @@
   {:else if page.data.screen === "results"}
     {@const C = REGISTRY.results}
     <C {phone} {theme} report={rep} onrefresh={refreshResults} refreshed={building ? "Building the results…" : page.data.refreshed ?? ""}>{#if build}{@render buildConfirm(false)}{/if}</C>
+  {:else if page.data.screen === "report" || page.data.screen === "report-detailed"}
+    {@const C = REGISTRY[page.data.screen]}
+    <C {phone} {theme} report={rep} state={route.query.get("state") ?? undefined} pdfUrl={m.reportId ? reportPdfUrl(m.reportId) : null} pdfToken={token()} />
   {:else}
     {@const C = REGISTRY[page.data.screen]}
     <C {phone} {theme} report={rep} state={route.query.get("state") ?? undefined} />

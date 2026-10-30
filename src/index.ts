@@ -20,6 +20,7 @@ import { unnamedLinkPage, verifiedAddress, badLinkPage, checkEmailPage, magicLin
 import { installRoadmapStream } from "./roadmap/stream";
 import { installTranslate } from "./translate";
 import { installPassages } from "./passages";
+import { installPdf } from "./pdf";
 
 const app = new Hono<{ Bindings: Env }>();
 const json = (value: unknown, status: number) => new Response(JSON.stringify(value), {
@@ -39,6 +40,7 @@ installRoadmapStream(app, contextForRequest);
 installTranslate(app);
 // Passage files and links on an assessment (captain 2026-09-29; Lovable parity). Registered before the capability twins.
 installPassages(app);
+installPdf(app, contextForRequest);
 
 // Serve the actual schema before the catalog twin at this same path can return its explanatory JSON note.
 app.get("/v2/openapi.yaml", (c) => c.text(openapiText as unknown as string, 200, { "content-type": "application/yaml" }));

@@ -35,12 +35,14 @@
   import { untrack } from "svelte";
   import R0 from "../../../fixtures/actions/review.json";
   import D0 from "../../../fixtures/actions/print.json";
+  import PdfActions from './PdfActions.svelte';
+  import { surveyPdfUrl } from '../../../../ui/pdf/download.js';
 
   // data: the fixture shape (gallery) or app/data.js printPageModel (live: this review's surveys, links and languages). onprint({ picked, lang,
   // paper }) prints for real (app/print.js preparePapers → openPapersPrint; live only): the primary is then a button, never a link to
   // Collect; status is the live run's line (preparing, translating, blocked tab, the ready line); previews: each survey's read form by
   // survey id (app/print.js paperPreview) for the sheet of the first ticked survey (live), else the board's paper.
-  let { phone = false, theme = "light", data = null, onprint, status = "", busy = false, previews = {} } = $props();
+  let { phone = false, theme = "light", data = null, onprint, status = "", busy = false, previews = {}, pdfEnabled = false, pdfToken = null } = $props();
   const live = $derived(!!data);
   const R = $derived(data ?? R0);
   const D = $derived(data ? { checked: data.checked, phoneChecked: data.checked, phoneStatus: data.surveys.map((s) => (s.open ? "" : "not collecting")), sizes: ["A4", "Letter"], missing: null, preview: "" } : D0);
@@ -68,6 +70,16 @@
 {#snippet bar()}{#if phone}{#if onprint}<div class="glass phone-bar" role="group" aria-label="Page actions"><Button label="Cancel" variant="quiet" href={href("collect", at)} /><button class="btn btn-primary btn-lg" type="button" disabled={!count || busy} aria-describedby="pp-why" onclick={print}>{printLabel}</button></div>{:else}<PhoneBar label={printLabel} href={href("collect", at)} backHref={href("collect", at)} backLabel="Cancel" disabled={!count} ariaDescribedby="pp-why" />{/if}{/if}{/snippet}
 {#snippet meta()}{R.project} · {R.review.language} · {R.review.modality} · Updated {R.review.updated ?? "just now"}{/snippet}
 {#snippet printIco()}<Ico d={A.print} />{/snippet}
+{#snippet pdfDownloads()}
+  {#if live && pdfEnabled && count}
+    <Stack gap={2}>
+      <span class="micro">Download selected surveys</span>
+      {#each picked as i (R.surveys[i].id)}
+        <PdfActions url={surveyPdfUrl(R.aid,R.surveys[i].id,{lang,paper})} token={pdfToken} primary={false} label={`Download ${R.surveys[i].name} PDF`} />
+      {/each}
+    </Stack>
+  {/if}
+{/snippet}
 {#snippet language(id, label)}
   {#if showLanguage}<div><label class="lbl" for={id}>{label}</label><label class="sel"><select class="in" {id} bind:value={lang}>{#each options as o}<option value={o.code}>{o.name}</option>{/each}</select><Ico d={A.chev} /></label></div>{/if}
 {/snippet}
@@ -82,6 +94,7 @@
         <label class="row-opt l-row" data-split><span class="l-row" data-gap="3"><input class="cb" type="checkbox" value={i} bind:group={picked} /><b>{s.name}</b></span><span class="small">{D.phoneStatus[i]}</span></label>
       {/each}
       {@render language("pp-lang", "Language")}
+      {@render pdfDownloads()}
     </Card>
   {:else}
     <Page gap={5}>
@@ -117,6 +130,7 @@
             <div class="l-row" data-justify="end" data-gap="2"><p class="small" role="status" id="pt-why">{#if !count}{NONE}{:else}{status}{/if}</p><Button label="Cancel" variant="quiet" href={href("collect", at)} />{#if onprint}<button class="btn btn-primary btn-lg" type="button" disabled={!count || busy} aria-describedby="pt-why" onclick={print}><Ico d={A.print} />{printLabel}</button>{:else if count}<Button label={printLabel} variant="primary" lg href={href("collect", at)} lead={printIco} />{:else}<Button label={printLabel} variant="primary" lg disabled ariaDescribedby="pt-why" lead={printIco} />{/if}</div>
           </Stack>
           <Stack gap={2}>
+            {@render pdfDownloads()}
             <Row split gap={2}><span class="micro">{previewLine}</span><IconAction d={A.x} ariaLabel="Close" onclick={() => closeDialog(dialog)} /></Row>
             {#if live}{#if preview}<Paper paper={preview} cells={R.surveys[picked[0]]?.qr ?? null} fit={paper === "Letter" ? "letter" : "a4"} page="" />{:else}<p class="small">{picked.length ? "The sheet is drawn once the form is read: press Print." : NONE}</p>{/if}{:else}<Paper paper={R.paper} qr={R.qr.survey} />{/if}
           </Stack>

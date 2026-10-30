@@ -3,6 +3,7 @@
 import { mount, unmount } from "svelte";
 import "../tokens.css";
 import "../components/base.css";
+import "../components/pdf.css";
 import "../components/button.css";
 import "../components/pill.css";
 import "../components/lensdot.css";

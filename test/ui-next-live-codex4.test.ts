@@ -39,6 +39,7 @@ const serve = (routes: Record<string, unknown | Route>) => {
     if (r === undefined) return new Response(JSON.stringify({ ok: false, error: { code: "NOT_FOUND", message: `no route ${key}` } }), { status: 404, headers: { "content-type": "application/json" } });
     if (r instanceof Error) return new Response(JSON.stringify({ ok: false, error: { code: "FAILED", message: r.message } }), { status: 500, headers: { "content-type": "application/json" } });
     const result = typeof r === "function" ? (r as Route)(url, body, method) : r;
+    if (result instanceof Response) return result;
     return new Response(JSON.stringify({ ok: true, result }), { status: 200, headers: { "content-type": "application/json" } });
   }) as typeof fetch;
 };
@@ -639,4 +640,20 @@ describe("Codex P2 4383751986: the hold copy follows the server's report_hold_re
     expect(heldBuildText(preview, "Nothing was built.", "environment")).toBe("The results can’t be built here: reports aren’t available in this environment. Nothing was built.");
     expect(heldBuildText(preview, "Nothing was built.", "count")).toBe("The results can’t be built yet: more answers are needed. Nothing was built.");
   });
+});
+
+it.each(["report", "report-detailed"])('Live wires the stored report id to the actual %s screen PDF control',async(screenName)=>{
+  const OriginalURL=globalThis.URL;
+  vi.stubGlobal('URL',class extends OriginalURL {static createObjectURL=()=> 'blob:live-report-pdf';static revokeObjectURL=()=>{};});
+  try {
+    serve(base({'GET /v2/reports/rep_11/pdf':()=>new Response('%PDF-1.7\nlocal transport fixture',{headers:{'content-type':'application/pdf','content-disposition':'attachment; filename="report.pdf"'}})}));
+    globalThis.location.hash=to(screenName,{aid:AID});
+    const view=render(Live as never,{props:{}});
+    let button:HTMLButtonElement|undefined;
+    await waitFor(()=>{button=[...view.container.querySelectorAll('button')].find(b=>b.textContent==='Download full report PDF');expect(button).toBeDefined();});
+    await fireEvent.click(button!);
+    await waitFor(()=>expect(calls.some(c=>c.url==='/v2/reports/rep_11/pdf')).toBe(true));
+    await waitFor(()=>expect(view.container.querySelector('a[download="report.pdf"]')).not.toBeNull());
+    view.unmount();
+  } finally {vi.stubGlobal('URL',OriginalURL);}
 });
