@@ -74,10 +74,18 @@
 
   onMount(() => {
     const onHash = () => { capturePrivateInvitation(); hash = globalThis.location.hash; };
+    let focusCheck = 0;
     const onFocus = async () => {
       if (!session) return;
-      const prior = session.principal, fresh = await S.me({ fresh: true }).catch(() => null);
-      if (prior?.id !== fresh?.principal?.id || prior?.access_mode !== fresh?.principal?.access_mode) { D.clearLinks(); SU.forgetAll(); S.forget(); workspaceUndo = null; await load(); }
+      const check = ++focusCheck, prior = session.principal, credential = token();
+      let fresh;
+      try { fresh = await api("/v2/me"); } catch (e) { if (classify(e) === "unauthenticated") fresh = null; else return; }
+      // The probe never mutates the session cache. Route changes alone do not supersede an identity check:
+      // invalidate a same-actor replacement page too, but never replace a newer, already-established identity.
+      if (check !== focusCheck || credential !== token()) return;
+      if (session !== undefined && (session?.principal?.id !== prior?.id || session?.principal?.access_mode !== prior?.access_mode)) return;
+      if (fresh !== null && !fresh?.principal?.id) return; // malformed/unknown is not a confirmed actor change
+      if (prior?.id !== fresh?.principal?.id || prior?.access_mode !== fresh?.principal?.access_mode) { D.clearLinks(); SU.forgetAll(); S.forget(); suSt = null; workspaceUndo = null; await load(); }
     };
     globalThis.addEventListener("focus", onFocus);
     globalThis.addEventListener("pageshow", onFocus);
@@ -86,7 +94,7 @@
     const onMq = () => { phone = mq.matches; };
     mq?.addEventListener("change", onMq);
     const off = P.subscribe((s) => { pstate = s; });
-    return () => { globalThis.removeEventListener("focus", onFocus); globalThis.removeEventListener("pageshow", onFocus); globalThis.removeEventListener("hashchange", onHash); mq?.removeEventListener("change", onMq); off(); };
+    return () => { focusCheck++; globalThis.removeEventListener("focus", onFocus); globalThis.removeEventListener("pageshow", onFocus); globalThis.removeEventListener("hashchange", onHash); mq?.removeEventListener("change", onMq); off(); };
   });
 
   const PARTICIPANT = new Set(["p-entry", "p-code", "p-welcome", "p-passage", "p-about", "p-question", "p-review", "p-receipt", "p-problem"]);
@@ -104,7 +112,7 @@
     // The sample review is a closed world (captain 2026-10-22 10:36 ET: a clickable journey across every screen, nothing live): any
     // route carrying the sample id — review, project, setup ?review=, people ?review= — renders its approved fixture with the
     // plain "Sample review" tag and never calls the API. The results lane keeps its fixture report; everything else draws its own fixture.
-    const inSample = params.aid === SAMPLE_AID || params.pid === SAMPLE_AID || params.wid === SAMPLE_AID || route.query.get("review") === SAMPLE_AID;
+    const inSample = params.aid === SAMPLE_AID || params.pid === SAMPLE_AID || params.wid === SAMPLE_AID || r.query.get("review") === SAMPLE_AID;
     if (inSample) setLiveContext({ ...liveContext(), aid: SAMPLE_AID, pid: SAMPLE_AID, wid: SAMPLE_AID }); // every link from a sample screen stays in the sample
     if (inSample && !SAMPLE.has(name)) { if (name === "review") return { redirect: to("setup5", {}, { review: SAMPLE_AID }) }; if (name === "setup") return { redirect: to("setup1", {}, { review: SAMPLE_AID }) }; return { screen: name, sample: true, fixture: true }; }
     if (params.aid === SAMPLE_AID) { if (!SAMPLE.has(name)) return { redirect: to("results", { aid: SAMPLE_AID }) }; const m = sampleModel(); return name === "next-step" || name === "action-plan" ? { screen: name, results: m, plan: D.nextStepModel(m), sample: true } : name === "results-answers" ? { screen: name, results: m, answers: { suppressed: true, reason: "sample data has no answer rows" }, sample: true } : { screen: name, results: m, sample: true }; }
@@ -119,10 +127,10 @@
     const me = await S.me();
     if (!me) return { screen: "sign-in", next: hash };
     // Setup: with a review in the query, Setup 5 shows that review's own data (the review page's board while preparing).
-    const reviewQ = route.query.get("review");
+    const reviewQ = r.query.get("review");
     if (name === "setup5" && reviewQ) return { screen: "setup5", data: await D.setupModel(reviewQ), readOnly: true };
     // Steps 1–4 edit the review through the existing contracts (app/setup.js, wizard.js order); a bare #setup starts a new review.
-    if (["setup", "setup1", "setup2", "setup3", "setup4"].includes(name)) { if (reviewQ) { const { assessment: a } = await D.assessment(reviewQ); if (a.role === "viewer") return { screen: "setup5", data: await D.setupModel(reviewQ), readOnly: true }; } suSt = await SU.openSetup(reviewQ || null, { pid: route.query.get("project") || liveContext()?.pid || "" }); suError = ""; bump(); const screen = name === "setup" ? "setup1" : name;  /* a launched review edits details and dates only (step 3 could archive a live survey with responses) */ return { screen, step: Number(screen.slice(-1)) }; }
+    if (["setup", "setup1", "setup2", "setup3", "setup4"].includes(name)) { if (reviewQ) { const { assessment: a } = await D.assessment(reviewQ); if (a.role === "viewer") return { screen: "setup5", data: await D.setupModel(reviewQ), readOnly: true }; } const setupState = await SU.openSetup(reviewQ || null, { pid: r.query.get("project") || contextForRoute(r).pid || "" }); const screen = name === "setup" ? "setup1" : name;  /* a launched review edits details and dates only (step 3 could archive a live survey with responses) */ return { screen, step: Number(screen.slice(-1)), setupState }; }
     if (name === "projects") return { screen: "projects", projects: await D.projects() };
     if (name === "workspaces") return { screen: "workspaces", workspaces: await D.workspaces() };
     if (name === "setup5") return { redirect: to("home") }; // a review's own page is its Setup 5 while preparing (name === "review")
@@ -204,7 +212,7 @@
     // even for fast reads; the skeleton keeps neutral navigation until this load resolves the current session.
     page = { status: "loading", key: r.name, data: null, error: null };
     session = undefined; applyChrome(null);
-    build = null; uncertainBuild = null; // a pending build preview never outlives the route; a reload re-reads the report list, which clears the uncertain lock
+    build = null; building = false; previewing = false; uncertainBuild = null; // a pending operation never updates another route; reload re-reads the report list
     setLiveContext({ ...contextForRoute(r), ...(r.query.get("report") ? { report: r.query.get("report") } : {}) }); // a setup screen's review (router.linkFor)
     try {
       if (!PARTICIPANT.has(r.name)) {
@@ -213,8 +221,10 @@
         if (my !== seq || credential !== token()) return;
         session = current; applyChrome(current);
       }
+      const principal = session?.principal?.id, accessMode = session?.principal?.access_mode;
       const data = await loader(r);
-      if (my !== seq || credential !== token()) return;
+      if (my !== seq || credential !== token() || principal !== session?.principal?.id || accessMode !== session?.principal?.access_mode) return;
+      if (data.setupState) { suSt = data.setupState; suBusy = false; suError = ""; bump(); }
       if (data.redirect) { replace(data.redirect); return; }
       if (data.screen === null) return;
       // Review-scoped screens draw project crumbs (href("project") needs :pid): the loaded model's project joins the live context.
@@ -297,26 +307,49 @@
   // Report build (first build and "Refresh with new answers" alike): the current design's contract (ui/assess/report-build.js) —
   // the dry run first, then the person confirms a plain sentence with the response count, then execute spends the confirm token.
   // Nothing is built until the confirm; the pending token never outlives the route (load() clears it).
-  let build = $state(null); // { aid, text, token, expires } while a preview waits for its confirm
-  let building = $state(false);
-  let uncertainBuild = $state(null); // aid whose execute response was lost: no new preview until load() re-reads the report list (ui/assess/report-build.js keeps the same lock)
+  let build = $state(null); // a preview carries immutable review/identity context until confirmation
+  let building = $state(false), previewing = $state(false);
+  let uncertainBuild = $state(null); // a lost execute response locks only its initiating review until reload
   const say = (refreshed) => { page = { ...page, data: { ...page.data, refreshed } }; };
+  function buildContext(aid) {
+    const generation = seq, credential = token(), principal = session?.principal?.id, accessMode = session?.principal?.access_mode;
+    return { aid, principal, accessMode, current: () => generation === seq && route.params.aid === aid && credential === token() && principal === session?.principal?.id && accessMode === session?.principal?.access_mode };
+  }
   async function refreshResults() {
     const aid = route.params.aid; const m = page.data?.results;
-    if (building || build) return;
+    if (building || previewing || build) return;
+    const context = buildContext(aid);
     if (uncertainBuild === aid) { say("A report build's outcome is unknown. Reload this page to see the report list before building again."); return; }
-    build = null; say("");
-    try { const out = await D.previewBuild(aid); if (out.held) { say(D.heldBuildText(out.preview, "Nothing was built.", m?.results?.report_hold_reason)); return; } build = { aid, text: buildConfirmText(m?.review?.liveResponses ?? m?.review?.responses), token: out.token, expires: out.expires }; }
-    catch (e) { say(`The preview could not be loaded. Nothing was built; ${e?.message || "try again"}.`); }
+    build = null; previewing = true; say("");
+    try {
+      const out = await D.previewBuild(aid);
+      if (!context.current()) return;
+      if (out.held) { say(D.heldBuildText(out.preview, "Nothing was built.", m?.results?.report_hold_reason)); return; }
+      build = { ...context, text: buildConfirmText(m?.review?.liveResponses ?? m?.review?.responses), token: out.token, expires: out.expires };
+    } catch (e) { if (context.current()) say(`The preview could not be loaded. Nothing was built; ${e?.message || "try again"}.`); }
+    finally { if (context.current()) previewing = false; }
   }
   function cancelBuild() { build = null; say("Cancelled. Nothing was built."); }
   async function confirmBuild() {
     const b = build; if (!b || building) return;
+    if (!b.current()) { build = null; return; }
     if (Date.now() >= b.expires) { build = null; say("Preview expired. Preview again before building."); return; }
-    build = null; building = true;
-    try { const out = await D.executeBuild(b.aid, b.token); if (out.held) say(D.heldBuildText(out.preview, "No report was built.", page.data?.results?.results?.report_hold_reason)); else load(); }
-    catch (e) { uncertainBuild = b.aid; say(`The report build outcome could not be confirmed: ${e?.message || "reload to see whether a report was built"}. Rebuilding is locked until this page reloads the report list.`); }
-    finally { building = false; }
+    build = null; building = true; let attempted = false;
+    try {
+      // A cookie session can switch without changing the bearer or this shell's cached principal.
+      const fresh = await api("/v2/me");
+      if (!b.current()) return;
+      if (!fresh?.principal?.id) throw new Error("The sign-in response was incomplete.");
+      if (fresh.principal.id !== b.principal || fresh.principal.access_mode !== b.accessMode) { D.clearLinks(); SU.forgetAll(); S.forget(); suSt = null; await load(); return; }
+      attempted = true;
+      const out = await D.executeBuild(b.aid, b.token);
+      if (!b.current()) return;
+      if (out.held) say(D.heldBuildText(out.preview, "No report was built.", page.data?.results?.results?.report_hold_reason)); else load();
+    } catch (e) {
+      if (!b.current()) return;
+      if (attempted) { uncertainBuild = b.aid; say(`The report build outcome could not be confirmed: ${e?.message || "reload to see whether a report was built"}. Rebuilding is locked until this page reloads the report list.`); }
+      else say("Your sign-in could not be checked. Nothing was built. Preview again before building.");
+    } finally { if (b.current()) building = false; }
   }
   async function launch() { const aid = route.params.aid ?? route.query.get("review"); try { await D.setStage(aid, "collect"); SU.forget(aid); go(to("collect", { aid })); } catch (e) { page = { status: "error", key: route.name, data: null, error: { kind: classify(e), message: e?.message || "The survey could not be launched." } }; } }
   function planActionsFor(m) {
@@ -523,7 +556,7 @@
   {#if page.data.sample}{@render sampleMark()}{/if}
   {#if !rep && !m.held && page.data.screen !== "results-held"}
     <NotBuilt {chrome} {phone} {theme} crumbs={[{ label: m.review.project, href: m.review.projectId ? to("project", { pid: m.review.projectId }) : to("home") }, { label: m.review.title }]} message={`No report has been built for ${m.review.title} yet. ${m.canBuild ? "Building reads the answers collected so far and keeps that report." : "An owner or member of the review builds it."}${page.data.refreshed ? ` ${page.data.refreshed}` : ""}`} back={to("collect", route.params)} backLabel="Back to Collect">
-      {#if m.canBuild}{#if build}{@render buildConfirm(true)}{:else}<Row gap={2}><button class="btn btn-primary btn-lg" type="button" onclick={refreshResults} disabled={building || undefined}>{building ? "Building the results…" : "Build the report"}</button></Row>{/if}{/if}
+      {#if m.canBuild}{#if build}{@render buildConfirm(true)}{:else}<Row gap={2}><button class="btn btn-primary btn-lg" type="button" onclick={refreshResults} disabled={building || previewing || undefined}>{building ? "Building the results…" : previewing ? "Preparing preview…" : "Build the report"}</button></Row>{/if}{/if}
     </NotBuilt>
   {:else if !rep || page.data.screen === "results-held"}
     {@const Held = REGISTRY["results-held"]}

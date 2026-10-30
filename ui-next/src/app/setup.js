@@ -38,8 +38,9 @@ export function freshDraft(pid = "") {
 
 // One setup state per review (or "new") for the life of the tab: Next/Back between steps keeps what was typed; a reload re-reads.
 const STATES = new Map();
+let cacheEpoch = 0;
 export const forget = (key) => STATES.delete(key ?? "new");
-export const forgetAll = () => STATES.clear();
+export const forgetAll = () => { cacheEpoch++; STATES.clear(); };
 
 const store = () => { try { return globalThis.localStorage; } catch { return null; } };
 export function expectedOf(id, st = store()) { try { const n = Number(JSON.parse(st?.getItem(V3_EXPECTED_KEY) || "{}")[id]); return Number.isInteger(n) && n > 0 ? n : null; } catch { return null; } }
@@ -60,7 +61,7 @@ export const passages = async (aid) => { const r = await api(`/v2/assessments/${
 // Open the setup state for a review (or a new one): the draft from the server row and the surveys it holds (wizard.js draftFromSaved),
 // the catalogue the steps draw from. A state already open in this tab keeps its unsaved steps; the server facts are refreshed.
 export async function openSetup(aid, { pid = "" } = {}) {
-  const key = aid || "new";
+  const key = aid || "new", epoch = cacheEpoch;
   const prior = STATES.get(key);
   const [ps, ts] = await Promise.all([api("/v2/projects").then((r) => (r.projects ?? []).filter((p) => !p.archived_at && (p.role === "owner" || p.role === "member"))), templates()]);
   let st;
@@ -84,7 +85,8 @@ export async function openSetup(aid, { pid = "" } = {}) {
     }
   }
   if (st.draft.project) await loadLanguages(st);
-  STATES.set(key, st);
+  // Identity invalidation can happen while the reads above are pending. Do not repopulate its cleared cache.
+  if (epoch === cacheEpoch) STATES.set(key, st);
   return st;
 }
 export async function loadLanguages(st) { st.languages = st.draft.project ? await languages(st.draft.project) : []; return st.languages; }
