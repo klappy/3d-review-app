@@ -50,7 +50,7 @@ for (const phone of [false, true]) describe(phone ? "phone email handoff" : "des
     expect(field.readOnly).toBe(true);
     expect(field.value).toContain("1. Trust & feedback — 2 levels apart");
     expect(field.value).toContain("2. Translation brief — Needs support");
-    expect(field.value).toContain("Agreed actions and notes have not been recorded");
+    expect(field.value).toContain("What we noticed:"); expect(field.value).toContain("The next step:");
     expect(field.value).not.toContain("https:");
     await fireEvent.click(view.getByRole("button", { name: "Copy message" }));
     expect(draft.textContent).toContain("Copy failed. Select the message below and copy it.");

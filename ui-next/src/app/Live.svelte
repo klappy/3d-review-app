@@ -12,7 +12,7 @@
   import { REPORT as SAMPLE_REPORT } from "../screens/results/data.js";
   import { api, token } from "./api.js";
   import { onMount } from "svelte";
-  import { parse, to } from "./router.js";
+  import { parse, to, legacyHref, contextForRoute } from "./router.js";
   import { setLiveContext, liveContext } from "../screens/href.js";
   import { setLiveChrome } from "./chrome.js";
   import { PHONE_QUERY } from "../route.js";
@@ -27,8 +27,10 @@
   import Landing from "../screens/Landing.svelte";
   import Home from "../screens/Home.svelte";
   import SignInLive from "./SignInLive.svelte";
-  import { savePlan } from "./plan.js";
+  import { savePlan, completePlan } from "./plan.js";
   import { renameWorkspace, ungroupProject } from "./workspace-actions.js";
+  import ReportHistory from "./ReportHistory.svelte";
+  import AccessMode from "./AccessMode.svelte";
   import Projects from "./Projects.svelte";
   import ProjectSettings from "./ProjectSettings.svelte";
   import { loadProjectSettings } from "./project-settings.js";
@@ -111,6 +113,7 @@
     if (name === "explore") return { screen: name, data: await D.exploreModel(me) };
     if (name === "workspace" || name === "workspace-group") return { screen: name, data: await D.workspaceModel(params.wid, me) };
     if (name === "people-workspace") return { screen: name, data: await D.peopleModel({ type: "workspace", id: params.wid }, me) };
+    if (name === "people" && r.query.get("project")) return { screen: name, projectScope: true, data: await D.peopleModel({ type: "project", id: r.query.get("project") }, me) };
     if (name === "people") { if (!reviewQ) return { screen: name, empty: true, emptyText: "Open People from a review's page: this page lists who has access to one review." }; return { screen: name, data: await D.peopleModel({ type: "assessment", id: reviewQ }, me) }; }
     if (name === "invitations") return { screen: name, data: await D.invitationsModel(me) };
     if (name === "project") return { screen: "project", data: await D.projectModel(params.pid) };
@@ -126,12 +129,12 @@
       return { screen: name, data: m, empty: !m.groups.length, emptyText: open.length ? "The survey links could not be created. Try again." : "No survey is collecting yet. Open collection on the review page first." };
     }
     if (name.startsWith("results") || name.startsWith("report")) {
-      const m = await D.resultsModel(params.aid, { build: false }); // read-only: a missing report is offered to build, never built on load
+      const m = await D.resultsModel(params.aid, { build: false, ...(r.query.get("report") ? { reportId: r.query.get("report") } : {}) }); // read-only: a missing report is offered to build, never built on load
       if (name === "results-answers") { const rows = await D.responsesList(params.aid); return { screen: name, results: m, answers: rows }; } // a failed read is the shell's error (retryable), not a policy hold
       return { screen: name, results: m };
     }
     if (name === "share") { const sm = await D.shareModel(params.aid, me); return { screen: "share", shareData: sm.review, share: sm.share }; }
-    if (name === "menu") { const home = await D.homeModel(me); return { screen: "menu", menu: D.menuModel(me, home, { onSignOut: signOut }) }; }
+    if (name === "menu") { const home = await D.homeModel(me); return { screen: "menu", menu: D.menuModel(me, home, { onSignOut: signOut, currentDesign: legacyHref(r, contextForRoute(r)) }) }; }
     // Print paper surveys for real: the chosen surveys' blank forms through GET /v2/assessments/{aid}/surveys/{sid}/print (app/print.js);
     // the preview sheet is the first ticked survey's form, read now (read-only) so the dialog shows the real paper before printing.
     if (name === "print") {
@@ -145,7 +148,7 @@
     if (name === "paper-entry") { const { assessment } = await D.assessment(params.aid); return { screen: "paper-entry", unavailable: true, assessment, message: `Entering paper answers for ${assessment.name} is not available yet: the assisted-entry capability (cap.response.assisted_next, POST /v2/participate/next) is refused by the server until an assisted collector can be authorised (D6). Hand the paper's QR link to the person instead, or wait for that capability.` }; }
     // Next step and the plan read the built report (the same results model as Results): a review with no report is offered the build.
     if (name === "next-step" || name === "action-plan") {
-      const m = await D.resultsModel(params.aid, { build: false });
+      const m = await D.resultsModel(params.aid, { build: false, ...(r.query.get("report") ? { reportId: r.query.get("report") } : {}) });
       return { screen: name, results: m, plan: m.payload ? D.nextStepModel(m) : null };
     }
     return { redirect: to("home") };
@@ -178,7 +181,7 @@
     page = { status: "loading", key: r.name, data: null, error: null };
     session = undefined; applyChrome(null);
     build = null; uncertainBuild = null; // a pending build preview never outlives the route; a reload re-reads the report list, which clears the uncertain lock
-    setLiveContext({ ...r.params, ...(r.query.get("review") && !r.params.aid ? { aid: r.query.get("review") } : {}) }); // a setup screen's review (router.linkFor)
+    setLiveContext({ ...contextForRoute(r), ...(r.query.get("report") ? { report: r.query.get("report") } : {}) }); // a setup screen's review (router.linkFor)
     try {
       if (!PARTICIPANT.has(r.name)) {
         let current;
@@ -261,7 +264,7 @@
   const accountItems = $derived(session ? [
     { kind: "head", label: session.principal?.display_name || "Signed in", sub: session.principal?.id ? "Facilitator" : "" }, { kind: "hr" },
     { label: "Help and FAQ", href: to("help") }, { label: "Why 3D Review exists", href: to("about") }, { label: "Send app feedback", href: to("feedback", {}, { from: route.name, review: page.data?.data?.review?.title ?? page.data?.results?.review?.title ?? "" }) },
-    { label: "Public website home", href: to("landing") }, { kind: "theme" }, { label: "Current design", href: "/" }, { kind: "hr" }, { label: "Sign out", onclick: signOut },
+    { label: "Public website home", href: to("landing") }, { kind: "theme" }, { label: "Projects", href: to("projects") }, { label: "Current design", href: legacyHref(route, liveContext()) }, { kind: "hr" }, { label: "Sign out", onclick: signOut },
   ] : []);
   function onSignedIn() { D.clearLinks(); SU.forgetAll(); S.forget(); session = undefined; const next = page.data?.next; go(next && next !== "#/signin" ? next : to("home")); }
   // Report build (first build and "Refresh with new answers" alike): the current design's contract (ui/assess/report-build.js) —
@@ -289,7 +292,7 @@
     finally { building = false; }
   }
   async function launch() { const aid = route.params.aid ?? route.query.get("review"); try { await D.setStage(aid, "collect"); SU.forget(aid); go(to("collect", { aid })); } catch (e) { page = { status: "error", key: route.name, data: null, error: { kind: classify(e), message: e?.message || "The survey could not be launched." } }; } }
-  async function completeReview() { const aid = route.params.aid; await D.setStage(aid, "improve"); const read = await D.assessment(aid); if (read.assessment?.stage !== "improve") throw new Error("Completion could not be verified. Reopen this review before retrying."); go(to("home")); }
+  async function completeReview() { await completePlan(route.params.aid); await load(); }
   async function reopenCollection() { const aid = route.params.aid; try { await D.setStage(aid, "collect"); go(to("share", { aid })); } catch (e) { page = { status: "error", key: route.name, data: null, error: { kind: classify(e), message: e?.message || "Collection could not be reopened." } }; } }
   // People actions (app/data.js: the same routes the current UI's permissions page calls); each lands on a fresh read, or the shell's error.
   const peopleScope = () => page.data?.data?.scope;
@@ -373,10 +376,12 @@
   <div class="app" data-theme={theme} data-w={phone ? "phone" : undefined}><div class="layer"><main class="l-main" data-rhythm="center" data-sample-mark><div class={phone ? "l-page" : undefined}><Row gap={2}><Tag label="Sample review" />{#if link}<Button label={link.label} variant="quiet" href={link.href} />{/if}</Row></div></main></div></div>
 {/snippet}
 
+<AccessMode principal={session?.principal} sample={!!page.data?.sample} oninvalidate={() => { D.clearLinks(); SU.forgetAll(); S.forget(); page = { status: "loading", key: route.name, data: null, error: null }; }} />
+
 {#if page.status === "loading"}
   <LoadingFrame {phone} {theme} {chrome} kind={page.key} />
 {:else if page.status === "error"}
-  <Status {phone} {theme} kind={page.error.kind} message={page.error.message} onretry={load} back={route.name === "project-settings" ? to("home") : undefined} backLabel={route.name === "project-settings" ? "Home" : undefined} />
+  <Status {phone} {theme} kind={page.error.kind} message={page.error.message} onretry={load} back={route.params.aid ? to("results", { aid: route.params.aid }) : to("home")} backLabel={route.params.aid ? "Latest results" : "Home"} />
 {:else if page.data.screen === "project-settings" && page.data.sample}
   <ProjectSettings {phone} {theme} project={{ id: "sample", name: "Sample project", organization: "", role: "viewer" }} sample />
 {:else if page.data.fixture}
@@ -409,12 +414,13 @@
   <Status {phone} {theme} kind="unavailable" message={page.data.message} back={page.data.assessment ? to("collect", { aid: page.data.assessment.id }) : to("home")} backLabel={page.data.assessment ? "Back to Collect" : "Home"} />
 {:else if page.data.screen === "next-step" || page.data.screen === "action-plan"}
   {@const m = page.data.results}
+  {#if m.reports?.length}<ReportHistory aid={m.aid} reports={m.reports} selected={m.reportId} screen={page.data.screen} />{/if}
   {#if page.data.sample}{@render sampleMark()}{/if}
   {#if !page.data.plan}
     <Status {phone} {theme} kind="not_built" message={`No report has been built for ${m.review.title} yet, so there is nothing to plan from. ${m.canBuild ? "Build it on Results first." : "An owner or member of the review builds it."}`} back={to("results", route.params)} backLabel="Go to Results" />
   {:else}
     {@const C = REGISTRY[page.data.screen]}
-    <C {phone} {theme} data={page.data.plan} user={{ first: who?.first ?? "", initials: who?.initials ?? "" }} workspace="Your workspace" onsave={!m.sample && m.canEditNotes ? (notes) => savePlan(m.aid, notes) : undefined} oncomplete={!m.sample && m.serverStage !== "improve" && m.canEditNotes ? completeReview : undefined} />
+    <C {phone} {theme} data={page.data.plan} user={{ first: who?.first ?? "", initials: who?.initials ?? "" }} workspace="Your workspace" onsave={!m.sample && m.canEditNotes ? (notes) => savePlan(m.aid, notes) : undefined} oncomplete={!m.sample && m.canEditNotes ? completeReview : undefined} />
   {/if}
 {:else if page.data.screen === "home"}
   <Home {phone} {theme} data={page.data.home} state={phone ? "reviews" : page.data.state} />
@@ -449,6 +455,7 @@
 {:else if page.data.screen === "results" || page.data.screen === "results-gaps" || page.data.screen === "results-answers" || page.data.screen === "report" || page.data.screen === "report-detailed" || page.data.screen === "results-held"}
   {@const m = page.data.results}
   {@const rep = reportFor(m, page.data.screen)}
+  {#if m.reports?.length}<ReportHistory aid={m.aid} reports={m.reports} selected={m.reportId} screen={page.data.screen} />{/if}
   {#if page.data.sample}{@render sampleMark()}{/if}
   {#if !rep && !m.held && page.data.screen !== "results-held"}
     <NotBuilt {chrome} {phone} {theme} crumbs={[{ label: m.review.project, href: m.review.projectId ? to("project", { pid: m.review.projectId }) : to("home") }, { label: m.review.title }]} message={`No report has been built for ${m.review.title} yet. ${m.canBuild ? "Building reads the answers collected so far and keeps that report." : "An owner or member of the review builds it."}${page.data.refreshed ? ` ${page.data.refreshed}` : ""}`} back={to("collect", route.params)} backLabel="Back to Collect">
@@ -487,7 +494,7 @@
     <Status {phone} {theme} kind="refused" message="Permissions are managed by members and owners: a viewer cannot read who has access here. Ask an owner if you need to manage people." back={page.data.data.review ? to("review", { aid: page.data.data.review.id }) : to("workspace", { wid: page.data.data.workspace.id })} backLabel={page.data.data.review ? "Back to the review" : "Back to the workspace"} />
   {:else}
     {@const C = REGISTRY[page.data.screen]}
-    <C {phone} {theme} data={page.data.data} oninvite={sendInvite} onaction={rowAction} onrole={changeRole} />
+    <C {phone} {theme} data={page.data.data} oninvite={sendInvite} onaction={rowAction} onrole={changeRole} ownershipMe={session} ontransferred={async () => { S.forget(); await load(); }} scope={page.data.projectScope ? "workspace" : undefined} backHref={page.data.projectScope ? to("project", { pid: page.data.data.scope.id }) : undefined} />
   {/if}
 {:else if page.data.screen === "invitations"}
   {@const C = REGISTRY.invitations}

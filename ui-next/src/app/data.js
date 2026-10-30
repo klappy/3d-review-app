@@ -1,9 +1,10 @@
 // UI Next (v4) workspace data. Status: provisional. Reads only the /v2 routes the current UI reads (ui/assess/scope.js, views.js,
 // share.js, report-build.js); builds view models in the shapes the lane screens already draw (collect/model.js, results/data.js, home.json).
+import { readSelectedReport, selectedReport } from "./report-selection.js";
 import { heldContext } from "./setup.js";
 import { api, classify, confirmed, enc, token } from "./api.js";
 import { lensLabel } from "../../../ui/report-lenses.js";
-import { v3ScoreBand, v3ExpectedFor } from "../../../ui/assess/v3-assessment.js";
+import { v3ScoreBand, v3ExpectedFor, v3NextParse, v3IsComplete, v3CompleteLock } from "../../../ui/assess/v3-assessment.js";
 import { parsePeriod, collectLine } from "../../../ui/v3/components/active-until.js";
 import { LEVEL_KEY, LEVEL_WORD, levelCutoffs, useLevelMinimum, levelMinimumOf, currentLevelMin, sentLenses, snapshotTotal, footPrivacy, gapRows, scoreRows, bandRows, lensCards, responsesFor, lookNextOf, standsOutOf, sameBand } from "../screens/results/data.js";
 import { to } from "./router.js";
@@ -23,7 +24,7 @@ export const workspaces = async () => (await api("/v2/workspaces")).workspaces ?
 export const projects = async () => (await api("/v2/projects")).projects ?? [];
 export const project = async (pid) => (await api(`/v2/projects/${enc(pid)}`)).project ?? (await api(`/v2/projects/${enc(pid)}`));
 export const assessmentsOf = async (pid) => (await api(`/v2/projects/${enc(pid)}/assessments`)).assessments ?? [];
-export const assessment = async (aid) => api(`/v2/assessments/${enc(aid)}`); // { assessment, surveys }
+export const assessment = async (aid) => { const r = await api(`/v2/assessments/${enc(aid)}`); return { ...r, assessment: v3CompleteLock(r.assessment) }; }; // { assessment, surveys }
 export const surveyCounts = async (aid, sid) => api(`/v2/assessments/${enc(aid)}/surveys/${enc(sid)}`); // { survey, counts, expected_count? }
 export const setStage = async (aid, stage) => api(`/v2/assessments/${enc(aid)}/stage`, { method: "POST", body: { stage } });
 export const results = async (aid) => api(`/v2/assessments/${enc(aid)}/results`);
@@ -326,7 +327,7 @@ export const heldBuildText = (preview, tail, reason) => {
   return `The results can’t be built: ${own} ${tail}`;
 };
 // Results: the newest built report (or build one) in the shape results/data.js reads: { review, counts, payload } plus a held reason.
-export async function resultsModel(aid, { build = false } = {}) {
+export async function resultsModel(aid, { build = false, reportId = null } = {}) {
   // The report list and every survey count must load: a failed read is the shell's retryable error, never an empty list (which
   // would offer a build beside an existing report) nor a zero (which would band a perspective as held and understate the total).
   const [{ assessment: a, surveys }, res, rep] = await Promise.all([assessment(aid), results(aid).catch((e) => ({ error: e })), reports(aid)]);
@@ -334,14 +335,14 @@ export async function resultsModel(aid, { build = false } = {}) {
   const live = surveys.filter((s) => !s.archived_at);
   const counts = { team: 0, community: 0, church: 0 };
   let list = Array.isArray(rep?.reports) ? rep.reports.filter((x) => x?.id) : [];
-  const newest = newestReport(list);
+  const newest = selectedReport(list, reportId);
   // These reads depend only on the assessment/report list, not on one another. Join them together so a slow project or
   // survey does not delay the language/report reads. Required failures still reject; explicit writes stay after this join.
   const [p, per, language, existing] = await Promise.all([
     project(a.project_id).catch(() => ({ name: "Project", id: a.project_id })),
     Promise.all(live.map((s) => surveyCounts(aid, s.id))),
     languageOf(a),
-    newest ? newest.payload ? newest : report(newest.id) : null,
+    readSelectedReport(list, reportId, report),
   ]);
   live.forEach((s, i) => { const k = lensKeyOf(s.perspective); if (k) counts[k] += Number(per[i]?.counts?.respondents ?? 0); });
   const liveResponses = per.reduce((n, c) => n + Number(c?.counts?.responses ?? 0), 0); // the live survey total: the newer-responses notice and a new build only
@@ -361,7 +362,7 @@ export async function resultsModel(aid, { build = false } = {}) {
   // left out rather than mislabelled. Language resolves as Collect does (language_name, else language_id via the project's languages).
   const review = { id: a.id, project: p.name, projectId: a.project_id, language, modality: a.format ? a.format[0].toUpperCase() + a.format.slice(1) : "", title: a.name, stage: a.stage === "collect" ? "collecting" : built ? "results" : "closed", closed: "", closedLong: "", builtOn: built ? shortDate(built.created_at) : "", responses, liveResponses, canReadResponses: member, canReopen: member }; // results lane StagePill: the review's real state — collecting | closed (no report yet) | results
   // Role flags (src/handlers: report build, stage and the response list need owner/member; viewers read results and reports only).
-  return { aid, review, notes: { notes_reflection: a.notes_reflection, notes_next_steps: a.notes_next_steps }, canEditNotes: member, counts, sent: sentLenses(live), payload: built?.payload ?? null, reportId: built?.id ?? null, held: held ?? (built ? null : buildHold(res)), results: res, serverStage: a.stage, canBuild: member && buildAllowed(res), canReadResponses: member, canReopen: member }; // D7: /results is held for everyone until a report exists; a member's first Build must not be hidden behind it (Codex P1 on 26a86937)
+  return { aid, review, reports: list, created_at: built?.created_at, notes: { notes_reflection: a.notes_reflection, notes_next_steps: v3NextParse(a.notes_next_steps).text }, canEditNotes: member, counts, sent: sentLenses(live), payload: built?.payload ?? null, reportId: built?.id ?? null, held: held ?? (built ? null : buildHold(res)), results: res, serverStage: a.stage, canBuild: member && buildAllowed(res), canReadResponses: member, canReopen: member }; // D7: /results is held for everyone until a report exists; a member's first Build must not be hidden behind it (Codex P1 on 26a86937)
 }
 
 // Gap names for ResultsGaps/Report (results/data.js bandRows reads the payload's cross-perspective areas by construct name), after
@@ -391,7 +392,7 @@ export const phonePayload = (payload) => ({ ...payload, lenses: (payload.lenses 
 export function liveReport(m, { phone = false, screen = "" } = {}) {
   if (!m?.payload) return null;
   const full = m.payload, cards = lensCards(full, m.counts, { sent: m.sent }), rows = gapRows({ payload: full }, m.counts);
-  return { review: m.review, counts: m.counts, sent: m.sent, payload: phone && screen === "results" ? phonePayload(full) : full,
+  return { reportId: m.reportId, created_at: m.created_at, review: m.review, counts: m.counts, sent: m.sent, payload: phone && screen === "results" ? phonePayload(full) : full,
     gaps: gapsOf(full, m.counts), radar: radarOf(full), lookNext: lookNextOf(cards), standsOut: standsOutOf(cards, rows) };
 }
 
@@ -519,13 +520,14 @@ export function nextStepModel(m) {
 
 // The phone account menu sheet (actions/MenuSheet.svelte, live): HomePhone's list from the home model, the signed-in account and the
 // sheet's seven rows; no invitation store is read (the invitation card is not drawn), no workspace switch (one workspace tonight).
-export function menuModel(me, home, { onSignOut } = {}) {
+export function menuModel(me, home, { onSignOut, currentDesign = "/#projects" } = {}) {
   const name = me?.principal?.display_name || "Signed in";
   const who = [name, me?.principal?.email].filter(Boolean).join(" · ");
   const reviews = home.groups.flatMap((g) => g.reviews.map((r) => ({ project: r.project, title: r.title, stage: g.stage, meta: r.phoneMeta ?? r.meta, action: r.action, href: r.href })));
   return {
     who, initials: home.user.initials, invitation: null, chips: [home.workspace, "Mine"], reviews, completed: home.completed.length,
     items: [
+      ["list", "Projects", to("projects")], ["out", "Current design", currentDesign],
       ["people", `${home.workspace} — your workspace`, to("workspaces")], ["mail", "Invitations", to("invitations")], ["help", "Help and FAQ", to("help")],
       ["sparkle", "Why 3D Review exists", to("about")], ["pen", "Send app feedback", to("feedback")], ["globe", "Public website home", to("landing")], ["people", "Use another account", null, onSignOut], ["out", "Sign out", null, onSignOut],
     ],
@@ -539,6 +541,7 @@ export const ROLES = Object.freeze({ owner: "Owner", member: "Member", viewer: "
 // The boards' words for what each role can do (fixtures/people/people.json); the server's gating is ui/scope-invitations.js, through people-data.js.
 export const CAN = Object.freeze({
   assessment: { owner: "Can change everything, invite people and delete", member: "Can run the review and read results", viewer: "Can read results only" },
+  project: { owner: "Can manage this project and its reviews", member: "Can run reviews", viewer: "Can read results" },
   workspace: { owner: "Everything in the workspace, including deleting projects", member: "Can create projects and run reviews in all of them", viewer: "Can read results across all projects" },
 });
 export const INVITE_LABELS = Object.freeze({ viewer: "Viewer — reads results", member: "Member — runs reviews", owner: "Owner — everything" });
@@ -572,6 +575,10 @@ export async function peopleModel(scope, me) {
   if (scope.type === "workspace") {
     const { workspace: w } = await workspace(scope.id);
     return { ...base, user: { ...base.user, workspace: w.name }, review: null, workspace: { id: w.id, name: w.name, short: w.name, heading: "People in this workspace", phoneTitle: "People in this workspace", me: myId, can: CAN.workspace, roster, role: w.role } };
+  }
+  if (scope.type === "project") {
+    const p = await project(scope.id);
+    return { ...base, review: null, workspace: { id: p.id, name: p.name, short: p.name, heading: "People in this project", phoneTitle: "People in this project", me: myId, can: CAN.project, roster, role: p.role } };
   }
   const { assessment: a } = await assessment(scope.id);
   const p = await project(a.project_id).catch(() => ({ name: "Project", id: a.project_id }));
@@ -664,7 +671,7 @@ export async function exploreModel(me) {
   // Explore bands with the results lane's cut-off (explore-data.js levelOf): the session's served policy, never a per-review read.
   const levelMinimum = useSessionPolicy();
   const rows = await Promise.all(home.rows.map(async ({ a, p }) => ({
-    id: a.id, title: a.name, project: p.name, projectId: a.project_id, projectHref: to("project", { pid: a.project_id }), updatedAt: a.updated_at || a.created_at, language: a.language_name || "", region: "", orgs: p.organization || "",
+    id: a.id, title: a.name, project: p.name, projectId: a.project_id || p.id, projectHref: to("project", { pid: a.project_id || p.id }), updatedAt: a.updated_at || a.created_at, language: a.language_name || "", region: "", orgs: p.organization || "",
     stage: Object.hasOwn(PILL_OF, a.stage) ? a.stage : "prepare", responses: { n: Number(a.response_count ?? 0) }, lenses: await reviewLenses(a),
     updated: ago(a.updated_at || a.created_at), href: to(a.stage === "prepare" ? "review" : a.stage === "collect" ? "collect" : "results", { aid: a.id }),
   })));

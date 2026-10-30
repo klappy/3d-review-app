@@ -44,7 +44,7 @@
 </script>
 
 {#snippet top()}{#if phone}<PhoneHeader state="nested" title={D.phone.title} parent={R.project} back={href("project", at)} initials={user.initials} menuHref={href("menu", at)} />{:else}<TopBar home={href("home", at)} who={R.user.first} initials={R.user.initials} workspace={R.workspace} {crumbs} />{/if}{/snippet}
-{#snippet bar()}{#if phone}<PhoneBar label="Print or share the plan" href={href("action-plan", at)} />{/if}{/snippet}
+{#snippet bar()}{#if phone}<PhoneBar label={live ? "Print or share the plan" : "Complete the review"} href={href(live ? "action-plan" : "home", at)} />{/if}{/snippet}
 {#snippet meta()}{R.project} · {R.review.language} · {R.review.modality} · {live ? "Read from the built report" : "Saved just now"}{/snippet}
 {#snippet plus()}<Ico d={A.plus} />{/snippet}
 {#snippet check()}<Ico d={A.check} />{/snippet}

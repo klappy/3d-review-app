@@ -16,7 +16,7 @@ import { packPeriod, parsePeriod, periodErrors, todayIso } from "../../../ui/v3/
 import { LWC_LANGUAGES, MAX_LWC } from "../../../ui/v3/lwc.js";
 export const MAX_LWC_COUNT = MAX_LWC;
 import { groupFields, contextValues } from "../../../ui/v3/components/context-fields.js";
-import { V3_EXPECTED_KEY } from "../../../ui/assess/v3-assessment.js";
+import { V3_EXPECTED_KEY, v3IsComplete } from "../../../ui/assess/v3-assessment.js";
 import { slug } from "../screens/setup/draft.js";
 
 export const LENS_OF = Object.freeze({ "Translation Team": "team", Community: "community", Church: "church" });
@@ -72,7 +72,7 @@ export async function openSetup(aid, { pid = "" } = {}) {
     const pre = [];
     for (const s of live) { if (d.groups[s.template_id]) continue; d.groups[s.template_id] = { checked: true, version: String(s.template_version), expected: expectedOf(s.id) ? String(expectedOf(s.id)) : "" }; pre.push({ id: s.id, context: heldContext(s), template: s.template_id, version: Number(s.template_version), name: s.template_name || s.template_id }); }
     if (!ps.some((x) => x.id === a.project_id)) ps.push({ id: a.project_id, name: "This project" });
-    st = { key, aid, role: a.role ?? "viewer", stage: a.stage, draft: prior ? { ...d, ...prior.draft, project: a.project_id, groups: { ...d.groups, ...prior.draft.groups }, context: { ...prior.draft.context } } : d, snap: { ...snapOf(d), demographics_enabled: a.demographics_enabled === true }, pre, projects: ps, templates: ts, languages: [], passages: pz.passages, fileStorage: pz.fileStorage };
+    st = { key, aid, role: v3IsComplete(a) ? "viewer" : a.role ?? "viewer", stage: a.stage, draft: prior ? { ...d, ...prior.draft, project: a.project_id, groups: { ...d.groups, ...prior.draft.groups }, context: { ...prior.draft.context } } : d, snap: { ...snapOf(d), demographics_enabled: a.demographics_enabled === true }, pre, projects: ps, templates: ts, languages: [], passages: pz.passages, fileStorage: pz.fileStorage };
     // A survey the server no longer holds is unticked here too; one it gained stays ticked (another device selected it).
     for (const tid of Object.keys(st.draft.groups)) if (prior && prior.pre.some((x) => x.template === tid) && !pre.some((x) => x.template === tid)) delete st.draft.groups[tid];
   } else {
