@@ -31,6 +31,7 @@
   import { renameWorkspace, ungroupProject } from "./workspace-actions.js";
   import ReportHistory from "./ReportHistory.svelte";
   import AccessMode from "./AccessMode.svelte";
+  import Workspaces from "./Workspaces.svelte";
   import Projects from "./Projects.svelte";
   import ProjectSettings from "./ProjectSettings.svelte";
   import { loadProjectSettings } from "./project-settings.js";
@@ -106,7 +107,7 @@
     // Steps 1–4 edit the review through the existing contracts (app/setup.js, wizard.js order); a bare #setup starts a new review.
     if (["setup", "setup1", "setup2", "setup3", "setup4"].includes(name)) { suSt = await SU.openSetup(reviewQ || null, { pid: route.query.get("project") || liveContext()?.pid || "" }); suError = ""; bump(); const screen = name === "setup" ? "setup1" : name; if (suSt.stage !== "prepare" && screen !== "setup1") return { redirect: to("review", { aid: suSt.aid }) }; /* a launched review edits details and dates only (step 3 could archive a live survey with responses) */ return { screen, step: Number(screen.slice(-1)) }; }
     if (name === "projects") return { screen: "projects", projects: await D.projects() };
-    if (name === "workspaces") return { screen: "home", home: await D.homeModel(me), assessment: null };
+    if (name === "workspaces") return { screen: "workspaces", workspaces: await D.workspaces() };
     if (name === "setup5") return { redirect: to("home") }; // a review's own page is its Setup 5 while preparing (name === "review")
     // People and workspaces read the live stores (app/data.js): a workspace's grouped projects, a scope's roster (members and owners
     // only: a viewer's refusal is shown as such), the account's own invitations, every review it can see.
@@ -196,6 +197,7 @@
       // Review-scoped screens draw project crumbs (href("project") needs :pid): the loaded model's project joins the live context.
       const pid = data?.data?.projectId ?? data?.results?.review?.projectId ?? data?.shareData?.projectId ?? data?.projectId ?? null;
       if (pid && !r.params.pid) setLiveContext({ ...liveContext(), pid });
+      if (data.results?.reportId) setLiveContext({ ...liveContext(), report: data.results.reportId });
       page = { status: "ready", key: r.name, data, error: null };
     } catch (e) {
       if (my !== seq || credential !== token()) return;
@@ -424,6 +426,8 @@
   {/if}
 {:else if page.data.screen === "home"}
   <Home {phone} {theme} data={page.data.home} state={phone ? "reviews" : page.data.state} />
+{:else if page.data.screen === "workspaces"}
+  <Workspaces {phone} {theme} workspaces={page.data.workspaces} />
 {:else if page.data.screen === "projects"}
   <Projects {phone} {theme} projects={page.data.projects} />
 {:else if page.data.screen === "project-settings"}

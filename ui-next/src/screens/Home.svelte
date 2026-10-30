@@ -134,7 +134,7 @@
           {#each data.groups as g}<label class="chip"><input class="cb" type="checkbox" checked={!hidden[g.stage]} onchange={(e) => (hidden = { ...hidden, [g.stage]: !e.currentTarget.checked })} />{g.heading} <span class="small">{g.reviews.length}</span></label>{/each}
           <label class="chip"><input class="cb" type="checkbox" checked={showCompleted} onchange={(e) => (showCompleted = e.currentTarget.checked)} />Completed <span class="small">{data.completed.length}</span></label>
           <span class="chip">Workspace · {data.workspace}</span><span class="chip">Facilitator · me</span>
-          <Button label="Add filter" variant="quiet" lead={plus} disabled ariaDescribedby="home-filter-why" /><span class="small" id="home-filter-why">More filters are not in the new design yet.</span>
+          <Button label="Add filter" variant="quiet" lead={plus} href="#explore" /><span class="small" id="home-filter-why">Search and filter across your authorized reviews in Explore.</span>
         </Row>
         {#each shown as g (g.stage)}
           <Section heading={g.heading} help={g.help}>
