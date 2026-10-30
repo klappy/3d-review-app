@@ -17,6 +17,7 @@ export const ROUTES = Object.freeze([
   ["help", "/help"],
   ["feedback", "/feedback"],
   ["explore", "/explore"],
+  ["projects", "/projects"],
   ["workspaces", "/workspaces"],
   ["workspace", "/workspace/:wid"],
   ["workspace-group", "/workspace/:wid/group"],
@@ -130,6 +131,41 @@ export function linkFor(name, extra = {}, ctx = {}) {
   // setup routes have no :aid (they are the new-review wizard too) — so the live app can show the review's own read-only data.
   // The review's People page ("people", no :aid: the route is the one the lanes link by name) carries its review the same way.
   if ((name.startsWith("setup") || name === "people") && ctx.aid && !(BY_NAME.get(name) ?? "").includes(":aid")) query.review = ctx.aid;
+  if (ctx.report && (name.startsWith("results") || name.startsWith("report") || ["next-step", "action-plan"].includes(name))) query.report = ctx.report;
+  // Menu is a real route on phones, so carry its originating scope through reload/back.
+  if (name === "menu") for (const [key, value] of Object.entries({ review: ctx.aid, project: ctx.pid, workspace: ctx.wid })) if (value) query[key] = value;
+  if (name === "people" && !ctx.aid) {
+    if (ctx.pid) query.project = ctx.pid;
+    else if (ctx.wid) return to("people-workspace", { wid: ctx.wid });
+  }
   // A lane link to a review-scoped screen from a page with no review in context (Home's "#setup") lands on Home, never nowhere.
   try { return to(name, params, query); } catch { return to("home"); }
+}
+
+
+// Resolve only known scope keys. No credentials, arbitrary URL, or participant tokens are carried into account navigation.
+export function contextForRoute(route = {}, context = {}) {
+  const q = route.query;
+  return {
+    ...context, ...route.params,
+    ...(q?.get("review") ? { aid: q.get("review") } : {}),
+    ...(q?.get("project") ? { pid: q.get("project") } : {}),
+    ...(q?.get("workspace") ? { wid: q.get("workspace") } : {}),
+  };
+}
+
+// The current UI owns these same scope identifiers. A normal same-origin link works in an installed PWA too;
+// it never depends on an opener or browser history, and it does not mutate the session or access mode.
+export function legacyHref(route = {}, context = {}) {
+  const { aid, pid, wid } = contextForRoute(route, context);
+  const name = route.name ?? "";
+  if ([aid, pid, wid].includes(SAMPLE_AID)) return SAMPLE_HREF;
+  const encoded = encodeURIComponent;
+  if (aid) {
+    const view = name === "people" ? "permissions" : ["next-step", "action-plan"].includes(name) ? "improve" : name.startsWith("results") || name.startsWith("report") ? "understand" : ["collect", "share", "qr-room", "print", "print-qr", "close-collection", "paper-entry"].includes(name) ? "collect" : "";
+    return `/#assessment/${encoded(aid)}${view ? `/${view}` : ""}`;
+  }
+  if (pid) return name === "people" ? `/#permissions/projects/${encoded(pid)}` : `/#project/${encoded(pid)}`;
+  if (wid) return name === "people-workspace" || name === "people" ? `/#permissions/workspaces/${encoded(wid)}` : `/#workspace/${encoded(wid)}`;
+  return name === "workspaces" ? "/#workspaces" : "/#projects";
 }
