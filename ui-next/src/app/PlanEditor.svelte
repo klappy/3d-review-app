@@ -1,0 +1,29 @@
+<script>
+  import Button from '../Button.svelte';
+  import Stack from '../Stack.svelte';
+  import Row from '../Row.svelte';
+  let { notes = {}, onsave, oncomplete } = $props();
+  let reflection = $state(notes.notes_reflection ?? '');
+  let next = $state(notes.notes_next_steps ?? '');
+  let busy = $state(false), status = $state(''), failed = $state(false);
+  async function save(complete = false) {
+    if (busy || !onsave) return;
+    busy = true; failed = false; status = 'Saving…';
+    try {
+      await onsave({ notes_reflection: reflection, notes_next_steps: next });
+      status = 'Saved and verified';
+      if (complete && oncomplete) await oncomplete();
+    } catch (e) { failed = true; status = e?.message || 'The save could not be confirmed. Your text is still here.'; }
+    finally { busy = false; }
+  }
+</script>
+
+<Stack gap={3}>
+  <div><label class="lbl" for="plan-reflection">What you noticed</label><textarea class="in" id="plan-reflection" bind:value={reflection} disabled={!onsave || busy}></textarea></div>
+  <div><label class="lbl" for="plan-next">The next step</label><textarea class="in" id="plan-next" bind:value={next} disabled={!onsave || busy}></textarea><p class="small">Include agreed actions, who will follow up and dates. Everyone with access to this review can read these notes.</p></div>
+  <Row wrap gap={2}>
+    {#if onsave}<button class="btn" type="button" onclick={() => save()} disabled={busy}>{busy ? 'Saving…' : 'Save notes and plan'}</button>{/if}
+    {#if oncomplete}<button class="btn" type="button" onclick={() => save(true)} disabled={busy}>Save and complete the review</button>{/if}
+  </Row>
+  {#if status}<p class="small" role={failed ? 'alert' : 'status'}>{status}</p>{/if}
+</Stack>

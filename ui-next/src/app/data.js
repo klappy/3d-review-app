@@ -361,7 +361,7 @@ export async function resultsModel(aid, { build = false } = {}) {
   // left out rather than mislabelled. Language resolves as Collect does (language_name, else language_id via the project's languages).
   const review = { id: a.id, project: p.name, projectId: a.project_id, language, modality: a.format ? a.format[0].toUpperCase() + a.format.slice(1) : "", title: a.name, stage: a.stage === "collect" ? "collecting" : built ? "results" : "closed", closed: "", closedLong: "", builtOn: built ? shortDate(built.created_at) : "", responses, liveResponses, canReadResponses: member, canReopen: member }; // results lane StagePill: the review's real state — collecting | closed (no report yet) | results
   // Role flags (src/handlers: report build, stage and the response list need owner/member; viewers read results and reports only).
-  return { aid, review, counts, sent: sentLenses(live), payload: built?.payload ?? null, reportId: built?.id ?? null, held: held ?? (built ? null : buildHold(res)), results: res, serverStage: a.stage, canBuild: member && buildAllowed(res), canReadResponses: member, canReopen: member }; // D7: /results is held for everyone until a report exists; a member's first Build must not be hidden behind it (Codex P1 on 26a86937)
+  return { aid, review, notes: { notes_reflection: a.notes_reflection, notes_next_steps: a.notes_next_steps }, canEditNotes: member, counts, sent: sentLenses(live), payload: built?.payload ?? null, reportId: built?.id ?? null, held: held ?? (built ? null : buildHold(res)), results: res, serverStage: a.stage, canBuild: member && buildAllowed(res), canReadResponses: member, canReopen: member }; // D7: /results is held for everyone until a report exists; a member's first Build must not be hidden behind it (Codex P1 on 26a86937)
 }
 
 // Gap names for ResultsGaps/Report (results/data.js bandRows reads the payload's cross-perspective areas by construct name), after
@@ -489,7 +489,7 @@ export async function printPageModel(aid, me) {
 // (urgent, then needs support) and each perspective's level. Notes, follow-up dates and recommendations have no store yet
 // (cap.recommendation.propose / review are RESERVED_NOT_BUILT in /v2/capabilities.json), so the model says so and carries none.
 export const RECS_UNAVAILABLE = "Recommendations are not available yet: the server's recommendation capabilities (POST /v2/assessments/{aid}/recommendations) are reserved, not built.";
-export const NOTES_UNAVAILABLE = "Notes, follow-up dates and the plan are not saved yet: there is no plan store in the API, so this screen reads the results only.";
+export const NOTES_UNAVAILABLE = "Save reflections and agreed actions on this review. Include dates in the next-step notes.";
 export function nextStepModel(m) {
   const payload = m.payload;
   if (!payload) throw new Error("next step: no built report to read");
@@ -509,7 +509,7 @@ export function nextStepModel(m) {
   const talk = [...gaps.map((g) => [`${g.area} — ${g.dots.map((d) => `${d.lens} ${LEVEL_WORD[d.level]}`).join(" · ")}`, g.apart]), ...weak.map((w) => [w.label, LEVEL_WORD[w.level]])];
   const stage = m.serverStage === "improve" ? "reviewed" : "results";
   return {
-    review: m.review, stage, gaps, weak, glance, talk, recs: [], recsNote: RECS_UNAVAILABLE, notesNote: NOTES_UNAVAILABLE,
+    review: m.review, stage, gaps, weak, glance, talk, notes: m.notes, noticed: m.notes?.notes_reflection ?? "", next: m.notes?.notes_next_steps ?? "", recs: [], recsNote: RECS_UNAVAILABLE, notesNote: "Notes are saved on this review. Automated recommendations are not available.",
     phone: { title: m.review.title, stage, lead: gaps.length ? "Where the perspectives pull apart, from the built report." : "The built report shows no area two perspectives both scored.", items: gaps.map((g) => ({ kind: "Tension", title: g.area, text: `${g.dots.map((d) => `${NAME[d.lens]} ${LEVEL_WORD[d.level]}`).join(" · ")} — ${g.apart}.`, inPlan: false })) },
     doc: `Next steps · 1 page · ${m.review.title}`,
     meta: [m.review.project, m.review.language, "3D Review next steps", m.review.closed ? `closed ${m.review.closed}` : "", `${m.review.responses} response${m.review.responses === 1 ? "" : "s"}`].filter(Boolean).join(" · "),

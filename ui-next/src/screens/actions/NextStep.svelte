@@ -7,6 +7,7 @@
      contract classes are written here. Links: the shared ../href.js href() with this screen's w/theme. One .btn-primary per page:
      desktop "Complete the review" (page head), phone "Complete the review" (phone-bar). Copy is the boards'. -->
 <script>
+  import PlanEditor from "../../app/PlanEditor.svelte";
   import AppShell from "../../AppShell.svelte";
   import Page from "../../Page.svelte";
   import Card from "../../Card.svelte";
@@ -34,7 +35,7 @@
   // data: the fixture shape (gallery) or app/data.js nextStepModel (live: the built report's gaps, weakest areas and levels through the
   // results lane's banding; recs is empty and recsNote / notesNote say what has no store yet: the recommendation capabilities are
   // RESERVED_NOT_BUILT and there is no plan store, so the note fields are drawn disabled and nothing claims to save).
-  let { phone = false, theme = "light", data = null, user = R0.user, workspace = R0.workspace, oncomplete } = $props(); // oncomplete (live): POST stage improve, then Home; absent → a viewer, or already completed: the action is not offered
+  let { phone = false, theme = "light", data = null, user = R0.user, workspace = R0.workspace, onsave, oncomplete } = $props(); // oncomplete (live): POST stage improve, then Home; absent → a viewer, or already completed: the action is not offered
   const live = $derived(!!data);
   const D = $derived(data ?? D0);
   const R = $derived(data ? { ...R0, user, workspace, project: data.review.project, review: { title: data.review.title, language: data.review.language, modality: data.review.modality }, deleteRefused: "Deleting a review is done from the current design's review page; this screen does not delete yet." } : R0);
@@ -43,7 +44,7 @@
 </script>
 
 {#snippet top()}{#if phone}<PhoneHeader state="nested" title={D.phone.title} parent={R.project} back={href("project", at)} initials={user.initials} menuHref={href("menu", at)} />{:else}<TopBar home={href("home", at)} who={R.user.first} initials={R.user.initials} workspace={R.workspace} {crumbs} />{/if}{/snippet}
-{#snippet bar()}{#if phone}<PhoneBar label="Complete the review" href={href("home", at)} />{/if}{/snippet}
+{#snippet bar()}{#if phone}<PhoneBar label="Print or share the plan" href={href("action-plan", at)} />{/if}{/snippet}
 {#snippet meta()}{R.project} · {R.review.language} · {R.review.modality} · {live ? "Read from the built report" : "Saved just now"}{/snippet}
 {#snippet plus()}<Ico d={A.plus} />{/snippet}
 {#snippet check()}<Ico d={A.check} />{/snippet}
@@ -62,10 +63,11 @@
       </Card>
     {/each}
     {#if live}<Card gap={3} label="Resources for weakest areas"><ReviewResources weak={D.weak} /></Card>{/if}
+    {#if live}<Card gap={3} label="Notes and plan"><PlanEditor notes={D.notes} {onsave} {oncomplete} /></Card>{/if}
     <Row wrap gap={2}><Button label="See all results" href={href("results", at)} lead={list} block /><Button label="Print or share the plan" href={href("action-plan", at)} lead={print} block /></Row>
   {:else}
     <Page gap={5}>
-      <ReviewHead {theme} title={R.review.title} stage={D.stage ?? "reviewed"} {meta} viewed="improve" live="improve" done={["prepare", "collect", "understand"]} deleteRefused={R.deleteRefused} action={oncomplete ? { label: "Complete the review", variant: "primary", trail: "check", onclick: oncomplete } : live ? undefined : { label: "Complete the review", variant: "primary", href: href("home", at), trail: "check" }} />
+      <ReviewHead {theme} title={R.review.title} stage={D.stage ?? "reviewed"} {meta} viewed="improve" live="improve" done={["prepare", "collect", "understand"]} deleteRefused={R.deleteRefused} action={live ? undefined : { label: "Complete the review", variant: "primary", href: href("home", at), trail: "check" }} />
       <div class="l-grid" data-tpl="aside-wide" data-gap="5">
         <div class="glass-hi l-card l-stack" data-pad="work" data-gap="5" role="group" aria-label="What will you talk about?">
           <div><h2 class="h2 t-24">What will you talk about?</h2><p class="small t-15">Suggested from the results. Keep the ones that matter; add your own.</p></div>
@@ -85,7 +87,7 @@
             {#if live}<ReviewResources weak={D.weak} />{/if}
             <input class="in" placeholder="Something else" aria-label="Something else" disabled={live} />
           </Stack>
-          {#if live}<p class="small" role="status" id="ns-notes-why">{D.notesNote}</p>{/if}
+          {#if live}<PlanEditor notes={D.notes} {onsave} {oncomplete} />{:else}
           <div><label class="lbl" for="ns-noticed">What you noticed</label><textarea class="in" id="ns-noticed" disabled={live} aria-describedby={live ? "ns-notes-why" : undefined}>{D.noticed ?? ""}</textarea></div>
           <div><label class="lbl" for="ns-next">The next step</label><textarea class="in" id="ns-next" disabled={live} aria-describedby={live ? "ns-notes-why" : undefined}>{D.next ?? ""}</textarea></div>
           <Grid cols={2} gap={4}>
@@ -95,7 +97,7 @@
               <p class="small field-help" id="ns-again-help">Starts a new review in this project, so you can compare over time.</p>
             </Stack>
           </Grid>
-          <p class="small">{live ? "Nothing typed here is saved yet." : "Everyone with access to this review can read these notes."}</p>
+          <p class="small">Everyone with access to this review can read these notes.</p>{/if}
         </div>
         <Stack gap={4}>
           <Card gap={3} label="Recommended for this review">

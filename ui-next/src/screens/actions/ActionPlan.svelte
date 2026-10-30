@@ -34,15 +34,15 @@
   // no link, no QR and no PDF.
   let { phone = false, theme = "light", data = null, user = R0.user } = $props();
   const live = $derived(!!data);
-  const D = $derived(data ? { doc: data.doc, meta: data.meta, talk: data.talk, noticed: "", next: "", facts: [["Built on", data.review.builtOn || "—"], ["Responses", String(data.review.responses)], ["Agreed by", "—"]], share: null, foot: data.foot, phone: { crumb: `${data.review.title} · ${data.stage === "reviewed" ? "improve" : "understand"}`, meta: `${data.review.project} · ${data.talk.length} item${data.talk.length === 1 ? "" : "s"} · from the built report`, items: data.talk.map(([t, apart]) => [t, apart]) } } : D0);
+  const D = $derived(data ? { doc: data.doc, meta: data.meta, talk: data.talk, noticed: data.noticed ?? "", next: data.next ?? "", facts: [["Built on", data.review.builtOn || "—"], ["Responses", String(data.review.responses)], ["Agreed by", "—"]], share: null, foot: data.foot, phone: { crumb: `${data.review.title} · ${data.stage === "reviewed" ? "improve" : "understand"}`, meta: `${data.review.project} · ${data.talk.length} item${data.talk.length === 1 ? "" : "s"} · from the built report`, items: data.talk.map(([t, apart]) => [t, apart]) } } : D0);
   let emailOpen = $state(false);
   const R = $derived(data ? { ...R0, user, review: { title: data.review.title } } : R0);
   const at = $derived(carry(phone, theme));
   // "Print" prints this page through the browser, as the current UI's print buttons do (ui/stage-screens.js doc.defaultView.print()).
   const printPage = () => globalThis.print?.();
   let refused = $state(false);
-  const emailBody = $derived([`Next steps: ${R.review.title}`, D.meta, "What we will talk about", ...D.talk.map(([topic, detail], i) => `${i + 1}. ${topic}${detail ? ` — ${detail}` : ""}`), ...(live ? ["These discussion items come from the built report. Agreed actions and notes have not been recorded in this app."] : [`What we noticed: ${D.noticed}`, `The next step: ${D.next}`])].filter(Boolean).join("\n\n"));
-  const NO_NOTES = "Not recorded: notes are not saved in this app yet (no plan store in the API).";
+  const emailBody = $derived([`Next steps: ${R.review.title}`, D.meta, "What we will talk about", ...D.talk.map(([topic, detail], i) => `${i + 1}. ${topic}${detail ? ` — ${detail}` : ""}`), `What we noticed: ${D.noticed}`, `The next step: ${D.next}`].filter(Boolean).join("\n\n"));
+  const NO_NOTES = "No notes recorded yet.";
   const NO_SHARE = "A read-only link to the plan is not available yet: the API has no plan share link. Print this page instead.";
 </script>
 
@@ -62,6 +62,7 @@
         <Row gap={3}><span class="num h2">{i + 1}</span><Stack gap={1}><b>{t}</b><span class="small">{owner}</span></Stack></Row>
       {/each}
     </Card>
+    {#if live}<Card gap={2} label="Saved notes"><b>What we noticed</b><p class="small">{D.noticed || NO_NOTES}</p><b>The next step</b><p class="small">{D.next || NO_NOTES}</p></Card>{/if}
     <Card gap={2} label="Share">
       <span class="micro">Share</span>
       {#if D.share}<p class="small">Read-only link, expires in 90 days.</p>

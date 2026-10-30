@@ -27,6 +27,8 @@
   import Landing from "../screens/Landing.svelte";
   import Home from "../screens/Home.svelte";
   import SignInLive from "./SignInLive.svelte";
+  import { savePlan } from "./plan.js";
+  import Projects from "./Projects.svelte";
   import ProjectSettings from "./ProjectSettings.svelte";
   import { loadProjectSettings } from "./project-settings.js";
   import Status from "./Status.svelte";
@@ -100,6 +102,7 @@
     if (name === "setup5" && reviewQ) return { screen: "setup5", data: await D.setupModel(reviewQ), readOnly: true };
     // Steps 1–4 edit the review through the existing contracts (app/setup.js, wizard.js order); a bare #setup starts a new review.
     if (["setup", "setup1", "setup2", "setup3", "setup4"].includes(name)) { suSt = await SU.openSetup(reviewQ || null, { pid: route.query.get("project") || liveContext()?.pid || "" }); suError = ""; bump(); const screen = name === "setup" ? "setup1" : name; if (suSt.stage !== "prepare" && screen !== "setup1") return { redirect: to("review", { aid: suSt.aid }) }; /* a launched review edits details and dates only (step 3 could archive a live survey with responses) */ return { screen, step: Number(screen.slice(-1)) }; }
+    if (name === "projects") return { screen: "projects", projects: await D.projects() };
     if (name === "workspaces") return { screen: "home", home: await D.homeModel(me), assessment: null };
     if (name === "setup5") return { redirect: to("home") }; // a review's own page is its Setup 5 while preparing (name === "review")
     // People and workspaces read the live stores (app/data.js): a workspace's grouped projects, a scope's roster (members and owners
@@ -285,7 +288,7 @@
     finally { building = false; }
   }
   async function launch() { const aid = route.params.aid ?? route.query.get("review"); try { await D.setStage(aid, "collect"); SU.forget(aid); go(to("collect", { aid })); } catch (e) { page = { status: "error", key: route.name, data: null, error: { kind: classify(e), message: e?.message || "The survey could not be launched." } }; } }
-  async function completeReview() { const aid = route.params.aid; try { await D.setStage(aid, "improve"); go(to("home")); } catch (e) { page = { status: "error", key: route.name, data: null, error: { kind: classify(e), message: e?.message || "The review could not be marked complete." } }; } }
+  async function completeReview() { const aid = route.params.aid; await D.setStage(aid, "improve"); const read = await D.assessment(aid); if (read.assessment?.stage !== "improve") throw new Error("Completion could not be verified. Reopen this review before retrying."); go(to("home")); }
   async function reopenCollection() { const aid = route.params.aid; try { await D.setStage(aid, "collect"); go(to("share", { aid })); } catch (e) { page = { status: "error", key: route.name, data: null, error: { kind: classify(e), message: e?.message || "Collection could not be reopened." } }; } }
   // People actions (app/data.js: the same routes the current UI's permissions page calls); each lands on a fresh read, or the shell's error.
   const peopleScope = () => page.data?.data?.scope;
@@ -410,10 +413,12 @@
     <Status {phone} {theme} kind="not_built" message={`No report has been built for ${m.review.title} yet, so there is nothing to plan from. ${m.canBuild ? "Build it on Results first." : "An owner or member of the review builds it."}`} back={to("results", route.params)} backLabel="Go to Results" />
   {:else}
     {@const C = REGISTRY[page.data.screen]}
-    <C {phone} {theme} data={page.data.plan} user={{ first: who?.first ?? "", initials: who?.initials ?? "" }} workspace="Your workspace" oncomplete={m.serverStage === "understand" && m.canBuild ? completeReview : undefined} />
+    <C {phone} {theme} data={page.data.plan} user={{ first: who?.first ?? "", initials: who?.initials ?? "" }} workspace="Your workspace" onsave={!m.sample && m.canEditNotes ? (notes) => savePlan(m.aid, notes) : undefined} oncomplete={!m.sample && m.serverStage !== "improve" && m.canEditNotes ? completeReview : undefined} />
   {/if}
 {:else if page.data.screen === "home"}
   <Home {phone} {theme} data={page.data.home} state={phone ? "reviews" : page.data.state} />
+{:else if page.data.screen === "projects"}
+  <Projects {phone} {theme} projects={page.data.projects} />
 {:else if page.data.screen === "project-settings"}
   {#if page.data.project.id !== route.params.pid}<Status {phone} {theme} kind="loading" back={to("home")} />{:else}
     {#key page.data.project.id}<ProjectSettings {phone} {theme} project={page.data.project} />{/key}
