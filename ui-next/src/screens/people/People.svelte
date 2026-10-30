@@ -13,6 +13,7 @@
   export const SCOPES = Object.freeze(["review", "workspace"]);
 </script>
 <script>
+  import OwnershipTransfer from "../../app/OwnershipTransfer.svelte";
   import AppShell from "../../AppShell.svelte";
   import Page from "../../Page.svelte";
   import Card from "../../Card.svelte";
@@ -35,12 +36,12 @@
   // controls stay the board's): oninvite({ email, role }) sends an invitation (the confirmed dry-run → execute pair); onrole(row, role)
   // changes a grant's role the same way; onaction(name, row) does a row action the app performs for real — data.actions names them
   // (Remove, Withdraw); a board action without a route (Transfer ownership, Resend) is not offered on live data.
-  let { scope = "review", phone = false, theme = "light", data = fixture, oninvite, onaction, onrole } = $props();
+  let { scope = "review", phone = false, theme = "light", data = fixture, oninvite, onaction, onrole, ownershipMe, ontransferred, backHref } = $props();
   if (!SCOPES.includes(scope)) throw new TypeError(`People: unknown scope "${String(scope)}" (review | workspace)`);
   const review = scope === "review";
   const s = review ? data.review : data.workspace;
   const COLLECT = href("collect"), WORKSPACE = href("workspace"), HOME = href("home"), MENU = href("menu");
-  const back = review ? COLLECT : WORKSPACE;
+  const back = $derived(backHref ?? (review ? COLLECT : WORKSPACE));
   const roster = $derived(rosterRows(phone ? data.phone.roster : s.roster, { me: phone ? data.phone.me : s.me, can: s.can, roles: data.roles }));
   const options = $derived(inviteOptions(roster.myRole, phone ? data.phone.inviteLabels : data.inviteLabels));
   const MORE = [
@@ -113,13 +114,13 @@
           {/each}
         </nav>
       {:else}
-        <div><a class="link small" href={WORKSPACE}>{data.workspace.name}</a><h1 class="title-page">People</h1></div>
+        <div><a class="link small" href={back}>{data.workspace.name}</a><h1 class="title-page">People</h1></div>
       {/if}
       <div class="glass-hi l-card l-stack" data-pad="work" data-gap="5" role="group" aria-label={s.heading}>
         <div>
           <h2 class="h2 t-24">{s.heading}</h2>
           {#if review}<p class="small t-15">Access to <strong>{data.review.title}</strong>. People on the whole <strong>{data.review.project}</strong> project see it too.</p>
-          {:else}<p class="small t-15">Access to <strong>{data.workspace.name}</strong> and everything in it. Someone invited only to a project or a review does not appear here.</p>{/if}
+          {:else}<p class="small t-15">Access to <strong>{data.workspace.name}</strong> and everything in it. {data.scope?.type === "project" ? "Someone invited only to a review does not appear here." : "Someone invited only to a project or a review does not appear here."}</p>{/if}
         </div>
         <div class="solid l-card l-grid" data-pad="form" data-tpl="invite" data-gap="3" {@attach inviting}>
           <div><label class="lbl" for="pp-invite">Invite someone</label><input class="in" type="email" placeholder="name@example.org" id="pp-invite" /></div>
@@ -144,4 +145,5 @@
       <div class="l-row" data-justify="end"><Button label="Done" variant="quiet" href={back} trail={check} /></div>
     </Page>
   {/if}
+  {#if ownershipMe && data.scope}<OwnershipTransfer scope={data.scope} me={ownershipMe} grants={(data.review ?? data.workspace)?.roster?.grants ?? []} {ontransferred} />{/if}
 </AppShell>
