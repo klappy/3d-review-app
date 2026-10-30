@@ -31,6 +31,7 @@
   import { renameWorkspace, ungroupProject } from "./workspace-actions.js";
   import ReportHistory from "./ReportHistory.svelte";
   import AccessMode from "./AccessMode.svelte";
+  import EntityTools from "./EntityTools.svelte";
   import Workspaces from "./Workspaces.svelte";
   import Projects from "./Projects.svelte";
   import ProjectSettings from "./ProjectSettings.svelte";
@@ -118,6 +119,8 @@
     if (name === "people") { if (!reviewQ) return { screen: name, empty: true, emptyText: "Open People from a review's page: this page lists who has access to one review." }; return { screen: name, data: await D.peopleModel({ type: "assessment", id: reviewQ }, me) }; }
     if (name === "invitations") return { screen: name, data: await D.invitationsModel(me) };
     if (name === "project") return { screen: "project", data: await D.projectModel(params.pid) };
+    if (name === "project-tools") return { screen: name, entity: await D.project(params.pid) };
+    if (name === "review-tools") return { screen: name, entity: (await D.assessment(params.aid)).assessment };
     if (name === "project-settings") return { screen: name, project: await loadProjectSettings(params.pid) };
     // A review's own page is the board for its stage: Setup 5 (ready to launch) while preparing, Collect while collecting, Results after.
     if (name === "review") { const { assessment } = await D.assessment(params.aid); if (assessment.stage === "collect") return { redirect: to("collect", params) }; if (assessment.stage !== "prepare") return { redirect: to("results", params) }; return { screen: "setup5", data: await D.setupModel(params.aid) }; }
@@ -294,7 +297,19 @@
     finally { building = false; }
   }
   async function launch() { const aid = route.params.aid ?? route.query.get("review"); try { await D.setStage(aid, "collect"); SU.forget(aid); go(to("collect", { aid })); } catch (e) { page = { status: "error", key: route.name, data: null, error: { kind: classify(e), message: e?.message || "The survey could not be launched." } }; } }
-  async function completeReview() { await completePlan(route.params.aid); await load(); }
+  function planActionsFor(m) {
+    if (m.sample || !m.canEditNotes) return {};
+    const aid = m.aid, generation = seq, credential = token(), principal = session?.principal?.id;
+    const current = () => generation === seq && route.params.aid === aid && credential === token() && principal === session?.principal?.id;
+    const request = async (url, options) => {
+      if (!current()) throw new Error("The review or sign-in changed. Reopen the original review to check its saved notes.");
+      return api(url, options);
+    };
+    return {
+      save: notes => savePlan(aid, notes, request),
+      complete: async () => { if (!current()) return; await completePlan(aid, request); if (current()) await load(); },
+    };
+  }
   async function reopenCollection() { const aid = route.params.aid; try { await D.setStage(aid, "collect"); go(to("share", { aid })); } catch (e) { page = { status: "error", key: route.name, data: null, error: { kind: classify(e), message: e?.message || "Collection could not be reopened." } }; } }
   // People actions (app/data.js: the same routes the current UI's permissions page calls); each lands on a fresh read, or the shell's error.
   const peopleScope = () => page.data?.data?.scope;
@@ -422,12 +437,15 @@
     <Status {phone} {theme} kind="not_built" message={`No report has been built for ${m.review.title} yet, so there is nothing to plan from. ${m.canBuild ? "Build it on Results first." : "An owner or member of the review builds it."}`} back={to("results", route.params)} backLabel="Go to Results" />
   {:else}
     {@const C = REGISTRY[page.data.screen]}
-    <C {phone} {theme} data={page.data.plan} user={{ first: who?.first ?? "", initials: who?.initials ?? "" }} workspace="Your workspace" onsave={!m.sample && m.canEditNotes ? (notes) => savePlan(m.aid, notes) : undefined} oncomplete={!m.sample && m.canEditNotes ? completeReview : undefined} />
+    {@const planActions = planActionsFor(m)}
+    <C {phone} {theme} data={page.data.plan} user={{ first: who?.first ?? "", initials: who?.initials ?? "" }} workspace="Your workspace" onsave={planActions.save} oncomplete={planActions.complete} />
   {/if}
 {:else if page.data.screen === "home"}
   <Home {phone} {theme} data={page.data.home} state={phone ? "reviews" : page.data.state} />
+{:else if page.data.screen === "project-tools" || page.data.screen === "review-tools"}
+  {#key page.data.entity.id}<EntityTools {phone} {theme} type={page.data.screen === "review-tools" ? "assessment" : "project"} entity={page.data.entity} />{/key}
 {:else if page.data.screen === "workspaces"}
-  <Workspaces {phone} {theme} workspaces={page.data.workspaces} />
+  <Workspaces {phone} {theme} workspaces={page.data.workspaces} canCreate={session?.principal?.kind === "user" && session?.principal?.provisioned === true} />
 {:else if page.data.screen === "projects"}
   <Projects {phone} {theme} projects={page.data.projects} />
 {:else if page.data.screen === "project-settings"}

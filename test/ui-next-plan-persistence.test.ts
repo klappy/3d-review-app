@@ -56,3 +56,25 @@ it('stage failure never writes the complete marker', async () => {
   })).rejects.toThrow('unknown');
   expect(writes).toEqual([{stage: 'improve'}]);
 });
+it('completion preserves notes and metadata saved while stage advancement is pending', async () => {
+  let stored: any = { stage: 'understand', notes_reflection: 'original', notes_next_steps: 'original plan' };
+  const request = async (url, init) => {
+    if (url.endsWith('/stage')) stored = { ...stored, stage: 'improve', notes_reflection: 'colleague saved during stage', notes_next_steps: 'colleague plan\n\n[Other] Added during stage' };
+    else if (init) stored = { ...stored, ...init.body };
+    return { assessment: { ...stored } };
+  };
+  const saved = await completePlan('a', request);
+  expect(saved.notes_reflection).toBe('colleague saved during stage');
+  expect(saved.notes_next_steps).toContain('colleague plan');
+  expect(saved.notes_next_steps).toContain('[Other] Added during stage');
+  expect(saved.notes_next_steps).toContain('[This review is complete.]');
+});
+it('destroying an editor during its pending save never invokes completion', async () => {
+  let release!: () => void;
+  const complete = vi.fn();
+  const pending = new Promise<void>(resolve => { release = resolve; });
+  const v = render(Editor, { notes: {}, onsave: () => pending, oncomplete: complete });
+  await fireEvent.click(v.getByText('Save and complete the review'));
+  v.unmount(); release(); await pending; await Promise.resolve();
+  expect(complete).not.toHaveBeenCalled();
+});

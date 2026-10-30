@@ -1,17 +1,22 @@
 <script>
+  import { onDestroy } from 'svelte';
   import Stack from '../Stack.svelte';
   import Row from '../Row.svelte';
   let { notes = {}, suggestions = [], completed = false, onsave, oncomplete } = $props();
   let reflection = $state(notes.notes_reflection ?? '');
   let next = $state(notes.notes_next_steps ?? '');
   let busy = $state(false), status = $state(''), failed = $state(false);
+  let alive = true;
+  onDestroy(() => { alive = false; });
   async function save(complete = false) {
     if (busy || !onsave) return;
     busy = true; failed = false; status = 'Saving…';
     try {
-      await onsave({ notes_reflection: reflection, notes_next_steps: next });
+      const saveNotes = onsave, finish = oncomplete;
+      await saveNotes({ notes_reflection: reflection, notes_next_steps: next });
+      if (!alive) return;
       status = 'Saved and verified';
-      if (complete && oncomplete) await oncomplete();
+      if (complete && finish) await finish();
     } catch (e) { failed = true; status = e?.message || 'The save could not be confirmed. Your text is still here.'; }
     finally { busy = false; }
   }
