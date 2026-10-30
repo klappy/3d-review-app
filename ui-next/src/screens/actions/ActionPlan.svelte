@@ -34,14 +34,14 @@
   // no link, no QR and no PDF.
   let { phone = false, theme = "light", data = null, user = R0.user } = $props();
   const live = $derived(!!data);
-  const D = $derived(data ? { doc: data.doc, meta: data.meta, talk: data.talk, noticed: data.noticed ?? "", next: data.next ?? "", facts: [["Built on", data.review.builtOn || "—"], ["Responses", String(data.review.responses)], ["Agreed by", "—"]], share: null, foot: data.foot, phone: { crumb: `${data.review.title} · ${data.stage === "reviewed" ? "improve" : "understand"}`, meta: `${data.review.project} · ${data.talk.length} item${data.talk.length === 1 ? "" : "s"} · from the built report`, items: data.talk.map(([t, apart]) => [t, apart]) } } : D0);
+  const D = $derived(data ? { doc: data.doc, meta: data.meta, talk: data.talk, noticed: data.noticed ?? "", next: data.next ?? "", facts: [["Built on", data.review.builtOn || "—"], ["Responses", String(data.review.responses)], ["Agreed by", "—"]], share: data.share ?? null, foot: data.foot, phone: { crumb: `${data.review.title} · ${data.stage === "reviewed" ? "improve" : "understand"}`, meta: `${data.review.project} · ${data.talk.length} item${data.talk.length === 1 ? "" : "s"} · from the built report`, items: data.talk.map(([t, apart]) => [t, apart]) } } : D0);
   let emailOpen = $state(false);
   const R = $derived(data ? { ...R0, user, review: { title: data.review.title } } : R0);
   const at = $derived(carry(phone, theme));
   // "Print" prints this page through the browser, as the current UI's print buttons do (ui/stage-screens.js doc.defaultView.print()).
   const printPage = () => globalThis.print?.();
   let refused = $state(false);
-  const emailBody = $derived([`Next steps: ${R.review.title}`, D.meta, "What we will talk about", ...D.talk.map(([topic, detail], i) => `${i + 1}. ${topic}${detail ? ` — ${detail}` : ""}`), `What we noticed: ${D.noticed}`, `The next step: ${D.next}`].filter(Boolean).join("\n\n"));
+  const emailBody = $derived([`Next steps: ${R.review.title}`, D.meta, "What we will talk about", ...D.talk.map(([topic, detail], i) => `${i + 1}. ${topic}${detail ? ` — ${detail}` : ""}`), `What we noticed: ${D.noticed}`, `The next step: ${D.next}`, ...(D.share?.authenticated ? [`Plan link (existing review access required): ${D.share.url}`] : [])].filter(Boolean).join("\n\n"));
   const NO_NOTES = "No notes recorded yet.";
   const NO_SHARE = "A read-only link to the plan is not available yet: the API has no plan share link. Print this page instead.";
 </script>
@@ -65,7 +65,7 @@
     {#if live}<Card gap={2} label="Saved notes"><b>What we noticed</b><p class="small">{D.noticed || NO_NOTES}</p><b>The next step</b><p class="small">{D.next || NO_NOTES}</p></Card>{/if}
     <Card gap={2} label="Share">
       <span class="micro">Share</span>
-      {#if D.share}<p class="small">Read-only link, expires in 90 days.</p>
+      {#if D.share}<p class="small">{D.share.authenticated ? "Only people with access to this review can open this link. It shows the current saved notes." : "Read-only link, expires in 90 days."}</p>
       <Row wrap gap={2}><CopyButton text={D.share.url} label="Copy link" block bind:failed={refused} /><EmailDraft {phone} bind:opened={emailOpen} subject={`Next steps: ${R.review.title}`} body={emailBody} label="Email it" /></Row>
       {#if refused}<input class="in small" readonly value={D.share.url} aria-label="Link to this plan" />{/if}
       {:else}<p class="small">{NO_SHARE}</p><Row wrap gap={2}><EmailDraft {phone} bind:opened={emailOpen} subject={`Next steps: ${R.review.title}`} body={emailBody} label="Email it" /></Row>{/if}

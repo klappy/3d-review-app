@@ -54,5 +54,7 @@
         <a class="btn" href={back}>Cancel</a>
       </div>
     </form>
+    {#if current.languages}<section aria-label="Project languages"><h2 class="h3">Project languages</h2>{#each current.languages as language}<p class="small">{language.name}{language.code ? ` · ${language.code}` : ""}</p>{/each}{#if !current.languages.length}<p class="small">No language has been added yet. Add one while setting up a review.</p>{/if}</section>{/if}
   </Page>
+  {#if !sample}<a class="link" href={to("project-tools", { pid: current.id })}>Archive or delete this project</a>{/if}
 </AppShell>

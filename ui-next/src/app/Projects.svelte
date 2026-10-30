@@ -7,7 +7,7 @@
   import PhoneHeader from '../PhoneHeader.svelte';
   import { to } from './router.js';
   import { api, enc } from './api.js';
-  let { phone = false, theme = 'light', projects = [] } = $props();
+  let { phone = false, theme = 'light', projects = [], returnToSetup = false } = $props();
   let search = $state(''), view = $state('Active'), creating = $state(false), name = $state(''), organization = $state(''), busy = $state(false), error = $state(''), uncertain = $state(false);
   const shown = $derived(projects.filter(p => (view === 'All' || (view === 'Archived' ? !!p.archived_at : !p.archived_at)) && `${p.name} ${p.organization ?? ''}`.toLowerCase().includes(search.trim().toLowerCase())));
   async function create(event) {
@@ -18,7 +18,7 @@
       if (!result.project?.id) throw new Error('Project creation could not be confirmed.');
       const read = await api(`/v2/projects/${enc(result.project.id)}`);
       if (read.project?.name !== name.trim()) throw new Error('The new project could not be verified.');
-      location.hash = to('project', { pid: read.project.id });
+      location.hash = returnToSetup ? to('setup1', {}, { project: read.project.id }) : to('project', { pid: read.project.id });
     } catch (e) { error = `${e.message || 'Project creation failed.'} Reload the project list before trying again.`; uncertain = true; }
     finally { busy = false; }
   }

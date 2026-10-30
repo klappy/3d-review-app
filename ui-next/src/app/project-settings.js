@@ -2,9 +2,9 @@
 import { api, enc } from "./api.js";
 
 export async function loadProjectSettings(id, request = api) {
-  const { project } = await request(`/v2/projects/${enc(id)}`);
+  const { project, languages } = await request(`/v2/projects/${enc(id)}`);
   if (!project || project.id !== id) throw new Error("The requested project could not be read.");
-  return project;
+  return { ...project, languages: languages ?? [] };
 }
 
 export async function saveProjectSettings(project, fields, request = api) {

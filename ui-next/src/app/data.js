@@ -512,6 +512,7 @@ export function nextStepModel(m) {
   return {
     review: m.review, complete: m.complete === true, stage, gaps, weak, glance, talk, notes: m.notes, noticed: m.notes?.notes_reflection ?? "", next: m.notes?.notes_next_steps ?? "", recs: [], recsNote: RECS_UNAVAILABLE, notesNote: "Notes are saved on this review. Automated recommendations are not available.",
     phone: { title: m.review.title, stage, lead: gaps.length ? "Where the perspectives pull apart, from the built report." : "The built report shows no area two perspectives both scored.", items: gaps.map((g) => ({ kind: "Tension", title: g.area, text: `${g.dots.map((d) => `${NAME[d.lens]} ${LEVEL_WORD[d.level]}`).join(" · ")} — ${g.apart}.`, inPlan: false })) },
+    share: !m.sample ? { url: `${globalThis.location?.origin ?? ""}/next/${to("action-plan", { aid: m.aid }, m.reportId ? { report: m.reportId } : {})}`, authenticated: true } : null,
     doc: `Next steps · 1 page · ${m.review.title}`,
     meta: [m.review.project, m.review.language, "3D Review next steps", m.review.closed ? `closed ${m.review.closed}` : "", `${m.review.responses} response${m.review.responses === 1 ? "" : "s"}`].filter(Boolean).join(" · "),
     foot: `Built from ${m.review.responses} response${m.review.responses === 1 ? "" : "s"}${m.review.builtOn ? ` on ${m.review.builtOn}` : ""} · levels are bands, not scores · ${footPrivacy()}`,
@@ -676,5 +677,5 @@ export async function exploreModel(me) {
     updated: ago(a.updated_at || a.created_at), href: to(a.stage === "prepare" ? "review" : a.stage === "collect" ? "collect" : "results", { aid: a.id }),
   })));
   const phone = rows.map((r) => ({ title: r.title, href: r.href, meta: [r.project, monthOf(home.rows.find((x) => x.a.id === r.id)?.a.created_at)].filter(Boolean).join(" · "), team: r.lenses?.team ?? null, lenses: r.lenses ?? null }));
-  return { levelMinimum, projects: home.projects, user: home.user, workspace: home.workspace, visible: rows.length, filters: [], groupBy: { options: ["None"], selected: "None" }, addFilter: [], reviews: rows, phone: { chips: [], rows: phone, sheet: [] } };
+  return { viewKey: me?.principal?.id ? `${me.principal.id}:${me.principal.access_mode || "my"}` : null, levelMinimum, projects: home.projects, user: home.user, workspace: home.workspace, visible: rows.length, filters: [], groupBy: { options: ["None"], selected: "None" }, addFilter: [], reviews: rows, phone: { chips: [], rows: phone, sheet: [] } };
 }

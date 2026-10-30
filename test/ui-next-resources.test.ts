@@ -63,7 +63,7 @@ for (const phone of [false, true]) {
     expect(resource.href).toBe('https://example.org/supplied-guide'); expect(resource.target).toBe('_blank');
     const links = [...container.querySelectorAll('a')].map(a => a.getAttribute('href'));
     expect(links).toContain(`#/project/${pid}`);
-    expect(links).toContain(`#/review/${aid}/results`);
+    expect(links.some(href => href?.startsWith(`#/review/${aid}/results?report=`))).toBe(true);
     expect(calls.some(c => c.startsWith('POST'))).toBe(false);
   });
 }

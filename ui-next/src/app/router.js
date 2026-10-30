@@ -10,6 +10,7 @@
 // params, so the seven lanes' hand-written anchors keep working as normal links.
 export const ROUTES = Object.freeze([
   ["home", "/"],
+  ["account", "/account"],
   ["landing", "/welcome"],
   ["about", "/about"],
   ["sign-in", "/signin"],
@@ -32,6 +33,8 @@ export const ROUTES = Object.freeze([
   ["setup5", "/setup/5"],
   ["project", "/project/:pid"],
   ["project-settings", "/project/:pid/settings"],
+  ["project-tools", "/project/:pid/manage"],
+  ["review-tools", "/review/:aid/manage"],
   ["review", "/review/:aid"],
   ["collect", "/review/:aid/collect"],
   ["qr-room", "/review/:aid/collect/qr"],

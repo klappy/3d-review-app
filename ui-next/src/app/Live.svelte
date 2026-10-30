@@ -28,9 +28,12 @@
   import Home from "../screens/Home.svelte";
   import SignInLive from "./SignInLive.svelte";
   import { savePlan, completePlan } from "./plan.js";
-  import { renameWorkspace, ungroupProject } from "./workspace-actions.js";
+  import { renameWorkspace, ungroupProject, undoWorkspaceRename } from "./workspace-actions.js";
   import ReportHistory from "./ReportHistory.svelte";
   import AccessMode from "./AccessMode.svelte";
+  import { capturePrivateInvitation, revokeWithConfirmation } from "./invitation-actions.js";
+  import AccountSettings from "./AccountSettings.svelte";
+  import { loadAccountSettings, shouldAskName } from "./account-settings.js";
   import EntityTools from "./EntityTools.svelte";
   import Workspaces from "./Workspaces.svelte";
   import Projects from "./Projects.svelte";
@@ -47,6 +50,7 @@
   import NotBuilt from "./NotBuilt.svelte";
   import { buildConfirmText } from "../../../ui/assess/report-build.js";
 
+  capturePrivateInvitation();
   let hash = $state(globalThis.location?.hash ?? "");
   let phone = $state(typeof matchMedia === "function" ? matchMedia(PHONE_QUERY).matches : false);
   const route = $derived(parse(hash));
@@ -59,12 +63,13 @@
   let page = $state({ status: "loading", key: "", data: null, error: null });
   let pstate = $state(P.snapshot()); // participant journey snapshot
   let seq = 0;
+  let workspaceUndo = $state(null);
   let sessionCredential = token();
   const go = (h) => { if (globalThis.location.hash !== h) globalThis.location.hash = h; else load(); };
   const replace = (h) => { history.replaceState(null, "", globalThis.location.pathname + globalThis.location.search + h); hash = h; };
 
   onMount(() => {
-    const onHash = () => { hash = globalThis.location.hash; };
+    const onHash = () => { capturePrivateInvitation(); hash = globalThis.location.hash; };
     globalThis.addEventListener("hashchange", onHash);
     const mq = typeof matchMedia === "function" ? matchMedia(PHONE_QUERY) : null;
     const onMq = () => { phone = mq.matches; };
@@ -106,7 +111,7 @@
     const reviewQ = route.query.get("review");
     if (name === "setup5" && reviewQ) return { screen: "setup5", data: await D.setupModel(reviewQ), readOnly: true };
     // Steps 1–4 edit the review through the existing contracts (app/setup.js, wizard.js order); a bare #setup starts a new review.
-    if (["setup", "setup1", "setup2", "setup3", "setup4"].includes(name)) { if (reviewQ) { const { assessment: a } = await D.assessment(reviewQ); if (a.role === "viewer") return { screen: "setup5", data: await D.setupModel(reviewQ), readOnly: true }; } suSt = await SU.openSetup(reviewQ || null, { pid: route.query.get("project") || liveContext()?.pid || "" }); suError = ""; bump(); const screen = name === "setup" ? "setup1" : name; if (suSt.stage !== "prepare" && screen !== "setup1") return { redirect: to("review", { aid: suSt.aid }) }; /* a launched review edits details and dates only (step 3 could archive a live survey with responses) */ return { screen, step: Number(screen.slice(-1)) }; }
+    if (["setup", "setup1", "setup2", "setup3", "setup4"].includes(name)) { if (reviewQ) { const { assessment: a } = await D.assessment(reviewQ); if (a.role === "viewer") return { screen: "setup5", data: await D.setupModel(reviewQ), readOnly: true }; } suSt = await SU.openSetup(reviewQ || null, { pid: route.query.get("project") || liveContext()?.pid || "" }); suError = ""; bump(); const screen = name === "setup" ? "setup1" : name;  /* a launched review edits details and dates only (step 3 could archive a live survey with responses) */ return { screen, step: Number(screen.slice(-1)) }; }
     if (name === "projects") return { screen: "projects", projects: await D.projects() };
     if (name === "workspaces") return { screen: "workspaces", workspaces: await D.workspaces() };
     if (name === "setup5") return { redirect: to("home") }; // a review's own page is its Setup 5 while preparing (name === "review")
@@ -117,8 +122,9 @@
     if (name === "people-workspace") return { screen: name, data: await D.peopleModel({ type: "workspace", id: params.wid }, me) };
     if (name === "people" && r.query.get("project")) return { screen: name, projectScope: true, data: await D.peopleModel({ type: "project", id: r.query.get("project") }, me) };
     if (name === "people") { if (!reviewQ) return { screen: name, empty: true, emptyText: "Open People from a review's page: this page lists who has access to one review." }; return { screen: name, data: await D.peopleModel({ type: "assessment", id: reviewQ }, me) }; }
-    if (name === "invitations") return { screen: name, data: await D.invitationsModel(me) };
+    if (name === "invitations") return { screen: name, data: await D.invitationsModel(me), privateInvitation: r.query.get("private") === "1" };
     if (name === "project") return { screen: "project", data: await D.projectModel(params.pid) };
+    if (name === "account") return { screen: name, principal: await loadAccountSettings(me.principal.id), view: r.query.get("view") || "name" };
     if (name === "project-tools") return { screen: name, entity: await D.project(params.pid) };
     if (name === "review-tools") return { screen: name, entity: (await D.assessment(params.aid)).assessment };
     if (name === "project-settings") return { screen: name, project: await loadProjectSettings(params.pid) };
@@ -179,6 +185,7 @@
     const my = ++seq;
     const r = route;
     const credential = token();
+    if (workspaceUndo && (workspaceUndo.workspaceId !== r.params.wid || credential !== sessionCredential)) workspaceUndo = null;
     if (credential !== sessionCredential) { S.forget(); sessionCredential = credential; }
     // Clear the old route before changing its context. Pending UI never borrows another review's body or account chrome,
     // even for fast reads; the skeleton keeps neutral navigation until this load resolves the current session.
@@ -268,7 +275,7 @@
   async function signOut() { try { await S.signOut(); D.clearLinks(); SU.forgetAll(); session = null; go(to("landing")); } catch (e) { page = { status: "error", key: route.name, data: null, error: { kind: classify(e), message: `You are still signed in: ${e?.message || "the sign-out was not confirmed"}. Try again.` } }; } }
   const accountItems = $derived(session ? [
     { kind: "head", label: session.principal?.display_name || "Signed in", sub: session.principal?.id ? "Facilitator" : "" }, { kind: "hr" },
-    { label: "Help and FAQ", href: to("help") }, { label: "Why 3D Review exists", href: to("about") }, { label: "Send app feedback", href: to("feedback", {}, { from: route.name, review: page.data?.data?.review?.title ?? page.data?.results?.review?.title ?? "" }) },
+    { label: "Account settings", href: to("account") }, { label: "Version and changes", href: to("account", {}, { view: "release" }) }, { label: "Roadmap", href: to("account", {}, { view: "roadmap" }) }, { label: "Use another account", href: to("account", {}, { view: "switch" }) }, { label: "Help and FAQ", href: to("help") }, { label: "Why 3D Review exists", href: to("about") }, { label: "Send app feedback", href: to("feedback", {}, { from: route.name, review: page.data?.data?.review?.title ?? page.data?.results?.review?.title ?? "" }) },
     { label: "Public website home", href: to("landing") }, { kind: "theme" }, { label: "Projects", href: to("projects") }, { label: "Current design", href: legacyHref(route, liveContext()) }, { kind: "hr" }, { label: "Sign out", onclick: signOut },
   ] : []);
   function onSignedIn() { D.clearLinks(); SU.forgetAll(); S.forget(); session = undefined; const next = page.data?.next; go(next && next !== "#/signin" ? next : to("home")); }
@@ -322,17 +329,18 @@
     const out = await D.inviteWithConfirm(scope, { email, role }, (text) => !!globalThis.confirm?.(text), sheetSentence({ kind: "invite", params: { email, role } }, scope?.type));
     if (!out.sent) throw new Error("not confirmed; no invitation was sent");
   });
-  const rowAction = (name, row) => act(name === "Withdraw" ? "Invitation not withdrawn" : "Access not removed", () => (row.pending ? D.revokeInvitation(row.key) : D.revokeGrant(peopleScope(), row.key)));
+  const rowAction = (name, row) => act(name === "Withdraw" ? "Invitation not withdrawn" : "Access not removed", () => revokeWithConfirmation(peopleScope(), row));
   // A role change is a danger twin: the dry run's impact is shown and the person confirms before execute (an owner elevation cannot be
   // undone here; a downgrade can revoke the person's outstanding invitations). Codex P1 on 26a86937.
   const changeRole = (row, role) => act("Role not changed", async () => {
-    const p = await D.previewRole(peopleScope(), row.key, role);
+    const scope = peopleScope();
+    const p = await D.previewRole(scope, row.key, role);
     if (p?.suppressed === true || p?.status === "held") throw new Error("the server held the change");
     if (typeof p?.confirm_token !== "string") throw new Error("the preview could not be read");
     const impact = Array.isArray(p.impact?.affected) ? p.impact.affected.map((a) => a.will_see || a.summary || "").filter(Boolean).join(" ") : "";
     const ok = globalThis.confirm?.(`Change ${row.name || "this person"} to ${role}? ${impact}${p.impact?.irreversible ? " This cannot be undone here." : ""}`.trim());
     if (!ok) throw new Error("not confirmed; nothing changed");
-    await D.executeRole(peopleScope(), row.key, role, p.confirm_token);
+    await D.executeRole(scope, row.key, role, p.confirm_token);
   });
   const acceptInvite = (id) => act("Invitation not accepted", () => D.acceptInvitation(id));
   const groupProject = (pid) => act("Project not added", async () => { await D.addProject(route.params.wid, pid); go(to("workspace", { wid: route.params.wid })); });
@@ -345,7 +353,7 @@
   const bump = () => { suRev++; };
   const suView = $derived.by(() => { void suRev; const st = suSt; if (!st || page.status !== "ready" || !SETUP.has(page.data?.screen ?? "")) return null; return { details: SU.detailsView(st, phone), passage: SU.passageView(st), groups: SU.groupsOf(st, phone), context: SU.contextView(st), status: suBusy ? "Saving…" : st.aid ? "Draft saved" : "" }; });
   const fail = (e, fallback) => { if (classify(e) === "unauthenticated") { S.forget(); page = { status: "ready", key: route.name, data: { screen: "sign-in", next: hash }, error: null }; return; } suError = e?.message || fallback; };
-  async function suAct(fn, then, fallback = "The change could not be saved.") { if (suBusy) return; suBusy = true; suError = ""; bump(); try { await fn(); suBusy = false; bump(); then?.(); } catch (e) { suBusy = false; fail(e, fallback); bump(); } }
+  async function suAct(fn, then, fallback = "The change could not be saved.") { if (suBusy) return; const generation = seq, credential = token(), state = suSt; const current = () => generation === seq && credential === token() && state === suSt; suBusy = true; suError = ""; bump(); try { const result = await fn(); if (!current()) return; suBusy = false; bump(); then?.(result); } catch (e) { if (!current()) return; suBusy = false; fail(e, fallback); bump(); } finally { if (!current()) suBusy = false; } }
   const suNext = (n) => go(to(`setup${n}`, {}, { review: suSt.aid }));
   function suField(k, v) {
     const d = suSt.draft;
@@ -360,12 +368,13 @@
     onadd: () => suAct(() => SU.addLanguage(suSt, suSt.draft.languageQuery), undefined, "The language could not be added."),
   };
   const suStep = {
-    1: () => { const errs = SU.validateDetails(suSt.draft); if (errs.length) { suError = errs.join(" "); bump(); return; } suAct(() => SU.saveDetails(suSt), () => (suSt.stage !== "prepare" ? go(to("review", { aid: suSt.aid })) : suNext(2)), "The review could not be saved."); },
+    1: () => { const errs = SU.validateDetails(suSt.draft); if (errs.length) { suError = errs.join(" "); bump(); return; } suAct(() => SU.saveDetails(suSt), () => suNext(2), "The review could not be saved."); },
     2: () => { if (!suSt.draft.purpose.trim()) { suError = "Name what people will respond to first."; bump(); return; } suAct(() => SU.savePassage(suSt), () => suNext(3)); },
-    3: () => { const errs = SU.validateGroups(suSt.draft); if (errs.length) { suError = errs.join(" "); bump(); return; } suAct(() => SU.saveGroups(suSt), () => suNext(4), "The surveys could not be updated."); },
+    3: () => { const errs = SU.validateGroups(suSt.draft); if (errs.length) { suError = errs.join(" "); bump(); return; } suAct(() => SU.saveGroups(suSt, { confirmRemoval: rows => !!globalThis.confirm?.(`Remove these surveys from this review: ${rows.map(x => x.name || x.template).join(", ")}? Collection closes for them. Existing responses, codes and invitations are preserved by the server.`) }), result => { if (result.saved) suNext(4); }, "The surveys could not be updated."); },
     4: () => suAct(() => SU.saveContext(suSt), () => go(to("setup5", {}, { review: suSt.aid })), "The surveys could not be added."),
   };
   const suPassage = {
+    onattach: body => suAct(() => SU.addPassage(suSt, body), undefined, "The reference could not be saved."),
     onfile: (f) => suAct(() => SU.addPassageFile(suSt, f), undefined, "The file could not be uploaded."),
     onlink: () => { const url = globalThis.prompt?.("Paste the link (https://…), for example a sign-language video:"); if (url && url.trim()) suAct(() => SU.addPassageLink(suSt, url.trim()), undefined, "The link could not be added."); },
     onremove: (id) => suAct(() => SU.removePassage(suSt, id), undefined, "The passage could not be removed."),
@@ -442,12 +451,14 @@
   {/if}
 {:else if page.data.screen === "home"}
   <Home {phone} {theme} data={page.data.home} state={phone ? "reviews" : page.data.state} />
+{:else if page.data.screen === "account"}
+  {#key page.data.principal.id}<AccountSettings {phone} {theme} principal={page.data.principal} initialView={page.data.view} onsaved={async () => { S.forget(); session = await S.me({ fresh: true }); applyChrome(session); }} onskip={() => go(to("home"))} onswitch={async () => { try { await S.signOut(); D.clearLinks(); SU.forgetAll(); session = null; go(to("sign-in")); } catch (e) { page = { status: "error", key: route.name, data: null, error: { kind: classify(e), message: "Account switch could not be confirmed. You may still be signed in." } }; } }} />{/key}
 {:else if page.data.screen === "project-tools" || page.data.screen === "review-tools"}
   {#key page.data.entity.id}<EntityTools {phone} {theme} type={page.data.screen === "review-tools" ? "assessment" : "project"} entity={page.data.entity} />{/key}
 {:else if page.data.screen === "workspaces"}
   <Workspaces {phone} {theme} workspaces={page.data.workspaces} canCreate={session?.principal?.kind === "user" && session?.principal?.provisioned === true} />
 {:else if page.data.screen === "projects"}
-  <Projects {phone} {theme} projects={page.data.projects} />
+  <Projects {phone} {theme} projects={page.data.projects} returnToSetup={route.query.get("return") === "setup1"} />
 {:else if page.data.screen === "project-settings"}
   {#if page.data.project.id !== route.params.pid}<Status {phone} {theme} kind="loading" back={to("home")} />{:else}
     {#key page.data.project.id}<ProjectSettings {phone} {theme} project={page.data.project} />{/key}
@@ -459,7 +470,7 @@
   {@const C = REGISTRY[page.data.screen]}
   {@const n = page.data.step}
   {#if n === 1}<C {phone} {theme} data={suView.details} onfield={suField} lang={suLang} onnext={suStep[1]} busy={suBusy} error={suError} status={suView.status} />
-  {:else if n === 2}<C {phone} {theme} data={suView.passage} onfield={suField} onfile={suPassage.onfile} onlink={suPassage.onlink} onremove={suPassage.onremove} onlwc={suPassage.onlwc} onnext={suStep[2]} busy={suBusy} error={suError} status={suView.status} />
+  {:else if n === 2}<C {phone} {theme} data={suView.passage} onfield={suField} onfile={suPassage.onfile} onattach={suPassage.onattach} onlink={suPassage.onlink} onremove={suPassage.onremove} onlwc={suPassage.onlwc} onnext={suStep[2]} busy={suBusy} error={suError} status={suView.status} />
   {:else if n === 3}<C {phone} {theme} data={{ groups: suView.groups }} ongroup={suGroups.ongroup} onexpected={suGroups.onexpected} onnext={suStep[3]} busy={suBusy} error={suError} status={suView.status} />
   {:else}<C {phone} {theme} data={{ groups: suView.groups, context: suView.context }} oncontext={suContext.oncontext} ondemographics={suContext.ondemographics} onexpected={suGroups.onexpected} onnext={suStep[4]} busy={suBusy} error={suError} status={suView.status} />{/if}
 {:else if page.data.screen === "setup5"}
@@ -508,7 +519,7 @@
   <C {phone} {theme} data={page.data.data} state={route.query.get("state") ?? undefined} />
 {:else if page.data.screen === "workspace" || page.data.screen === "workspace-group"}
   {@const C = REGISTRY[page.data.screen]}
-  <C {phone} {theme} data={page.data.data} ongroup={groupProject} onrename={async name => { await renameWorkspace(page.data.data, name); await load(); }} onungroup={async project => { await ungroupProject(page.data.data, project); await load(); }} />
+  <C {phone} {theme} data={page.data.data} ongroup={groupProject} onrename={async name => { const saved = await renameWorkspace(page.data.data, name); workspaceUndo = saved.undo; await load(); }} undo={workspaceUndo} onundo={async receipt => { await undoWorkspaceRename(receipt); workspaceUndo = null; await load(); }} onungroup={async project => { await ungroupProject(page.data.data, project); await load(); }} />
 {:else if page.data.screen === "people" || page.data.screen === "people-workspace"}
   {#if page.data.empty}
     <Status {phone} {theme} kind="empty" message={page.data.emptyText} back={to("home")} backLabel="Your reviews" />
@@ -520,7 +531,7 @@
   {/if}
 {:else if page.data.screen === "invitations"}
   {@const C = REGISTRY.invitations}
-  <C {phone} {theme} data={page.data.data} onaccept={acceptInvite} />
+  <C {phone} {theme} data={page.data.data} onaccept={acceptInvite} privateInvitation={page.data.privateInvitation} onsettled={async () => { S.forget(); await load(); }} />
 {:else if page.data.preview}
   {@const C = REGISTRY[page.data.screen]}
   {@render sampleMark({ href: page.data.editHref ?? (page.data.assessment ? to("review", { aid: page.data.assessment.id }) : to("home")), label: page.data.previewNote ? "Send feedback in the current design" : page.data.editHref ? `Edit ${page.data.assessment?.name ?? "this review"} in the current design` : page.data.assessment ? "Back to the review" : "Home" })}

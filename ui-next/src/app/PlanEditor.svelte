@@ -1,4 +1,5 @@
 <script>
+  import PlanDates from './PlanDates.svelte';
   import { onDestroy } from 'svelte';
   import Stack from '../Stack.svelte';
   import Row from '../Row.svelte';
@@ -27,6 +28,7 @@
   {#if onsave && suggestions.length}<details><summary>Choose discussion topics for the plan</summary><Stack gap={2}>{#each suggestions as topic}<label class="row-opt"><input class="cb" type="checkbox" checked={next.split('\n').includes(topic)} disabled={busy} onchange={e => { const lines = next.split('\n').filter(x => x !== topic); next = (e.currentTarget.checked ? [...lines, topic] : lines).filter(Boolean).join('\n'); }} />{topic}</label>{/each}</Stack></details>{/if}
   <div><label class="lbl" for="plan-reflection">What you noticed</label><textarea class="in" id="plan-reflection" bind:value={reflection} disabled={!onsave || busy}></textarea></div>
   <div><label class="lbl" for="plan-next">The next step</label><textarea class="in" id="plan-next" bind:value={next} disabled={!onsave || busy}></textarea><p class="small">Include agreed actions, who will follow up and dates. Everyone with access to this review can read these notes.</p></div>
+  <PlanDates text={next} disabled={!onsave || busy} onchange={value => { next = value; }} />
   <Row wrap gap={2}>
     {#if onsave}<button class="btn" type="button" onclick={() => save()} disabled={busy}>{busy ? 'Saving…' : 'Save notes and plan'}</button>{/if}
     {#if oncomplete}<button class="btn" type="button" onclick={() => save(true)} disabled={busy}>Save and complete the review</button>{/if}
