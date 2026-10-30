@@ -91,13 +91,8 @@
   {#if live && pdfEnabled && count}
     <Stack gap={2}>
       <span class="micro">Download selected surveys</span>
-<<<<<<< HEAD
-      {#each picked as i (R.surveys[i].id)}
-        <PdfActions url={surveyPdfUrl(R.aid,R.surveys[i].id,{lang,paper})} token={pdfToken} primary={false} label={`Download ${R.surveys[i].name} PDF`} />
-=======
       {#each selectedSurveys as survey (`${selectionContext()}:${survey.id}`)}
         <PdfActions url={surveyPdfUrl(R.aid,survey.id,{lang,paper})} token={pdfToken} primary={false} label={`Download ${survey.name} PDF`} />
->>>>>>> a015e546 (fix(next): retain print selection by survey identity)
       {/each}
     </Stack>
   {/if}
