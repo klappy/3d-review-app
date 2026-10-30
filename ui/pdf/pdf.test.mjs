@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {JSDOM} from 'jsdom';
 import {surveyPdfDocument,reportPdfDocument} from './documents.js';
+import {renderReport} from '../report-view.js';
 import {fetchPdf,pdfLoader,pdfObjectUrl,sharePdf} from './download.js';
 const model={visible:true,blank:true,title:'Survey',items:[{text:'Question <script>bad</script>',type:'single',options:[{text:'Yes'},{text:'No'}]}]};
 test('survey reuses the paper, includes all choices, embedded font and page size without app tools/scripts',()=>{
@@ -13,6 +14,15 @@ test('report refuses held data and renders exact stored aggregates as text, char
   assert.throws(()=>reportPdfDocument({suppressed:true,report:{payload:{}}}));
   const result={suppressed:false,report:{created_at:'2026-10-29',payload:{source_commit:'f042cde',versions:{scorer:'s',narrative:'n',policy:'p'},evidence:[{label:'Community — Written',n:7}],lenses:[{lens:'Community',score:68.25,sub_dimensions:[{sub_dimension:'Clarity',score:72.5,n_items_included:3}]}],narrative:['<img src=x onerror=bad>']}}};
   const d=new JSDOM(reportPdfDocument(result)).window.document;assert.match(d.body.textContent,/68.25/);assert.match(d.querySelector('table').textContent,/72.5/);assert.equal(d.querySelectorAll('img,script').length,0);assert.match(d.body.textContent,/<img src=x onerror=bad>/);
+});
+test('PDF expands supplied provenance while the screen disclosure stays closed',()=>{
+  const report={id:'report-provenance',created_at:'2026-10-29T12:00:00Z',payload:{source_commit:'f042cde553761a6a7f24132cef7802f956378ee0',versions:{scorer:'scorer-v1',narrative:'narrative-v2',policy:'policy-v3'},lenses:[]}};
+  const screen=new JSDOM('<main></main>').window.document;
+  renderReport({doc:screen,root:screen.querySelector('main'),report});
+  assert.equal(screen.querySelector('details').open,false);
+  const printed=new JSDOM(reportPdfDocument({suppressed:false,report})).window.document;
+  assert.equal(printed.querySelector('details').open,true);
+  for(const value of ['f042cde','scorer-v1','narrative-v2','policy-v3','report-provenance','2026-10-29T12:00:00Z'])assert.ok(printed.querySelector('details').textContent.includes(value));
 });
 test('download validates bytes/type and uses the server filename; errors remain actionable',async()=>{
   const fetchImpl=async()=>new Response('%PDF-1.7\nfile',{headers:{'content-type':'application/pdf','content-disposition':'attachment; filename="survey.pdf"'}});

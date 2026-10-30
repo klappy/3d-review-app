@@ -54,6 +54,9 @@ export function reportPdfDocument(result, {paper='letter',minimum=3}={}) {
     (payload?.standalone_indicators||[]).some(i=>!Number.isFinite(i.n_responses)||i.n_responses<minimum)) throw new Error('PDF_REPORT_HELD');
   const root = node('div');
   if (!renderReport({doc,root,report:result.report})) throw new Error('Report unavailable.');
+  // PDF documents have no interactive disclosure: retain provenance on paper.
+  // Only this isolated print tree is opened; the shared screen renderer stays closed.
+  for (const child of root.children) if (child.tag === 'details') child.setAttribute('open', '');
   // The same exact stored aggregates in an accessible table beside the vector charts.
   const rows = (payload.lenses||[]).flatMap(l => (l.sub_dimensions||[]).map(s => `<tr><th scope="row">${esc(l.lens)}</th><td>${esc(s.sub_dimension)}</td><td>${esc(s.score)}</td></tr>`));
   const table = rows.length ? `<section><h2>Scores in this report</h2><table><thead><tr><th>Perspective</th><th>Area</th><th>Score (out of 100)</th></tr></thead><tbody>${rows.join('')}</tbody></table></section>` : '';
