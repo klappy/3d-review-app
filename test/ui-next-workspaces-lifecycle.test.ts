@@ -47,6 +47,7 @@ for(const phone of [false,true]) it(`directory cancel deletion and create/archiv
  const v=render(Workspaces,{phone,workspaces:items.map(x=>({...x})),canCreate:true,request});
  await fireEvent.click(v.getByRole('button',{name:'Preview deletion of Synthetic'}));
  await waitFor(()=>v.getByRole('button',{name:'Cancel deletion'}));
+ expect(v.getByRole('button',{name:'Cancel deletion'}).parentElement!.hasAttribute('data-wrap')).toBe(true);
  await fireEvent.click(v.getByRole('button',{name:'Cancel deletion'}));
  expect(calls.filter(x=>x.method==='DELETE'&&x.body.mode==='execute')).toHaveLength(0);
  await fireEvent.click(v.getByRole('button',{name:'Archive Synthetic'}));

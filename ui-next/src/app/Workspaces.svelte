@@ -47,7 +47,7 @@
   {#if pending}<section class="glass-hi l-card l-stack" data-gap="2" aria-label="Confirm workspace deletion"><h2 class="h3">Delete {pending.workspace.name}?</h2><p class="small">Deletion cannot be undone. Only an empty workspace can be deleted. Workspace invitations and grants are removed.</p>
     {#each pending.impact.affected as row}{#each ['projects','assessments','responses','grants'] as key}<p class="small">{key}: {row[key]}</p>{/each}{/each}
     {#if pending.impact.affected[0].projects > 0}<p class="small">Remove the grouped projects before deleting this workspace. The projects keep their own grants.</p>{/if}
-    <div class="l-row" data-gap="2"><button class="btn" type="button" disabled={busy || mustReload || pending.impact.affected[0].projects > 0} onclick={confirmDelete}>Confirm deletion</button><button class="btn btn-quiet" type="button" disabled={busy} onclick={() => { pending = null; }}>Cancel deletion</button></div>
+    <div class="l-row" data-gap="2" data-wrap><button class="btn" type="button" disabled={busy || mustReload || pending.impact.affected[0].projects > 0} onclick={confirmDelete}>Confirm deletion</button><button class="btn btn-quiet" type="button" disabled={busy} onclick={() => { pending = null; }}>Cancel deletion</button></div>
   </section>{/if}
   {#if !shown.length}<p class="small">No workspaces match this view.</p>{/if}
   <a class="link" href={to('projects')}>Projects across workspaces</a>

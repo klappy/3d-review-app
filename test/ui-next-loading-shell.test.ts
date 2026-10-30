@@ -22,6 +22,7 @@ describe("content-shaped loading frame", () => {
     setLiveChrome({ who: "Previous Account", initials: "PA", workspace: "Previous Workspace" });
     const view = render(LoadingFrame as never, { props: { phone, kind: "results" } });
     expect(view.container.querySelector("header .brand")?.getAttribute("href")).toBe("#/home");
+    expect(view.container.querySelector("header a:not(.brand), header button, header details")).toBeNull();
     const busy = view.container.querySelector('[aria-busy="true"]')!;
     expect(busy).not.toBeNull(); expect(view.getAllByRole("status")).toHaveLength(1);
     expect(busy.contains(view.getByRole("status"))).toBe(false); // busy regions must not defer the loading announcement
@@ -39,6 +40,17 @@ describe("content-shaped loading frame", () => {
     const view = render(LoadingFrame as never, { props: { phone: true, chrome, kind: "report" } });
     expect(view.getByRole("link", { name: "Workspace and account" }).getAttribute("href")).toBe("#/menu");
     expect(view.container.textContent).toContain("KA"); expect(view.container.querySelector('[aria-label="Breadcrumb"]')).toBeNull();
+  });
+
+  it.each([false, true])("participant pending content never borrows facilitator navigation (phone=%s)", (phone) => {
+    const chrome = { phone, who: { first: "Kay", initials: "KA" }, accountItems: [], session: person() };
+    const view = render(LoadingFrame as never, { props: { phone, chrome, kind: "p-entry" } });
+    const header = view.container.querySelector('header[data-shell="participant"]')!;
+    expect(header).not.toBeNull();
+    expect(header.querySelector(".brand")?.tagName).toBe("SPAN");
+    expect(header.querySelector("a, button, details, nav")).toBeNull();
+    expect(header.textContent).not.toMatch(/Kay|KA|Help|Sign in/);
+    expect(view.getByRole("status").textContent).toBe("Loading content…");
   });
 
   it("uses static shapes in every motion preference", () => {

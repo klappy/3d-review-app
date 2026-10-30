@@ -110,7 +110,7 @@
     <section class="glass-hi l-card l-stack" data-pad="work" data-gap="3" aria-label={edit.kind === "rename" ? "Rename workspace" : "Remove project from workspace"}>
       {#if edit.kind === "rename"}<label class="lbl">Workspace name<input class="in" bind:value={name} disabled={busy} /></label>
       {:else}<h2 class="h3">Remove {edit.project.title} from {d.name}?</h2><p class="small">The project and its reviews remain. People whose access comes only from this workspace lose that access. Direct project grants remain.</p>{/if}
-      <Row gap={2}><button class="btn" type="button" onclick={save} disabled={busy || mustReload}>{busy ? "Saving…" : edit.kind === "rename" ? "Save workspace name" : "Confirm removal"}</button><button class="btn btn-quiet" type="button" disabled={busy} onclick={() => { edit = null; message = ""; }}>Cancel</button></Row>
+      <Row wrap gap={2}><button class="btn" type="button" onclick={save} disabled={busy || mustReload}>{busy ? "Saving…" : edit.kind === "rename" ? "Save workspace name" : "Confirm removal"}</button><button class="btn btn-quiet" type="button" disabled={busy} onclick={() => { edit = null; message = ""; }}>Cancel</button></Row>
     </section>
   {/if}
   {#if phone}
@@ -124,7 +124,7 @@
           <div class="list-body"><div class="list-title">{p.title}</div><div class="small">{STAGE_LABELS[p.stage]} · {p.phone}</div></div>
           <Pill stage={p.stage} />
         </a>
-        {#if canUngroup(p)}<button class="btn btn-quiet" type="button" onclick={() => beginUngroup(p)} disabled={busy || mustReload}>Remove {p.title} from workspace</button>{/if}
+        {#if canUngroup(p)}<Row wrap gap={2}><button class="btn btn-quiet" type="button" aria-label={`Remove project ${p.title} from workspace`} onclick={() => beginUngroup(p)} disabled={busy || mustReload}>Remove project</button></Row>{/if}
       {/each}
     </section>
     <a class="link" href={HOME}>Your reviews across workspaces <Icon d={I.arrow} /></a>
@@ -146,6 +146,7 @@
       </Row>
       <Grid cols={2} gap={4}>
         {#each visible as p}
+          <Stack gap={2}>
           <Card href={p.href ?? PROJECT} gap={4}>
             <Row split gap={3}><Row gap={3}><h3 class="h2">{p.title}</h3><Pill stage={p.stage} /></Row><span class="go" aria-hidden="true"><Icon d={I.arrow} /></span></Row>
             <Row split gap={4}>
@@ -166,7 +167,8 @@
               <span class="small l-row" data-gap="2"><Icon d={I.clock} />No results yet</span>
             {/if}
           </Card>
-          {#if canUngroup(p)}<button class="btn btn-quiet" type="button" onclick={() => beginUngroup(p)} disabled={busy || mustReload}>Remove {p.title} from workspace</button>{/if}
+          {#if canUngroup(p)}<Row wrap gap={2}><button class="btn btn-quiet" type="button" aria-label={`Remove project ${p.title} from workspace`} onclick={() => beginUngroup(p)} disabled={busy || mustReload}>Remove project</button></Row>{/if}
+          </Stack>
         {/each}
       </Grid>
       <p class="small">Looking for your own reviews across projects? <a class="link" href={HOME}>Your reviews</a> lists everything you facilitate.</p>

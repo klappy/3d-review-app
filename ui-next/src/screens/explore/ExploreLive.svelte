@@ -1,6 +1,6 @@
 <!-- Live discovery uses the same authorized list for phone and desktop; fixture boards remain in Explore. -->
 <script>
-  import { untrack } from "svelte";
+  import { tick, untrack } from "svelte";
   import AppShell from "../../AppShell.svelte";
   import Page from "../../Page.svelte";
   import Stack from "../../Stack.svelte";
@@ -12,6 +12,7 @@
   import Coverage from "../results/Coverage.svelte";
   import { exploreRows, LENS_KEYS, tableAssurance } from "./explore-data.js";
   import { selectReviews, projectOptions, reviewCsv, groupReviews, viewPreferenceKey, saveView, loadView, deleteView, validateView } from "./discovery.js";
+  import { modal, backdropClose } from "./dialog.js";
   let { phone = false, theme = "light", data } = $props();
   let search = $state("");
   let project = $state("");
@@ -20,13 +21,23 @@
   let view = $state(phone ? "cards" : "table");
   let projectSearch = $state("");
   let group = $state("none"), viewStatus = $state("");
+  let filtersOpen = $state(false), filterTrigger = $state();
+  let filterStart = null;
+  const closer = backdropClose();
+  const filterCount = $derived(Number(!!project) + Number(!!stage));
+  function openFilters() { filterStart = { search, project, stage, sort, view, group }; filtersOpen = true; }
+  function closeFilters(apply = false) {
+    if (!apply && filterStart) applyView(filterStart);
+    filterStart = null; filtersOpen = false;
+    tick().then(() => filterTrigger?.focus());
+  }
   const preferenceKey = $derived(viewPreferenceKey(data.viewKey));
   const grouped = $derived(groupReviews(rows, group));
   const storage = () => { try { return globalThis.localStorage; } catch { return null; } };
   function applyView(p) { search = p.search; project = p.project; stage = p.stage; sort = p.sort; view = p.view; group = p.group; }
   $effect(() => {
     const identity = preferenceKey;
-    untrack(() => { void identity; applyView(validateView({}, projects, phone ? "cards" : "table")); projectSearch = ""; viewStatus = ""; });
+    untrack(() => { void identity; applyView(validateView({}, projects, phone ? "cards" : "table")); projectSearch = ""; viewStatus = ""; filtersOpen = false; filterStart = null; });
   });
   function saveCurrentView() {
     viewStatus = saveView(storage(), preferenceKey, { search, project, stage, sort, view, group }, projects)
@@ -50,20 +61,22 @@
 <AppShell {phone} {theme} screen {top}>
   <Page gap={5}>
     <Stack gap={2}><h1 class={phone ? "title-phone" : "title-page"}>Explore reviews</h1><p class="small">Search the reviews and projects you can access.</p></Stack>
-    <div class="glass l-card l-stack" data-pad="work" data-gap="3" role="search" aria-label="Find reviews">
-      <label class="l-stack" data-gap="1">Search reviews<input class="in" type="search" bind:value={search} placeholder="Review, project or language" /></label>
-      <Row wrap gap={3}>
-        <label class="l-stack" data-gap="1">Project<select class="in" bind:value={project}><option value="">All projects</option>{#each projects as p}<option value={p.id}>{p.name}</option>{/each}</select></label>
-        <label class="l-stack" data-gap="1">Stage<select class="in" bind:value={stage}><option value="">All stages</option><option value="prepare">Setting up</option><option value="collect">Collecting</option><option value="understand">Results ready</option><option value="improve">Reviewed</option></select></label>
-        <label class="l-stack" data-gap="1">Sort<select class="in" bind:value={sort}><option value="updated">Recently updated</option><option value="title">Review title</option></select></label>
-        <label class="l-stack" data-gap="1">Group by<select class="in" bind:value={group}><option value="none">None</option><option value="project">Project</option><option value="stage">Stage</option><option value="language">Language</option></select></label>
-        <button class="btn btn-quiet" type="button" onclick={reset}>Reset filters</button>
-      </Row>
-      <Row wrap gap={3}><fieldset class="seg" data-inline><legend class="small">Show reviews as</legend><label><input type="radio" name="discovery-view" value="table" bind:group={view} />Table</label><label><input type="radio" name="discovery-view" value="cards" bind:group={view} />Cards</label></fieldset><button class="btn" type="button" onclick={download}>Download CSV</button></Row>
-      <Row wrap gap={3}><button class="btn" type="button" disabled={!preferenceKey} onclick={saveCurrentView}>Save this view</button><button class="btn" type="button" disabled={!preferenceKey} onclick={loadSavedView}>Load saved view</button><button class="btn btn-quiet" type="button" disabled={!preferenceKey} onclick={removeSavedView}>Delete saved view</button></Row>
-      <p class="small">Saved views stay on this browser, separately for each account and access mode.</p>
-      {#if viewStatus}<p class="small" role="status">{viewStatus}</p>{/if}
-    </div>
+    {#if phone}
+      <div class="l-stack" data-gap="2" role="search" aria-label="Find reviews">
+        <label class="l-stack" data-gap="1">Search reviews<input class="in" type="search" bind:value={search} placeholder="Review, project or language" /></label>
+        <Row split gap={2}>
+          <button class="btn" type="button" bind:this={filterTrigger} aria-haspopup="dialog" aria-expanded={filtersOpen} onclick={openFilters}>Filters{filterCount ? ` · ${filterCount}` : ""}</button>
+          <label class="l-stack" data-gap="1">Sort<select class="in" bind:value={sort}><option value="updated">Recently updated</option><option value="title">Review title</option></select></label>
+        </Row>
+      </div>
+    {:else}
+      <div class="glass l-card l-stack" data-pad="work" data-gap="3" role="search" aria-label="Find reviews">
+        <label class="l-stack" data-gap="1">Search reviews<input class="in" type="search" bind:value={search} placeholder="Review, project or language" /></label>
+        {@render filters()}
+        {@render viewOptions()}
+        {@render savedViews()}
+      </div>
+    {/if}
     <p class="small" aria-live="polite">{rows.length} of {data.reviews.length} reviews match</p>
     {#if rows.length === 0}<p class="small">No reviews match. Change the filters or open a project below to start a review.</p>
     {:else}
@@ -78,6 +91,34 @@
       {/each}
     {/if}
     <div class="tbl-foot"><span class="small">{tableAssurance(data.levelMinimum)}</span></div>
+    {#if phone}<section class="l-stack" data-gap="3" aria-label="View actions">{@render savedViews()}<button class="btn" type="button" onclick={download}>Download CSV</button></section>{/if}
     <section class="l-stack" data-gap="3" aria-labelledby="discovery-projects"><h2 class="h2" id="discovery-projects">Projects</h2><label class="l-stack" data-gap="1">Search projects<input class="in" type="search" bind:value={projectSearch} /></label>{#if !listedProjects.length}<p class="small">No projects match.</p>{/if}{#each listedProjects as p}<div class="glass l-card" data-pad="work">{#if p.href}<a class="link" href={p.href}>{p.name}</a>{:else}<span>{p.name}</span>{/if}</div>{/each}</section>
   </Page>
+  {#if phone && filtersOpen}
+    <dialog class="glass-hi sheet" aria-labelledby="live-explore-filters" {@attach modal} onpointerdown={closer.onpointerdown} onclick={closer.onclick} oncancel={(event) => { event.preventDefault(); closeFilters(); }} onclose={() => closeFilters()}>
+      <div class="l-stack" data-gap="3"><span class="sheet-handle" aria-hidden="true"></span><h2 class="h2" id="live-explore-filters">Review filters</h2>
+        {@render filters()}{@render viewOptions()}
+        <Row wrap gap={2}><button class="btn btn-quiet" type="button" onclick={() => closeFilters()}>Cancel</button><button class="btn btn-primary" type="button" onclick={() => closeFilters(true)}>Show reviews</button></Row>
+      </div>
+    </dialog>
+  {/if}
 </AppShell>
+
+
+{#snippet filters()}
+  <Row wrap gap={3}>
+    <label class="l-stack" data-gap="1">Project<select class="in" bind:value={project}><option value="">All projects</option>{#each projects as p}<option value={p.id}>{p.name}</option>{/each}</select></label>
+    <label class="l-stack" data-gap="1">Stage<select class="in" bind:value={stage}><option value="">All stages</option><option value="prepare">Setting up</option><option value="collect">Collecting</option><option value="understand">Results ready</option><option value="improve">Reviewed</option></select></label>
+    {#if !phone}<label class="l-stack" data-gap="1">Sort<select class="in" bind:value={sort}><option value="updated">Recently updated</option><option value="title">Review title</option></select></label>{/if}
+    <label class="l-stack" data-gap="1">Group by<select class="in" bind:value={group}><option value="none">None</option><option value="project">Project</option><option value="stage">Stage</option><option value="language">Language</option></select></label>
+    <button class="btn btn-quiet" type="button" onclick={reset}>Reset filters</button>
+  </Row>
+{/snippet}
+{#snippet viewOptions()}
+  <Row wrap gap={3}><fieldset class="seg" data-inline><legend class="small">Show reviews as</legend><label><input type="radio" name="discovery-view" value="table" bind:group={view} />Table</label><label><input type="radio" name="discovery-view" value="cards" bind:group={view} />Cards</label></fieldset>{#if !phone}<button class="btn" type="button" onclick={download}>Download CSV</button>{/if}</Row>
+{/snippet}
+{#snippet savedViews()}
+  <Row wrap gap={3}><button class="btn" type="button" disabled={!preferenceKey} onclick={saveCurrentView}>Save this view</button><button class="btn" type="button" disabled={!preferenceKey} onclick={loadSavedView}>Load saved view</button><button class="btn btn-quiet" type="button" disabled={!preferenceKey} onclick={removeSavedView}>Delete saved view</button></Row>
+  <p class="small">Saved views stay on this browser, separately for each account and access mode.</p>
+  {#if viewStatus}<p class="small" role="status">{viewStatus}</p>{/if}
+{/snippet}

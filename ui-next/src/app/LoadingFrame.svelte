@@ -7,14 +7,17 @@
   import Chrome from "./Chrome.svelte";
   import PhoneHeader from "../PhoneHeader.svelte";
   import TopBar from "../TopBar.svelte";
+  import Mark from "../Mark.svelte";
   import "../../components/loading.css";
   let { phone = false, theme = "light", chrome = null, kind = "page" } = $props();
+  const participant = $derived(kind.startsWith("p-"));
   const report = $derived(["results", "results-held", "results-gaps", "results-answers", "report", "report-detailed", "next-step", "action-plan"].includes(kind));
   const label = $derived(report ? "Loading review content…" : "Loading content…");
 </script>
 
 {#snippet top()}
-  {#if chrome?.session}<Chrome {chrome} />
+  {#if participant}<header class="phone-top" data-shell="participant"><span class="brand"><Mark size={26} /><span>3D Review</span></span></header>
+  {:else if chrome?.session}<Chrome {chrome} />
   {:else if phone}<PhoneHeader state="public" signIn={false} home="#/home" initials="" />
   {:else}<TopBar variant="public" end={false} home="#/home" />{/if}
 {/snippet}

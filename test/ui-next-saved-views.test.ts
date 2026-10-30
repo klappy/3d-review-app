@@ -45,6 +45,26 @@ describe('browser-scoped saved Explore preferences',()=>{
   await q.rerender({data});await fireEvent.click(q.getByRole('button',{name:'Delete saved view'}));
   await fireEvent.click(q.getByRole('button',{name:'Load saved view'}));expect(q.getByText(/No saved view is available/)).toBeTruthy();
  });
+ it('phone sheet selections can be saved, loaded and deleted from view actions after results',async()=>{
+  const q=render(Explore,{props:{data,phone:true}});
+  await fireEvent.click(q.getByRole('button',{name:'Filters'}));
+  await fireEvent.change(q.getByRole('combobox',{name:'Project'}),{target:{value:'p1'}});
+  await fireEvent.change(q.getByRole('combobox',{name:'Group by'}),{target:{value:'language'}});
+  await fireEvent.click(q.getByRole('button',{name:'Show reviews'}));
+  await fireEvent.click(q.getByRole('button',{name:'Save this view'}));
+  expect(q.getByText(/View saved on this browser/)).toBeTruthy();
+  await fireEvent.click(q.getByRole('button',{name:'Filters · 1'}));
+  await fireEvent.click(q.getByRole('button',{name:'Reset filters'}));
+  await fireEvent.click(q.getByRole('button',{name:'Show reviews'}));
+  expect(q.getByRole('link',{name:'Second'})).toBeTruthy();
+  await fireEvent.click(q.getByRole('button',{name:'Load saved view'}));
+  expect(q.queryByRole('link',{name:'Second'})).toBeNull();
+  expect(q.getByRole('heading',{name:'Hindi · 1'})).toBeTruthy();
+  expect(q.getByRole('button',{name:'Download CSV'})).toBeTruthy();
+  await fireEvent.click(q.getByRole('button',{name:'Delete saved view'}));
+  await fireEvent.click(q.getByRole('button',{name:'Load saved view'}));
+  expect(q.getByText(/No saved view is available/)).toBeTruthy();
+ });
  it('revalidates removed project IDs and never restores saved rows',async()=>{
   const key=viewPreferenceKey(data.viewKey);saveView(localStorage,key,{project:'p1',group:'stage'},projects);
   const q=render(Explore,{props:{data:{...data,projects:[projects[1]],reviews:[reviews[1]]}}});

@@ -31,15 +31,38 @@ describe('workspace lifecycle', () => {
   expect(workspaceProjects(cards,'beta','Archived').map(x=>x.id)).toEqual(['2']);
   expect(workspaceProjects(cards,'french','All').map(x=>x.id)).toEqual(['1']);
  });
+ it('keeps each removable desktop project and its independent action in one grid cell', () => {
+  const data={...fixture,id:w.id,role:'owner',projects:fixture.projects.slice(0,2).map((p,i)=>({...p,id:`p${i}`,directRole:'owner'}))};
+  const v=render(Workspace,{data,onungroup:vi.fn()});
+  const grid=v.container.querySelector('.l-grid[data-cols="2"]')!;
+  expect(grid.children).toHaveLength(2);
+  for (const [i,cell] of [...grid.children].entries()) {
+   const action=v.getByRole('button',{name:`Remove project ${data.projects[i].title} from workspace`});
+   expect(cell.contains(action)).toBe(true);
+   expect(cell.querySelector('a.card-link')).not.toBeNull();
+   expect(action.closest('a')).toBeNull();
+   expect(action.textContent).toBe('Remove project');
+  }
+ });
+ it('phone removal labels stay compact while preserving distinct accessible project names', async () => {
+  const title='A synthetic project name long enough to overflow a phone button';
+  const data={...fixture,id:w.id,role:'owner',projects:[{...fixture.projects[0],id:'p',title,directRole:'owner'}]};
+  const v=render(Workspace,{phone:true,data,onungroup:vi.fn()});
+  const action=v.getByRole('button',{name:`Remove project ${title} from workspace`});
+  expect(action.textContent).toBe('Remove project');
+  await fireEvent.click(action);
+  expect(v.getByRole('heading',{name:`Remove ${title} from ${data.name}?`})).toBeTruthy();
+  expect(v.getByRole('button',{name:'Confirm removal'})).toBeTruthy();
+ });
  for(const phone of [false,true]) it(`cancel and confirm removal ${phone ? 'phone':'desktop'}; reload receives updated data`, async()=>{
   setLiveContext({wid:w.id,pid:'p'});
   const data={...fixture,id:w.id,role:'owner',projects:[{...fixture.projects[0],id:'p',title:'Synthetic project',directRole:'owner'}]};
   const onungroup=vi.fn().mockResolvedValue(undefined),onrename=vi.fn().mockResolvedValue(undefined);
   const v=render(Workspace,{phone,data,onungroup,onrename});
-  await fireEvent.click(v.getByRole('button',{name:'Remove Synthetic project from workspace'}));
+  await fireEvent.click(v.getByRole('button',{name:'Remove project Synthetic project from workspace'}));
   expect(v.getByText(/People whose access comes only/)).toBeTruthy();
   await fireEvent.click(v.getByRole('button',{name:'Cancel'}));expect(onungroup).not.toHaveBeenCalled();
-  await fireEvent.click(v.getByRole('button',{name:'Remove Synthetic project from workspace'}));
+  await fireEvent.click(v.getByRole('button',{name:'Remove project Synthetic project from workspace'}));
   await fireEvent.click(v.getByRole('button',{name:'Confirm removal'}));
   await waitFor(()=>expect(onungroup).toHaveBeenCalledWith(data.projects[0]));
   await v.rerender({phone,data:{...data,projects:[]},onungroup,onrename});
