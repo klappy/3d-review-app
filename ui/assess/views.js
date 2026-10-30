@@ -7,6 +7,7 @@
 import { reportBuildMarkup, bindReportBuild } from './report-build.js';
 import { renderReport } from '../report-view.js';
 import { lensesAgreeMarkup } from '../report-lenses.js'; // lenses agree / disagree block, overview + full report
+import { resourcesMarkup } from './improve-resources.js'; // Improve: resources (or "More resources coming.") under each suggested area
 import { learnMore } from '../v3/components/learn-more.js'; // lane 9 L9-24: shared closed-by-default disclosure
 import { v3CountLine, v3BandsMarkup, v3ReportScores, v3EvidenceRows, v3EvidenceMarkup, v3StageWord, V3_FLAGS, v3css, v3ReviewGateMarkup, v3SetStage, V3_SET_STAGE, V3_NEXT, v3HeldText, V3_REPORTS_HELD, V3_REPORT_HELD, V3_BAND_CUTOFFS, v3LevelMinimum, V3_SUGGEST, v3SuggestedAreas, v3NextParse, v3NextSerialize, askStageMove } from './v3-assessment.js'; // v3 lane 3 (rulings a/b/c) // relative: resolves at /report-view.js in the browser and under node --test
 
@@ -294,7 +295,7 @@ const improve = {
       const suggested = (m.suggest?.areas || []).map(x => x.area), extra = areas.filter(x => !suggested.includes(x));
       const box = (area, band) => `<label class="choice"><input type="checkbox" name="area" value="${esc(area)}" data-area${areas.includes(area) ? ' checked' : ''}> ${esc(area)}${band ? ` <span class="small muted">· ${esc(band)}</span>` : ''}</label>`;
       const line = m.suggest && m.suggest.status !== 'loaded' ? `<p class="muted" data-suggest-empty>${esc(S[m.suggest.status] || S.unreadable)}</p>` : '';
-      const suggest = `<fieldset class="field" data-suggest><legend>${esc(S.heading)}</legend>${line}${(m.suggest?.areas || []).map(x => box(x.area, x.band)).join('')}${extra.map(a => box(a, '')).join('')}<label class="field">${esc(S.other)}<input type="text" name="notes_other" maxlength="300" placeholder="${esc(S.otherHint)}" value="${esc(m.other || '')}"></label></fieldset>`;
+      const suggest = `<fieldset class="field" data-suggest><legend>${esc(S.heading)}</legend>${line}${(m.suggest?.areas || []).map(x => box(x.area, x.band) + resourcesMarkup(x.area, esc)).join('')}${extra.map(a => box(a, '')).join('')}<label class="field">${esc(S.other)}<input type="text" name="notes_other" maxlength="300" placeholder="${esc(S.otherHint)}" value="${esc(m.other || '')}"></label></fieldset>`;
       const complete = COMPLETE_STAGES.has(m.stage) ? `<div class="actions" data-complete-row><button type="button" class="primary" data-complete-review>${esc(S.complete)}</button> <span class="status" role="status" aria-live="polite" data-complete-status></span></div>` : '';
       const saved = areas.length || m.other ? `<dt>${esc(S.heading)}</dt><dd data-notes-areas>${areas.length ? `<ul>${areas.map(a => `<li>${esc(a)}</li>`).join('')}</ul>` : ''}${m.other ? `<p data-notes-other>${esc(S.other)}: ${esc(m.other)}</p>` : ''}</dd>` : '';
       const notes = m.editable
