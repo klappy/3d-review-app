@@ -18,6 +18,8 @@
      .h3 or inline type inside a sheet; only value-driven left/width % (ScoreBar). -->
 <script>
   import AppShell from "../../AppShell.svelte";
+  import LevelLegend from "./LevelLegend.svelte";
+  import ReportContext from "./ReportContext.svelte";
   import Level from "../../Level.svelte";
   import Coverage from "./Coverage.svelte";
   import DocBar from "./DocBar.svelte";
@@ -48,7 +50,7 @@
   const tensionsLead = $derived(tensions.length === 0 ? "No area has two perspectives to compare yet." : tensions.length === 1 ? "The area where the perspectives are furthest apart." : `The ${countWord(tensions.length)} areas where the perspectives are furthest apart.`);
 </script>
 
-{#snippet top()}<DocBar title={`Detailed report · ${PAGES} pages · ${D.review.title}`} other="Open the overview · 1 page" otherHref={href("report")} {pdfUrl} {pdfToken} />{/snippet}
+{#snippet top()}<DocBar title={`Detailed report · ${PAGES} pages · ${D.review.title}`} other="Open the overview · 1 page" otherHref={href("report")} {pdfUrl} {pdfToken} /><LevelLegend />{/snippet}
 {#snippet foot(n)}<div class="pfoot"><span class="pf-text">{FOOT}</span><span class="pn">{n} of {PAGES}</span></div>{/snippet}
 {#snippet scores(rows)}
   {#each rows as row}
@@ -70,7 +72,7 @@
     </table>
   </div>
 {/snippet}
-{#snippet words()}{#if D.theirWords?.length}<div><div class="sheet-head" role="heading" aria-level="2">In their words</div><p class="sheet-text">{D.theirWords.map((w) => `“${w}”`).join(" · ")}</p></div>{/if}{/snippet}
+{#snippet words()}{#if D.theirWords?.length}<div><div class="sheet-head" role="heading" aria-level="2">In their words</div><p class="sheet-text">{D.theirWords.map((w) => `“${w}”`).join(" · ")}</p></div>{/if}<ReportContext report={D} />{/snippet}
 
 {#snippet page1()}
     <div class="paper" data-sheet="page">
@@ -126,6 +128,7 @@
 <!-- design-system.md Phone report reading (QA-LIVE N2): the detailed view, the same sheets as desktop scaled to the width (.psheet[data-fit=a4]),
      back to the overview; the PDF reason in the page; the download disabled with it. -->
 <AppShell phone {theme} screen top={ptop} bar={pbar}>
+  <LevelLegend />
   {#if pdfUrl}<PdfActions url={pdfUrl} token={pdfToken} label="Download full report PDF" />{/if}
   <span class="micro">Detailed · {PAGES} pages · A4 scaled to the width; pinch to zoom</span>
   {#if !pdfUrl}<p class="small" id="pdf-why">PDF export is not in the new design yet; the current design's report page downloads it.</p>{/if}
@@ -137,7 +140,8 @@
   <a class="link" href={href("report", { state: "overview" })}>Back to the overview <Glyph d={G.arrow} /></a>
 </AppShell>
 {:else}
-<AppShell {theme} screen rhythm="report" {top}><!-- §8.3 Report frame: main.l-main[data-rhythm=report] > .paper[data-sheet] sheets as direct children -->
+<AppShell {theme} screen rhythm="report" {top}>
+<!-- §8.3 Report frame: main.l-main[data-rhythm=report] > .paper[data-sheet] sheets as direct children -->
 {@render page1()}{@render page2()}{#each sheets as sheet, i}{@render evidenceSheet(sheet, i)}{/each}
 </AppShell>
 {/if}

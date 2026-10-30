@@ -11,6 +11,7 @@
      is its sheets for this report (data.js detailedPages, R4-5). -->
 <script>
   import AppShell from "../../AppShell.svelte";
+  import LevelLegend from "./LevelLegend.svelte";
   import Card from "../../Card.svelte";
   import Stack from "../../Stack.svelte";
   import Row from "../../Row.svelte";
@@ -51,10 +52,11 @@
 
 {#snippet eye()}<Glyph d={G.eye} />{/snippet}
 {#snippet share()}<Glyph d={G.share} />{/snippet}
-{#snippet top()}{#if reading}<PhoneHeader state="nested" title="Overview" parent="Reports" back={href("report")} menuHref={out("menu")} />{:else if phone}<PhoneHeader state="nested" title="Reports" parent="Results" back={href("results")} menuHref={out("menu")} />{:else}<DocBar title={`Overview report · 1 page · ${D.review.title}`} other={`Open the detailed report · ${pages} pages`} otherHref={href("report-detailed")} {pdfUrl} {pdfToken} />{/if}{/snippet}
+{#snippet top()}{#if reading}<PhoneHeader state="nested" title="Overview" parent="Reports" back={href("report")} menuHref={out("menu")} />{:else if phone}<PhoneHeader state="nested" title="Reports" parent="Results" back={href("results")} menuHref={out("menu")} />{:else}<DocBar title={`Overview report · 1 page · ${D.review.title}`} other={`Open the detailed report · ${pages} pages`} otherHref={href("report-detailed")} {pdfUrl} {pdfToken} /><LevelLegend />{/if}{/snippet}
 {#snippet bar()}{#if !pdfUrl}{#if reading}<div class="glass phone-bar" role="group" aria-label="Page actions"><button class="btn btn-primary btn-lg btn-block" type="button" disabled aria-describedby="pdf-why">Download the overview (PDF)</button></div>{:else if phone}<PhoneBar label="Download the overview (PDF)" href={live ? undefined : "#download"} disabled={live} ariaDescribedby={live ? "doc-pdf-why" : undefined} />{/if}{/if}{/snippet}
 
 <AppShell {phone} {theme} screen rhythm="report" {top} {bar}><!-- §8.3 Report frame: main.l-main[data-rhythm=report] > .paper sheets (desktop) -->
+  {#if phone}<LevelLegend />{/if}
   {#if phone && pdfUrl}<PdfActions url={pdfUrl} token={pdfToken} label="Download full report PDF" />{/if}
   {#if reading}
     <!-- design-system.md Phone report reading (QA-LIVE N2): the overview sheet scaled to the width, the PDF reason in the page. -->
