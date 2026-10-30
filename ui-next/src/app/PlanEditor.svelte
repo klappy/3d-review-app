@@ -3,14 +3,16 @@
   import { onDestroy } from 'svelte';
   import Stack from '../Stack.svelte';
   import Row from '../Row.svelte';
+  import { V3_REVIEW_CHECK } from '../../../ui/v3/components/review-gate.js';
   let { notes = {}, suggestions = [], completed = false, onsave, oncomplete } = $props();
   let reflection = $state(notes.notes_reflection ?? '');
   let next = $state(notes.notes_next_steps ?? '');
   let busy = $state(false), status = $state(''), failed = $state(false);
+  let reviewed = $state(false);
   let alive = true;
   onDestroy(() => { alive = false; });
   async function save(complete = false) {
-    if (busy || !onsave) return;
+    if (busy || !onsave || (complete && !reviewed)) return;
     busy = true; failed = false; status = 'Saving…';
     try {
       const saveNotes = onsave, finish = oncomplete;
@@ -29,9 +31,10 @@
   <div><label class="lbl" for="plan-reflection">What you noticed</label><textarea class="in" id="plan-reflection" bind:value={reflection} disabled={!onsave || busy}></textarea></div>
   <div><label class="lbl" for="plan-next">The next step</label><textarea class="in" id="plan-next" bind:value={next} disabled={!onsave || busy}></textarea><p class="small">Include agreed actions, who will follow up and dates. Everyone with access to this review can read these notes.</p></div>
   <PlanDates text={next} disabled={!onsave || busy} onchange={value => { next = value; }} />
+  {#if oncomplete}<label class="row-opt"><input class="cb" type="checkbox" bind:checked={reviewed} disabled={busy} />{V3_REVIEW_CHECK}</label>{/if}
   <Row wrap gap={2}>
     {#if onsave}<button class="btn" type="button" onclick={() => save()} disabled={busy}>{busy ? 'Saving…' : 'Save notes and plan'}</button>{/if}
-    {#if oncomplete}<button class="btn" type="button" onclick={() => save(true)} disabled={busy}>Save and complete the review</button>{/if}
+    {#if oncomplete}<button class="btn" type="button" onclick={() => save(true)} disabled={busy || !reviewed}>Save and complete the review</button>{/if}
   </Row>
   {#if status}<p class="small" role={failed ? 'alert' : 'status'}>{status}</p>{/if}
 </Stack>

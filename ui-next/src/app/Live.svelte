@@ -34,6 +34,10 @@
   import { capturePrivateInvitation, revokeWithConfirmation } from "./invitation-actions.js";
   import AccountSettings from "./AccountSettings.svelte";
   import { loadAccountSettings, shouldAskName } from "./account-settings.js";
+  import SurveyLinks from "./SurveyLinks.svelte";
+  import Activity from "./Activity.svelte";
+  import { activitySnapshot, clearActivity } from "./activity.js";
+  import UndoNotice from "./UndoNotice.svelte";
   import EntityTools from "./EntityTools.svelte";
   import Workspaces from "./Workspaces.svelte";
   import Projects from "./Projects.svelte";
@@ -70,12 +74,19 @@
 
   onMount(() => {
     const onHash = () => { capturePrivateInvitation(); hash = globalThis.location.hash; };
+    const onFocus = async () => {
+      if (!session) return;
+      const prior = session.principal, fresh = await S.me({ fresh: true }).catch(() => null);
+      if (prior?.id !== fresh?.principal?.id || prior?.access_mode !== fresh?.principal?.access_mode) { D.clearLinks(); SU.forgetAll(); S.forget(); workspaceUndo = null; await load(); }
+    };
+    globalThis.addEventListener("focus", onFocus);
+    globalThis.addEventListener("pageshow", onFocus);
     globalThis.addEventListener("hashchange", onHash);
     const mq = typeof matchMedia === "function" ? matchMedia(PHONE_QUERY) : null;
     const onMq = () => { phone = mq.matches; };
     mq?.addEventListener("change", onMq);
     const off = P.subscribe((s) => { pstate = s; });
-    return () => { globalThis.removeEventListener("hashchange", onHash); mq?.removeEventListener("change", onMq); off(); };
+    return () => { globalThis.removeEventListener("focus", onFocus); globalThis.removeEventListener("pageshow", onFocus); globalThis.removeEventListener("hashchange", onHash); mq?.removeEventListener("change", onMq); off(); };
   });
 
   const PARTICIPANT = new Set(["p-entry", "p-code", "p-welcome", "p-passage", "p-about", "p-question", "p-review", "p-receipt", "p-problem"]);
@@ -124,8 +135,10 @@
     if (name === "people") { if (!reviewQ) return { screen: name, empty: true, emptyText: "Open People from a review's page: this page lists who has access to one review." }; return { screen: name, data: await D.peopleModel({ type: "assessment", id: reviewQ }, me) }; }
     if (name === "invitations") return { screen: name, data: await D.invitationsModel(me), privateInvitation: r.query.get("private") === "1" };
     if (name === "project") return { screen: "project", data: await D.projectModel(params.pid) };
+    if (name === "activity") return { screen: name, entries: activitySnapshot() };
     if (name === "account") return { screen: name, principal: await loadAccountSettings(me.principal.id), view: r.query.get("view") || "name" };
     if (name === "project-tools") return { screen: name, entity: await D.project(params.pid) };
+    if (name === "review-links") { const model = await D.assessment(params.aid); return { screen: name, assessment: model.assessment, surveys: model.surveys }; }
     if (name === "review-tools") return { screen: name, entity: (await D.assessment(params.aid)).assessment };
     if (name === "project-settings") return { screen: name, project: await loadProjectSettings(params.pid) };
     // A review's own page is the board for its stage: Setup 5 (ready to launch) while preparing, Collect while collecting, Results after.
@@ -217,16 +230,18 @@
     }
   }
   // Print QR pages for real: the chosen surveys' sheets (ui/assess/share.js) in their own tab, printing itself (app/print.js).
-  const printQr = ({ surveys, per, paper }) => openQrPrint(globalThis, { title: page.data?.data?.review?.title ?? "", surveys, per, paper });
+  const printQr = ({ surveys, per, paper }) => openQrPrint(globalThis, { title: page.data?.data?.review?.title ?? "", surveys, per, paper, returnHref: `/next/${to("collect", { aid: route.params.aid })}` });
   // Print paper surveys for real (app/print.js): the forms are read and translated here, then open in their own tab from the result;
   // a blocked tab is said (the current UI's words), the ready line names what printed.
   let printStatus = $state(""), printBusy = $state(false);
   async function printPapers({ picked, lang, paper }) {
     const m = page.data?.data; if (!m) return;
+    const generation = seq, credential = token(), actor = session?.principal?.id;
     printBusy = true; printStatus = "Preparing the forms…";
     try {
       const models = await preparePapers(m, picked, { lang, onProgress: (t) => { printStatus = t; } });
-      printStatus = openPapersPrint(globalThis, models, { paper, title: `${m.review.title} · paper surveys` }) ? models.map((x) => `${x.identity?.survey?.name ?? x.title}: ${printOpenedLine(x)}`).join(" ") : "Your browser blocked the print page. Allow pop-ups for this site, then use Print again.";
+      if (generation !== seq || credential !== token() || actor !== session?.principal?.id) return;
+      printStatus = openPapersPrint(globalThis, models, { paper, title: `${m.review.title} · paper surveys`, returnHref: `/next/${to("print", { aid: m.aid })}` }) ? models.map((x) => `${x.identity?.survey?.name ?? x.title}: ${printOpenedLine(x)}`).join(" ") : "Your browser blocked the print page. Allow pop-ups for this site, then use Print again.";
     } catch (e) { printStatus = e?.message || "The blank questionnaire could not be prepared. Try Print again."; }
     finally { printBusy = false; }
   }
@@ -272,10 +287,10 @@
 
   // Signed-in chrome for the live screens.
   const who = $derived(session ? { first: S.firstName(session.principal), initials: S.initialsOf(session.principal) } : null);
-  async function signOut() { try { await S.signOut(); D.clearLinks(); SU.forgetAll(); session = null; go(to("landing")); } catch (e) { page = { status: "error", key: route.name, data: null, error: { kind: classify(e), message: `You are still signed in: ${e?.message || "the sign-out was not confirmed"}. Try again.` } }; } }
+  async function signOut() { try { await S.signOut(); clearActivity(); D.clearLinks(); SU.forgetAll(); session = null; go(to("landing")); } catch (e) { page = { status: "error", key: route.name, data: null, error: { kind: classify(e), message: `You are still signed in: ${e?.message || "the sign-out was not confirmed"}. Try again.` } }; } }
   const accountItems = $derived(session ? [
     { kind: "head", label: session.principal?.display_name || "Signed in", sub: session.principal?.id ? "Facilitator" : "" }, { kind: "hr" },
-    { label: "Account settings", href: to("account") }, { label: "Version and changes", href: to("account", {}, { view: "release" }) }, { label: "Roadmap", href: to("account", {}, { view: "roadmap" }) }, { label: "Use another account", href: to("account", {}, { view: "switch" }) }, { label: "Help and FAQ", href: to("help") }, { label: "Why 3D Review exists", href: to("about") }, { label: "Send app feedback", href: to("feedback", {}, { from: route.name, review: page.data?.data?.review?.title ?? page.data?.results?.review?.title ?? "" }) },
+    { label: "Account settings", href: to("account") }, { label: "Request activity", href: to("activity") }, { label: "Version and changes", href: to("account", {}, { view: "release" }) }, { label: "Roadmap", href: to("account", {}, { view: "roadmap" }) }, { label: "Use another account", href: to("account", {}, { view: "switch" }) }, { label: "Help and FAQ", href: to("help") }, { label: "Why 3D Review exists", href: to("about") }, { label: "Send app feedback", href: to("feedback", {}, { from: route.name, review: page.data?.data?.review?.title ?? page.data?.results?.review?.title ?? "" }) },
     { label: "Public website home", href: to("landing") }, { kind: "theme" }, { label: "Projects", href: to("projects") }, { label: "Current design", href: legacyHref(route, liveContext()) }, { kind: "hr" }, { label: "Sign out", onclick: signOut },
   ] : []);
   function onSignedIn() { D.clearLinks(); SU.forgetAll(); S.forget(); session = undefined; const next = page.data?.next; go(next && next !== "#/signin" ? next : to("home")); }
@@ -310,6 +325,14 @@
     const current = () => generation === seq && route.params.aid === aid && credential === token() && principal === session?.principal?.id;
     const request = async (url, options) => {
       if (!current()) throw new Error("The review or sign-in changed. Reopen the original review to check its saved notes.");
+      if (options?.method && options.method !== "GET") {
+        // Cookie sessions can change in another tab without changing facilitatorToken or this cached shell.
+        const fresh = await api("/v2/me");
+        if (!current() || fresh?.principal?.id !== principal) {
+          S.forget(); D.clearLinks();
+          throw new Error("Your signed-in account changed. Reopen the review before saving or completing it.");
+        }
+      }
       return api(url, options);
     };
     return {
@@ -451,14 +474,18 @@
   {/if}
 {:else if page.data.screen === "home"}
   <Home {phone} {theme} data={page.data.home} state={phone ? "reviews" : page.data.state} />
+{:else if page.data.screen === "review-links"}
+  {#key `${page.data.assessment.id}:${session?.principal?.id}`}<SurveyLinks {phone} {theme} aid={page.data.assessment.id} surveys={page.data.surveys} principalId={session?.principal?.id} role={page.data.assessment.role} title={page.data.assessment.name} user={{ first: who?.first, initials: who?.initials }} onrevoked={() => D.clearLinks()} />{/key}
+{:else if page.data.screen === "activity"}
+  <Activity {phone} {theme} entries={page.data.entries} onrefresh={load} />
 {:else if page.data.screen === "account"}
-  {#key page.data.principal.id}<AccountSettings {phone} {theme} principal={page.data.principal} initialView={page.data.view} onsaved={async () => { S.forget(); session = await S.me({ fresh: true }); applyChrome(session); }} onskip={() => go(to("home"))} onswitch={async () => { try { await S.signOut(); D.clearLinks(); SU.forgetAll(); session = null; go(to("sign-in")); } catch (e) { page = { status: "error", key: route.name, data: null, error: { kind: classify(e), message: "Account switch could not be confirmed. You may still be signed in." } }; } }} />{/key}
+  {#key page.data.principal.id}<AccountSettings {phone} {theme} principal={page.data.principal} initialView={page.data.view} onsaved={async () => { S.forget(); session = await S.me({ fresh: true }); applyChrome(session); }} onskip={() => go(to("home"))} onswitch={async () => { try { await S.signOut(); clearActivity(); D.clearLinks(); SU.forgetAll(); session = null; go(to("sign-in")); } catch (e) { page = { status: "error", key: route.name, data: null, error: { kind: classify(e), message: "Account switch could not be confirmed. You may still be signed in." } }; } }} />{/key}
 {:else if page.data.screen === "project-tools" || page.data.screen === "review-tools"}
   {#key page.data.entity.id}<EntityTools {phone} {theme} type={page.data.screen === "review-tools" ? "assessment" : "project"} entity={page.data.entity} />{/key}
 {:else if page.data.screen === "workspaces"}
   <Workspaces {phone} {theme} workspaces={page.data.workspaces} canCreate={session?.principal?.kind === "user" && session?.principal?.provisioned === true} />
 {:else if page.data.screen === "projects"}
-  <Projects {phone} {theme} projects={page.data.projects} returnToSetup={route.query.get("return") === "setup1"} />
+  <Projects {phone} {theme} projects={page.data.projects} returnToSetup={route.query.get("return") === "setup1"} canCreate={session?.principal?.kind === "user" && session?.principal?.provisioned === true} />
 {:else if page.data.screen === "project-settings"}
   {#if page.data.project.id !== route.params.pid}<Status {phone} {theme} kind="loading" back={to("home")} />{:else}
     {#key page.data.project.id}<ProjectSettings {phone} {theme} project={page.data.project} />{/key}
@@ -469,6 +496,7 @@
 {:else if SETUP.has(page.data.screen) && page.data.step && suView}
   {@const C = REGISTRY[page.data.screen]}
   {@const n = page.data.step}
+  {#if suSt?.undo}<UndoNotice undo={suSt.undo} onundo={async () => { await SU.undoDetails(suSt); await load(); }} />{/if}
   {#if n === 1}<C {phone} {theme} data={suView.details} onfield={suField} lang={suLang} onnext={suStep[1]} busy={suBusy} error={suError} status={suView.status} />
   {:else if n === 2}<C {phone} {theme} data={suView.passage} onfield={suField} onfile={suPassage.onfile} onattach={suPassage.onattach} onlink={suPassage.onlink} onremove={suPassage.onremove} onlwc={suPassage.onlwc} onnext={suStep[2]} busy={suBusy} error={suError} status={suView.status} />
   {:else if n === 3}<C {phone} {theme} data={{ groups: suView.groups }} ongroup={suGroups.ongroup} onexpected={suGroups.onexpected} onnext={suStep[3]} busy={suBusy} error={suError} status={suView.status} />

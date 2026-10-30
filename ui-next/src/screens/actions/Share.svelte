@@ -9,6 +9,7 @@
      240px 1fr auto auto (no contract row: generator line); the rows sit in the work card's 20px gap, as drawn. Access codes: §2 Disclosure. Links: ../href.js href() with this screen's w/theme.
      One .btn-primary per page: desktop "Done" (page head), phone "Show QR codes for the room" (phone-bar). -->
 <script>
+  import { liveContext } from "../href.js";
   import { onMount } from "svelte";
   import { createAccessCodesState } from "../../app/access-codes.svelte.js";
   import AppShell from "../../AppShell.svelte";
@@ -56,6 +57,7 @@
 {#snippet download()}<Ico d={A.download} />{/snippet}
 
 <AppShell {phone} {theme} screen {top} {bar}>
+  {#if liveContext()?.aid && liveContext().aid !== "sample"}<a class="link" href={href("review-links", at)}>Preview or revoke survey links</a>{/if}
   {#if phone}
     <ReviewHead phone {theme} title={R.review.title} project={R.project} stage={R.review.stage ?? "collecting"} viewed="collect" live="collect" canClose={role === "owner" || role === "member"} />
     <p class="small">{D.phoneLead}</p>

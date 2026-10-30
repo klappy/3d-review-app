@@ -126,7 +126,7 @@ describe("actions lane links: the shared href() helper, literal names, w/theme c
       const src = readFileSync(join(LANE_DIR, f), "utf8").replace(/<!--[\s\S]*?-->/g, "").replace(/^\s*\/\/.*$/gm, "");
       expect(src.match(/[?&]screen=/g), f).toBeNull();
     }
-    expect([...declared].sort()).toEqual(["about", "action-plan", "close-collection", "collect", "explore", "feedback", "help", "home", "invitations", "landing", "menu", "next-step", "paper-entry", "people", "print", "project", "qr-room", "results", "sandbox", "setup1", "setup5", "share", "sign-in", "workspace"]);
+    expect([...declared].sort()).toEqual(["about", "action-plan", "close-collection", "collect", "explore", "feedback", "help", "home", "invitations", "landing", "menu", "next-step", "paper-entry", "people", "print", "project", "qr-room", "results", "review-links", "review-tools", "sandbox", "setup1", "setup5", "share", "sign-in", "workspace"]);
   });
   it("no fixture carries a link (links are built in the .svelte files, where the shared link test reads them)", () => {
     const dir = resolve(__dirname, "../ui-next/fixtures/actions");

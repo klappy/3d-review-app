@@ -11,6 +11,7 @@
 export const ROUTES = Object.freeze([
   ["home", "/"],
   ["account", "/account"],
+  ["activity", "/activity"],
   ["landing", "/welcome"],
   ["about", "/about"],
   ["sign-in", "/signin"],
@@ -35,6 +36,7 @@ export const ROUTES = Object.freeze([
   ["project-settings", "/project/:pid/settings"],
   ["project-tools", "/project/:pid/manage"],
   ["review-tools", "/review/:aid/manage"],
+  ["review-links", "/review/:aid/links"],
   ["review", "/review/:aid"],
   ["collect", "/review/:aid/collect"],
   ["qr-room", "/review/:aid/collect/qr"],

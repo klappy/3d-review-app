@@ -20,6 +20,7 @@ it('retains edited text and never completes when save is uncertain', async () =>
   const complete = vi.fn();
   const v = render(Editor, { notes: {}, onsave: async () => { throw new Error('Outcome unknown'); }, oncomplete: complete });
   await fireEvent.input(v.getByLabelText('What you noticed'), { target: { value: 'Keep my draft' } });
+  await fireEvent.click(v.getByLabelText('I checked the meaning, the missing evidence and any sensitive details'));
   await fireEvent.click(v.getByText('Save and complete the review'));
   await waitFor(() => expect(v.getByRole('alert').textContent).toContain('Outcome unknown'));
   expect((v.getByLabelText('What you noticed') as HTMLTextAreaElement).value).toBe('Keep my draft');
@@ -28,6 +29,7 @@ it('retains edited text and never completes when save is uncertain', async () =>
 it('completion waits for saving and verified readback', async () => {
   const order: string[] = [];
   const v = render(Editor, { notes: {}, onsave: async () => { order.push('saved and read'); }, oncomplete: async () => { order.push('complete'); } });
+  await fireEvent.click(v.getByLabelText('I checked the meaning, the missing evidence and any sensitive details'));
   await fireEvent.click(v.getByText('Save and complete the review'));
   await waitFor(() => expect(order).toEqual(['saved and read', 'complete']));
 });
@@ -74,6 +76,7 @@ it('destroying an editor during its pending save never invokes completion', asyn
   const complete = vi.fn();
   const pending = new Promise<void>(resolve => { release = resolve; });
   const v = render(Editor, { notes: {}, onsave: () => pending, oncomplete: complete });
+  await fireEvent.click(v.getByLabelText('I checked the meaning, the missing evidence and any sensitive details'));
   await fireEvent.click(v.getByText('Save and complete the review'));
   v.unmount(); release(); await pending; await Promise.resolve();
   expect(complete).not.toHaveBeenCalled();

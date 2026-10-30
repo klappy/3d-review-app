@@ -92,7 +92,7 @@
         </Card>
       {/each}
     {/each}
-    <Card href="#practice" gap={2}><Row gap={3}><span class="icn" data-lens="team"><Icon d={I.sparkle} /></span><span class="small"><b>Practice</b> · open the sample or make a practice copy</span></Row></Card>
+    <Card href="#practice" gap={2}><Row gap={3}><span class="icn" data-lens="team"><Icon d={I.sparkle} /></span><span class="small"><b>Practice</b> · {data.practiceAvailable === false ? "open the labelled sample review" : "open the sample or make a practice copy"}</span></Row></Card>
     <details class="dd"><summary class="link small">Completed · {data.completed.length}</summary>
       <Stack gap={2}>{#each data.completed as c}<a class="card-link solid l-card l-stack" href={c.href ?? "#next-step"} data-gap="1"><span class="h3">{c.title}</span><span class="small">{c.meta}</span></a>{/each}</Stack>
     </details>
@@ -109,7 +109,7 @@
             <span class="micro">Welcome, {data.user.first}</span>
             <h2 class="display">Your first 3D Review takes about ten minutes to set up.</h2>
             <p>You have not started one yet. Try the practice copy first if you want to see the whole journey with made-up answers, or start the real thing — you can change anything until you launch.</p>
-            <Row wrap gap={3}><Button label="Open the sample review" href="#results" /><Button label="Make a practice copy" href="#sandbox" /><a class="link" href="#video">Watch the 2-minute tour</a></Row>
+            <Row wrap gap={3}><Button label="Open the sample review" href="#results" />{#if data.practiceAvailable !== false}<Button label="Make a practice copy" href="#sandbox" />{/if}<a class="link" href="#video">Watch the 2-minute tour</a></Row>
           </Stack>
           <Grid cols={4} gap={4}>
             {#each PHASES as [name, text], i}<Row gap={3}><span class="num">{i + 1}</span><Stack gap={1}><h3 class="h3">{name}</h3><p class="small">{text}</p></Stack></Row>{/each}
@@ -156,7 +156,7 @@
         <Card gap={3} label="Practice">
           <Row split wrap gap={4}>
             <Row gap={3}><span class="icn" data-lens="team"><Icon d={I.sparkle} /></span><Stack gap={1}><h3 class="h3">Practice</h3><p class="small">Try a review without real answers. Open the shared sample, or make a practice copy of one of yours and fill it with simulated responses. Practice copies are badged, kept out of Explore and reports, and can be deleted.</p></Stack></Row>
-            <Row gap={2}><Button label="Open the sample" variant="quiet" href="#results" /><Button label="Make a practice copy" href="#sandbox" /></Row>
+            <Row gap={2}><Button label="Open the sample" variant="quiet" href="#results" />{#if data.practiceAvailable !== false}<Button label="Make a practice copy" href="#sandbox" />{/if}</Row>
           </Row>
         </Card>
         <Section heading="Completed" help={`${data.completed.length} · hidden until you tick Completed above`}>

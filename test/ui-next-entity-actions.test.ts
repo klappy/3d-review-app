@@ -37,7 +37,7 @@ it('archive requires independently matching state, and deletion requires absence
 it('project creation can cancel without writes and return the verified new project to the retained setup draft', async () => {
   const calls: string[] = [];
   globalThis.fetch = vi.fn(async (url, init: any) => { calls.push(`${init.method} ${url}`); return response({ project: { id: 'new-project', name: 'New project' } }); }) as any;
-  const v = render(Projects, { projects: [], returnToSetup: true });
+  const v = render(Projects, { projects: [], returnToSetup: true, canCreate: true });
   await fireEvent.click(v.getByText('New project')); await fireEvent.click(v.getByText('Cancel')); expect(calls).toEqual([]);
   await fireEvent.click(v.getByText('New project'));
   await fireEvent.input(v.getByLabelText('Project name'), { target: { value: 'New project' } });

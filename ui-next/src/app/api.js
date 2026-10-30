@@ -1,5 +1,6 @@
 // UI Next (v4) live API client. Status: provisional. The same call the current UI makes (ui/assess/assess.js api()): same-origin
 // JSON, cookie session, plus the legacy facilitatorToken bearer when this tab holds one (code sign-in). No new backend.
+import { observeActivity } from "./activity.js";
 import { refusalError } from "../../../ui/rate-limit.js";
 import { classify } from "../../../ui/assess/scope.js";
 export { classify };
@@ -16,6 +17,7 @@ export async function apiFull(url, { method = "GET", body } = {}) {
   let j = null;
   try { j = await r.json(); } catch { /* unreadable */ }
   if (!r.ok || !j?.ok) throw refusalError(r.status, j?.error, r);
+  observeActivity(j, t);
   return j;
 }
 export async function api(url, options) { return (await apiFull(url, options)).result; }
