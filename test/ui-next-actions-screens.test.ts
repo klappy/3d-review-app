@@ -86,7 +86,7 @@ describe("actions lane screens render as the boards draw them", () => {
         expect(a, `${name} ${v}`).toBeTruthy();
         expect(a.dataset.theme).toBe(props.theme ?? "light");
         if (props.phone || name === "menu") expect(a.dataset.w).toBe("phone");
-        expect(a.querySelectorAll(".btn-primary").length).toBeLessThanOrEqual(1);
+        expect([...a.querySelectorAll(".btn-primary")].filter(el => !el.closest("dialog:not([open])")).length).toBeLessThanOrEqual(1);
         expect(a.querySelectorAll("[style]").length).toBe(0);
         for (const r of rows) expect(text(a), r).toContain(r);
       });
@@ -390,7 +390,7 @@ describe("actions lane parts", () => {
 // Validator round 2 N2 + N4 (VALIDATION-actions-r2.md): controls that looked live but did nothing.
 describe("actions lane controls act, and the ones that cannot yet are named debt", () => {
   const byText = (root: Element, sel: string, t: string) => [...root.querySelectorAll(sel)].find((el) => text(el) === t) as HTMLElement;
-  it("action plan: the share-link copies are buttons that copy the plan link; Email it goes to people at both widths; Print prints", async () => {
+  it("action plan: the share-link copies are buttons that copy the plan link; Email it prepares a draft at both widths; Print prints", async () => {
     const writeText = vi.fn(async () => {});
     Object.defineProperty(navigator, "clipboard", { value: { writeText }, configurable: true });
     const before = window.print;
@@ -404,7 +404,7 @@ describe("actions lane controls act, and the ones that cannot yet are named debt
       await fireEvent.click(copy);
       await vi.waitFor(() => expect(text(copy)).toBe("Copied"));
       expect(writeText).toHaveBeenLastCalledWith(PLAN.share.url);
-      expect(p(byText(d, "a", "Email it").getAttribute("href") ?? "").get("screen")).toBe("people");
+      expect(byText(d, "button", "Email it").getAttribute("aria-haspopup")).toBe("dialog");
       await fireEvent.click(byText(d, "button", "Print"));
       expect(print).toHaveBeenCalledTimes(1);
       const ph = mount(ActionPlan, { phone: true });
@@ -413,7 +413,7 @@ describe("actions lane controls act, and the ones that cannot yet are named debt
       await fireEvent.click(pc);
       await vi.waitFor(() => expect(text(pc)).toBe("Copied"));
       expect(writeText).toHaveBeenCalledTimes(2);
-      expect(p(byText(ph, "a", "Email it").getAttribute("href") ?? "").get("screen")).toBe("people");
+      expect(byText(ph, "button", "Email it").getAttribute("aria-haspopup")).toBe("dialog");
       expect(ph.querySelector("input[readonly]")).toBeNull();
     } finally {
       Reflect.deleteProperty(navigator, "clipboard");
@@ -518,12 +518,10 @@ describe("actions lane controls act, and the ones that cannot yet are named debt
     "More actions → collect[menu]", "People with access → people", "Print or share the plan → action-plan", "Print {survey} survey → print",
     "QR code for {survey} → qr-room", "QR for {survey} → qr-room", "See all results → results", "Public website home → landing", "Send app feedback → feedback", "Share the practice survey → share",
     "Share the survey → share", "Show QR codes for the room → qr-room", "Start a 3D Review → setup1", "BCS · India — switch workspace → workspace",
-    "Why 3D Review exists → about",
+    "Why 3D Review exists → about", "Open email app → mailto",
   ];
   const STAND_IN: Record<string, string> = {
     "Complete the review → home": "debt 3: no review-stage write in UI Next",
-    "Email it → people": "debt 3: no mail seam; People holds the addresses",
-    "Email the links to someone → people": "debt 1: no mail seam; People holds the addresses",
     "Print 2 surveys → collect": "debt 2: printing not wired (printDocumentHtml / openPrintDocument)",
     "Try translating again → print": "debt 2: translatePrint not called",
     "Save and enter the next paper → paper-entry": "debt 5: saving a paper response not wired",
@@ -538,6 +536,7 @@ describe("actions lane controls act, and the ones that cannot yet are named debt
     "Use another account → sign-in": "debt 8: no sign-out seam in UI Next",
   };
   const control = (a: HTMLAnchorElement) => {
+    if ((a.getAttribute("href") ?? "").startsWith("mailto:")) return `${text(a)} → mailto`;
     let label = (a.getAttribute("aria-label") ?? text(a)).replace(/\s+/g, " ").trim();
     for (const sv of R.surveys) label = label.replace(sv.name, "{survey}");
     const [query, hash] = (a.getAttribute("href") ?? "").split("#");

@@ -4,7 +4,7 @@
      Desktop paper: the pinned base.css .paper[data-sheet] row (the 794px page, 56/64 padding, --sp-5 gap; the results lane's report
      sheet row) in the paper scope (.pfoot); its contents on the Paper sheet contents row (design-system.md §8.11). Links: ../href.js href()
      with this screen's w/theme. One .btn-primary per page: desktop "Download PDF" (top bar), phone "Share the PDF" (phone-bar).
-     Controls: "Copy share link" / "Copy link" copy the plan link (./CopyButton.svelte); "Email it" goes to people (both widths); "Print"
+     Controls: "Copy share link" / "Copy link" copy the plan link (./CopyButton.svelte); "Email it" prepares the displayed discussion text in the user’s email app (both widths), with a copyable fallback; "Print"
      opens the browser's print (./ActButton.svelte). A refused copy says "Copy failed" (a short label, so the phone row keeps its width)
      and its status says to select the link: the desktop page prints the link; the phone card draws none, so it shows the link in a
      readonly field once the copy is refused, and the row wraps rather than clip at 320 (VALIDATION-actions-r4.md R4-1). "Download PDF" / "Share the PDF" (#pdf) wait on a PDF of the plan: RESULTS debt. -->
@@ -21,6 +21,7 @@
   import Qr from "./Qr.svelte";
   import CopyButton from "./CopyButton.svelte";
   import ActButton from "./ActButton.svelte";
+  import EmailDraft from "./EmailDraft.svelte";
   import Ico from "./Ico.svelte";
   import { A } from "./icons.js";
   import { href } from "../href.js";
@@ -34,19 +35,21 @@
   let { phone = false, theme = "light", data = null, user = R0.user } = $props();
   const live = $derived(!!data);
   const D = $derived(data ? { doc: data.doc, meta: data.meta, talk: data.talk, noticed: "", next: "", facts: [["Built on", data.review.builtOn || "—"], ["Responses", String(data.review.responses)], ["Agreed by", "—"]], share: null, foot: data.foot, phone: { crumb: `${data.review.title} · ${data.stage === "reviewed" ? "improve" : "understand"}`, meta: `${data.review.project} · ${data.talk.length} item${data.talk.length === 1 ? "" : "s"} · from the built report`, items: data.talk.map(([t, apart]) => [t, apart]) } } : D0);
+  let emailOpen = $state(false);
   const R = $derived(data ? { ...R0, user, review: { title: data.review.title } } : R0);
   const at = $derived(carry(phone, theme));
   // "Print" prints this page through the browser, as the current UI's print buttons do (ui/stage-screens.js doc.defaultView.print()).
   const printPage = () => globalThis.print?.();
   let refused = $state(false);
+  const emailBody = $derived([`Next steps: ${R.review.title}`, D.meta, "What we will talk about", ...D.talk.map(([topic, detail], i) => `${i + 1}. ${topic}${detail ? ` — ${detail}` : ""}`), ...(live ? ["These discussion items come from the built report. Agreed actions and notes have not been recorded in this app."] : [`What we noticed: ${D.noticed}`, `The next step: ${D.next}`])].filter(Boolean).join("\n\n"));
   const NO_NOTES = "Not recorded: notes are not saved in this app yet (no plan store in the API).";
   const NO_SHARE = "A read-only link to the plan is not available yet: the API has no plan share link. Print this page instead.";
 </script>
 
 {#snippet mail()}<Ico d={A.mail} />{/snippet}
 {#snippet download()}<Ico d={A.download} />{/snippet}
-{#snippet top()}{#if phone}<PhoneHeader state="nested" title="Next steps" parent={live ? R.review.title : "Luke 1–2"} back={href("next-step", at)} initials={R.user.initials} menuHref={href("menu", at)} />{:else}<DocTop title={D.doc} home={href("next-step", at)}>{#if D.share}<CopyButton text={D.share.url} label="Copy share link" lead="link" />{/if}<Button label="Email it" href={href("people", at)} lead={mail} />{#if live}<ActButton label="Print" lead="print" onclick={printPage} />{:else}<Button label="Download PDF" variant="primary" href="#pdf" lead={download} /><ActButton label="Print" lead="print" onclick={printPage} />{/if}</DocTop>{/if}{/snippet}
-{#snippet bar()}{#if phone}{#if live}<div class="glass phone-bar" role="group" aria-label="Page actions"><button class="btn btn-primary btn-lg" type="button" onclick={printPage}>Print</button></div>{:else}<PhoneBar label="Share the PDF" href="#pdf" />{/if}{/if}{/snippet}
+{#snippet top()}{#if phone}<PhoneHeader state="nested" title="Next steps" parent={live ? R.review.title : "Luke 1–2"} back={href("next-step", at)} initials={R.user.initials} menuHref={href("menu", at)} />{:else}<DocTop title={D.doc} home={href("next-step", at)}>{#if D.share}<CopyButton text={D.share.url} label="Copy share link" lead="link" />{/if}<EmailDraft {phone} bind:opened={emailOpen} subject={`Next steps: ${R.review.title}`} body={emailBody} label="Email it" />{#if live}<ActButton label="Print" lead="print" onclick={printPage} />{:else}<Button label="Download PDF" variant={emailOpen ? "secondary" : "primary"} href="#pdf" lead={download} /><ActButton label="Print" lead="print" onclick={printPage} />{/if}</DocTop>{/if}{/snippet}
+{#snippet bar()}{#if phone}{#if live}<div class="glass phone-bar" role="group" aria-label="Page actions"><button class={emailOpen ? "btn btn-lg btn-block" : "btn btn-primary btn-lg"} type="button" onclick={printPage}>Print</button></div>{:else}<PhoneBar demoted={emailOpen} label="Share the PDF" href="#pdf" />{/if}{/if}{/snippet}
 
 <AppShell {phone} {theme} screen {top} {bar}>
   {#if phone}
@@ -62,9 +65,9 @@
     <Card gap={2} label="Share">
       <span class="micro">Share</span>
       {#if D.share}<p class="small">Read-only link, expires in 90 days.</p>
-      <Row wrap gap={2}><CopyButton text={D.share.url} label="Copy link" block bind:failed={refused} /><Button label="Email it" href={href("people", at)} lead={mail} block /></Row>
+      <Row wrap gap={2}><CopyButton text={D.share.url} label="Copy link" block bind:failed={refused} /><EmailDraft {phone} bind:opened={emailOpen} subject={`Next steps: ${R.review.title}`} body={emailBody} label="Email it" /></Row>
       {#if refused}<input class="in small" readonly value={D.share.url} aria-label="Link to this plan" />{/if}
-      {:else}<p class="small">{NO_SHARE}</p><Row wrap gap={2}><Button label="Email it" href={href("people", at)} lead={mail} block /></Row>{/if}
+      {:else}<p class="small">{NO_SHARE}</p><Row wrap gap={2}><EmailDraft {phone} bind:opened={emailOpen} subject={`Next steps: ${R.review.title}`} body={emailBody} label="Email it" /></Row>{/if}
     </Card>
   {:else}
     <!-- Paper sheet contents (design-system.md §8.11 row, provisional; the next-steps sheet): .paper-title-row (title + .sheet-meta, the
