@@ -613,7 +613,7 @@ const formatIconOf = (formats) => (formats.some((f) => /audio|oral/i.test(f)) ? 
 // /v2/projects direct_role: ui/workspace-manager.js mayGroup decides, through people-data.js groupRows).
 export async function workspaceModel(wid, me) {
   const [{ workspace: w, projects: wps }, mine] = await Promise.all([workspace(wid), projects()]);
-  const live = (wps ?? []).filter((p) => !p.archived_at);
+  const live = wps ?? [];
   const lists = await Promise.all(live.map((p) => assessmentsOf(p.id).then((as) => as.filter((a) => !a.archived_at).sort((x, y) => String(y.created_at).localeCompare(String(x.created_at))))));
   const all = lists.flat();
   useSessionPolicy();
@@ -624,7 +624,7 @@ export async function workspaceModel(wid, me) {
     const reported = as.find((a) => ["understand", "improve"].includes(a.stage));
     const lenses = reported ? await reviewLenses(reported) : null;
     return {
-      id: p.id, title: p.name, href: to("project", { pid: p.id }), stage: as[0] ? PILL_OF[as[0].stage] ?? "setup" : "setup",
+      id: p.id, title: p.name, archived_at: p.archived_at, directRole: mine.find(x => x.id === p.id)?.direct_role ?? null, href: to("project", { pid: p.id }), stage: as[0] ? PILL_OF[as[0].stage] ?? "setup" : "setup",
       language: langs.join(" · ") || "Language not set", format: formats.join(" · ") || "Format not set", formatIcon: formatIconOf(formats),
       orgs: p.organization ? [[p.organization, false]] : [], reviews: Number(p.assessment_count ?? as.length), responses: Number(p.response_count ?? 0),
       activity: as[0] ? ago(as[0].updated_at || as[0].created_at) : "no review yet", levels: lenses ? levelTriples(lenses) : null,
@@ -664,10 +664,10 @@ export async function exploreModel(me) {
   // Explore bands with the results lane's cut-off (explore-data.js levelOf): the session's served policy, never a per-review read.
   const levelMinimum = useSessionPolicy();
   const rows = await Promise.all(home.rows.map(async ({ a, p }) => ({
-    id: a.id, title: a.name, project: p.name, language: a.language_name || "", region: "", orgs: p.organization || "",
+    id: a.id, title: a.name, project: p.name, projectId: a.project_id, projectHref: to("project", { pid: a.project_id }), updatedAt: a.updated_at || a.created_at, language: a.language_name || "", region: "", orgs: p.organization || "",
     stage: Object.hasOwn(PILL_OF, a.stage) ? a.stage : "prepare", responses: { n: Number(a.response_count ?? 0) }, lenses: await reviewLenses(a),
     updated: ago(a.updated_at || a.created_at), href: to(a.stage === "prepare" ? "review" : a.stage === "collect" ? "collect" : "results", { aid: a.id }),
   })));
   const phone = rows.map((r) => ({ title: r.title, href: r.href, meta: [r.project, monthOf(home.rows.find((x) => x.a.id === r.id)?.a.created_at)].filter(Boolean).join(" · "), team: r.lenses?.team ?? null, lenses: r.lenses ?? null }));
-  return { levelMinimum, user: home.user, workspace: home.workspace, visible: rows.length, filters: [], groupBy: { options: ["None"], selected: "None" }, addFilter: [], reviews: rows, phone: { chips: [], rows: phone, sheet: [] } };
+  return { levelMinimum, projects: home.projects, user: home.user, workspace: home.workspace, visible: rows.length, filters: [], groupBy: { options: ["None"], selected: "None" }, addFilter: [], reviews: rows, phone: { chips: [], rows: phone, sheet: [] } };
 }

@@ -63,7 +63,7 @@
       </Card>
     {/each}
     {#if live}<Card gap={3} label="Resources for weakest areas"><ReviewResources weak={D.weak} /></Card>{/if}
-    {#if live}<Card gap={3} label="Notes and plan"><PlanEditor notes={D.notes} {onsave} {oncomplete} /></Card>{/if}
+    {#if live}<Card gap={3} label="Notes and plan"><PlanEditor notes={D.notes} suggestions={D.talk.map(([topic]) => topic)} {onsave} {oncomplete} /></Card>{/if}
     <Row wrap gap={2}><Button label="See all results" href={href("results", at)} lead={list} block /><Button label="Print or share the plan" href={href("action-plan", at)} lead={print} block /></Row>
   {:else}
     <Page gap={5}>
@@ -75,19 +75,19 @@
             <Row gap={3}><span class="h3">Where the perspectives disagree</span>{#if widestLine(D.gaps.length)}<span class="small">{widestLine(D.gaps.length)}</span>{/if}</Row>
             {#if live && !D.gaps.length}<p class="small">The built report shows no area two perspectives both scored.</p>{/if}
             {#each D.gaps as g}
-              <label class="row-opt" data-kind="gap"><input class="cb" type="checkbox" checked={g.checked} /><b>{g.area}</b><GapBar pts={g.pts} span={g.span} wide={g.wide} w="100%" /><strong class="small">{g.apart}</strong></label>
+              <label class="row-opt" data-kind="gap">{#if !live}<input class="cb" type="checkbox" checked={g.checked} />{/if}<b>{g.area}</b><GapBar pts={g.pts} span={g.span} wide={g.wide} w="100%" /><strong class="small">{g.apart}</strong></label>
             {/each}
           </Stack>
           <Stack gap={2}>
             <Row gap={3}><span class="h3">Weakest areas</span><span class="small">Needs support or urgent attention</span></Row>
             {#if live && !D.weak.length}<p class="small">No low-scoring areas are available to show from this report.</p>{/if}
             {#each D.weak as a}
-              <label class="row-opt l-row" data-split><span class="l-row" data-gap="3"><input class="cb" type="checkbox" checked={a.checked} /><LensDot lens={a.lens} decorative /><b>{a.label}</b></span><Level level={a.level} /></label>
+              <label class="row-opt l-row" data-split><span class="l-row" data-gap="3">{#if !live}<input class="cb" type="checkbox" checked={a.checked} />{/if}<LensDot lens={a.lens} decorative /><b>{a.label}</b></span><Level level={a.level} /></label>
             {/each}
             {#if live}<ReviewResources weak={D.weak} />{/if}
             <input class="in" placeholder="Something else" aria-label="Something else" disabled={live} />
           </Stack>
-          {#if live}<PlanEditor notes={D.notes} {onsave} {oncomplete} />{:else}
+          {#if live}<PlanEditor notes={D.notes} suggestions={D.talk.map(([topic]) => topic)} {onsave} {oncomplete} />{:else}
           <div><label class="lbl" for="ns-noticed">What you noticed</label><textarea class="in" id="ns-noticed" disabled={live} aria-describedby={live ? "ns-notes-why" : undefined}>{D.noticed ?? ""}</textarea></div>
           <div><label class="lbl" for="ns-next">The next step</label><textarea class="in" id="ns-next" disabled={live} aria-describedby={live ? "ns-notes-why" : undefined}>{D.next ?? ""}</textarea></div>
           <Grid cols={2} gap={4}>

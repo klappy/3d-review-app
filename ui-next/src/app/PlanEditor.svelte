@@ -1,8 +1,7 @@
 <script>
-  import Button from '../Button.svelte';
   import Stack from '../Stack.svelte';
   import Row from '../Row.svelte';
-  let { notes = {}, onsave, oncomplete } = $props();
+  let { notes = {}, suggestions = [], onsave, oncomplete } = $props();
   let reflection = $state(notes.notes_reflection ?? '');
   let next = $state(notes.notes_next_steps ?? '');
   let busy = $state(false), status = $state(''), failed = $state(false);
@@ -19,6 +18,7 @@
 </script>
 
 <Stack gap={3}>
+  {#if onsave && suggestions.length}<details><summary>Choose discussion topics for the plan</summary><Stack gap={2}>{#each suggestions as topic}<label class="row-opt"><input class="cb" type="checkbox" checked={next.split('\n').includes(topic)} disabled={busy} onchange={e => { const lines = next.split('\n').filter(x => x !== topic); next = (e.currentTarget.checked ? [...lines, topic] : lines).filter(Boolean).join('\n'); }} />{topic}</label>{/each}</Stack></details>{/if}
   <div><label class="lbl" for="plan-reflection">What you noticed</label><textarea class="in" id="plan-reflection" bind:value={reflection} disabled={!onsave || busy}></textarea></div>
   <div><label class="lbl" for="plan-next">The next step</label><textarea class="in" id="plan-next" bind:value={next} disabled={!onsave || busy}></textarea><p class="small">Include agreed actions, who will follow up and dates. Everyone with access to this review can read these notes.</p></div>
   <Row wrap gap={2}>

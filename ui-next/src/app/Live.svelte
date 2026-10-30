@@ -28,6 +28,7 @@
   import Home from "../screens/Home.svelte";
   import SignInLive from "./SignInLive.svelte";
   import { savePlan } from "./plan.js";
+  import { renameWorkspace, ungroupProject } from "./workspace-actions.js";
   import Projects from "./Projects.svelte";
   import ProjectSettings from "./ProjectSettings.svelte";
   import { loadProjectSettings } from "./project-settings.js";
@@ -478,7 +479,7 @@
   <C {phone} {theme} data={page.data.data} state={route.query.get("state") ?? undefined} />
 {:else if page.data.screen === "workspace" || page.data.screen === "workspace-group"}
   {@const C = REGISTRY[page.data.screen]}
-  <C {phone} {theme} data={page.data.data} ongroup={groupProject} />
+  <C {phone} {theme} data={page.data.data} ongroup={groupProject} onrename={async name => { await renameWorkspace(page.data.data, name); await load(); }} onungroup={async project => { await ungroupProject(page.data.data, project); await load(); }} />
 {:else if page.data.screen === "people" || page.data.screen === "people-workspace"}
   {#if page.data.empty}
     <Status {phone} {theme} kind="empty" message={page.data.emptyText} back={to("home")} backLabel="Your reviews" />
