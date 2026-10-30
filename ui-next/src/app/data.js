@@ -528,9 +528,10 @@ export function menuModel(me, home, { onSignOut, currentDesign = "/#projects" } 
   return {
     who, initials: home.user.initials, invitation: null, chips: [home.workspace, "Mine"], reviews, completed: home.completed.length,
     items: [
-      ["list", "Projects", to("projects")], ["out", "Current design", currentDesign],
+      ["list", "Projects", to("projects")], ["people", "Workspaces", to("workspaces")], ["out", "Current design", currentDesign],
+      ["people", "Account settings", to("account")], ["list", "Version and changes", to("account", {}, { view: "release" })], ["list", "Roadmap", to("account", {}, { view: "roadmap" })], ["list", "Request activity", to("activity")],
       ["people", `${home.workspace} — your workspace`, to("workspaces")], ["mail", "Invitations", to("invitations")], ["help", "Help and FAQ", to("help")],
-      ["sparkle", "Why 3D Review exists", to("about")], ["pen", "Send app feedback", to("feedback")], ["globe", "Public website home", to("landing")], ["people", "Use another account", null, onSignOut], ["out", "Sign out", null, onSignOut],
+      ["sparkle", "Why 3D Review exists", to("about")], ["pen", "Send app feedback", to("feedback")], ["globe", "Public website home", to("landing")], ["people", "Use another account", to("account", {}, { view: "switch" })], ["out", "Sign out", null, onSignOut],
     ],
   };
 }
