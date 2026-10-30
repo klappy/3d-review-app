@@ -1,3 +1,5 @@
+<a id="release-procedure-and-corrective-review-hold"></a>
+
 # Release procedure
 
 ## Current release checklist
@@ -56,6 +58,8 @@ The following records preserve the September checkpoint, superseded topology and
 
 **September 2026 hold receipt (historical wording).** App PRs [6](https://github.com/klappy/3d-review-app/pull/6), [7](https://github.com/klappy/3d-review-app/pull/7), and [8](https://github.com/klappy/3d-review-app/pull/8) merged before required Bugbot SUCCESS without a named override. Later tests cannot make those merges compliant. [The recorded hold](https://github.com/klappy/3d-review-cookbook/issues/14#issuecomment-5706415133) and [kitchen case](https://github.com/klappy/kitchen/blob/main/rail/3-pass/2026-08-11-four-cs-amendment/HYGIENE-trial-line.md) govern. This PR documents corrective controls; it does not authorize its own merge, lift the hold, or authorize production.
 
+
+<a id="current-corrective-checkpoint--2026-09-16-2043-americanew_york"></a>
 
 ## Historical corrective checkpoint — 2026-09-16 20:43 America/New_York
 
