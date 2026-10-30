@@ -78,6 +78,10 @@ export async function openSetup(aid, { pid = "" } = {}) {
   } else {
     st = prior ?? { key, aid: null, role: "owner", stage: "prepare", draft: freshDraft(pid && ps.some((p) => p.id === pid) ? pid : ps.length === 1 ? ps[0].id : ""), snap: null, pre: [], projects: ps, templates: ts, languages: [], passages: [], fileStorage: true };
     st.projects = ps; st.templates = ts;
+    // Returning from Create project explicitly selects that authorized project without replacing the unsaved draft.
+    if (pid && ps.some((p) => p.id === pid) && st.draft.project !== pid) {
+      st.draft.project = pid; st.draft.language = ""; st.draft.languageQuery = ""; st.languages = [];
+    }
   }
   if (st.draft.project) await loadLanguages(st);
   STATES.set(key, st);
@@ -135,7 +139,18 @@ export async function savePassage(st) {
   if (Object.keys(body).length) { await api(`/v2/assessments/${enc(st.aid)}`, { method: "PATCH", body }); st.snap = { ...st.snap, purpose: now.purpose, lwc: now.lwc }; }
 }
 // Passages (src/passages.ts): JSON {url,title?,reference?} adds a link; a file is the raw body with ?name=; DELETE removes.
-export async function addPassageLink(st, url, title = "") { await api(`/v2/assessments/${enc(st.aid)}/passages`, { method: "POST", body: title ? { url, title } : { url } }); st.passages = (await passages(st.aid)).passages; }
+export async function addPassage(st, { url = "", title = "", reference = "" } = {}) {
+  if (st.role === "viewer") throw new Error("This review is read-only.");
+  if (!st.aid) throw new Error("Save the review before adding a passage.");
+  const body = {};
+  if (String(url).trim()) body.url = String(url).trim();
+  if (String(title).trim()) body.title = String(title).trim();
+  if (String(reference).trim()) body.reference = String(reference).trim();
+  if (!body.url && !body.reference) throw new Error("Name a passage reference or give a https:// link.");
+  await api(`/v2/assessments/${enc(st.aid)}/passages`, { method: "POST", body });
+  st.passages = (await passages(st.aid)).passages;
+}
+export const addPassageLink = (st, url, title = "", reference = "") => addPassage(st, { url, title, reference });
 export async function addPassageFile(st, file, fetchImpl = globalThis.fetch) {
   const headers = { accept: "application/json", "content-type": file.type || "application/octet-stream" };
   let t = null; try { t = sessionStorage.getItem("facilitatorToken"); } catch { /* none */ }
@@ -187,16 +202,25 @@ export function setExpected(st, tid, raw) { const g = st.draft.groups[tid]; if (
 export function setContext(st, tid, field, value) { const c = { ...(st.draft.context[tid] ?? {}) }; const v = String(value ?? "").trim(); if (v) c[field] = v; else delete c[field]; st.draft.context[tid] = c; }
 export const validateGroups = (d) => (chosenTids(d).length ? [] : ["Choose at least one group."]);
 // Step 3 Continue: a survey the review held and was unticked is removed now (cap.survey.deselect); new ticks wait for step 4.
-export async function saveGroups(st) {
+export async function saveGroups(st, { confirmRemoval } = {}) {
+  if (st.role === "viewer") throw new Error("This review is read-only.");
+  const removing = st.pre.filter((x) => !st.draft.groups[x.template]?.checked);
+  // Launched-survey removal may close collection and archive responses/codes/invitations. Require an explicit preview/cancel.
+  if (st.stage !== "prepare" && removing.length) {
+    if (!confirmRemoval) throw new Error("Confirm which surveys will be removed before changing a launched review.");
+    if (!(await confirmRemoval(removing))) return { saved: false, cancelled: true };
+  }
   for (const x of [...st.pre]) {
     if (st.draft.groups[x.template]?.checked) continue;
     await api(`/v2/assessments/${enc(st.aid)}/surveys/${enc(x.id)}`, { method: "DELETE" });
     st.pre = st.pre.filter((y) => y.id !== x.id); delete st.draft.groups[x.template]; delete st.draft.context[x.template];
   }
+  return { saved: true };
 }
 // Step 4 Continue: each new survey is selected with its context (sent only when something was entered, as the wizard does), the
 // expected counts are kept on this browser per survey id, then the demographics switch is written as the Prepare form writes it.
 export async function saveContext(st) {
+  if (st.role === "viewer") throw new Error("This review is read-only.");
   const d = st.draft, remembered = [];
   for (const tid of chosenTids(d)) {
     if (st.pre.some((x) => x.template === tid)) { const s = st.pre.find((x) => x.template === tid); remembered.push([s.id, expectedValue(d.groups[tid].expected)]); continue; }
@@ -224,8 +248,8 @@ export function detailsView(st, phone = false) {
 const size = (n) => (n == null ? "" : n > 1048576 ? `${(n / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round(n / 1024))} KB`);
 export function passageView(st) {
   const d = st.draft;
-  const shown = st.passages.filter((p) => !p.archived_at && p.kind !== "reference");
-  const files = shown.map((p) => ({ id: p.id, name: p.title || p.filename || p.url || "Attachment", note: p.media === "text" ? (p.pdf_key || p.pdf ? "Typeset · PDF" : "Text file") : p.media === "link" || p.media === "video" ? "Link" : (p.media || "").toUpperCase(), shows: p.kind === "link" ? p.url : `Participants open ${p.title || p.filename} from the survey.`, size: size(p.size), href: p.href || p.url || "" }));
+  const shown = st.passages.filter((p) => !p.archived_at);
+  const files = shown.map((p) => ({ id: p.id, kind: p.kind, reference: p.reference || "", name: p.title || p.filename || p.reference || p.url || "Attachment", note: p.kind === "reference" ? "Passage reference" : p.media === "text" ? (p.pdf_key || p.pdf ? "Typeset · PDF" : "Text file") : p.media === "link" || p.media === "video" ? "Link" : (p.media || "").toUpperCase(), shows: p.kind === "reference" ? p.reference : [p.reference, p.kind === "link" ? p.url : `Participants open ${p.title || p.filename} from the survey.`].filter(Boolean).join(" · "), size: size(p.size), href: p.kind === "reference" ? "" : p.href || p.url || "" }));
   const chips = d.lwc.map((code) => { const l = LWC_LANGUAGES.find((x) => x.code === code); return [l ? `${l.name} · ${l.code}` : code, l?.name ?? code, code]; });
   return { name: d.purpose, files, languages: [["English", "English", ""], ...chips], signNote: d.lwc.some((c) => LWC_LANGUAGES.find((x) => x.code === c)?.mt === false) ? "A sign language has no written survey — add an interpreter note in the next step instead." : "", fileStorage: st.fileStorage, max: MAX_LWC };
 }
