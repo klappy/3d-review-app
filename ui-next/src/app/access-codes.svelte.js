@@ -6,11 +6,13 @@ import { parse } from "./router.js";
 import { codeRequest, issueCodeBatch, undoCodeBatch, codesCsv } from "./access-codes.js";
 import { CAN_SHARE } from "../screens/actions/legacy.js";
 import { copyText } from "../screens/actions/copy.js";
+import { accessCodePrintDocument } from './access-code-print.js';
 export function createAccessCodesState({ aid = liveContext()?.aid, requestFactory = codeRequest } = {}) {
   const state = $state({ expanded: false, surveys: [], sid: "", count: 20, role: "", stage: "loading", message: "", codes: [], batch: null });
   let owner, bearer, request, mountedHash, alive = true, generation = 0;
+  const printTabs = new Set();
   const name = () => state.surveys.find(s => s.id === state.sid)?.name ?? "Survey";
-  function clear() { state.codes = []; state.batch = null; }
+  function clear() { state.codes = []; state.batch = null; for (const tab of printTabs) { try { if (tab.document?.body) tab.document.body.textContent = 'Code values cleared. Close this print page and return to the review.'; tab.close(); } catch {} } printTabs.clear(); }
   function sameContext() { const ctx = liveContext(); return alive && bearer === token() && (ctx === null || ctx.aid === aid) && (globalThis.location?.hash ?? "") === mountedHash; }
   async function current() {
     if (!sameContext()) return false;
@@ -94,7 +96,22 @@ export function createAccessCodesState({ aid = liveContext()?.aid, requestFactor
     if (!alive || gen !== generation) return;
     aid = route.params.aid; load();
   }
-  return { state, name, mount, load, issue, undo, download, copy, prepare,
+  async function print(win = globalThis) {
+    if (state.stage !== 'shown' || !state.codes.length) return;
+    const gen = generation, batch = state.batch;
+    const tab = win.open?.('', '_blank');
+    if (!tab) { state.message = 'The print page was blocked. Allow pop-ups, then print this same batch again.'; return; }
+    try {
+      tab.opener = null;
+      const allowed = await current();
+      if (gen !== generation || batch !== state.batch || state.stage !== 'shown') { tab.close(); return; }
+      if (!allowed) { generation++; clear(); state.stage = 'changed'; state.message = 'Your sign-in changed. Code values were cleared.'; tab.close(); return; }
+      const html = accessCodePrintDocument({ aid, survey: name(), codes: state.codes });
+      tab.document.open(); tab.document.write(html); tab.document.close(); printTabs.add(tab);
+      state.message = 'The current batch is ready to print. No new codes were issued. Close the print page to return.';
+    } catch { try { tab.close(); } catch {} state.message = 'Your sign-in or print page could not be checked. The codes remain here; print was not opened.'; }
+  }
+  return { state, name, mount, load, issue, undo, download, copy, print, prepare,
     setExpanded: value => { state.expanded = value; },
     setCount: value => { state.count = value; }, setSurvey: value => { state.sid = value; },
     cancel: () => { state.stage = "idle"; state.message = "Cancelled; no codes were issued."; },

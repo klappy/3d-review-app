@@ -36,7 +36,7 @@
     {:else if c.stage === "shown"}
       <p class="small">{c.codes.length} access code{c.codes.length === 1 ? "" : "s"} in this batch · shown once. Download or copy before leaving.</p>
       <label class="small l-stack" data-gap="1">Access codes<textarea class="in" readonly rows="6" value={c.codes.map(c => c.code).join("\n")}></textarea></label>
-      <div class="l-row" data-wrap data-gap="2"><button class="btn" type="button" onclick={flow.download}>Download as CSV</button><button class="btn" type="button" onclick={flow.copy}>Copy codes</button><button class="btn" type="button" onclick={flow.undo}>Undo this batch</button><button class="btn" type="button" onclick={flow.done}>Done with this batch</button></div>
+      <div class="l-row" data-wrap data-gap="2"><button class="btn" type="button" onclick={() => flow.print()}>Print this batch</button><button class="btn" type="button" onclick={flow.download}>Download as CSV</button><button class="btn" type="button" onclick={flow.copy}>Copy codes</button><button class="btn" type="button" onclick={flow.undo}>Undo this batch</button><button class="btn" type="button" onclick={flow.done}>Done with this batch</button></div>
     {:else if c.stage === "undo-required"}<button class="btn" type="button" onclick={flow.undo}>Retry undo</button>{/if}
     <p class="small" role="status">{c.message}</p>
   {/if}

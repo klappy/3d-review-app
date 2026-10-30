@@ -4,7 +4,7 @@
      and retry states are drawn here once; the lane screens draw the data. Screens with no live store yet are drawn from their fixture
      and labelled as a preview (never hidden): the receipt lists them. -->
 <script>
-  import { tick, untrack } from "svelte";
+  import { tick, untrack, setContext } from "svelte";
   import { openQrPrint, preparePapers, openPapersPrint, paperPreview, printOpenedLine, printAllowed } from "./print.js";
   import { loadBlankPrint } from "../../../ui/stage-screens.js";
   import { reportPdfUrl } from '../../../ui/pdf/download.js';
@@ -407,6 +407,7 @@
   const suContext = { oncontext: (key, field, v) => { const tid = SU.tidOfKey(suSt, key); if (tid) SU.setContext(suSt, tid, field, v); }, ondemographics: (on) => { suSt.draft.demographics = on; bump(); } };
   // The built report for this screen (app/data.js liveReport: full snapshot for the readers, compact payload for phone Results only).
   const reportFor = (m, screen) => D.liveReport(m, { phone, screen });
+  setContext("next-review-utilities", { visible: () => page.status === "ready" && (!!(session?.principal?.super_admin && !page.data?.sample) || !!page.data?.results?.reports?.length || !!(SETUP.has(page.data?.screen) && suSt?.undo)), render: () => utilities });
 </script>
 
 <!-- The build confirm (report-build.js: one plain sentence with the response count, confirm "Build the results", cancel "Not now").
@@ -425,7 +426,12 @@
   <div class="app" data-theme={theme} data-w={phone ? "phone" : undefined}><div class="layer"><main class="l-main" data-rhythm="center" data-sample-mark><div class={phone ? "l-page" : undefined}><Row gap={2}><Tag label="Sample review" />{#if link}<Button label={link.label} variant="quiet" href={link.href} />{/if}</Row></div></main></div></div>
 {/snippet}
 
-<AccessMode principal={session?.principal} sample={!!page.data?.sample} oninvalidate={() => { D.clearLinks(); SU.forgetAll(); S.forget(); page = { status: "loading", key: route.name, data: null, error: null }; }} />
+
+{#snippet utilities()}
+  <AccessMode principal={session?.principal} sample={!!page.data?.sample} oninvalidate={() => { D.clearLinks(); SU.forgetAll(); S.forget(); page = { status: "loading", key: route.name, data: null, error: null }; }} />
+  {#if page.data?.results?.reports?.length}<ReportHistory aid={page.data.results.aid} reports={page.data.results.reports} selected={page.data.results.reportId} screen={page.data.screen} />{/if}
+  {#if SETUP.has(page.data?.screen) && suSt?.undo}<UndoNotice undo={suSt.undo} onundo={async () => { await SU.undoDetails(suSt); await load(); }} />{/if}
+{/snippet}
 
 {#if page.status === "loading"}
   <LoadingFrame {phone} {theme} {chrome} kind={page.key} />
@@ -463,7 +469,6 @@
   <Status {phone} {theme} kind="unavailable" message={page.data.message} back={page.data.assessment ? to("collect", { aid: page.data.assessment.id }) : to("home")} backLabel={page.data.assessment ? "Back to Collect" : "Home"} />
 {:else if page.data.screen === "next-step" || page.data.screen === "action-plan"}
   {@const m = page.data.results}
-  {#if m.reports?.length}<ReportHistory aid={m.aid} reports={m.reports} selected={m.reportId} screen={page.data.screen} />{/if}
   {#if page.data.sample}{@render sampleMark()}{/if}
   {#if !page.data.plan}
     <Status {phone} {theme} kind="not_built" message={`No report has been built for ${m.review.title} yet, so there is nothing to plan from. ${m.canBuild ? "Build it on Results first." : "An owner or member of the review builds it."}`} back={to("results", route.params)} backLabel="Go to Results" />
@@ -496,7 +501,6 @@
 {:else if SETUP.has(page.data.screen) && page.data.step && suView}
   {@const C = REGISTRY[page.data.screen]}
   {@const n = page.data.step}
-  {#if suSt?.undo}<UndoNotice undo={suSt.undo} onundo={async () => { await SU.undoDetails(suSt); await load(); }} />{/if}
   {#if n === 1}<C {phone} {theme} data={suView.details} onfield={suField} lang={suLang} onnext={suStep[1]} busy={suBusy} error={suError} status={suView.status} />
   {:else if n === 2}<C {phone} {theme} data={suView.passage} onfield={suField} onfile={suPassage.onfile} onattach={suPassage.onattach} onlink={suPassage.onlink} onremove={suPassage.onremove} onlwc={suPassage.onlwc} onnext={suStep[2]} busy={suBusy} error={suError} status={suView.status} />
   {:else if n === 3}<C {phone} {theme} data={{ groups: suView.groups }} ongroup={suGroups.ongroup} onexpected={suGroups.onexpected} onnext={suStep[3]} busy={suBusy} error={suError} status={suView.status} />
@@ -516,7 +520,6 @@
 {:else if page.data.screen === "results" || page.data.screen === "results-gaps" || page.data.screen === "results-answers" || page.data.screen === "report" || page.data.screen === "report-detailed" || page.data.screen === "results-held"}
   {@const m = page.data.results}
   {@const rep = reportFor(m, page.data.screen)}
-  {#if m.reports?.length}<ReportHistory aid={m.aid} reports={m.reports} selected={m.reportId} screen={page.data.screen} />{/if}
   {#if page.data.sample}{@render sampleMark()}{/if}
   {#if !rep && !m.held && page.data.screen !== "results-held"}
     <NotBuilt {chrome} {phone} {theme} crumbs={[{ label: m.review.project, href: m.review.projectId ? to("project", { pid: m.review.projectId }) : to("home") }, { label: m.review.title }]} message={`No report has been built for ${m.review.title} yet. ${m.canBuild ? "Building reads the answers collected so far and keeps that report." : "An owner or member of the review builds it."}${page.data.refreshed ? ` ${page.data.refreshed}` : ""}`} back={to("collect", route.params)} backLabel="Back to Collect">

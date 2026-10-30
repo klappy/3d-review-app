@@ -64,6 +64,8 @@ for (const phone of [false, true]) {
     const links = [...container.querySelectorAll('a')].map(a => a.getAttribute('href'));
     expect(links).toContain(`#/project/${pid}`);
     expect(links.some(href => href?.startsWith(`#/review/${aid}/results?report=`))).toBe(true);
+    const history = container.querySelector('[aria-label="Report history"]');
+    expect(history?.closest('.app main')).not.toBeNull();
     expect(calls.some(c => c.startsWith('POST'))).toBe(false);
   });
 }
