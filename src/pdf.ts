@@ -9,7 +9,8 @@ import { handleTranslate } from './translate';
 import { lwcLanguage } from './languages';
 import { perspectiveLevelMinimum } from './report-admission';
 import { PdfError, pdfBytes, pdfResponse, type PdfEnv } from './pdf-render';
-import { surveyPdfDocument, reportPdfDocument } from '../ui/pdf/documents.js';
+import { storedReportDocument } from '../ui/pdf/report-formats.js';
+import { surveyPdfDocument } from '../ui/pdf/documents.js';
 import { paperLink, printIdentityFrom } from '../ui/assess/print.js';
 import { translatePrint } from '../ui/assess/print-lang.js';
 import { printItemsFrom, printTitleFromHtml } from '../ui/stage-screens.js';
@@ -22,11 +23,13 @@ async function read(ctx:Ctx,cap:string,params:Record<string,string>):Promise<Rec
 }
 function options(request:Request,survey:boolean) {
   const q=new URL(request.url).searchParams;
-  for(const k of q.keys())if(!['paper',...(survey?['lang']:[])].includes(k))throw new PdfError('INVALID_PARAMS','Unknown PDF option.',400);
-  const paper=q.get('paper')||'letter',lang=q.get('lang')||'en';
+  for(const k of q.keys())if(q.getAll(k).length!==1||!['paper',...(survey?['lang']:['format'])].includes(k))throw new PdfError('INVALID_PARAMS','Unknown PDF option.',400);
+  const format=q.has('format')?q.get('format')!:'full';
+  if(!['full','overview','detailed'].includes(format))throw new PdfError('INVALID_PARAMS','Choose full, overview or detailed.',400);
+  const paper=q.get('paper')||(format==='full'?'letter':'a4'),lang=q.get('lang')||'en';
   if(!['letter','a4'].includes(paper))throw new PdfError('INVALID_PARAMS','Choose letter or a4.',400);
   if(survey&&lang!=='en'&&!lwcLanguage(lang))throw new PdfError('INVALID_PARAMS','Choose a supported survey language.',400);
-  return {paper:paper as 'letter'|'a4',lang};
+  return {paper:paper as 'letter'|'a4',lang,format:format as 'full'|'overview'|'detailed'};
 }
 export async function surveyDocument(ctx:Ctx,request:Request,aid:string,sid:string,lang:string,paper:'letter'|'a4') {
   const printed=await read(ctx,'cap.survey.print',{aid,sid}); // exact member role, selected template, choices
@@ -52,21 +55,31 @@ export async function surveyDocument(ctx:Ctx,request:Request,aid:string,sid:stri
   return surveyPdfDocument(model,{paper});
 }
 export function installPdf(app:Hono<{Bindings:Env}>,context:(request:Request,env:Env)=>Promise<Ctx>) {
-  const handle=async(request:Request,env:Env,build:(ctx:Ctx,paper:'letter'|'a4',lang:string)=>Promise<{html:string;name:string}>,survey:boolean)=>{
+  const handle=async(request:Request,env:Env,build:(ctx:Ctx,paper:'letter'|'a4',lang:string,format:'full'|'overview'|'detailed')=>Promise<{html:string;name:string}>,survey:boolean)=>{
     try {
-      const {paper,lang}=options(request,survey),ctx=await context(request,env);
+      const {paper,lang,format}=options(request,survey),ctx=await context(request,env);
       // Authorize/read before checking rendering availability: configuration must not reveal hidden report existence.
-      const {html,name}=await build(ctx,paper,lang);
+      const {html,name}=await build(ctx,paper,lang,format);
       return pdfResponse(await pdfBytes(html,paper,env as Env&PdfEnv,request.signal),name);
     } catch(e) {return e instanceof PdfError?error(e.code,e.message,e.status):error('PDF_FAILED','PDF download failed. Try again or use Print.',503);}
   };
   app.get('/v2/assessments/:aid/surveys/:sid/print.pdf',c=>handle(c.req.raw,c.env,async(ctx,paper,lang)=>({html:await surveyDocument(ctx,c.req.raw,c.req.param('aid'),c.req.param('sid'),lang,paper),name:`survey-${c.req.param('sid')}-${lang}`}),true));
-  app.get('/v2/reports/:id/pdf',c=>handle(c.req.raw,c.env,async(ctx,paper)=>{
+  app.get('/v2/reports/:id/pdf',c=>handle(c.req.raw,c.env,async(ctx,paper,_lang,format)=>{
     const stored=await read(ctx,'cap.report.get',{id:c.req.param('id')}); // current store policy; never report.build
     if(stored.suppressed!==false||!stored.report)throw new PdfError('PDF_REPORT_HELD','This report is unavailable under the current reporting policy.',409);
     let html:string;
-    try {html=reportPdfDocument(stored,{paper,minimum:perspectiveLevelMinimum(ctx.env)});}
-    catch(e) {if(e instanceof Error&&e.message==='PDF_REPORT_HELD')throw new PdfError('PDF_REPORT_HELD','This full report cannot be exported until every included perspective has enough responses.',409);throw e;}
-    return {html,name:`report-${c.req.param('id')}`};
+    try {
+      let identity={};
+      if(format!=='full'){
+        const {assessment}=await read(ctx,'cap.assessment.get',{id:stored.assessment_id});
+        let project='',language=assessment.language_name||assessment.language||'';
+        try{project=(await read(ctx,'cap.project.get',{id:assessment.project_id})).project.name;const listed=await read(ctx,'cap.language.list',{pid:assessment.project_id});language=listed.languages.find((l:Record<string,any>)=>l.id===assessment.language_id)?.name||language;}
+        catch(e){if(!(e instanceof PdfError)||![403,404].includes(e.status))throw e;}
+        identity={title:assessment.name,project,language};
+      }
+      html=storedReportDocument(stored,{paper,format,identity,minimum:perspectiveLevelMinimum(ctx.env)});
+    }
+    catch(e) {if(e instanceof Error&&e.message==='PDF_REPORT_HELD')throw new PdfError('PDF_REPORT_HELD','This report cannot be exported until every included perspective has enough responses.',409);throw e;}
+    return {html,name:`report-${c.req.param('id')}${format==='full'?'':'-'+format}`};
   },false));
 }

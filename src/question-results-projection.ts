@@ -1,6 +1,6 @@
 /** Internal preparation only. No route/capability registration; D7 disclosure remains held. */
 import type { Ctx } from './handlers/types';
-import { gate, roleAt } from './handlers/common';
+import { gate, effectiveRoleAt } from './handlers/common';
 import { notVisible } from './handlers/errors';
 import { perspectiveLevelMinimum } from './report-admission';
 import { canonicalJson } from './report-canonical-json';
@@ -43,6 +43,6 @@ export function prepareQuestionResults(input:AggregateInput, minimum:number) {
 export async function readQuestionResults(ctx:Ctx,aid:string){
   const assessment=await ctx.db.prepare('SELECT id, stage FROM assessment WHERE id = ?').bind(aid).first();
   if(!assessment)throw notVisible('assessment');
-  gate(await roleAt(ctx,'assessment',aid),'viewer','assessment');
+  gate(await effectiveRoleAt(ctx,'assessment',aid),'viewer','assessment');
   return {suppressed:true as const,status:'held' as const,reason:'Question-level disclosure policy remains held.',minimum:perspectiveLevelMinimum(ctx.env),excerpts:'held' as const};
 }

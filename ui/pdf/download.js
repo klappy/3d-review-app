@@ -1,7 +1,16 @@
 // Binary download primitive shared by survey/report controls. The UI supplies its existing authorized PDF endpoint.
 // Prepare asynchronously, then offer Save/Open/Share on a fresh click: iOS requires user activation for file sharing.
 export const surveyPdfUrl=(aid,sid,{lang='en',paper='letter'}={})=>`/v2/assessments/${encodeURIComponent(aid)}/surveys/${encodeURIComponent(sid)}/print.pdf?lang=${encodeURIComponent(lang)}&paper=${String(paper).toLowerCase()==='a4'?'a4':'letter'}`;
-export const reportPdfUrl=id=>`/v2/reports/${encodeURIComponent(id)}/pdf`;
+export function reportPdfUrl(id,{format='full',paper}={}) {return reportPdfFormatUrl(`/v2/reports/${encodeURIComponent(id)}/pdf`,format,{paper});}
+export function reportPdfFormatUrl(url,format,{paper}={}) {
+ if(!['full','overview','detailed'].includes(format))throw new Error('Unknown report PDF format.');
+ const [path,query='']=String(url).split('?');if(!/^\/v2\/reports\/[^/?#]+\/pdf$/.test(path)||String(url).includes('#'))throw new Error('Invalid report PDF URL.');
+ const params=new URLSearchParams(query);if(format==='full')params.delete('format');else params.set('format',format);
+ if(paper!==undefined){if(!['letter','a4'].includes(paper))throw new Error('Unknown paper size.');params.set('paper',paper);}
+ return path+(params.size?'?'+params:'');
+}
+export function reportPdfFormat(url){const [path,query='']=String(url||'').split('?');return /^\/v2\/reports\/[^/?#]+\/pdf$/.test(path)?new URLSearchParams(query).get('format')||'full':null;}
+
 export async function fetchPdf(url, {fetchImpl=globalThis.fetch,token,signal}={}) {
   const response=await fetchImpl(url,{credentials:'same-origin',cache:'no-store',signal,headers:{accept:'application/pdf',...(token?{authorization:`Bearer ${token}`}:{})}});
   if(!response.ok) {
