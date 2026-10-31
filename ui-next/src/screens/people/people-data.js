@@ -49,9 +49,17 @@ export function inviteOptions(myRole, labels) {
   return Object.entries(labels).filter(([role]) => allowed.includes(role));
 }
 
-// Group dialog rows: a project can be grouped only by a direct project owner who is a workspace member+ (mayGroup).
+// Eligibility is computed by the server without returning hidden review identifiers. The write still rechecks it.
 export function groupRows(group) {
-  return (group?.candidates ?? []).map((c) => ({ ...c, can: mayGroup(group.workspaceRole, c.directRole) }));
+  return (group?.candidates ?? []).map((c) => {
+    const can = mayGroup(group.workspaceRole, c.directRole, 'group', c.groupingEligible);
+    const reason = can ? 'You directly own this project and every review it contains'
+      : !['owner', 'member'].includes(group.workspaceRole) ? 'Only a workspace member or owner can group projects'
+      : c.directRole !== 'owner' ? 'Cannot group: a direct project owner grant is required; inherited access is not enough'
+      : c.groupingEligible === undefined ? 'Grouping eligibility is unavailable; reload before grouping'
+      : 'Cannot group: you must directly own every review in this project, including archived reviews';
+    return { ...c, can, reason };
+  });
 }
 
 // The current UI's words for an invitation whose scope name the server did not send (ui/v3/components/invite.js mountInvitations).
