@@ -94,3 +94,15 @@ it.each(['identity','scope'])('focus-confirmed %s change in an open menu never f
  setup(true);vi.spyOn(D,'projects').mockResolvedValue(rows);const home=vi.spyOn(D,'homeModel');location.hash='#/projects';const view=render(Live);await view.findByRole('link',{name:'Verified project'});await go('#/menu');await view.findByRole('navigation',{name:'Workspace and account'});
  const next={...me,principal:{...me.principal,...(change==='identity'?{id:'actor-B',display_name:'Actor B'}:{access_mode:'global'})}};vi.stubGlobal('fetch',vi.fn(async()=>response(next)));await fireEvent(window,new Event('focus'));await flush();await view.findByRole('navigation',{name:'Workspace and account'});expect(view.queryByRole('link',{name:'Verified project'})).toBeNull();expect(home).not.toHaveBeenCalled();expect(view.container.querySelector('[data-loading-frame]')).toBeNull();
 });
+
+it.each(['resolve','reject'])('closing a menu cancels a retained read for a different selected snapshot (%s)',async outcome=>{
+ setup(true);const pending=deferred<any>();
+ const model=(id:string,title:string)=>({aid:'review-A',review:{id:'review-A',title,project:'Project',projectId:'project-A',language:'English',stage:'closed',responses:0,liveResponses:0},counts:{team:0,community:0,church:0},payload:null,results:{},reportId:id,canBuild:false,held:null});
+ vi.spyOn(D,'resultsModel').mockResolvedValueOnce(model('old','Old selected snapshot')).mockReturnValueOnce(pending.promise);
+ location.hash='#/review/review-A/results?report=old';const view=render(Live);await view.findByText(/No report has been built for Old selected snapshot/);
+ await go('#/review/review-A/results?report=new');await go('#/menu?review=review-A');await view.findByRole('navigation',{name:'Workspace and account'});
+ await fireEvent.click(view.getByRole('button',{name:'Close',exact:true}));await flush();expect(location.hash).toBe('#/review/review-A/results?report=old');
+ expect(view.container.querySelector('main')?.getAttribute('aria-busy')).toBe('false');
+ if(outcome==='resolve')pending.resolve(model('new','New pending snapshot'));else pending.reject(new Error('Late snapshot failure'));await flush();
+ expect(view.container.textContent).not.toContain('New pending snapshot');expect(view.container.textContent).not.toContain('Late snapshot failure');expect(vi.mocked(D.resultsModel)).toHaveBeenCalledTimes(2);expect(location.hash).toBe('#/review/review-A/results?report=old');
+});

@@ -264,7 +264,7 @@
     if (menuState) {
       const m = menuState; menuState = null; menuSeq++;
       if (!invalidate && m.origin && credential === m.credential && page.status === "ready" && routeKey(r) === routeKey(route)) {
-        if (!refreshAfterMenu) { const target = menuReturnFocus; menuReturnFocus = null; await tick(); if (requestedRoute.name !== "menu" && target?.isConnected) target.focus(); return; } // Close/back restores the SAME mounted view; no aggregate reload.
+        if (!refreshAfterMenu) { seq++; refreshing = false; refreshError = ""; actionBusy = false; const target = menuReturnFocus; menuReturnFocus = null; await tick(); if (requestedRoute.name !== "menu" && target?.isConnected) target.focus(); return; } // Close/back restores the SAME mounted view; no aggregate reload.
       }
     }
     refreshAfterMenu = false;
@@ -293,7 +293,7 @@
       }
       const principal = session?.principal?.id, accessMode = session?.principal?.access_mode;
       const data = await loader(r);
-      if (my !== seq || credential !== token() || principal !== session?.principal?.id || accessMode !== session?.principal?.access_mode) return;
+      if (my !== seq || routeKey(r) !== routeKey(requestedRoute) || credential !== token() || principal !== session?.principal?.id || accessMode !== session?.principal?.access_mode) return;
       if (data.setupState) { suSt = data.setupState; suBusy = false; suError = ""; bump(); }
       if (data.redirect) { replace(data.redirect); return; }
       if (data.screen === null) return;
@@ -304,7 +304,7 @@
       if (data.results?.reportId) setLiveContext({ ...liveContext(), report: data.results.reportId });
       page = { status: "ready", key: r.name, data, error: null };
     } catch (e) {
-      if (my !== seq || credential !== token()) return;
+      if (my !== seq || routeKey(r) !== routeKey(requestedRoute) || credential !== token()) return;
       const kind = classify(e);
       if (retained && page.status === "ready" && kind === "failed") {
         refreshError = String(e?.message || "This view could not be updated.");
