@@ -2,6 +2,7 @@
 // home -> project -> review -> collection room (real link + QR) -> participant journey in a second context (answers persist across
 // reload, submit, receipt) -> results (real report). Prints one line per step; exits 1 on the first failure.
 import { chromium } from "playwright";
+import { requireTerminalPage, verifyAccountMenuAndSignOut } from './readiness.mjs';
 const BASE = process.env.BASE ?? "http://127.0.0.1:8787";
 const EMAIL = process.env.EMAIL ?? "uinext.demo@example.invalid";
 const SHOTS = process.env.SHOTS ?? "";
@@ -11,8 +12,8 @@ const fail = (m) => { console.log("❌", m); process.exit(1); };
 const browser = await chromium.launch({ executablePath: process.env.CHROMIUM || "/opt/pw-browsers/chromium-1194/chrome-linux/chrome" }) // CHROMIUM: another machine's Chromium binary (README);
 const shot = async (page, name) => { if (SHOTS) await page.screenshot({ path: `${SHOTS}/${name}.png`, fullPage: true }); };
 const errors = [];
-// A screen counts as loaded only when it is not the shell's Status card (app/Status.svelte: "Loading…", "Something went wrong", "Not found").
-const loaded = async (page, what) => { await page.waitForTimeout(300); /* Status defers "Loading…" 180ms (app/Live.svelte), so a fresh load is briefly blank */ await page.waitForFunction(() => !/Loading…/.test(document.body.textContent ?? ""), null, { timeout: 30000 }).catch(() => {}); const t = (await page.textContent("body")) ?? ""; if (/Loading…|Something went wrong|Could not load|Try again/.test(t) && !/Question \d+ of/.test(t)) fail(`${what}: screen is the Status card, not the page: ${t.replace(/\s+/g, " ").slice(0, 160)}`); };
+// Check the actual pending-shell markers and require usable terminal content; a timeout is a failure.
+const loaded = async (page, what) => { try { await requireTerminalPage(page, what); if (errors.length) fail(`${what}: ${errors[0]}`); } catch (error) { fail(error.message); } };
 // Page exceptions and console errors fail the run. The one accepted line: the browser's own "Failed to load resource … 401" for the
 // signed-out session probe (GET /v2/me before sign-in), which the app makes on purpose; any other failed request is recorded by URL.
 const watch = (page, tag) => {
@@ -264,7 +265,8 @@ if (!copiedShown && !clip) fail("share: copy neither reported success nor wrote 
 ok(`share: ${shareLinks.length} real link(s) for this review; copy ${clip ? "wrote the clipboard with a real link" : "reported Link copied"}`);
 await f.goto(`${BASE}/next/#/nowhere/at/all`); await f.waitForSelector("text=Your reviews"); ok("unknown deep link falls back to home");
 // sign out from the account menu
-await f.click("summary:has-text('Account menu'), #acct summary, [aria-label^='Account menu']").catch(() => {});
+await verifyAccountMenuAndSignOut(f);
+ok('account menu exposes authorized actions and confirmed sign-out reaches the signed-out page');
 await browser.close();
 if (errors.length) { console.log("❌ page errors (the run fails):"); for (const e of errors) console.log("  ", e.slice(0, 300)); process.exit(1); }
 console.log("DONE clean");

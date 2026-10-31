@@ -42,6 +42,7 @@
   import Workspaces from "./Workspaces.svelte";
   import Projects from "./Projects.svelte";
   import ProjectSettings from "./ProjectSettings.svelte";
+  import { loadMenuIdentity, loadMenuModel } from "./menu-loader.js";
   import { loadProjectSettings } from "./project-settings.js";
   import Status from "./Status.svelte";
   import LoadingFrame from "./LoadingFrame.svelte";
@@ -124,7 +125,7 @@
     // lanes' "Try the sample review" link does; no practice-copy store exists to fill a sandbox from.
     if (name === "sandbox") { globalThis.location.assign(SAMPLE_HREF); return { screen: null }; }
     if (name === "sign-in" || name === "sign-in-check") { const me = await S.me(); return me ? { redirect: to("home") } : { screen: "sign-in" }; }
-    const me = await S.me();
+    const me = name === "menu" ? session : await S.me();
     if (!me) return { screen: "sign-in", next: hash };
     // Setup: with a review in the query, Setup 5 shows that review's own data (the review page's board while preparing).
     const reviewQ = r.query.get("review");
@@ -165,7 +166,7 @@
       return { screen: name, results: m };
     }
     if (name === "share") { const sm = await D.shareModel(params.aid, me); return { screen: "share", shareData: sm.review, share: sm.share }; }
-    if (name === "menu") { const home = await D.homeModel(me); return { screen: "menu", menu: D.menuModel(me, home, { onSignOut: signOut, currentDesign: legacyHref(r, contextForRoute(r)) }) }; }
+    if (name === "menu") return { screen: "menu", menu: await loadMenuModel(me, { onSignOut: signOut, currentDesign: legacyHref(r, contextForRoute(r)) }) };
     // Print paper surveys for real: the chosen surveys' blank forms through GET /v2/assessments/{aid}/surveys/{sid}/print (app/print.js);
     // the preview sheet is the first ticked survey's form, read now (read-only) so the dialog shows the real paper before printing.
     if (name === "print") {
@@ -217,8 +218,10 @@
     try {
       if (!PARTICIPANT.has(r.name)) {
         let current;
-        try { current = await S.me(); } catch { current = null; }
+        try { current = r.name === "menu" ? await loadMenuIdentity() : await S.me(); }
+        catch (error) { if (r.name === "menu") throw error; current = null; }
         if (my !== seq || credential !== token()) return;
+        if (r.name === "menu") S.forget(); // The fresh menu probe must not leave an older cached actor for the next route.
         session = current; applyChrome(current);
       }
       const principal = session?.principal?.id, accessMode = session?.principal?.access_mode;
@@ -482,7 +485,7 @@
 {#if page.status === "loading"}
   <LoadingFrame {phone} {theme} {chrome} kind={page.key} />
 {:else if page.status === "error"}
-  <Status {phone} {theme} kind={page.error.kind} message={page.error.message} onretry={load} back={route.params.aid ? to("results", { aid: route.params.aid }) : to("home")} backLabel={route.params.aid ? "Latest results" : "Home"} />
+  <Status {phone} {theme} kind={page.error.kind} message={page.error.message} onretry={load} back={route.params.aid && route.name !== "review-tools" ? to("results", { aid: route.params.aid }) : to("home")} backLabel={route.params.aid && route.name !== "review-tools" ? "Latest results" : "Home"} />
 {:else if page.data.screen === "project-settings" && page.data.sample}
   <ProjectSettings {phone} {theme} project={{ id: "sample", name: "Sample project", organization: "", role: "viewer" }} sample />
 {:else if page.data.fixture}

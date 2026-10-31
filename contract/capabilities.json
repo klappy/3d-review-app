@@ -629,7 +629,7 @@
       "slice": "v2.0-bcs",
       "section": "C. Project",
       "ui_surface": "All projects; context panel",
-      "notes": "direct-assessment grantees do **not** see parent",
+      "notes": "direct-assessment grantees do **not** see parent. Project grouping_eligible is caller-scoped: direct project owner AND direct owner of every contained assessment, including archived; no child IDs. It is project-side preflight only; add_project rechecks workspace membership, containment and authority atomically.",
       "status": "target",
       "inverse": {
         "kind": "n/a"
@@ -649,7 +649,7 @@
       "slice": "v2.0-bcs",
       "section": "C. Project",
       "ui_surface": "All projects; context panel",
-      "notes": "direct-assessment grantees do **not** see parent",
+      "notes": "direct-assessment grantees do **not** see parent. Project grouping_eligible is caller-scoped: direct project owner AND direct owner of every contained assessment, including archived; no child IDs. It is project-side preflight only; add_project rechecks workspace membership, containment and authority atomically.",
       "status": "target",
       "inverse": {
         "kind": "n/a"
@@ -901,7 +901,7 @@
       "slice": "v2.0-bcs",
       "section": "D. Assessment (main page)",
       "ui_surface": "context panel; header",
-      "notes": "scope/role badge",
+      "notes": "scope/role badge; caller-scoped can_archive describes the existing archive authority intersection: direct assessment member/owner and effective parent project member/owner. False does not disclose the parent or change mutation authorization.",
       "status": "target",
       "inverse": {
         "kind": "n/a"
