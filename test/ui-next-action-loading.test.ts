@@ -89,3 +89,8 @@ it('an authoritative menu refusal removes private background and remains distinc
  vi.stubGlobal('fetch',vi.fn(async()=>response({code:'NOT_AUTHORIZED',message:'Fixture access refused'},403)));
  await go('#/menu');await waitFor(()=>expect(view.queryByRole('link',{name:'Verified project'})).toBeNull());expect(view.container.textContent).not.toContain('Sign in to continue');
 });
+
+it.each(['identity','scope'])('focus-confirmed %s change in an open menu never falls back to aggregate Home reads',async change=>{
+ setup(true);vi.spyOn(D,'projects').mockResolvedValue(rows);const home=vi.spyOn(D,'homeModel');location.hash='#/projects';const view=render(Live);await view.findByRole('link',{name:'Verified project'});await go('#/menu');await view.findByRole('navigation',{name:'Workspace and account'});
+ const next={...me,principal:{...me.principal,...(change==='identity'?{id:'actor-B',display_name:'Actor B'}:{access_mode:'global'})}};vi.stubGlobal('fetch',vi.fn(async()=>response(next)));await fireEvent(window,new Event('focus'));await flush();await view.findByRole('navigation',{name:'Workspace and account'});expect(view.queryByRole('link',{name:'Verified project'})).toBeNull();expect(home).not.toHaveBeenCalled();expect(view.container.querySelector('[data-loading-frame]')).toBeNull();
+});

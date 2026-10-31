@@ -76,7 +76,7 @@
   let viewRead = $state(0);
   let viewHash = $state(globalThis.location?.hash ?? "");
   let refreshing = $state(false), refreshError = $state(""), actionBusy = $state(false);
-  let menuState = $state(null), menuSeq = 0, refreshAfterMenu = false;
+  let menuState = $state(null), menuSeq = 0, refreshAfterMenu = false, menuReturnFocus = null;
   const routeKey = r => JSON.stringify([r.name, r.params, r.query.toString()]);
   const scopeKey = r => {
     const c = contextForRoute(r);
@@ -222,7 +222,9 @@
     menuState = { ...m, closing: true };
     replace(m.returnHash || to("home"));
   }
-  async function openMenu(r) {
+  async function openMenu(r, { invalidate = false } = {}) {
+    if (!menuState) menuReturnFocus = globalThis.document?.activeElement;
+    if (invalidate) { seq++; D.clearLinks(); SU.forgetAll(); S.forget(); suSt = null; workspaceUndo = null; refreshing = false; refreshError = ""; actionBusy = false; page = { status: "loading", key: "menu", data: null, error: null }; session = undefined; applyChrome(null); }
     const my = ++menuSeq, credential = token();
     const origin = page.status === "ready" && !!session?.principal?.id && credential === sessionCredential && scopeKey(r) === scopeKey(route);
     const prior = session?.principal;
@@ -255,14 +257,14 @@
   }
   async function load({ invalidate = false, navigation = false } = {}) {
     const r = requestedRoute, credential = token(), requestHash = hash;
-    if (r.name === "menu" && !invalidate) {
-      if (menuState?.origin && !navigation) { refreshAfterMenu = true; return; }
-      return openMenu(r);
+    if (r.name === "menu") {
+      if (!invalidate && menuState?.origin && !navigation) { refreshAfterMenu = true; return; }
+      return openMenu(r, { invalidate });
     }
     if (menuState) {
       const m = menuState; menuState = null; menuSeq++;
       if (!invalidate && m.origin && credential === m.credential && page.status === "ready" && routeKey(r) === routeKey(route)) {
-        if (!refreshAfterMenu) return; // Close/back restores the SAME mounted view; no aggregate reload.
+        if (!refreshAfterMenu) { const target = menuReturnFocus; menuReturnFocus = null; await tick(); if (requestedRoute.name !== "menu" && target?.isConnected) target.focus(); return; } // Close/back restores the SAME mounted view; no aggregate reload.
       }
     }
     refreshAfterMenu = false;
