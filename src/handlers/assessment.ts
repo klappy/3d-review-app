@@ -88,8 +88,18 @@ function shownSurvey(s: Record<string, unknown>) {
 export const get: Handler = async (ctx, params) => {
   const id = reqStr(params, "id"), {row, role} = await exact(ctx, id);
   const {results} = await ctx.db.prepare("SELECT s.id, s.template_id, s.template_version, s.state, s.collection_status, s.archived_at, s.created_at, t.name AS template_name, t.perspective FROM assessment_survey s JOIN survey_template t ON t.id = s.template_id AND t.version = s.template_version WHERE s.assessment_id = ? ORDER BY s.created_at").bind(id).all();
-  return { result: { assessment: { ...view(row, role), demographics_enabled: await readDemographics(ctx, id) }, surveys: results.map(s => shownSurvey(s as Record<string, unknown>)) }, scope: { type: "assessment", id } };
+  return { result: { assessment: { ...view(row, role), can_archive: await canArchive(ctx, row), demographics_enabled: await readDemographics(ctx, id) }, surveys: results.map(s => shownSurvey(s as Record<string, unknown>)) }, scope: { type: "assessment", id } };
 };
+// This describes archiveChange's existing two authority checks. It grants no
+// project access and reveals no details about an otherwise hidden parent.
+async function canArchive(ctx: Ctx, row: AssessmentRow & { direct_role: Role | null }): Promise<boolean> {
+  if (row.direct_role !== "owner" && row.direct_role !== "member") return false;
+  try { await loadProject(ctx, row.project_id, "member"); return true; }
+  catch (error) {
+    if (error instanceof CapError && ["NOT_AUTHORIZED_AT_SCOPE", "NOT_FOUND_OR_NOT_VISIBLE"].includes(error.code)) return false;
+    throw error;
+  }
+}
 async function readDemographics(ctx: Ctx, id: string): Promise<boolean> {
   const { results } = await ctx.db.prepare("SELECT context_json FROM assessment_survey WHERE assessment_id = ? AND state = 'selected'").bind(id).all<{ context_json?: string }>();
   return (results || []).some((r) => demographicsEnabled(r.context_json));
