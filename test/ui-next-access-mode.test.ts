@@ -8,9 +8,9 @@ import { switchAccessMode, watchAccessMode, preferenceOf } from "../ui-next/src/
 describe("Next access mode uses the existing server-authorized preference", () => {
   it("does not show or change mode for an ordinary account or the sample", () => {
     const ordinary = render(AccessMode, { principal: { super_admin: false, access_mode: "my" } });
-    expect(screen.queryByRole("group", { name: "Access mode" })).toBeNull(); ordinary.unmount();
+    expect(screen.queryByRole("combobox", { name: "Access mode" })).toBeNull(); ordinary.unmount();
     render(AccessMode, { principal: { super_admin: true, access_mode: "my" }, sample: true });
-    expect(screen.queryByRole("group", { name: "Access mode" })).toBeNull();
+    expect(screen.queryByRole("combobox", { name: "Access mode" })).toBeNull();
     const doc = { cookie: "" }, location = { replace: vi.fn(), reload: vi.fn() };
     expect(switchAccessMode({ super_admin: false }, "global", { document: doc, location })).toBe(false);
     expect(doc.cookie).toBe(""); expect(location.reload).not.toHaveBeenCalled();
@@ -18,8 +18,9 @@ describe("Next access mode uses the existing server-authorized preference", () =
   it("renders the effective served mode and actual project navigation", () => {
     document.cookie = "review_access=global; Path=/";
     render(AccessMode, { principal: { id: "admin", super_admin: true, access_mode: "global" } });
-    expect(screen.getByRole("button", { name: "Global Access" }).getAttribute("aria-pressed")).toBe("true");
-    expect(screen.getByRole("link", { name: "All projects" }).getAttribute("href")).toBe("#/projects");
+    expect((screen.getByRole("combobox", { name: "Access mode" }) as HTMLSelectElement).value).toBe("global");
+    expect(screen.getByRole("status").textContent).toContain("Support mode: browse all workspaces");
+    expect(screen.queryByRole("link", { name: "All projects" })).toBeNull();
   });
   it("writes only an allowed preference and fully reloads after navigating to projects", () => {
     const doc = { cookie: "" }, location = { replace: vi.fn(), reload: vi.fn() }, storage = { setItem: vi.fn(() => { throw new Error("storage unavailable"); }) }, channel = { postMessage: vi.fn() };

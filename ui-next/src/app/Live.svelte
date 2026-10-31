@@ -83,6 +83,7 @@
     return c.aid ? `review:${c.aid}` : c.pid ? `project:${c.pid}` : c.wid ? `workspace:${c.wid}` : PUBLIC.has(r.name) ? "public" : "account";
   };
   let workspaceUndo = $state(null);
+  let accessChange = $state({ busy: false, error: "" });
   let sessionCredential = token();
   const go = (h) => { if (globalThis.location.hash !== h) globalThis.location.hash = h; else load(); };
   const replace = (h) => { history.replaceState(null, "", globalThis.location.pathname + globalThis.location.search + h); hash = h; };
@@ -289,7 +290,7 @@
           route = r; page = { status: "loading", key: r.name, data: null, error: null }; refreshing = false;
           D.clearLinks(); SU.forgetAll(); suSt = null; workspaceUndo = null;
         }
-        session = current; applyChrome(current);
+        session = current; applyChrome(current); accessChange = { busy: false, error: "" };
       }
       const principal = session?.principal?.id, accessMode = session?.principal?.access_mode;
       const data = await loader(r);
@@ -538,7 +539,8 @@
   // The built report for this screen (app/data.js liveReport: full snapshot for the readers, compact payload for phone Results only).
   const reportFor = (m, screen) => D.liveReport(m, { phone, screen });
   setContext("next-view-pending", { busy: () => refreshing || actionBusy, inactive: () => refreshing || actionBusy || !!refreshError || !!menuState, render: () => refreshNotice });
-  setContext("next-review-utilities", { visible: () => (page.status === "ready" || (page.status === "loading" && route.name === "projects" && !!session)) && (!!(session?.principal?.super_admin && !page.data?.sample) || !!page.data?.results?.reports?.length || !!metadataUndo), render: () => utilities });
+  setContext("next-account-chrome", { session: () => session, chrome: () => chrome, available: () => !page.data?.sample && !PARTICIPANT.has(route.name), access: () => accessControl });
+  setContext("next-review-utilities", { visible: () => (page.status === "ready" || (page.status === "loading" && route.name === "projects" && !!session)) && (!!page.data?.results?.reports?.length || !!metadataUndo), render: () => utilities });
 </script>
 
 <!-- The build confirm (report-build.js: one plain sentence with the response count, confirm "Build the results", cancel "Not now").
@@ -558,8 +560,12 @@
 {/snippet}
 
 
+{#snippet accessControl()}
+  <AccessMode principal={session?.principal} sample={!!page.data?.sample} pending={accessChange.busy} error={accessChange.error} onfailure={() => { accessChange = { busy: true, error: "The access change could not be confirmed. Reload to verify your access before continuing." }; }} oninvalidate={() => { accessChange = { busy: true, error: "" }; seq++; menuSeq++; D.clearLinks(); SU.forgetAll(); S.forget(); suSt = null; workspaceUndo = null; refreshing = false; refreshError = ""; actionBusy = false; menuState = null; page = { status: "loading", key: route.name, data: null, error: null }; }} />
+{/snippet}
+
 {#snippet utilities()}
-  <AccessMode principal={session?.principal} sample={!!page.data?.sample} oninvalidate={() => { D.clearLinks(); SU.forgetAll(); S.forget(); page = { status: "loading", key: route.name, data: null, error: null }; }} />
+
   {#if page.data?.results?.reports?.length}<ReportHistory aid={page.data.results.aid} reports={page.data.results.reports} selected={page.data.results.reportId} screen={page.data.screen} />{/if}
   {#if metadataUndo}{@const context = metadataUndo}<UndoNotice undo={context.receipt} onundo={() => undoSavedDetails(context)} />{/if}
 {/snippet}
@@ -571,7 +577,7 @@
 {#snippet emptyMenuTop()}<header class={phone ? "phone-top" : "top"}><a class="brand" href={to("home")}><Mark size={26} /><span>3D Review</span></a></header>{/snippet}
 {#if page.status === "loading" && route.name === "menu"}
   <AppShell {phone} {theme} screen top={emptyMenuTop}><span class="sr-only">Workspace and account</span></AppShell>
-{:else if (page.status === "loading" && ["home", "landing"].includes(route.name) && !session) || (page.status === "ready" && page.data.screen === "landing")}
+{:else if (page.status === "loading" && (route.name === "landing" || (route.name === "home" && !session))) || (page.status === "ready" && page.data.screen === "landing")}
   <Landing {phone} {theme} home={session ? to("home") : undefined} pending={page.status === "loading"} />
 {:else if (page.status === "loading" && route.name === "projects") || (page.status === "ready" && page.data.screen === "projects")}
   <Projects {phone} {theme} {chrome} readKey={viewRead} identityKey={`${session?.principal?.id ?? ""}:${session?.principal?.access_mode ?? ""}`} pending={page.status === "loading"} identityReady={session !== undefined} projects={page.status === "ready" ? page.data.projects : []} returnToSetup={route.query.get("return") === "setup1"} canCreate={session?.principal?.kind === "user" && session?.principal?.provisioned === true} />
