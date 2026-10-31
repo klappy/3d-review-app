@@ -1,17 +1,17 @@
 {
   "version": "0.39.0",
   "cookbook_repo": "klappy/3d-review-cookbook",
-  "cookbook_commit": "c486c328d31bafe30824ab6b31b41e427e50dca7",
+  "cookbook_commit": "e20108a74bc04c1bb65fb42d78b392e4f9457a12",
   "records": [
     {
       "path": "planning/2026-09-16-parity-build/releases/0.39.0.md",
-      "blob_sha": "5770295034c1aaed0ea41366d97177db2337d639",
-      "sha256": "3f3ed0441634dcb5cf5e111b24e5626148b19994ccfd59550aa677eb5ac1f9f3"
+      "blob_sha": "ee15f96e59efb5f3938987414de54a9994f93313",
+      "sha256": "3ba36d1f3fe256f03f6faaf0ec402f8cf913168a22fba09071bac361b9427b92"
     },
     {
       "path": "planning/2026-09-16-parity-build/releases/releases.json",
-      "blob_sha": "8d9acd60be883277520113b182a069b7510e70b4",
-      "sha256": "9fdffa46d744ce3ae5676a4f58368d703754f4281a52b91fb63c184a0b1348aa"
+      "blob_sha": "47f66e23dfad366c955c1e425c9a4271c67842a1",
+      "sha256": "21385ff5f192b3d7c3f09636af71df2b9a097882a993baffcdbccc05ab70ca1a"
     }
   ],
   "changelog": {
@@ -23,11 +23,11 @@
         "Overview and Detailed downloads select their named document instead of both returning the full legacy report. The file names distinguish the named formats; repeated preparation and format/session changes retain stale-file protection."
       ],
       "changed": [
-        "MINOR under the major-zero policy for the additive accepted HTTP format selector. Local packaging snapshot against accepted main 7390415197aad5c7fb3dec618b1572a4f8333071; no publication, version reservation, formal approval or deployment.",
+        "MINOR under the major-zero policy for the additive accepted HTTP format selector. Candidate against accepted main 7390415197aad5c7fb3dec618b1572a4f8333071; no released-status, formal approval or deployment claim.",
         "Existing authorized stored reads, current suppression, server-owned perspective floors and full-report fallback remain authoritative. No scoring, new report creation, migration, public question-results cells/capability, excerpt disclosure, credential, subscription or runtime-configuration change.",
         "Local genuine PDF evidence covers two distinct synthetic snapshots: one-page overview and four-page detailed documents, matching same-model Next labels and counters. A three-page single-perspective report is a different model. Hosted new-format and physical installed-PWA acceptance remain pending.",
-        "Qualified source 064aefdda1eb4f3f1dcf42fd623ac85c9a83c200, tree 2ef5348765d603f646205d91af3103c5e60fc0f4. All 44 accepted PR594 files remain byte-identical. PDF delta remains 19 files. Local affected tests 42 passed with actual PDF/Workers evidence; eight download helpers passed; type/build and generated freshness passed. Denominators overlap and are not human persona-completion totals.",
-        "Independent native review and remote CI SUCCESS at prior source 3066881eace4b56046081eab01647662ec4f762e are historical evidence; bounded review refresh and exact-head CI are still required for this integrated and packaged candidate. Built local; review refresh pending; DEV new formats pending; Production new formats pending."
+        "Qualified source 064aefdda1eb4f3f1dcf42fd623ac85c9a83c200, tree 2ef5348765d603f646205d91af3103c5e60fc0f4. All 44 accepted PR594 files remain byte-identical. PDF delta remains 19 files. Local affected tests 42 passed with actual PDF/Workers evidence; eight download helpers passed; type/build and generated freshness passed. Denominators overlap and are not human persona-completion totals. Packaged local qualification head e3762c687c141b84c5bb83de8b1edc00c53dd42a passed 58 tests with one skip; eight helpers passed; Node tests 101 passed/six skipped. Final-head identity/layout checks 18 passed/one skip overlap those checks.",
+        "Independent native bounded review at e3762c687c141b84c5bb83de8b1edc00c53dd42a PASS: 22 tests passed with one existing skip; accepted PR594 product/PDF source, SSR body, prior release history and record hashes preserved. Roadmap regeneration and immutable published-pin metadata are finalized separately, requiring fresh exact-head checks and bounded metadata review. Built local; Reviewed product source; DEV new formats pending; Production new formats pending."
       ]
     }
   }
