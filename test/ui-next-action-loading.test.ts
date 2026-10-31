@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, waitFor } from '@testing-library/svelte';
+import { cleanup, fireEvent, render, waitFor, within } from '@testing-library/svelte';
 import { tick } from 'svelte';
 import Live from '../ui-next/src/app/Live.svelte';
 import * as D from '../ui-next/src/app/data.js';
@@ -10,6 +10,7 @@ import * as W from '../ui-next/src/app/workspace-actions.js';
 import { setToken } from '../ui-next/src/app/api.js';
 import { liveChrome, setLiveChrome } from '../ui-next/src/app/chrome.js';
 import { DATA as participantFixture } from '../ui-next/src/screens/participant/data.js';
+import { setTheme } from '../ui-next/src/theme.svelte.js';
 import workspace from '../ui-next/fixtures/people/workspace.json';
 const me={principal:{id:'actor-A',display_name:'Actor A',kind:'user',provisioned:true,access_mode:'my'},grants:[]};
 const rows=[{id:'project-A',name:'Verified project',organization:'Fixture organization',role:'owner',assessment_count:1,response_count:2}];
@@ -18,7 +19,7 @@ function deferred<T>(){let resolve!:(v:T)=>void;let reject!:(e:Error)=>void;cons
 async function flush(){await tick();for(let i=0;i<20;i++)await Promise.resolve();await tick();}
 async function go(hash:string){history.replaceState(null,'','/next/?ui_next=on'+hash);await fireEvent(window,new HashChangeEvent('hashchange'));await flush();}
 function setup(phone=false){vi.stubGlobal('matchMedia',(q:string)=>({matches:phone&&q.includes('max-width'),addEventListener(){},removeEventListener(){}}));vi.spyOn(S,'me').mockResolvedValue(me);vi.stubGlobal('fetch',vi.fn(async()=>response(me)));}
-afterEach(()=>{cleanup();vi.restoreAllMocks();vi.unstubAllGlobals();S.forget();setToken(null);setLiveChrome(null);history.replaceState(null,'','/next/?ui_next=on');document.cookie='review_access=my; Path=/';});
+afterEach(()=>{cleanup();vi.restoreAllMocks();vi.unstubAllGlobals();S.forget();setTheme('system');setToken(null);setLiveChrome(null);history.replaceState(null,'','/next/?ui_next=on');document.cookie='review_access=my; Path=/';});
 describe('local account menu lifecycle',()=>{
  it.each([false,true])('repeated menu open/close and back/forward preserve the actual view and make zero destination/history reads (phone=%s)',async phone=>{
   setup(phone);const projects=vi.spyOn(D,'projects').mockResolvedValue(rows),historyRead=vi.spyOn(D,'homeModel');location.hash='#/projects';const view=render(Live);
@@ -155,4 +156,14 @@ it.each([1,3])('adopts the fresh menu identity with its served level minimum %s'
 
 it('returns a pushed menu to the displayed anchor without another destination read',async()=>{
  setup();vi.spyOn(D,'projects').mockResolvedValue(rows);const reads=vi.spyOn(D,'workspaces').mockResolvedValue([]);location.hash='#/workspaces';const view=render(Live);await view.findByRole('heading',{name:'Workspaces',exact:true});location.hash='#/workspaces#details';await new Promise(resolve=>setTimeout(resolve,0));location.hash='#/menu';await view.findByRole('navigation',{name:'Workspace and account'});await fireEvent.click(view.getByRole('button',{name:'Close',exact:true}));await waitFor(()=>expect(location.hash).toBe('#/workspaces#details'));await waitFor(()=>expect(view.queryByRole('dialog')).toBeNull());expect(reads).toHaveBeenCalledTimes(1);
+});
+
+it.each([false,true])('does not claim a verified workspace save when its authoritative view read fails (menu=%s)',async menu=>{
+ setup(true);const data={...workspace,id:'workspace-A',name:'Workspace A',role:'owner',projects:[]};const reads=vi.spyOn(D,'workspaceModel').mockResolvedValueOnce(data).mockRejectedValueOnce(new Error('Synthetic readback failed'));const post=deferred<any>();vi.spyOn(W,'renameWorkspace').mockReturnValue(post.promise);location.hash='#/workspace/workspace-A';const view=render(Live);await view.findByRole('button',{name:'Rename workspace'});await fireEvent.click(view.getByRole('button',{name:'Rename workspace'}));await fireEvent.click(view.getByRole('button',{name:'Save workspace name'}));if(menu){await go('#/menu?workspace=workspace-A');await view.findByRole('navigation',{name:'Workspace and account'});}post.resolve({...data,undo:null});await waitFor(()=>expect(reads).toHaveBeenCalledTimes(2));if(menu){await waitFor(()=>expect(view.container.textContent).toContain('refreshed view could not be verified'));await fireEvent.click(view.getByRole('button',{name:'Close',exact:true}));await flush();}await waitFor(()=>expect(view.container.textContent).toContain('Synthetic readback failed'));expect(view.container.textContent).not.toContain('Saved and verified.');expect(view.container.textContent).toContain('The change was saved');expect(vi.mocked(W.renameWorkspace)).toHaveBeenCalledTimes(1);
+});
+it.each(['project','review'])('keeps phone %s management menu and Close bound to its actual origin',async kind=>{
+ setup(true);const entity={id:'synthetic-entity',name:'Synthetic managed item',role:'owner',direct_role:'owner',can_archive:true,stage:'setup'};vi.spyOn(D,'project').mockResolvedValue(entity);vi.spyOn(D,'assessment').mockResolvedValue({assessment:entity});const origin=kind==='project'?'#/project/synthetic-entity/manage':'#/review/synthetic-entity/manage';location.hash=origin;const view=render(Live);await view.findByRole('heading',{name:'Manage Synthetic managed item'});const heading=view.getByRole('heading',{name:'Manage Synthetic managed item'});const link=view.getByRole('link',{name:'Workspace and account'});expect(link.getAttribute('href')).toContain(kind==='project'?'project=synthetic-entity':'review=synthetic-entity');await go(link.getAttribute('href')!);await view.findByRole('navigation',{name:'Workspace and account'});expect(view.container.contains(heading)).toBe(true);await fireEvent.click(view.getByRole('button',{name:'Close',exact:true}));await flush();expect(location.hash).toBe(origin);expect(view.getByRole('heading',{name:'Manage Synthetic managed item'})).toBe(heading);
+});
+it('menu host follows stored viewer preference and live theme radio changes while staying open',async()=>{
+ setup(true);setTheme('dark');vi.spyOn(D,'projects').mockResolvedValue(rows);location.hash='#/projects';const view=render(Live);await view.findByRole('link',{name:'Verified project'});await go('#/menu');await view.findByRole('navigation',{name:'Workspace and account'});const host=view.container.querySelector('.account-overlay-root')!;expect(host.getAttribute('data-theme')).toBe('dark');const dialog=view.getByRole('dialog');await fireEvent.click(within(dialog).getByRole('radio',{name:'Light',exact:true}));await flush();expect(host.getAttribute('data-theme')).toBe('light');await fireEvent.click(within(dialog).getByRole('radio',{name:'Dark',exact:true}));await flush();expect(host.getAttribute('data-theme')).toBe('dark');expect(view.getByRole('dialog')).toBe(dialog);
 });

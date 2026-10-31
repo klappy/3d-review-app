@@ -258,13 +258,14 @@
       } else menuState = { ...menuState, pending: false, error: String(e?.message || "The menu could not be read. Try again.") };
     }
   }
-  async function load({ invalidate = false, navigation = false } = {}) {
-    const r = requestedRoute, credential = token(), requestHash = hash;
+  async function load({ invalidate = false, navigation = false, refreshView = false } = {}) {
+    const refreshBehindMenu = refreshView && menuState?.origin;
+    const r = refreshBehindMenu ? route : requestedRoute, credential = token(), requestHash = refreshBehindMenu ? viewHash : hash;
     if (r.name === "menu") {
       if (!invalidate && menuState?.origin && !navigation) { refreshAfterMenu = true; return; }
       return openMenu(r, { invalidate });
     }
-    if (menuState) {
+    if (menuState && !refreshBehindMenu) {
       const m = menuState; menuState = null; menuSeq++;
       if (!invalidate && m.origin && credential === m.credential && page.status === "ready" && routeKey(r) === routeKey(route)) {
         if (!refreshAfterMenu) { if (refreshing && pendingReadRoute !== routeKey(route)) { seq++; refreshing = false; refreshError = ""; } const target = menuReturnFocus; menuReturnFocus = null; await tick(); if (requestedRoute.name !== "menu" && target?.isConnected) target.focus(); return; } // Close/back restores the SAME mounted view; no aggregate reload.
@@ -307,6 +308,7 @@
       if (pid && !r.params.pid) setLiveContext({ ...liveContext(), pid });
       if (data.results?.reportId) setLiveContext({ ...liveContext(), report: data.results.reportId });
       page = { status: "ready", key: r.name, data, error: null };
+      return true;
     } catch (e) {
       if (my !== seq || !requestedReadCurrent() || credential !== token()) return;
       const kind = classify(e);
@@ -314,9 +316,10 @@
         refreshError = String(e?.message || "This view could not be updated.");
       } else {
         route = r;
-        if (kind === "unauthenticated") { menuState = null; menuSeq++; S.forget(); session = null; applyChrome(null); page = { status: "ready", key: r.name, data: { screen: "sign-in", next: hash }, error: null }; return; }
+        if (kind === "unauthenticated") { menuState = null; menuSeq++; S.forget(); session = null; applyChrome(null); page = { status: "ready", key: r.name, data: { screen: "sign-in", next: hash }, error: null }; return false; }
         page = { status: "error", key: r.name, data: null, error: { kind, message: String(e?.message || "Request could not be completed.") } };
       }
+      return false;
     } finally { if (my === seq) refreshing = false; }
   }
   // Print QR pages for real: the chosen surveys' sheets (ui/assess/share.js) in their own tab, printing itself (app/print.js).
@@ -461,7 +464,7 @@
     const current = () => generation === seq && credential === token() && principal === session?.principal?.id;
     if (actionBusy || refreshing || refreshError) return;
     actionBusy = true;
-    try { const result = await fn(); if (!current()) return; committed(result); if (menuState) refreshAfterMenu = true; else if (globalThis.location.hash === originHash) await load(); }
+    try { const result = await fn(); if (!current()) return; committed(result); if (menuState?.origin || globalThis.location.hash === originHash) { const verified = await load({ refreshView: true }); if (verified === false) throw new Error("The change was saved, but the refreshed view could not be verified. Reload before continuing."); } }
     catch (e) { if (!current()) { if (propagate) throw e; return; } if (classify(e) === "failed") refreshError = `${label}: ${e?.message || "the change could not be confirmed"}`; else { route = requestedRoute; page = { status: "error", key: route.name, data: null, error: { kind: classify(e), message: `${label}: ${e?.message || "the change was refused"}` } }; } if (propagate) throw e; }
     finally { if (current()) actionBusy = false; }
   };
