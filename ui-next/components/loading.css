@@ -6,3 +6,7 @@
 .loading-bar.loading-subtitle{width:45%}
 .loading-bar.loading-short{width:75%}
 .loading-bar.loading-value{height:var(--sp-7);width:35%}
+
+/* Destination fields keep their actual type line box and action dimensions; no retained data or animation. */
+.pending-text{color:transparent!important;background:var(--line-2);border-radius:var(--radius-s);pointer-events:none;user-select:none}
+.pending-project-title{max-width:100%;width:16ch}

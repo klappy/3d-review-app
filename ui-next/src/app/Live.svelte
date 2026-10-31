@@ -456,7 +456,7 @@
   }
   // The built report for this screen (app/data.js liveReport: full snapshot for the readers, compact payload for phone Results only).
   const reportFor = (m, screen) => D.liveReport(m, { phone, screen });
-  setContext("next-review-utilities", { visible: () => page.status === "ready" && (!!(session?.principal?.super_admin && !page.data?.sample) || !!page.data?.results?.reports?.length || !!metadataUndo), render: () => utilities });
+  setContext("next-review-utilities", { visible: () => (page.status === "ready" || (page.status === "loading" && route.name === "projects" && !!session)) && (!!(session?.principal?.super_admin && !page.data?.sample) || !!page.data?.results?.reports?.length || !!metadataUndo), render: () => utilities });
 </script>
 
 <!-- The build confirm (report-build.js: one plain sentence with the response count, confirm "Build the results", cancel "Not now").
@@ -482,7 +482,11 @@
   {#if metadataUndo}{@const context = metadataUndo}<UndoNotice undo={context.receipt} onundo={() => undoSavedDetails(context)} />{/if}
 {/snippet}
 
-{#if page.status === "loading"}
+{#if (page.status === "loading" && ["home", "landing"].includes(route.name) && !session) || (page.status === "ready" && page.data.screen === "landing")}
+  <Landing {phone} {theme} home={session ? to("home") : undefined} pending={page.status === "loading"} />
+{:else if (page.status === "loading" && route.name === "projects") || (page.status === "ready" && page.data.screen === "projects")}
+  <Projects {phone} {theme} {chrome} identityKey={`${session?.principal?.id ?? ""}:${session?.principal?.access_mode ?? ""}`} pending={page.status === "loading"} identityReady={session !== undefined} projects={page.status === "ready" ? page.data.projects : []} returnToSetup={route.query.get("return") === "setup1"} canCreate={session?.principal?.kind === "user" && session?.principal?.provisioned === true} />
+{:else if page.status === "loading"}
   <LoadingFrame {phone} {theme} {chrome} kind={page.key} />
 {:else if page.status === "error"}
   <Status {phone} {theme} kind={page.error.kind} message={page.error.message} onretry={load} back={route.params.aid && route.name !== "review-tools" ? to("results", { aid: route.params.aid }) : to("home")} backLabel={route.params.aid && route.name !== "review-tools" ? "Latest results" : "Home"} />
@@ -492,8 +496,6 @@
   {@const C = REGISTRY[page.data.screen]}
   {@render sampleMark()}
   <C {phone} {theme} state={route.query.get("state") ?? undefined} />
-{:else if page.data.screen === "landing"}
-  <Landing {phone} {theme} home={session ? to("home") : undefined} />
 {:else if page.data.screen === "about"}
   <About {phone} {theme} />
 {:else if page.data.screen === "sign-in"}
@@ -538,8 +540,6 @@
   {#key page.data.entity.id}<EntityTools {phone} {theme} type={page.data.screen === "review-tools" ? "assessment" : "project"} entity={page.data.entity} />{/key}
 {:else if page.data.screen === "workspaces"}
   <Workspaces {phone} {theme} workspaces={page.data.workspaces} canCreate={session?.principal?.kind === "user" && session?.principal?.provisioned === true} />
-{:else if page.data.screen === "projects"}
-  <Projects {phone} {theme} projects={page.data.projects} returnToSetup={route.query.get("return") === "setup1"} canCreate={session?.principal?.kind === "user" && session?.principal?.provisioned === true} />
 {:else if page.data.screen === "project-settings"}
   {#if page.data.project.id !== route.params.pid}<Status {phone} {theme} kind="loading" back={to("home")} />{:else}
     {#key page.data.project.id}<ProjectSettings {phone} {theme} project={page.data.project} />{/key}
