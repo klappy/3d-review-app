@@ -92,7 +92,7 @@
         <div class="plan-dates">{#each D.facts as [k, v]}<div><div class="plan-dt">{k}</div><div class="plan-dd">{v}</div></div>{/each}</div>
         <div class="plan-share">
           {#if D.share}<div><strong>Share this plan.</strong> {requiresAccess ? ACCESS : "Anyone with this link can read the plan and the overview report — no account, nothing editable."} <span class="mono">{D.share.url}</span>{#if D.share.line} · {D.share.line}{/if}</div>
-          <Qr bits={planQr?.cells ?? R.qr.plan} n={planQr?.n ?? 21} size={72} />{:else}<div><strong>Share this plan.</strong> {NO_SHARE}</div>{/if}
+          <Qr bits={planQr?.cells ?? R.qr.plan} n={planQr?.n ?? 21} size={72} variant="plan" />{:else}<div><strong>Share this plan.</strong> {NO_SHARE}</div>{/if}
         </div>
         <div class="pfoot"><span class="pf-text">{D.foot}</span><span class="pn">1 of 1</span></div>
     </article>

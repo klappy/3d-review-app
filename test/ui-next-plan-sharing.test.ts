@@ -26,11 +26,25 @@ it.each(urls)('live plan QR encodes its exact authenticated URL: %s',url=>{
  const plan=model(url===urls[0]?'alpha':'beta',url),v=render(ActionPlan,{data:plan});
  const qr=v.container.querySelector('.plan-share svg.qr')!;
  const encoded=D.qrModules(url);
+ expect(qr.getAttribute('data-size')).toBe('plan');
  expect(qr.getAttribute('data-n')).toBe(String(encoded.n));
  expect(qr.getAttribute('viewBox')).toBe(`0 0 ${encoded.n} ${encoded.n}`);
  expect(qr.querySelector('path')?.getAttribute('d')).toBe(pathOf(encoded));
  expect(qr.querySelector('path')?.getAttribute('d')).not.toBe(pathOf({n:21,cells:R.qr.plan}));
  expect(v.container.querySelector('.plan-share .mono')?.textContent).toBe(url);
+});
+
+it.each([
+ ['https://3dreview.app/next/#/review/assess_00000000-0000-4000-8000-000000000001/action-plan?report=a',41],
+ ['https://3d-review-dev.klappy.workers.dev/next/#/review/assess_00000000-0000-4000-8000-000000000002/action-plan?report=report_00000000-0000-4000-8000-000000000002',53],
+])('dense live plan retains the plan quiet-zone sizing preset (%s)',(url,n)=>{
+ const v=render(ActionPlan,{data:model('dense',String(url))});
+ const qr=v.container.querySelector('.plan-share svg.qr')!;
+ expect(qr.getAttribute('data-n')).toBe(String(n));
+ expect(qr.getAttribute('width')).toBe('72');
+ expect(qr.getAttribute('height')).toBe('72');
+ expect(qr.getAttribute('data-size')).toBe('plan');
+ expect(qr.querySelector('path')?.getAttribute('d')).toBe(pathOf(D.qrModules(String(url))));
 });
 
 it.each([false,true])('live plan copy and print are truthful about sign-in and current review access (phone=%s)',phone=>{

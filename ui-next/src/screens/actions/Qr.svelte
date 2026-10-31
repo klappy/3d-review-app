@@ -5,7 +5,7 @@
      code at its size beside long text in a flex row (a bare svg flex item shrank: ActionPlan's share block drew it 43px wide, 27px of code;
      the div's minimum is the svg's width; the board draws that block as a 1fr 72px grid inline, no contract row). Status: provisional. -->
 <script>
-  let { bits, n = 21, size = 120 } = $props();
+  let { bits, n = 21, size = 120, variant } = $props();
   const modules = $derived.by(() => {
     if (!Number.isInteger(n) || n < 21 || n > 177 || (n - 21) % 4 || typeof bits !== "string" || bits.length !== n * n || !/^[01]+$/.test(bits)) throw new TypeError(`Qr: bits must be ${n * n} characters of 0/1 (${n}×${n})`);
     return n;
@@ -13,4 +13,4 @@
   const d = $derived([...bits].map((c, i) => (c === "1" ? `M${i % modules} ${Math.floor(i / modules)}h1v1h-1z` : "")).join(""));
 </script>
 
-<div><svg class="qr" data-n={modules} width={size} height={size} viewBox={`0 0 ${modules} ${modules}`} shape-rendering="crispEdges" aria-hidden="true"><path {d} fill="var(--ink)"></path></svg></div>
+<div><svg class="qr" data-size={variant} data-n={modules} width={size} height={size} viewBox={`0 0 ${modules} ${modules}`} shape-rendering="crispEdges" aria-hidden="true"><path {d} fill="var(--ink)"></path></svg></div>
