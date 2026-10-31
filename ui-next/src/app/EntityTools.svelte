@@ -41,7 +41,7 @@
     finally { busy = false; }
   }
 </script>
-{#snippet top()}{#if phone}<PhoneHeader state="nested" title="Manage" parent={current.name} {back} menuHref={to('menu')} />{:else}<TopBar home={to('home')} crumbs={[{ label: current.name, href: back }, { label: 'Manage' }]} />{/if}{/snippet}
+{#snippet top()}{#if phone}<PhoneHeader state="nested" title="Manage" parent={current.name} {back} menuHref={to('menu', {}, review ? { review: current.id } : { project: current.id })} />{:else}<TopBar home={to('home')} crumbs={[{ label: current.name, href: back }, { label: 'Manage' }]} />{/if}{/snippet}
 <AppShell {phone} {theme} screen {top}><Page gap={4}>
   {#if deleted}
   <h1 class="title-page">{review ? 'Review' : 'Project'} deleted</h1>
