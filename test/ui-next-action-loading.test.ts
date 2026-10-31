@@ -106,3 +106,14 @@ it.each(['resolve','reject'])('closing a menu cancels a retained read for a diff
  if(outcome==='resolve')pending.resolve(model('new','New pending snapshot'));else pending.reject(new Error('Late snapshot failure'));await flush();
  expect(view.container.textContent).not.toContain('New pending snapshot');expect(view.container.textContent).not.toContain('Late snapshot failure');expect(vi.mocked(D.resultsModel)).toHaveBeenCalledTimes(2);expect(location.hash).toBe('#/review/review-A/results?report=old');
 });
+
+it('closing a menu preserves readback of an already pending same-view rename',async()=>{
+ setup(true);const data={...workspace,id:'workspace-A',name:'Workspace A',role:'owner',projects:[]};
+ const read=vi.spyOn(D,'workspaceModel').mockResolvedValueOnce(data).mockResolvedValueOnce({...data,name:'Confirmed new name'});const pending=deferred<any>();vi.spyOn(W,'renameWorkspace').mockReturnValue(pending.promise);
+ location.hash='#/workspace/workspace-A';const view=render(Live);await view.findByRole('button',{name:'Rename workspace'});
+ await fireEvent.click(view.getByRole('button',{name:'Rename workspace'}));await fireEvent.input(view.getByLabelText('Workspace name'),{target:{value:'Confirmed new name'}});await fireEvent.click(view.getByRole('button',{name:'Save workspace name'}));
+ await go('#/menu?workspace=workspace-A');await view.findByRole('navigation',{name:'Workspace and account'});await fireEvent.click(view.getByRole('button',{name:'Close',exact:true}));await flush();
+ expect(view.container.querySelector('main')?.getAttribute('aria-busy')).toBe('true');
+ pending.resolve({...data,name:'Confirmed new name',undo:{token:'synthetic-undo',workspaceId:'workspace-A',priorName:'Workspace A',used:false}});await flush();
+ expect(read).toHaveBeenCalledTimes(2);await view.findByRole('button',{name:'Undo workspace rename'});expect(view.container.querySelector('main')?.getAttribute('aria-busy')).toBe('false');
+});

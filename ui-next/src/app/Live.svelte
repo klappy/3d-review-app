@@ -264,7 +264,7 @@
     if (menuState) {
       const m = menuState; menuState = null; menuSeq++;
       if (!invalidate && m.origin && credential === m.credential && page.status === "ready" && routeKey(r) === routeKey(route)) {
-        if (!refreshAfterMenu) { seq++; refreshing = false; refreshError = ""; actionBusy = false; const target = menuReturnFocus; menuReturnFocus = null; await tick(); if (requestedRoute.name !== "menu" && target?.isConnected) target.focus(); return; } // Close/back restores the SAME mounted view; no aggregate reload.
+        if (!refreshAfterMenu) { if (refreshing) { seq++; refreshing = false; refreshError = ""; } const target = menuReturnFocus; menuReturnFocus = null; await tick(); if (requestedRoute.name !== "menu" && target?.isConnected) target.focus(); return; } // Close/back restores the SAME mounted view; no aggregate reload.
       }
     }
     refreshAfterMenu = false;
