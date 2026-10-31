@@ -95,7 +95,7 @@ it('phone Projects → menu → Projects, repeated entry and remount keep requir
   const reload = render(Live);
   await reload.findByRole('navigation', { name: 'Workspace and account' });
   expect(reload.getByRole('link', { name: 'Account settings', exact: true }).getAttribute('href')).toBe('#/account');
-  expect(readHistory).toHaveBeenCalled();
+  expect(readHistory).not.toHaveBeenCalled();
   await fireEvent.click(reload.getByRole('button', { name: 'Sign out', exact: true }));
   await waitFor(() => expect(signOut).toHaveBeenCalledOnce());
   await waitFor(() => expect(location.hash).toBe('#/welcome'));
@@ -151,11 +151,11 @@ it('a rejected fresh menu identity shows truthful Retry and recovers without a f
   vi.spyOn(D, 'homeModel').mockResolvedValue(home as any);
   history.replaceState(null, '', '/next/?ui_next=on#/menu');
   const view = render(Live);
-  await view.findByRole('heading', { name: 'Something went wrong' });
+  await view.findByRole('alert');
   expect(view.queryByRole('heading', { name: 'Sign in to 3D Review' })).toBeNull();
   expect(view.queryByRole('navigation', { name: 'Workspace and account' })).toBeNull();
   unavailable = false;
-  await fireEvent.click(view.getByRole('button', { name: 'Retry', exact: true }));
+  await fireEvent.click(view.getByRole('button', { name: 'Retry menu', exact: true }));
   await view.findByRole('navigation', { name: 'Workspace and account' });
 });
 
@@ -169,8 +169,8 @@ it('a never-settling fresh menu identity reaches a bounded retryable terminal er
   await flush();
   await vi.advanceTimersByTimeAsync(MENU_READ_LIMIT_MS + 1);
   await flush();
-  expect(view.getByRole('heading', { name: 'Something went wrong' })).toBeTruthy();
-  expect(view.getByRole('button', { name: 'Retry', exact: true })).toBeTruthy();
+  expect(view.getByRole('alert').textContent).toContain('Your sign-in could not be checked');
+  expect(view.getByRole('button', { name: 'Retry menu', exact: true })).toBeTruthy();
   expect(view.container.querySelector('[data-loading-frame]')).toBeNull();
   expect(readHistory).not.toHaveBeenCalled();
 });
@@ -183,7 +183,7 @@ it('the menu uses its fresh actor instead of another actor cached by a previous 
   history.replaceState(null, '', '/next/?ui_next=on#/menu');
   const view = render(Live);
   await view.findByRole('navigation', { name: 'Workspace and account' });
-  expect(readHistory).toHaveBeenCalledWith(replacement);
+  expect(readHistory).not.toHaveBeenCalled();
   expect(view.container.textContent).toContain(replacement.principal.email);
   expect(view.container.textContent).not.toContain(me.principal.email);
 });

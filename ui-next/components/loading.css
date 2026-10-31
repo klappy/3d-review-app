@@ -10,3 +10,7 @@
 /* Destination fields keep their actual type line box and action dimensions; no retained data or animation. */
 .pending-text{color:transparent!important;background:var(--line-2);border-radius:var(--radius-s);pointer-events:none;user-select:none}
 .pending-project-title{max-width:100%;width:16ch}
+/* The modal is top-layer; its theme host must not become a second page or move the retained destination. */
+.app.account-overlay-root{position:fixed;inset:0;pointer-events:none;background:none;box-shadow:none}
+.account-overlay-root dialog{pointer-events:auto}
+.live-refresh-notice{position:fixed;z-index:20;inset-inline:var(--sp-4);bottom:var(--sp-4);max-width:var(--page-max);margin-inline:auto}

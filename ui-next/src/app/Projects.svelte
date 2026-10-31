@@ -9,17 +9,20 @@
   import { to } from './router.js';
   import { api, enc } from './api.js';
   import '../../components/loading.css';
-  let { phone = false, theme = 'light', projects = [], returnToSetup = false, canCreate = false, pending = false, identityReady = true, chrome = null, identityKey = "" } = $props();
+  let { phone = false, theme = 'light', projects = [], returnToSetup = false, canCreate = false, pending = false, identityReady = true, chrome = null, identityKey = "", readKey = 0 } = $props();
+  let responseView = $state('All projects');
   let search = $state(''), view = $state('Active'), creating = $state(false), name = $state(''), organization = $state(''), busy = $state(false), error = $state(''), uncertain = $state(false);
   let expanded = $state({}), reviews = $state({}), loading = $state({}), failures = $state({}), archivedReviews = $state(false);
-  let generation = 0, disposed = false, previousIdentity;
+  let generation = 0, disposed = false, previousIdentity, previousRead;
   onDestroy(() => { disposed = true; generation++; });
   // The same destination instance survives pending→ready; discard all prior account/project UI state on a new read.
-  $effect(() => { const changedIdentity = previousIdentity !== identityKey; previousIdentity = identityKey; generation++; if (pending || changedIdentity) { search = ''; view = 'Active'; creating = false; name = ''; organization = ''; error = ''; uncertain = false; expanded = {}; reviews = {}; loading = {}; failures = {}; archivedReviews = false; busy = false; } });
+  $effect(() => { const changedRead = previousRead !== readKey; previousRead = readKey; const changedIdentity = previousIdentity !== identityKey; previousIdentity = identityKey; generation++; if (pending || changedIdentity) { search = ''; view = 'Active'; responseView = 'All projects'; creating = false; name = ''; organization = ''; error = ''; uncertain = false; expanded = {}; reviews = {}; loading = {}; failures = {}; archivedReviews = false; busy = false; } else if (changedRead) { creating = false; name = ''; organization = ''; busy = false; error = ''; uncertain = false; expanded = {}; reviews = {}; loading = {}; failures = {}; } });
   const countText = (value, unit) => Number.isSafeInteger(value) && value >= 0
     ? `${value} ${unit}${value === 1 ? '' : 's'}`
     : `${unit === 'review' ? 'Review' : 'Response'} count unavailable`;
-  const shown = $derived(projects.filter(p => (view === 'All' || (view === 'Archived' ? !!p.archived_at : !p.archived_at)) && `${p.name} ${p.organization ?? ''}`.toLowerCase().includes(search.trim().toLowerCase())));
+  const knownCount = value => Number.isSafeInteger(value) && value >= 0;
+  const contextLabel = p => [p.organization, p.workspace_name].filter((value, i, all) => value && all.indexOf(value) === i).join(' · ');
+  const shown = $derived(projects.filter(p => (view === 'All' || (view === 'Archived' ? !!p.archived_at : !p.archived_at)) && (responseView === 'All projects' || !knownCount(p.response_count) || p.response_count > 0) && `${p.name} ${contextLabel(p)}`.toLowerCase().includes(search.trim().toLowerCase())));
   async function toggle(project) {
     if (pending) return;
     expanded = { ...expanded, [project.id]: !expanded[project.id] };
@@ -54,14 +57,16 @@
     <Row split><h1 class="title-page">Projects</h1>{#if !identityReady}<span class="btn btn-primary pending-text" aria-hidden="true">New project</span>{:else if canCreate}<button class="btn btn-primary" type="button" disabled={pending} onclick={() => { creating = !creating; }}>New project</button>{/if}</Row>
     <p class="small">All projects available in your current access mode, including projects with no reviews.</p>
     <p class="small">Counts reflect reviews and submitted survey responses you can access in this mode, including archived reviews. Your project role and review access can differ.</p>
-    <Row wrap gap={3}><label class="lbl">Search projects<input class="in" type="search" disabled={pending} bind:value={search} /></label><label class="lbl">Show projects<select class="in" disabled={pending} bind:value={view}><option>Active</option><option>All</option><option>Archived</option></select></label></Row>
+    <Row wrap gap={3}><label class="lbl">Search projects<input class="in" type="search" disabled={pending} bind:value={search} /></label><label class="lbl">Show projects<select class="in" disabled={pending} bind:value={view}><option>Active</option><option>All</option><option>Archived</option></select></label><label class="lbl">Response view<select class="in" disabled={pending} bind:value={responseView}><option>All projects</option><option>With responses</option></select></label></Row>
+    <Row wrap gap={2}><p class="small" role={pending ? undefined : "status"}>{pending ? "\u00a0" : `Showing ${shown.length} of ${projects.length} accessible projects.`}</p>{#if search || view !== 'Active' || responseView !== 'All projects'}<button class="btn" type="button" onclick={() => { search = ''; view = 'Active'; responseView = 'All projects'; }}>Reset project filters</button>{/if}</Row>
+    {#if responseView === 'With responses'}<p class="small">Projects with accessible submitted responses, plus projects whose response count is unavailable. This view does not archive or change projects.</p>{/if}
     <label class="row-opt"><input class="cb" type="checkbox" disabled={pending} bind:checked={archivedReviews} />Include archived reviews inside projects</label>
     {#if creating}<Card gap={3} label="New project"><form class="l-stack" data-gap="3" onsubmit={create}><label class="lbl">Project name<input class="in" bind:value={name} required disabled={busy} /></label><label class="lbl">Lead organisation<input class="in" bind:value={organization} disabled={busy} /></label><Row gap={2}><button class="btn" type="submit" disabled={busy || uncertain || !name.trim()}>Create project</button><button class="btn" type="button" disabled={busy} onclick={() => { creating = false; }}>Cancel</button></Row>{#if error}<p role="alert">{error}</p><button class="btn" type="button" onclick={() => location.reload()}>Reload projects</button>{/if}</form></Card>{/if}
     {#each pending ? [null, null] : shown as p, i (i)}
       <div data-project-entry aria-hidden={pending ? 'true' : undefined} inert={pending}>
         <Card gap={2} label={pending ? undefined : p.name}>
           {#if pending}<span class="link h3 pending-text pending-project-title">Loading project</span>{:else}<a class="link h3" href={to('project', { pid: p.id })}>{p.name}</a>{/if}
-          <p class:pending-text={pending} class="small">{pending ? '\u00a0' : `${p.organization ?? ''} · ${p.role} · ${countText(p.assessment_count, 'review')} · ${countText(p.response_count, 'response')}${p.archived_at ? ' · Archived' : ''}`}</p>
+          <p class:pending-text={pending} class="small">{pending ? '\u00a0' : `${contextLabel(p)} · ${p.role} · ${countText(p.assessment_count, 'review')} · ${countText(p.response_count, 'response')}${p.archived_at ? ' · Archived' : ''}`}</p>
           <Row wrap gap={2}>
             {#if pending}<span class="link pending-text">Start a review in this project</span><button class="btn pending-text" type="button" disabled>Show reviews in this project</button>
             {:else}{#if !p.archived_at && ['owner','member'].includes(p.role)}<a class="link" href={to('setup1', {}, { project: p.id })}>Start a review in this project</a>{/if}<button class="btn" type="button" aria-expanded={!!expanded[p.id]} onclick={() => toggle(p)}>{expanded[p.id] ? 'Hide reviews' : 'Show reviews'} in {p.name}</button>{/if}
