@@ -1,34 +1,32 @@
 {
-  "version": "0.38.1",
+  "version": "0.38.2",
   "cookbook_repo": "klappy/3d-review-cookbook",
-  "cookbook_commit": "cf00c7a814f674a6d41ce7781a04fef471dbea3b",
+  "cookbook_commit": "0e0c2b6d5d55041e45089da735730246b1c893f6",
   "records": [
     {
-      "path": "planning/2026-09-16-parity-build/releases/0.38.1.md",
-      "blob_sha": "895358d84fe69f33b229d0832186e135d8408cc7",
-      "sha256": "b69019b00d6ac8051284c282fb0adc854ecfda71dda1bd82e25a34950d8675ee"
+      "path": "planning/2026-09-16-parity-build/releases/0.38.2.md",
+      "blob_sha": "7e95e47ed6281414a9716dc96ee231bf28c8bfc1",
+      "sha256": "11b0f3316e6d7ece3e64155518ea8a73bd317b60dbed7e1fedf4b0f719375d69"
     },
     {
       "path": "planning/2026-09-16-parity-build/releases/releases.json",
-      "blob_sha": "5d27acab60743f8b476299ddfa03c1feb09c621d",
-      "sha256": "ba6fdbb121fda88fafbb36a4540c773495983cbb439b0a10aba9492510c7fb9c"
+      "blob_sha": "4291881bc40511a75d3c16aa8c7744ad7c81fbc6",
+      "sha256": "c9e4ea78ea59c900c24896c7b5af534d362ee573f55d365a19d7c26e9c168488"
     }
   ],
   "changelog": {
     "sections": {
       "fixed": [
-        "The Next phone workspace/account menu renders its live navigation rows, reopens after dismissal, and reaches usable account actions even when optional review history is delayed or unavailable. Identity-read failure remains a bounded retryable state.",
-        "Projects displays the server-scoped submitted survey response total alongside its review total. Missing or malformed counts remain unavailable; project membership does not imply access to every review.",
-        "Assessment-only deletion no longer mistakes a now-inaccessible parent for an uncertain delete. Lifecycle controls offer adjacent stages and archive only when the existing direct-assessment and effective-project authority intersection permits it.",
-        "Current and Next workspace grouping choices use caller-scoped eligibility for direct project ownership and direct ownership of every contained assessment. Existing atomic mutation authorization remains authoritative.",
-        "Action-plan and next-step sharing state the recipient sign-in/access requirement. Printed and displayed action-plan QR codes encode the actual review URL instead of fixture bits.",
-        "Browser acceptance rejects actual Loading content and Loading review content frames, blank shells and failed account-menu interactions instead of reporting a completed journey."
+        "Next account navigation opens over the mounted destination using a bounded fresh identity read, and closes without repeating destination aggregate reads. Menu failures and retries remain local.",
+        "Same-context updates retain the displayed route and model with local pending or error state. Closing a menu discards superseded snapshot reads while preserving active mutation busy state, confirmed readback and Undo; late success and failure cannot replace another requested route.",
+        "Public Landing and Projects use their actual destination structure during initial reads. Projects fences old child/create completions and offers reversible All projects or With responses filtering with shown/total, reset and unknown-count visibility; existing human context labels distinguish duplicate names.",
+        "Missing-report presentation distinguishes collected responses from a saved report using the displayed authorized model, without new reads, automatic builds or PDF changes."
       ],
       "changed": [
-        "Compatible PATCH correcting eight audited UI gaps plus one acceptance-harness blind spot from production 0.38.0. Current UI remains the default and Next remains explicitly opt-in.",
-        "Local component, isolated D1 and mocked-HTTP browser evidence is recorded separately from hosted authentication/persistence and installed-phone PWA acceptance. No production data, real survey responses, access grants, email or scoring/disclosure policy is changed.",
-        "Facilitator/owner, collaborator/member, view-only, project-only owner and anonymous participant-shell browser fixtures:33 attempted,33 passed,0 failed,0 untested against the fixed affected-scenario denominator. Separate identity failure/retry3/3 and plan-sharing4/4 supplements are not added to33; two plan cases repeat desktop checks. Chrome156, actual routed UI with intercepted synthetic HTTP; not hosted authorization, real-store persistence, full canonical persona completion or physical installed-PWA acceptance. Satisfaction, confusion and frustration NOT MEASURED.",
-        "Product source e7f62610e3927eb20b9de02faf8e67590d2327de, tree3d374cccaf0ce052a798e7391d6fec024ba414b0: local full2262passed/3skipped, current-UI950passed, separate Node101passed/6skipped, build/typecheck and lint passed. Fresh independent114targeted checks found no material defect. Software denominators overlap and are not persona-completion totals. These precede packaging; exact packaged-head CI and protected review remain required. Built local; Reviewed local independent only; DEV live pending; Production live pending."
+        "Compatible PATCH from accepted 0.38.1. Product source dc964eeb369711b2209d5e18f1e39358d007b33d, tree b1dbbb5e8ae3e7997058e35d1952bb4d54e53ceb, app PR597. Existing authorization, My/Global scope, disclosure and mutation authority remain unchanged; no API, schema, migration, credential or response-data change.",
+        "Bounded persona scenario scorecard: anonymous visitor opening public Landing and verified facilitator using account-menu/update lifecycle. Automated local component and synthetic GET-only browser evidence: 2 named scenarios attempted, 2 passed, 0 failed, 0 untested within that fixed two-scenario scope. Facilitator browser checks separately cover actual 390x844 and 1280x844, repeated menu cycles, local failure/retry, back/forward and focus return; these viewport repetitions are not added to the persona total. Member, view-only, project-only and participant workflows are not qualified by this slice. Hosted persistence and physical installed-PWA acceptance remain unverified.",
+        "Frozen product-source validation: 1137 UI tests across 70 files, typecheck/guarded build and lint passed; independent native review passed 19 lifecycle checks including the three corrected menu races. Final source CI41209525126 completed all four jobs successfully. These overlapping software checks are not persona-completion totals. Satisfaction, confusion and frustration NOT MEASURED; human-study sample size 0.",
+        "Built and independently reviewed product source; packaging acceptance and fresh exact-head checks remain required. DEV live pending; Production live pending for 0.38.2. The separate compact Personal/Support chrome continuation, white iPhone top-band investigation, roadmap work and unshipped 0.39.0 PDF format candidate are excluded."
       ]
     }
   }
