@@ -39,7 +39,8 @@
     <a class="brand" href={home}><Mark size={26} /><span>3D Review</span></a>
   {/if}
   {#if state === "root" || state === "nested" || (state === "public" && verified)}
-    <div class="phone-account">{@render accessControl?.()}<a class="menu-btn" href={menuHref} aria-label="Workspace and account"><span class="av" aria-hidden="true">{verified ? accountChrome?.who?.initials ?? initials : initials}</span></a></div>
+    {#if verified && liveAccount.session().principal.super_admin === true}<div class="phone-account">{@render accessControl?.()}<a class="menu-btn" href={menuHref} aria-label="Workspace and account"><span class="av" aria-hidden="true">{accountChrome?.who?.initials ?? initials}</span></a></div>
+    {:else}<a class="menu-btn" href={menuHref} aria-label="Workspace and account"><span class="av" aria-hidden="true">{verified ? accountChrome?.who?.initials ?? initials : initials}</span></a>{/if}
   {:else if state === "public" && signIn}
     <Button label="Sign in" variant="quiet" href="#signin" />
   {/if}
