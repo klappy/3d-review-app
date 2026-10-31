@@ -123,3 +123,101 @@ describe("account switch and public product information", () => {
     await expect(loadRoadmapHistory("roadmap-1", 3, 0, fetcher)).rejects.toMatchObject({ code: "STALE_GENERATION" });
   });
 });
+
+describe("roadmap presentation uses only published workflow and freshness", () => {
+  const stages = () => Object.fromEntries(["planned", "built", "reviewed", "dev", "production"].map(stage => [stage, { state: "pending", reason: "No independent acceptance recorded", evidence: [] }]));
+  const item = (id: string, title: string, workflow?: string) => ({
+    id, title, provenance: { scope: `Published scope for ${title}`, outcome: "Readers can understand the next step; human results are not measured." },
+    operations: workflow ? { workflow, happening_now: `Published status for ${title}`, next_action: `Review ${title}` } : {}, stages: stages(),
+  });
+  const snapshot = (items: any[] = [], extra = {}) => ({ generation: 3, cursor: 9, source_mode: "production_canonical", items: items.map(value => ({ value })), item_next: null, last_event_at: "2026-10-31T12:00:00.000Z", ...extra });
+  afterEach(() => vi.restoreAllMocks());
+
+  for (const phone of [false, true]) it(`${phone ? "phone" : "desktop"}: keeps completed, active, future and unplaced public work separate`, async () => {
+    const unplaced = { ...item("roadmap-4", "Unplaced sample"), reported: { production: { state: "done" } } };
+    globalThis.fetch = vi.fn().mockImplementation(async () => envelope(snapshot([
+      item("roadmap-1", "Completed sample", "past"), item("roadmap-2", "Active sample", "now"), item("roadmap-3", "Future sample", "next"), unplaced,
+    ]))) as typeof fetch;
+    const view = render(AccountSettings, { phone, principal, initialView: "roadmap" });
+    await waitFor(() => expect(view.getByRole("heading", { name: "Active sample" })).toBeTruthy());
+    const region = view.getByRole("region", { name: "Roadmap work and history" });
+    const windows = Array.from(region.querySelector('[aria-label="Work window"]')!.querySelectorAll("button"));
+    expect(windows.map(button => button.textContent)).toEqual(["Past · 1", "Now · 1", "Future · 2"]);
+    expect(windows[1].getAttribute("aria-pressed")).toBe("true");
+    expect(region.querySelector("dt")?.textContent).toBe("Status");
+    expect(region.textContent).toContain("Readers can understand the next step; human results are not measured.");
+    await fireEvent.click(view.getByRole("button", { name: "Past · 1" }));
+    expect(view.getByRole("heading", { name: "Completed sample" })).toBeTruthy();
+    expect(view.queryByRole("heading", { name: "Active sample" })).toBeNull();
+    await fireEvent.click(view.getByRole("button", { name: "Future · 2" }));
+    expect(view.getByRole("heading", { name: "Future sample" })).toBeTruthy();
+    expect(view.getByRole("heading", { name: "Unplaced sample" })).toBeTruthy();
+    expect(region.textContent).toMatch(/workflow placement not yet reviewed; not active work/);
+    expect(region.textContent).toContain("Not verified");
+    expect(view.getByRole("button", { name: "Version and changelog" }).getAttribute("aria-expanded")).toBe("false");
+  });
+
+  it("distinguishes an empty public roadmap from a claim that no work is planned", async () => {
+    const fetcher = vi.fn().mockImplementation(async () => envelope(snapshot([], { cursor: 0, generation: 0, last_event_at: null })));
+    globalThis.fetch = fetcher as typeof fetch;
+    const view = render(AccountSettings, { principal, initialView: "roadmap" });
+    await waitFor(() => expect(view.container.textContent).toContain("No roadmap work is currently published."));
+    expect(view.container.textContent).toContain("Published plans and updates will appear here.");
+    expect(view.container.textContent).toContain("No public update has been published.");
+    expect(view.container.textContent).not.toMatch(/Nothing waiting|No work is planned/);
+    expect(fetcher.mock.calls.every(([url, init]) => url.startsWith("/v2/roadmap") && init.credentials === "omit" && (!init.method || init.method === "GET"))).toBe(true);
+  });
+
+  it("shows the actual successful-read and public-event timestamps without treating them as delivery dates", async () => {
+    const received = Date.parse("2026-10-31T14:00:00.000Z");
+    vi.spyOn(Date, "now").mockReturnValue(received);
+    globalThis.fetch = vi.fn().mockImplementation(async () => envelope(snapshot([item("roadmap-1", "Sample task", "now")]))) as typeof fetch;
+    const view = render(AccountSettings, { principal, initialView: "roadmap" });
+    await waitFor(() => expect(view.getByRole("heading", { name: "Sample task" })).toBeTruthy());
+    const region = view.getByRole("region", { name: "Roadmap work and history" });
+    expect(region.textContent).toContain("Last successful read");
+    expect(region.textContent).toContain("Latest public update");
+    expect(Array.from(region.querySelectorAll("time")).map(time => time.getAttribute("datetime"))).toEqual(["2026-10-31T14:00:00.000Z", "2026-10-31T12:00:00.000Z"]);
+    expect(region.textContent).not.toMatch(/due|expected release|scheduled for/i);
+  });
+
+  it("keeps previously received work and its timestamp visible when a refresh fails", async () => {
+    const received = Date.parse("2026-10-31T14:00:00.000Z"), clock = vi.spyOn(Date, "now").mockReturnValue(received);
+    let fail = false;
+    globalThis.fetch = vi.fn().mockImplementation(async () => fail ? new Response("unavailable", { status: 503 }) : envelope(snapshot([item("roadmap-1", "Retained sample", "now")]))) as typeof fetch;
+    const view = render(AccountSettings, { principal, initialView: "roadmap" });
+    await waitFor(() => expect(view.getByRole("heading", { name: "Retained sample" })).toBeTruthy());
+    fail = true; clock.mockReturnValue(received + 60000);
+    await fireEvent.click(view.getByRole("button", { name: "Refresh roadmap" }));
+    await waitFor(() => expect(view.getByRole("alert").textContent).toContain("Refresh failed. Showing previously received data"));
+    expect(view.getByRole("heading", { name: "Retained sample" })).toBeTruthy();
+    const region = view.getByRole("region", { name: "Roadmap work and history" });
+    expect(region.querySelector("time")?.getAttribute("datetime")).toBe("2026-10-31T14:00:00.000Z");
+    expect(view.getByRole("button", { name: "Retry roadmap" })).toBeTruthy();
+  });
+
+  it("offers retry after an initial read failure, without substituting invented work", async () => {
+    let fail = true;
+    const fetcher = vi.fn().mockImplementation(async () => fail ? new Response("unavailable", { status: 503 }) : envelope(snapshot([], { cursor: 0, last_event_at: null })));
+    globalThis.fetch = fetcher as typeof fetch;
+    const view = render(AccountSettings, { principal, initialView: "roadmap" });
+    await waitFor(() => expect(view.getByRole("alert").textContent).toContain("Roadmap unavailable. No progress data is being inferred."));
+    const region = view.getByRole("region", { name: "Roadmap work and history" });
+    expect(region.querySelector("article")).toBeNull();
+    fail = false; await fireEvent.click(view.getByRole("button", { name: "Retry roadmap" }));
+    await waitFor(() => expect(view.container.textContent).toContain("No roadmap work is currently published."));
+    expect(fetcher.mock.calls).toHaveLength(2);
+  });
+
+  it("renders reviewed prose as text and exposes an unknown outcome honestly", async () => {
+    const task = item("roadmap-1", "<img src=x> sample", "next"); task.provenance = { scope: "<script>sample</script>" } as typeof task.provenance;
+    globalThis.fetch = vi.fn().mockImplementation(async () => envelope(snapshot([task]))) as typeof fetch;
+    const view = render(AccountSettings, { principal, initialView: "roadmap" });
+    await waitFor(() => expect(view.getByRole("button", { name: "Future · 1" })).toBeTruthy());
+    await fireEvent.click(view.getByRole("button", { name: "Future · 1" }));
+    expect(view.getByRole("heading", { name: "<img src=x> sample" })).toBeTruthy();
+    expect(view.container.textContent).toContain("<script>sample</script>");
+    expect(view.container.querySelector("img,script")).toBeNull();
+    expect(view.container.textContent).toContain("Outcome not yet reviewed.");
+  });
+});
