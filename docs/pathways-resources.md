@@ -1,0 +1,15 @@
+# Supplied Pathways resource catalogue
+
+This change fills the existing shared Improve resource map consumed by the current UI and Next. It adds no recommendation service, scoring rule, threshold, generator or new route. Existing report weak-area selection remains unchanged.
+
+Source: Teryl's supplied “3D Pathways to Improvement”, modified October29,2026 at20:11:36.525Z. Native document extraction contains13 populated category rows,41 linked spans and39 unique destinations. Exact native linked titles and URLs are retained; links with query parameters use native ampersands rather than HTML entity text. Private source/revision evidence remains with the existing cookbook unit `work/active/2026-10-26-3d-improve-resources-links`; no private correspondence is copied here.
+
+The map contains40 source links /38 unique destinations. One supplied entry is excluded: “Intro to the New Testament” pointed to `https://oyc.yale.edu/NODE/246`, observed resolving to “Neutral Evolution: Genetic Drift”. The source owner must supply a corrected target or disposition; no replacement is guessed. Other entries remain reviewable supplied resources, not claims of independent endorsement or universal accessibility.
+
+Keys preserve perspective and category. Three explicitly reconciled aliases: Translation Team Governance → Governance/Management; Community Impactful → Impact; Translation Team Translation process & brief → both supplied Translation Brief and The Translation Process lists. No fuzzy category lookup is added. Appealing variants, Readiness and Impact observation remain unmapped unless separately reconciled; they show the existing missing-resource message. Language-only anchor labels such as Spanish remain exact supplied text and need contextual usability review.
+
+Automated reader checks of39 source destinations found8 readable pages with matching subjects,1 login redirect (Faithbridge),1 minimal YouTube shell,1 proven title/target mismatch and28 unverified fetches. HeyGen, Notion and Scripture Engagement availability remains unverified. Reader failure is not proof of a dead link. Public availability, substantive content suitability and anonymous/device browser acceptance are separate facts. Original HTTP Scripture Engagement URL is retained as supplied; no HTTPS replacement is guessed.
+
+Release qualification must check current UI and Next phone/desktop weak-area→resources, supplied category/alias behavior, unknown categories, external new-tab/return/reload behavior, access requirements, and visible resource context. No paid account creation, provider invocation, login, external contact or production mutation is part of this change. The Translation Brief HeyGen target is not presumed to be Chris's unfinished video proof. Normal independent review, UI/design checks and version/release-pin integration remain required.
+
+N08 recommendation proposal/review remains separate. Its reviewed proposed process supports evidence-backed inquiry/options with explicit human review; this curated map does not settle proposal registration/read visibility, review authority, replay/concurrency or generation assurance.
