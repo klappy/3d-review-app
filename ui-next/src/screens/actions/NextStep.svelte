@@ -119,7 +119,7 @@
           </Card>
           <Card gap={3} label="Take it out of the room">
             <h2 class="h3">Take it out of the room</h2>
-            <p class="small">Print the plan or share a read-only link with people who won't sign in — the same way as the reports.</p>
+            <p class="small">{live ? "Print the plan or share its link with people who already have access to this review. Opening it requires sign-in." : "Print the plan or share a read-only link with people who won't sign in — the same way as the reports."}</p>
             <Row wrap gap={2}><Button label="Print or share the plan" href={href("action-plan", at)} lead={print} /></Row>
           </Card>
         </Stack>

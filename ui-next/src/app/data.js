@@ -543,7 +543,7 @@ export const ROLES = Object.freeze({ owner: "Owner", member: "Member", viewer: "
 // The boards' words for what each role can do (fixtures/people/people.json); the server's gating is ui/scope-invitations.js, through people-data.js.
 export const CAN = Object.freeze({
   assessment: { owner: "Can change everything, invite people and delete", member: "Can run the review and read results", viewer: "Can read results only" },
-  project: { owner: "Can manage this project and its reviews", member: "Can run reviews", viewer: "Can read results" },
+  project: { owner: "Can manage this project; existing review access is separate", member: "Can create reviews; existing review access is separate", viewer: "Can view project details; review access is separate" },
   workspace: { owner: "Everything in the workspace, including deleting projects", member: "Can create projects and run reviews in all of them", viewer: "Can read results across all projects" },
 });
 export const INVITE_LABELS = Object.freeze({ viewer: "Viewer — reads results", member: "Member — runs reviews", owner: "Owner — everything" });
@@ -642,7 +642,7 @@ export async function workspaceModel(wid, me) {
   }));
   const year = String(new Date().getFullYear());
   const stats = [["Projects", live.length], ["Languages", new Set(all.map((a) => a.language_name).filter(Boolean)).size], ["Reviews collecting", all.filter((a) => a.stage === "collect").length], ["Results ready", all.filter((a) => a.stage === "understand").length], ["Completed this year", all.filter((a) => a.stage === "improve" && String(a.updated_at || a.created_at).startsWith(year)).length]];
-  const candidates = (mine ?? []).filter((p) => !p.archived_at && !p.workspace_id).map((p) => ({ id: p.id, title: p.name, directRole: p.direct_role ?? null }));
+  const candidates = (mine ?? []).filter((p) => !p.archived_at && !p.workspace_id).map((p) => ({ id: p.id, title: p.name, directRole: p.direct_role ?? null, groupingEligible: p.grouping_eligible }));
   return {
     id: w.id, role: w.role, user: userOf(me), name: w.name, short: w.name,
     lead: "Projects this organisation runs or has been given access to. Partners never see each other's workspaces.",

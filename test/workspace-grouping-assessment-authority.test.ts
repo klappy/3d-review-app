@@ -53,6 +53,33 @@ beforeAll(async () => {
 afterAll(() => mf.dispose());
 
 describe('grouping cannot launder project ownership into assessment authority', () => {
+  it('project reads expose safe project-side grouping eligibility without hidden child identifiers', async () => {
+    const f = await fixture();
+    const listed = async () => (await call(f.owner, 'cap.project.list', {})).result.projects.find((p: any) => p.id === f.pid);
+    const got = async () => (await call(f.owner, 'cap.project.get', { id: f.pid })).result.project;
+    expect.soft((await listed()).grouping_eligible).toBe(false);
+    expect.soft((await got()).grouping_eligible).toBe(false);
+    expect.soft(JSON.stringify(await listed())).not.toContain(f.aids[0]);
+    const gids = []; for (const aid of f.aids) gids.push(await grant(f.owner, 'assessment', aid, 'owner'));
+    expect.soft((await listed()).grouping_eligible).toBe(true);
+    expect.soft((await got()).grouping_eligible).toBe(true);
+    await run('UPDATE assessment SET archived_at=? WHERE id=?', at, f.aids[1]);
+    await run('DELETE FROM "grant" WHERE id=?', gids[1]);
+    expect.soft((await listed()).grouping_eligible).toBe(false);
+    expect.soft((await got()).grouping_eligible).toBe(false);
+    expect.soft((await group(f)).ok).toBe(false);
+    expect(await containment(f.pid)).toBeNull();
+  });
+  it('empty-project eligibility is direct ownership, not an inherited owner or member role', async () => {
+    const f = await fixture(0);
+    expect.soft((await call(f.owner, 'cap.project.get', { id: f.pid })).result.project.grouping_eligible).toBe(true);
+    expect((await group(f)).ok).toBe(true);
+    for (const actor of [f.member, f.viewer, f.inheritedOwner]) {
+      expect.soft((await call(actor, 'cap.project.get', { id: f.pid })).result.project.grouping_eligible).toBe(false);
+      const list = await call(actor, 'cap.project.list', {});
+      expect.soft(list.result.projects.find((p: any) => p.id === f.pid).grouping_eligible).toBe(false);
+    }
+  });
   it('refuses a direct project owner who self-creates a workspace but has no child grants', async () => {
     const f = await fixture();
     expect((await call(f.owner, 'cap.assessment.get', { id: f.aids[0] })).ok).toBe(false);
@@ -110,6 +137,20 @@ describe('grouping cannot launder project ownership into assessment authority', 
     expect(intervened).toBe(true);
     expect.soft(await containment(f.pid)).toBeNull();
     expect.soft((await call(f.inheritedOwner, 'cap.assessment.get', { id: f.aids[1] })).ok).toBe(false);
+  });
+  it('does not move a project if containment changes after its eligibility read', async () => {
+    const f = await fixture(); for (const aid of f.aids) await grant(f.owner, 'assessment', aid, 'owner');
+    const other = (await call(f.owner, 'cap.workspace.create', { name: 'Concurrent workspace' })).result.workspace.id;
+    expect((await call(f.owner, 'cap.project.get', { id: f.pid })).result.project.grouping_eligible).toBe(true);
+    let intervened = false;
+    const wrap = (statement: any): any => new Proxy(statement, { get(target, key) {
+      if (key === 'bind') return (...args: any[]) => wrap(target.bind(...args));
+      if (key === 'run') return async () => { if (!intervened) { intervened = true; await run('UPDATE project SET workspace_id=? WHERE id=?', other, f.pid); } return target.run(); };
+      const value = target[key]; return typeof value === 'function' ? value.bind(target) : value;
+    } });
+    const racingDb = { prepare(sql: string) { const st = db.prepare(sql); return /^UPDATE project SET workspace_id\s*=/.test(sql) ? wrap(st) : st; }, batch: (statements: any[]) => db.batch(statements) } as any;
+    expect(await group(f, racingDb)).toMatchObject({ ok:false,error:{code:'STAGE_CONFLICT'} });
+    expect(intervened).toBe(true); expect(await containment(f.pid)).toBe(other);
   });
   it('cannot use Undo of ungrouping to restore access after direct child authority is lost', async () => {
     const f = await fixture(); const direct = [];

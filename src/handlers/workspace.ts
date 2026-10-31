@@ -4,7 +4,7 @@ import type { Handler, Role } from "./types";
 import { requireConfirmedState } from "../receipt";
 import { CapError, notVisible } from "./errors";
 import {
-  grantApplies, countScalar, loadProject, loadWorkspace, newId, nowIso, patchOf, reqStr, requireUser, isDirectOwner,
+  assessmentShareAuthority, grantApplies, countScalar, loadProject, loadWorkspace, newId, nowIso, patchOf, reqStr, requireUser, isDirectOwner,
   type ProjectRow, type WorkspaceRow,
 } from "./common";
 
@@ -114,11 +114,6 @@ export const del: Handler = async (ctx, params, opts) => {
  * - add: workspace member+ AND direct project owner AND direct owner of every contained assessment.
  * - remove: workspace owner (ungrouping only narrows access), or workspace member+ with direct project owner.
  */
-const assessmentShareAuthority = (projectId: string, actor: string) =>
-  `NOT EXISTS (SELECT 1 FROM assessment shared_a WHERE shared_a.project_id = ${projectId}
-    AND NOT EXISTS (SELECT 1 FROM "grant" shared_g WHERE shared_g.principal_id = ${actor}
-      AND shared_g.scope_type = 'assessment' AND shared_g.scope_id = shared_a.id AND shared_g.role = 'owner'))`;
-
 async function shareAuthority(ctx: Parameters<Handler>[0], wid: string, pid: string, op: "add" | "remove"): Promise<{ w: WorkspaceRow; p: ProjectRow }> {
   const { row: w, role: wRole } = await loadWorkspace(ctx, wid, "member");
   const { row: p } = await loadProject(ctx, pid, "viewer");

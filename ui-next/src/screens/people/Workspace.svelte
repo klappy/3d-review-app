@@ -77,7 +77,8 @@
   const PROJECT = href("project"), SETUP = href("setup1"), MENU = href("menu");
   const rows = $derived(groupRows(d.group));
   let picked = $state(null);
-  const selected = $derived(picked ?? rows.find((c) => c.can)?.id ?? rows.find((c) => c.can)?.title ?? null);
+  const selectedRow = $derived(rows.find((c) => c.can && (c.id ?? c.title) === picked) ?? rows.find((c) => c.can));
+  const selected = $derived(selectedRow?.id ?? selectedRow?.title ?? null);
   const grouping = (el) => { const f = (e) => { if (ongroup && e.target instanceof Element && e.target.closest(".btn-primary") && selected != null) { e.preventDefault(); ongroup(selected); } }; el.addEventListener("click", f); return () => el.removeEventListener("click", f); };
   const FIND = "Find a project or language";
   // Escape closes the native modal (close event): drop the dialog and restore New project as the primary, at the Cancel target's address.
@@ -178,18 +179,18 @@
     <dialog class={phone ? "glass-hi sheet" : "glass-hi"} aria-labelledby="ws-group-title" {onclose} {@attach modal} {@attach grouping}>
       <Stack gap={phone ? 3 : 4}>
         {#if phone}<span class="sheet-handle" aria-hidden="true"></span><span class="micro" id="ws-group-title">Add a project to this workspace</span>
-          <p class="small">Only a <b>direct project owner</b> can group a project. Everyone in the workspace then opens it at their workspace role.</p>
+          <p class="small">You must directly own the project and <b>every review</b> it contains, including archived reviews. Everyone in the workspace then opens them at their workspace role.</p>
         {:else}<h2 class="h2" id="ws-group-title">Add a project to this workspace</h2>
-          <p class="small">Everyone in the workspace opens it at their workspace role, unless they already hold a higher project grant. Only a <b>direct project owner</b> can group it; a role inherited from a workspace is never enough.</p>{/if}
+          <p class="small">Everyone in the workspace opens the project and its reviews at their workspace role, unless they already hold a higher grant. You must directly own the project and <b>every review</b> it contains, including archived reviews; inherited access is not enough.</p>{/if}
         <div class="l-stack" data-gap="2" role="radiogroup" aria-label="Projects you own">
           {#each rows as c, i}
-            <label class="row-opt"><input class="rd" type="radio" name="ws-group" value={c.id ?? c.title} checked={(c.id ?? c.title) === selected} disabled={!c.can} onchange={() => { picked = c.id ?? c.title; }} /><span class="l-stack" data-gap="1" data-grow=""><b>{c.title}</b><span class="small">{c.can ? "You own this project directly" : phone ? "Cannot group: your access comes from the workspace, not a project grant" : "Your access here comes from the workspace, not a project grant"}</span></span>{#if !phone}<Tag label={c.can ? "Direct owner" : "Inherited · cannot group"} />{/if}</label>
+            <label class="row-opt"><input class="rd" type="radio" name="ws-group" value={c.id ?? c.title} checked={(c.id ?? c.title) === selected} disabled={!c.can} onchange={() => { picked = c.id ?? c.title; }} /><span class="l-stack" data-gap="1" data-grow=""><b>{c.title}</b><span class="small">{c.reason}</span></span>{#if !phone}<Tag label={c.can ? "Direct owner" : c.directRole == null ? "Inherited · cannot group" : "Cannot group"} />{/if}</label>
           {/each}
         </div>
         {#if phone}
-          <Row gap={2}><Button label="Cancel" variant="quiet" href={BACK} block /><Button label="Add to workspace" variant="primary" href={BACK} lead={plus} block /></Row>
+          <Row gap={2}><Button label="Cancel" variant="quiet" href={BACK} block /><Button label="Add to workspace" variant="primary" href={selected == null ? undefined : BACK} disabled={selected == null} lead={plus} block /></Row>
         {:else}
-          <div class="l-row" data-gap="2" data-justify="end"><Button label="Cancel" variant="quiet" href={BACK} /><Button label="Add to workspace" variant="primary" href={BACK} lead={plus} /></div>
+          <div class="l-row" data-gap="2" data-justify="end"><Button label="Cancel" variant="quiet" href={BACK} /><Button label="Add to workspace" variant="primary" href={selected == null ? undefined : BACK} disabled={selected == null} lead={plus} /></div>
         {/if}
       </Stack>
     </dialog>

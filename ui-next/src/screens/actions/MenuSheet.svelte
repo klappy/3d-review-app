@@ -33,11 +33,23 @@
   const byStage = $derived({ collecting: href("collect", at), setup: href("setup1", at), results: href("results", at) });
   // The sheet's rows in the board's order (fixture labels): workspace, invitations, help, about, feedback, another account, sign out.
   const to = $derived([href("workspace", at), href("invitations", at), href("help", at), href("about", at), href("feedback", at), href("landing", at), href("sign-in", at), href("sign-in", at)]);
-  if (D.items.length !== 8) throw new TypeError("MenuSheet: the sheet draws the board's eight rows"); // MenuPhone: + Public website home (design-system.md :344/:603)
+  // The gallery has eight rows; live navigation supplies explicit destinations and can contain more.
   const initials = $derived(D.initials ?? "BK");
 
   let sheet = $state();
+  function reopenMenu(event) {
+    if (!data || event.defaultPrevented || event.button > 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+    const link = event.target instanceof Element ? event.target.closest('a[aria-label="Workspace and account"]') : null;
+    if (!link || link.getAttribute('href') !== href('menu', at)) return;
+    event.preventDefault(); // Closing the sheet keeps this route, so a repeated same-route click reopens it.
+    if (!sheet?.open) {
+      try { sheet.showModal(); } catch { sheet?.setAttribute('open', ''); }
+    }
+    sheet?.querySelector('[data-autofocus]')?.focus();
+  }
 </script>
+
+<svelte:window onclick={reopenMenu} />
 
 {#snippet top()}<PhoneHeader state="root" {initials} home={href("home", at)} menuHref={href("menu", at)} />{/snippet}
 {#snippet bar()}<PhoneBar label="Start a 3D Review" lead="plus" href={href("setup1", at)} />{/snippet}
@@ -55,10 +67,11 @@
     </Card>
   {/each}
   <Card href={href("sandbox", at)} gap={2}><Row gap={3}><span class="icn icn-lens" data-lens="team"><Ico d={A.sparkle} /></span><span class="small"><b>Practice</b> · {data ? "open the sample review" : "open the sample or make a practice copy"}</span></Row></Card>
-  <details class="dd"><summary class="link small">Completed · {D.completed}</summary></details>
+  {#if D.completed != null}<details class="dd"><summary class="link small">Completed · {D.completed}</summary></details>{/if}
   <dialog class="glass-hi sheet" data-pad="menu" aria-labelledby="menu-who" closedby="any" bind:this={sheet} {@attach modal}>
     <div class="sheet-handle" aria-hidden="true"></div>
     <Row split gap={2}><p class="micro sheet-title" id="menu-who">{D.who}</p><IconAction d={A.x} ariaLabel="Close" onclick={() => closeDialog(sheet)} /></Row>
+    {#if D.historyStatus === 'unavailable'}<p class="small" role="status">{D.historyMessage} <a class="link" href={href('home', at)}>Open your reviews to retry</a></p>{/if}
     <!-- R14 Focus on open: a sheet of menu rows focuses its first row (./modal.js focuses [data-autofocus]). -->
     <nav aria-label="Workspace and account">
       {#each D.items as [icon, label, link, onclick], i}{#if typeof onclick === "function"}<button class="mi" data-size="lg" type="button" {onclick} data-autofocus={i === 0 ? "" : undefined}><Ico d={A[icon]} /><span>{label}</span></button>{:else}<a class="mi" data-size="lg" href={link ?? to[i]} data-autofocus={i === 0 ? "" : undefined}><Ico d={A[icon]} /><span>{label}</span></a>{/if}{#if label === "Public website home"}<ThemeControl uid="sheet" />{/if}{/each}

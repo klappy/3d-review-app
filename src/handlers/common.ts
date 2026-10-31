@@ -124,6 +124,12 @@ export const grantApplies = (g: string, scopeT: string, scopeI: string) =>
   + ` AND ${g}.scope_id = (SELECT p.workspace_id FROM project p WHERE p.id = ${scopeI}))`
   + ` OR (${scopeT} = 'assessment' AND ${g}.scope_type = 'workspace' AND ${g}.scope_id = (`
   + `SELECT inherited_p.workspace_id FROM assessment inherited_a JOIN project inherited_p ON inherited_p.id = inherited_a.project_id WHERE inherited_a.id = ${scopeI})))`;
+/** Grouping shares every contained assessment, including archived ones. Use the same direct-owner predicate
+ * for project-side eligibility reads and the atomic containment write; never disclose child identifiers. */
+export const assessmentShareAuthority = (projectId: string, actor: string) =>
+  `NOT EXISTS (SELECT 1 FROM assessment shared_a WHERE shared_a.project_id = ${projectId}
+    AND NOT EXISTS (SELECT 1 FROM "grant" shared_g WHERE shared_g.principal_id = ${actor}
+      AND shared_g.scope_type = 'assessment' AND shared_g.scope_id = shared_a.id AND shared_g.role = 'owner'))`;
 /** Effective project role: max(direct project grant, grant on the workspace that groups it). One query; null when neither. */
 export async function projectRole(ctx: Ctx, projectId: string): Promise<Role | null> {
   if (ctx.principal.kind !== "user" && ctx.principal.kind !== "support") return null;
