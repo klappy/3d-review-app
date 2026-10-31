@@ -79,6 +79,7 @@
   let menuState = $state(null), menuSeq = 0, refreshAfterMenu = false, menuReturnFocus = null;
   const routeKey = r => JSON.stringify([r.name, r.params, r.query.toString()]);
   const scopeKey = r => {
+    if (PARTICIPANT.has(r.name)) return "participant";
     const c = contextForRoute(r);
     return c.aid ? `review:${c.aid}` : c.pid ? `project:${c.pid}` : c.wid ? `workspace:${c.wid}` : PUBLIC.has(r.name) ? "public" : "account";
   };
@@ -538,7 +539,7 @@
   // The built report for this screen (app/data.js liveReport: full snapshot for the readers, compact payload for phone Results only).
   const reportFor = (m, screen) => D.liveReport(m, { phone, screen });
   setContext("next-view-pending", { busy: () => refreshing || actionBusy, inactive: () => refreshing || actionBusy || !!refreshError || !!menuState, render: () => refreshNotice });
-  setContext("next-review-utilities", { visible: () => (page.status === "ready" || (page.status === "loading" && route.name === "projects" && !!session)) && (!!(session?.principal?.super_admin && !page.data?.sample) || !!page.data?.results?.reports?.length || !!metadataUndo), render: () => utilities });
+  setContext("next-review-utilities", { visible: () => !PARTICIPANT.has(route.name) && (page.status === "ready" || (page.status === "loading" && route.name === "projects" && !!session)) && (!!(session?.principal?.super_admin && !page.data?.sample) || !!page.data?.results?.reports?.length || !!metadataUndo), render: () => utilities });
 </script>
 
 <!-- The build confirm (report-build.js: one plain sentence with the response count, confirm "Build the results", cancel "Not now").

@@ -5,9 +5,11 @@ import { tick } from 'svelte';
 import Live from '../ui-next/src/app/Live.svelte';
 import * as D from '../ui-next/src/app/data.js';
 import * as S from '../ui-next/src/app/session.js';
+import * as P from '../ui-next/src/app/participant.js';
 import * as W from '../ui-next/src/app/workspace-actions.js';
 import { setToken } from '../ui-next/src/app/api.js';
-import { setLiveChrome } from '../ui-next/src/app/chrome.js';
+import { liveChrome, setLiveChrome } from '../ui-next/src/app/chrome.js';
+import { DATA as participantFixture } from '../ui-next/src/screens/participant/data.js';
 import workspace from '../ui-next/fixtures/people/workspace.json';
 const me={principal:{id:'actor-A',display_name:'Actor A',kind:'user',provisioned:true,access_mode:'my'},grants:[]};
 const rows=[{id:'project-A',name:'Verified project',organization:'Fixture organization',role:'owner',assessment_count:1,response_count:2}];
@@ -16,7 +18,7 @@ function deferred<T>(){let resolve!:(v:T)=>void;let reject!:(e:Error)=>void;cons
 async function flush(){await tick();for(let i=0;i<20;i++)await Promise.resolve();await tick();}
 async function go(hash:string){history.replaceState(null,'','/next/?ui_next=on'+hash);await fireEvent(window,new HashChangeEvent('hashchange'));await flush();}
 function setup(phone=false){vi.stubGlobal('matchMedia',(q:string)=>({matches:phone&&q.includes('max-width'),addEventListener(){},removeEventListener(){}}));vi.spyOn(S,'me').mockResolvedValue(me);vi.stubGlobal('fetch',vi.fn(async()=>response(me)));}
-afterEach(()=>{cleanup();vi.restoreAllMocks();vi.unstubAllGlobals();S.forget();setToken(null);setLiveChrome(null);history.replaceState(null,'','/next/?ui_next=on');});
+afterEach(()=>{cleanup();vi.restoreAllMocks();vi.unstubAllGlobals();S.forget();setToken(null);setLiveChrome(null);history.replaceState(null,'','/next/?ui_next=on');document.cookie='review_access=my; Path=/';});
 describe('local account menu lifecycle',()=>{
  it.each([false,true])('repeated menu open/close and back/forward preserve the actual view and make zero destination/history reads (phone=%s)',async phone=>{
   setup(phone);const projects=vi.spyOn(D,'projects').mockResolvedValue(rows),historyRead=vi.spyOn(D,'homeModel');location.hash='#/projects';const view=render(Live);
@@ -116,4 +118,19 @@ it('closing a menu preserves readback of an already pending same-view rename',as
  expect(view.container.querySelector('main')?.getAttribute('aria-busy')).toBe('true');
  pending.resolve({...data,name:'Confirmed new name',undo:{token:'synthetic-undo',workspaceId:'workspace-A',priorName:'Workspace A',used:false}});await flush();
  expect(read).toHaveBeenCalledTimes(2);await view.findByRole('button',{name:'Undo workspace rename'});expect(view.container.querySelector('main')?.getAttribute('aria-busy')).toBe('false');
+});
+
+const participantTransitions = ['#/', '#/projects', '#/workspaces'].flatMap(origin => ['#/p/code', '#/p/welcome', '#survey=synthetic-entry'].map(destination => [origin,destination]));
+it.each(participantTransitions)('clears facilitator identity and access chrome from %s when entering %s',async(origin,destination)=>{
+ setup(true);const admin={...me,principal:{...me.principal,super_admin:true,access_mode:'global'}};document.cookie='review_access=global; Path=/';vi.mocked(S.me).mockResolvedValue(admin);vi.stubGlobal('fetch',vi.fn(async()=>response(admin)));vi.spyOn(D,'projects').mockResolvedValue(rows);vi.spyOn(D,'workspaces').mockResolvedValue([]);vi.spyOn(D,'homeModel').mockResolvedValue({user:{first:'Actor',name:'Actor A',initials:'AA'},workspace:'Fixture workspace',workspaces:[],projects:[],groups:[],phoneOrder:[],completed:[],empty:true} as any);
+ vi.spyOn(P,'state').mockReturnValue(null);vi.spyOn(P,'hasSession').mockReturnValue(false);const opening=deferred<any>();vi.spyOn(P,'start').mockReturnValue(opening.promise);
+ location.hash=origin;const view=render(Live);await view.findByRole('region',{name:'Super admin access'});const identityReads=vi.mocked(S.me).mock.calls.length;
+ await go(destination);expect(liveChrome()?.signedOut).toBe(true);expect(liveChrome()?.accountItems).toEqual([]);expect(view.queryByRole('region',{name:'Super admin access'})).toBeNull();expect(view.queryByRole('link',{name:'All workspaces',exact:true})).toBeNull();expect(view.queryByRole('link',{name:'All projects',exact:true})).toBeNull();expect(view.container.textContent).not.toContain('Actor A');expect(view.queryByRole('link',{name:'Verified project'})).toBeNull();
+ opening.resolve(null);await view.findByRole('heading',{name:'Have a survey code?'});expect(vi.mocked(S.me).mock.calls.length).toBe(identityReads);expect(view.queryByRole('region',{name:'Super admin access'})).toBeNull();document.cookie='review_access=my; Path=/';
+});
+
+it.each(['#/p/welcome','#survey=synthetic-entry'])('clears account chrome when a valid participant form opens through %s',async destination=>{
+ setup(true);const admin={...me,principal:{...me.principal,super_admin:true,access_mode:'global'}};document.cookie='review_access=global; Path=/';vi.mocked(S.me).mockResolvedValue(admin);vi.stubGlobal('fetch',vi.fn(async()=>response(admin)));vi.spyOn(D,'projects').mockResolvedValue(rows);
+ vi.spyOn(P,'state').mockReturnValue({phase:'form'} as any);vi.spyOn(P,'hasSession').mockReturnValue(true);vi.spyOn(P,'snapshot').mockReturnValue({state:{phase:'form'},model:participantFixture,draft:{}} as any);vi.spyOn(P,'start').mockResolvedValue(undefined);
+ location.hash='#/projects';const view=render(Live);await view.findByRole('region',{name:'Super admin access'});const reads=vi.mocked(S.me).mock.calls.length;await go(destination);await view.findByRole('heading',{name:"We'd like your perspective"});expect(liveChrome()?.signedOut).toBe(true);expect(liveChrome()?.accountItems).toEqual([]);expect(view.queryByRole('region',{name:'Super admin access'})).toBeNull();expect(view.container.querySelector('[data-next-utilities]')).toBeNull();expect(view.queryByRole('link',{name:'All workspaces',exact:true})).toBeNull();expect(view.container.textContent).not.toContain('Actor A');expect(vi.mocked(S.me).mock.calls.length).toBe(reads);
 });
