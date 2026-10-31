@@ -1,34 +1,33 @@
 {
-  "version": "0.38.1",
+  "version": "0.39.0",
   "cookbook_repo": "klappy/3d-review-cookbook",
-  "cookbook_commit": "cf00c7a814f674a6d41ce7781a04fef471dbea3b",
+  "cookbook_commit": "e20108a74bc04c1bb65fb42d78b392e4f9457a12",
   "records": [
     {
-      "path": "planning/2026-09-16-parity-build/releases/0.38.1.md",
-      "blob_sha": "895358d84fe69f33b229d0832186e135d8408cc7",
-      "sha256": "b69019b00d6ac8051284c282fb0adc854ecfda71dda1bd82e25a34950d8675ee"
+      "path": "planning/2026-09-16-parity-build/releases/0.39.0.md",
+      "blob_sha": "ee15f96e59efb5f3938987414de54a9994f93313",
+      "sha256": "3ba36d1f3fe256f03f6faaf0ec402f8cf913168a22fba09071bac361b9427b92"
     },
     {
       "path": "planning/2026-09-16-parity-build/releases/releases.json",
-      "blob_sha": "5d27acab60743f8b476299ddfa03c1feb09c621d",
-      "sha256": "ba6fdbb121fda88fafbb36a4540c773495983cbb439b0a10aba9492510c7fb9c"
+      "blob_sha": "47f66e23dfad366c955c1e425c9a4271c67842a1",
+      "sha256": "21385ff5f192b3d7c3f09636af71df2b9a097882a993baffcdbccc05ab70ca1a"
     }
   ],
   "changelog": {
     "sections": {
+      "added": [
+        "The existing stored-report PDF endpoint accepts explicit overview and detailed formats, rendered through the actual Next report components and styles. Full remains the default and an explicit fallback."
+      ],
       "fixed": [
-        "The Next phone workspace/account menu renders its live navigation rows, reopens after dismissal, and reaches usable account actions even when optional review history is delayed or unavailable. Identity-read failure remains a bounded retryable state.",
-        "Projects displays the server-scoped submitted survey response total alongside its review total. Missing or malformed counts remain unavailable; project membership does not imply access to every review.",
-        "Assessment-only deletion no longer mistakes a now-inaccessible parent for an uncertain delete. Lifecycle controls offer adjacent stages and archive only when the existing direct-assessment and effective-project authority intersection permits it.",
-        "Current and Next workspace grouping choices use caller-scoped eligibility for direct project ownership and direct ownership of every contained assessment. Existing atomic mutation authorization remains authoritative.",
-        "Action-plan and next-step sharing state the recipient sign-in/access requirement. Printed and displayed action-plan QR codes encode the actual review URL instead of fixture bits.",
-        "Browser acceptance rejects actual Loading content and Loading review content frames, blank shells and failed account-menu interactions instead of reporting a completed journey."
+        "Overview and Detailed downloads select their named document instead of both returning the full legacy report. The file names distinguish the named formats; repeated preparation and format/session changes retain stale-file protection."
       ],
       "changed": [
-        "Compatible PATCH correcting eight audited UI gaps plus one acceptance-harness blind spot from production 0.38.0. Current UI remains the default and Next remains explicitly opt-in.",
-        "Local component, isolated D1 and mocked-HTTP browser evidence is recorded separately from hosted authentication/persistence and installed-phone PWA acceptance. No production data, real survey responses, access grants, email or scoring/disclosure policy is changed.",
-        "Facilitator/owner, collaborator/member, view-only, project-only owner and anonymous participant-shell browser fixtures:33 attempted,33 passed,0 failed,0 untested against the fixed affected-scenario denominator. Separate identity failure/retry3/3 and plan-sharing4/4 supplements are not added to33; two plan cases repeat desktop checks. Chrome156, actual routed UI with intercepted synthetic HTTP; not hosted authorization, real-store persistence, full canonical persona completion or physical installed-PWA acceptance. Satisfaction, confusion and frustration NOT MEASURED.",
-        "Product source e7f62610e3927eb20b9de02faf8e67590d2327de, tree3d374cccaf0ce052a798e7391d6fec024ba414b0: local full2262passed/3skipped, current-UI950passed, separate Node101passed/6skipped, build/typecheck and lint passed. Fresh independent114targeted checks found no material defect. Software denominators overlap and are not persona-completion totals. These precede packaging; exact packaged-head CI and protected review remain required. Built local; Reviewed local independent only; DEV live pending; Production live pending."
+        "MINOR under the major-zero policy for the additive accepted HTTP format selector. Candidate against accepted main 7390415197aad5c7fb3dec618b1572a4f8333071; no released-status, formal approval or deployment claim.",
+        "Existing authorized stored reads, current suppression, server-owned perspective floors and full-report fallback remain authoritative. No scoring, new report creation, migration, public question-results cells/capability, excerpt disclosure, credential, subscription or runtime-configuration change.",
+        "Local genuine PDF evidence covers two distinct synthetic snapshots: one-page overview and four-page detailed documents, matching same-model Next labels and counters. A three-page single-perspective report is a different model. Hosted new-format and physical installed-PWA acceptance remain pending.",
+        "Qualified source 064aefdda1eb4f3f1dcf42fd623ac85c9a83c200, tree 2ef5348765d603f646205d91af3103c5e60fc0f4. All 44 accepted PR594 files remain byte-identical. PDF delta remains 19 files. Local affected tests 42 passed with actual PDF/Workers evidence; eight download helpers passed; type/build and generated freshness passed. Denominators overlap and are not human persona-completion totals. Packaged local qualification head e3762c687c141b84c5bb83de8b1edc00c53dd42a passed 58 tests with one skip; eight helpers passed; Node tests 101 passed/six skipped. Final-head identity/layout checks 18 passed/one skip overlap those checks.",
+        "Independent native bounded review at e3762c687c141b84c5bb83de8b1edc00c53dd42a PASS: 22 tests passed with one existing skip; accepted PR594 product/PDF source, SSR body, prior release history and record hashes preserved. Roadmap regeneration and immutable published-pin metadata are finalized separately, requiring fresh exact-head checks and bounded metadata review. Built local; Reviewed product source; DEV new formats pending; Production new formats pending."
       ]
     }
   }

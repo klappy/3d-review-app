@@ -17,6 +17,7 @@
      .radar-row > svg + .radar-side > .radar-legend (.legend-item > i.radar-dot); a score row's notes are span.nowrap. No .small,
      .h3 or inline type inside a sheet; only value-driven left/width % (ScoreBar). -->
 <script>
+  import { reportPdfFormatUrl } from '../../../../ui/pdf/download.js';
   import AppShell from "../../AppShell.svelte";
   import LevelLegend from "./LevelLegend.svelte";
   import ReportContext from "./ReportContext.svelte";
@@ -36,6 +37,7 @@
   import { REPORT, currentLevelMin, snapshotTotal, fmtScore, footPrivacy, readingPrivacy, lensCards, scoreRows, comparedRows, radar, gapLead, countWord, evidenceSheets, detailedPages } from "./data.js";
 
   let { phone = false, theme = "light", report, pdfUrl = null, pdfToken = null } = $props();
+  const namedPdfUrl = $derived(pdfUrl ? reportPdfFormatUrl(pdfUrl,'detailed') : null);
   const D = $derived(report ?? REPORT.desktop);
   const cards = $derived(lensCards(D.payload, D.counts, { sent: D.sent }));
   const tensions = $derived(scoreRows(D, D.counts).filter((r) => r.spread !== null).slice(0, 3));
@@ -50,7 +52,7 @@
   const tensionsLead = $derived(tensions.length === 0 ? "No area has two perspectives to compare yet." : tensions.length === 1 ? "The area where the perspectives are furthest apart." : `The ${countWord(tensions.length)} areas where the perspectives are furthest apart.`);
 </script>
 
-{#snippet top()}<DocBar title={`Detailed report · ${PAGES} pages · ${D.review.title}`} other="Open the overview · 1 page" otherHref={href("report")} {pdfUrl} {pdfToken} /><LevelLegend />{/snippet}
+{#snippet top()}<DocBar title={`Detailed report · ${PAGES} pages · ${D.review.title}`} other="Open the overview · 1 page" otherHref={href("report")} pdfUrl={namedPdfUrl} {pdfToken} /><LevelLegend />{/snippet}
 {#snippet foot(n)}<div class="pfoot"><span class="pf-text">{FOOT}</span><span class="pn">{n} of {PAGES}</span></div>{/snippet}
 {#snippet scores(rows)}
   {#each rows as row}
@@ -129,7 +131,7 @@
      back to the overview; the PDF reason in the page; the download disabled with it. -->
 <AppShell phone {theme} screen top={ptop} bar={pbar}>
   <LevelLegend />
-  {#if pdfUrl}<PdfActions url={pdfUrl} token={pdfToken} label="Download full report PDF" />{/if}
+  {#if pdfUrl}<PdfActions url={namedPdfUrl} token={pdfToken} label="Download detailed report PDF" />{/if}
   <span class="micro">Detailed · {PAGES} pages · A4 scaled to the width; pinch to zoom</span>
   {#if !pdfUrl}<p class="small" id="pdf-why">PDF export is not in the new design yet; the current design's report page downloads it.</p>{/if}
   <div class="report-sheets">

@@ -1,7 +1,27 @@
 {
   "schema": "3dr-releases/1",
-  "current": "0.38.1",
+  "current": "0.39.0",
   "versions": [
+    {
+      "version": "0.39.0",
+      "status": "candidate",
+      "notes_path": "releases/0.39.0.md",
+      "sections": {
+        "added": [
+          "The existing stored-report PDF endpoint accepts explicit overview and detailed formats, rendered through the actual Next report components and styles. Full remains the default and an explicit fallback."
+        ],
+        "fixed": [
+          "Overview and Detailed downloads select their named document instead of both returning the full legacy report. The file names distinguish the named formats; repeated preparation and format/session changes retain stale-file protection."
+        ],
+        "changed": [
+          "MINOR under the major-zero policy for the additive accepted HTTP format selector. Candidate against accepted main 7390415197aad5c7fb3dec618b1572a4f8333071; no released-status, formal approval or deployment claim.",
+          "Existing authorized stored reads, current suppression, server-owned perspective floors and full-report fallback remain authoritative. No scoring, new report creation, migration, public question-results cells/capability, excerpt disclosure, credential, subscription or runtime-configuration change.",
+          "Local genuine PDF evidence covers two distinct synthetic snapshots: one-page overview and four-page detailed documents, matching same-model Next labels and counters. A three-page single-perspective report is a different model. Hosted new-format and physical installed-PWA acceptance remain pending.",
+          "Qualified source 064aefdda1eb4f3f1dcf42fd623ac85c9a83c200, tree 2ef5348765d603f646205d91af3103c5e60fc0f4. All 44 accepted PR594 files remain byte-identical. PDF delta remains 19 files. Local affected tests 42 passed with actual PDF/Workers evidence; eight download helpers passed; type/build and generated freshness passed. Denominators overlap and are not human persona-completion totals. Packaged local qualification head e3762c687c141b84c5bb83de8b1edc00c53dd42a passed 58 tests with one skip; eight helpers passed; Node tests 101 passed/six skipped. Final-head identity/layout checks 18 passed/one skip overlap those checks.",
+          "Independent native bounded review at e3762c687c141b84c5bb83de8b1edc00c53dd42a PASS: 22 tests passed with one existing skip; accepted PR594 product/PDF source, SSR body, prior release history and record hashes preserved. Roadmap regeneration and immutable published-pin metadata are finalized separately, requiring fresh exact-head checks and bounded metadata review. Built local; Reviewed product source; DEV new formats pending; Production new formats pending."
+        ]
+      }
+    },
     {
       "version": "0.38.1",
       "status": "candidate",
