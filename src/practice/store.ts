@@ -56,6 +56,10 @@ async function source(ctx:Ctx, sourceId:string, validateSetup=true):Promise<stri
   if(validateSetup && (!setup.surveys.length || setup.surveys.length>8 || new TextEncoder().encode(r.snapshot).length>524288)) invalid('Select between one and eight published surveys within the practice size limit.');
   return r.snapshot;
 }
+// Practice-internal transaction builders share the same source/actor checks and SQL;
+// these exports add no handler, transport or public capability.
+export { principal as practiceActor, source as readPracticeSource, SOURCE_ALLOWED as practiceSourceAllowed,
+ SOURCE_JOIN as practiceSourceJoin, SNAPSHOT as practiceSnapshotSql, LIVE_SOURCE as practiceLiveSource, AUTH as practiceGrantSql };
 async function copy(ctx:Ctx,pid:string, removal=false):Promise<Copy> {
   const owner=principal(ctx);
   if(!/^practice_[a-f0-9-]{36}$/.test(pid)) throw notVisible('practice');
