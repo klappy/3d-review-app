@@ -56,6 +56,7 @@
   import Button from "../Button.svelte";
   import { systemTheme } from "../theme.svelte.js";
   import NotBuilt from "./NotBuilt.svelte";
+  import { reportAvailability } from "./report-availability.js";
   import { buildConfirmText } from "../../../ui/assess/report-build.js";
 
   capturePrivateInvitation();
@@ -657,7 +658,7 @@
   {@const rep = reportFor(m, page.data.screen)}
   {#if page.data.sample}{@render sampleMark()}{/if}
   {#if !rep && !m.held && page.data.screen !== "results-held"}
-    <NotBuilt {chrome} {phone} {theme} crumbs={[{ label: m.review.project, href: m.review.projectId ? to("project", { pid: m.review.projectId }) : to("home") }, { label: m.review.title }]} message={`No report has been built for ${m.review.title} yet. ${m.canBuild ? "Building reads the answers collected so far and keeps that report." : "An owner or member of the review builds it."}${page.data.refreshed ? ` ${page.data.refreshed}` : ""}`} back={to("collect", route.params)} backLabel="Back to Collect">
+    <NotBuilt {chrome} {phone} {theme} context={reportAvailability(m)} crumbs={[{ label: m.review.project, href: m.review.projectId ? to("project", { pid: m.review.projectId }) : to("home") }, { label: m.review.title }]} message={`No report has been built for ${m.review.title} yet. ${m.canBuild ? "Building reads the answers collected so far and keeps that report." : "An owner or member of the review builds it."}${page.data.refreshed ? ` ${page.data.refreshed}` : ""}`} back={to("collect", route.params)} backLabel="Back to Collect">
       {#if m.canBuild}{#if build}{@render buildConfirm(true)}{:else}<Row gap={2}><button class="btn btn-primary btn-lg" type="button" onclick={refreshResults} disabled={building || previewing || undefined}>{building ? "Building the results…" : previewing ? "Preparing preview…" : "Build the report"}</button></Row>{/if}{/if}
     </NotBuilt>
   {:else if !rep || page.data.screen === "results-held"}
