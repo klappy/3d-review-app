@@ -32,12 +32,12 @@ try {for(const viewport of [{width:390,height:844},{width:1280,height:800}]) for
  await page.goto(`${base}/?ui_next=on#/${family==='landing'?'':'projects'}`);
  const destination=page.locator(`[data-destination="${family}"]`);await destination.waitFor();
  await page.evaluate(()=>document.fonts.ready);
- const selectors=family==='landing'?{shell:'[data-destination=landing] .app',header:'header',hero:'[data-destination=landing] h1',...(viewport.width>600?{heroGrid:'[data-tpl=hero-landing]',media:'.l-media',perspectives:'[data-destination=landing] section:nth-child(2) .l-grid'}:{faq:'[aria-label="Common questions"]'})}:{shell:'[data-destination=projects] .app',header:'header',heading:'[data-destination=projects] h1',copy:'[data-destination=projects] .l-page>p:first-of-type',search:'input[type=search]',filter:'select',archive:'.row-opt',firstCard:'[data-project-entry] .l-card'};
+ const selectors=family==='landing'?{shell:'[data-destination=landing] .app',header:'header',hero:'[data-destination=landing] h1',...(viewport.width>600?{heroGrid:'[data-tpl=hero-landing]',media:'.l-media',perspectives:'[data-destination=landing] section:nth-child(2) .l-grid'}:{faq:'[aria-label="Common questions"]'})}:{shell:'[data-destination=projects] .app',header:'header',heading:'[data-destination=projects] h1',copy:'[data-destination=projects] .l-page>p:first-of-type',search:'input[type=search]',filter:'main select',archive:'.row-opt',firstCard:'[data-project-entry] .l-card'};
  const unknown=await anchors(page,selectors,family==='landing');
  if(family==='landing')await page.screenshot({path:`${out}/${family}-${viewport.width}-pending.png`,fullPage:true});assert.deepEqual(unknown.viewport,viewport);assert.equal(unknown.overflow,false);
- if(family==='projects'){assert.equal(await page.getByRole('searchbox',{name:'Search projects'}).isDisabled(),true);assert.equal(await page.getByRole('region',{name:'Super admin access'}).count(),0);}
+ if(family==='projects'){assert.equal(await page.getByRole('searchbox',{name:'Search projects'}).isDisabled(),true);assert.equal(await page.getByRole('combobox',{name:'Access mode'}).count(),0);}
  identity.release();
- if(family==='projects')await page.getByRole('region',{name:'Super admin access'}).waitFor();
+ if(family==='projects')await page.getByRole('combobox',{name:'Access mode'}).waitFor();
  else await page.waitForFunction(()=>document.querySelector('[data-destination=landing]')?.getAttribute('aria-busy')==='false');
  const pending=family==='landing'?unknown:await anchors(page,selectors,true);
  if(family==='projects'){assert.equal(await destination.getAttribute('aria-busy'),'true');assert.equal(await page.getByRole('status').filter({hasText:'Loading projects…'}).count(),1);assert.equal(await page.locator('.pending-text').evaluateAll(nodes=>nodes.every(n=>getComputedStyle(n).animationName==='none')),true);}

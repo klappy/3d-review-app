@@ -15,3 +15,7 @@
 .phone-step{color:var(--ink);font-weight:600;font-size:var(--t-14)}
 .phone-top>:last-child:not(:first-child){margin-left:auto}
 .phone-bar .btn-primary{flex-grow:1}
+
+/* Keep compact verified access and account controls together without adding another header row. */
+.phone-account{display:flex;align-items:center;gap:var(--sp-1);margin-left:auto;flex:none}
+.app .phone-top{position:relative;z-index:30}

@@ -3,12 +3,17 @@
      signed-in = brand → workspace switcher (details.dd) → .crumb → ? help → account menu; public = brand → Help and FAQ (quiet) + Sign in.
      Breadcrumb per WAI-ARIA APG: nav[aria-label=Breadcrumb] > ol, earlier items a.link, last a span[aria-current=page]. Desktop only (8.4). -->
 <script>
+  import { getContext } from "svelte";
   import Mark from "./Mark.svelte";
   import Menu from "./Menu.svelte";
   import Button from "./Button.svelte";
   import Icon from "./Icon.svelte";
   import { I, accountItems } from "./icons.js";
   import { liveChrome } from "./app/chrome.js";
+  const liveAccount = getContext("next-account-chrome");
+  const verified = $derived(!!liveAccount?.available?.() && !!liveAccount?.session?.()?.principal?.id && liveAccount.session().principal.kind !== "anonymous");
+  const liveAccountChrome = $derived(liveAccount?.chrome?.());
+  const accessControl = $derived(verified ? liveAccount?.access?.() : null);
   const VARIANTS = ["signed-in", "public"];
   // Live (app/chrome.js): the real account, workspace and menu are the defaults; the boards' values apply only with no live chrome.
   const L = liveChrome();
@@ -21,6 +26,7 @@
 
 {#snippet help()}<Icon d={I.help} />{/snippet}
 {#snippet acct()}<span class="av" aria-hidden="true">{initials}</span>{who}<Icon d={I.chev} />{/snippet}
+{#snippet verifiedAcct()}<span class="av" aria-hidden="true">{liveAccountChrome?.who?.initials ?? ""}</span>{liveAccountChrome?.who?.first ?? ""}<Icon d={I.chev} />{/snippet}
 {#snippet ws()}<span class="av" aria-hidden="true">{workspace.slice(0, 1)}</span>{workspace}<Icon d={I.chev} />{/snippet}
 
 <header class="top" data-variant={variant}>
@@ -36,12 +42,13 @@
     {/if}
     {#if end}<div class="top-end">
       <Button icon={help} ariaLabel="Help" variant="quiet" href="#help" />
+      {@render accessControl?.()}
       <Menu id="acct" summary={acct} title="Account menu" label={`Account menu, ${who}`} items={acctItems} open={accountOpen} />
     </div>{/if}
   {:else if end}
     <div class="top-end">
       <Button label="Help and FAQ" variant="quiet" href="#help" />
-      <Button label="Sign in" href="#signin" />
+      {#if verified}{@render accessControl?.()}<Menu id="acct" summary={verifiedAcct} title="Account menu" label={`Account menu, ${liveAccountChrome?.who?.first ?? ""}`} items={liveAccountChrome?.accountItems ?? []} />{:else}<Button label="Sign in" href="#signin" />{/if}
     </div>
   {/if}
 </header>

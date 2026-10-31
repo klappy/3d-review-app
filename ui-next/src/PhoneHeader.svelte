@@ -6,6 +6,7 @@
   export const HEADER_STATES = Object.freeze(["root", "nested", "public", "setup-step"]);
 </script>
 <script>
+  import { getContext } from "svelte";
   import Mark from "./Mark.svelte";
   import Button from "./Button.svelte";
   import Icon from "./Icon.svelte";
@@ -14,6 +15,10 @@
   import { linkFor } from "./app/router.js";
   import { liveContext } from "./screens/href.js";
   const L = liveChrome();
+  const liveAccount = getContext("next-account-chrome");
+  const verified = $derived(!!liveAccount?.available?.() && !!liveAccount?.session?.()?.principal?.id && liveAccount.session().principal.kind !== "anonymous");
+  const accountChrome = $derived(liveAccount?.chrome?.());
+  const accessControl = $derived(verified ? liveAccount?.access?.() : null);
   let { state = "root", title, parent = "Home", back = L?.home ?? "#home", step, steps = 5, signIn = true, initials = L?.initials ?? "BK", menuHref = L ? linkFor("menu", {}, liveContext() ?? {}) : "#menu", home = L?.home ?? "#home", onclose } = $props();
   if (!HEADER_STATES.includes(state)) throw new TypeError(`PhoneHeader: unknown state "${state}"`);
   if (state === "nested" && !(typeof title === "string" && title.trim())) throw new TypeError("PhoneHeader: a nested header needs the page title");
@@ -33,8 +38,8 @@
   {:else}
     <a class="brand" href={home}><Mark size={26} /><span>3D Review</span></a>
   {/if}
-  {#if state === "root" || state === "nested"}
-    <a class="menu-btn" href={menuHref} aria-label="Workspace and account"><span class="av" aria-hidden="true">{initials}</span></a>
+  {#if state === "root" || state === "nested" || (state === "public" && verified)}
+    <div class="phone-account">{@render accessControl?.()}<a class="menu-btn" href={menuHref} aria-label="Workspace and account"><span class="av" aria-hidden="true">{verified ? accountChrome?.who?.initials ?? initials : initials}</span></a></div>
   {:else if state === "public" && signIn}
     <Button label="Sign in" variant="quiet" href="#signin" />
   {/if}
