@@ -52,7 +52,7 @@ export async function preparePapers(m, picked, { lang = null, onProgress = () =>
 }
 
 // One document, one paper per page (the current UI's print CSS, page size from the picker); "" with nothing printable.
-export function papersDocumentHtml(models, { paper = "letter", title = "", autoPrint = false } = {}) {
+export function papersDocumentHtml(models, { paper = "letter", title = "", autoPrint = false, returnHref = "" } = {}) {
   const size = /a4/i.test(paper) ? "A4" : "letter";
   const bodies = models.map((m) => paperHtml(m, { paper: size === "A4" ? "a4" : "letter" })).filter(Boolean);
   if (!bodies.length) return "";
@@ -60,7 +60,7 @@ export function papersDocumentHtml(models, { paper = "letter", title = "", autoP
   const body = bodies.map((b) => `<section class="paper-page">${b}</section>`).join("");
   return `<!doctype html><html lang="${esc(first.lang || "en")}"${first.dir === "rtl" ? ' dir="rtl"' : ""}><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${esc(title || first.title || "Paper surveys")}</title><style>${PRINT_DOC_CSS}
 .paper-page{break-after:page}.paper-page:last-child{break-after:auto}
-@page{size:${size}}</style></head><body><main><div class="doc-tools"><button type="button" onclick="print()">Print</button><span>${size === "A4" ? "A4" : "Letter"} · ${bodies.length} ${bodies.length === 1 ? "survey" : "surveys"} · nothing personal on the page</span></div>${body}</main>${autoPrint ? '<script>addEventListener("load",function(){setTimeout(function(){print()},300)})</script>' : ""}</body></html>`;
+@page{size:${size}}</style></head><body><main><div class="doc-tools"><button type="button" onclick="print()">Print</button>${/^\/next\/#\/review\/[^/?#]+\/(?:collect|print|results)(?:[?#].*)?$/.test(returnHref) ? `<a href="${esc(returnHref)}">Return to review</a>` : ""}<span>${size === "A4" ? "A4" : "Letter"} · ${bodies.length} ${bodies.length === 1 ? "survey" : "surveys"} · nothing personal on the page</span></div>${body}</main>${autoPrint ? '<script>addEventListener("load",function(){setTimeout(function(){print()},300)})</script>' : ""}</body></html>`;
 }
 
 // Open the papers in their own tab and let them print themselves; false when the browser blocked the tab (the caller says so).

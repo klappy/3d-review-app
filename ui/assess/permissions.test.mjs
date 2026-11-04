@@ -367,7 +367,7 @@ test('DoD 4 (workspace-permissions): the scope line is true per scope — never 
   for (const scope of ['workspaces', 'projects', 'assessments']) {
     const html = permissions.render({ esc }, { ...m, scope }); assert.ok(html.includes(esc(APPLIES[scope])), scope); assert.doesNotMatch(html, /nothing is inherited/);
   }
-  assert.match(APPLIES.workspaces, /every project in this workspace/); assert.match(APPLIES.assessments, /project and workspace roles do not/);
+  assert.match(APPLIES.workspaces, /every contained project and assessment/); assert.match(APPLIES.assessments, /Members of the containing workspace also have access/);
   // #514 low (a): a new project starts ungrouped, so the project line is conditional — true with or without a workspace.
   assert.match(APPLIES.projects, /^If this project is in a workspace, /); assert.doesNotMatch(APPLIES.projects, /workspace that holds this project/);
   // #514 low (c): no permissions surface carries the retired copy — MCP panel source + build, assess page + its modules, docs topic.

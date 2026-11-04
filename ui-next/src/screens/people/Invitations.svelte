@@ -6,6 +6,7 @@
      phone "Accept and open the workspace" in the phone-bar. Decline is a link to Home on both widths (no decline endpoint is wired yet;
      the phone board links it Home). Links: ../href.js (carries w and theme); menu is the actions lane's name. -->
 <script>
+  import InvitationActions from "../../app/InvitationActions.svelte";
   import AppShell from "../../AppShell.svelte";
   import Page from "../../Page.svelte";
   import Card from "../../Card.svelte";
@@ -25,7 +26,7 @@
   // data: the fixture, or the signed-in person's own invitations in the same shape (app/data.js invitationsModel); onaccept(id) (live):
   // accepts one for real (POST /v2/me/invitations/{id}/accept, dry run → execute) when its Accept is pressed; the phone bar accepts the
   // first. Decline has no route (an invitee cannot revoke), so it stays the board's link Home.
-  let { phone = false, theme = "light", data = fixture, onaccept } = $props();
+  let { phone = false, theme = "light", data = fixture, onaccept, privateInvitation = false, onsettled } = $props();
   const d = data;
   const HOME = href("home"), WORKSPACE = href("workspace"), MENU = href("menu");
   const accepting = (id) => (el) => { const f = (e) => { const b = e.target instanceof Element ? e.target.closest(".btn") : null; if (onaccept && b && b.textContent.trim() === "Accept") { e.preventDefault(); onaccept(id); } }; el.addEventListener("click", f); return () => el.removeEventListener("click", f); };
@@ -35,12 +36,12 @@
 
 {#snippet check()}<Icon d={I.check} />{/snippet}
 {#snippet top()}{#if phone}<PhoneHeader state="root" initials={d.user.initials} home={HOME} menuHref={MENU} />{:else}<TopBar who={d.user.first} initials={d.user.initials} workspace={d.user.workspace} home={HOME} />{/if}{/snippet}
-{#snippet bar()}{#if phone}<PhoneBar label="Accept and open the workspace" href={onaccept ? HOME : WORKSPACE} />{/if}{/snippet}
+{#snippet bar()}{#if phone && !onaccept}<PhoneBar label="Accept and open the workspace" href={onaccept ? HOME : WORKSPACE} />{/if}{/snippet}
 {#snippet tile(d)}<span class="icn" data-size="36" data-lens="team" aria-hidden="true"><Icon {d} /></span>{/snippet}
 
 <svelte:document onclick={barAccept} />
 <AppShell {phone} {theme} screen {top} {bar}>
-  {#if phone}
+  {#if onaccept}<InvitationActions invitations={d.desktop.invitations} {privateInvitation} {onsettled} />{:else if phone}
     <h1 class="title-phone">Invitations</h1>
     {#each rows as r (r.key)}
       <Card gap={3} label="New">

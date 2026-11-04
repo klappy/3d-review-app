@@ -29,9 +29,9 @@ test('app.js lifecycle: reset first on identity change; identity/projects snapsh
   assert.ok(app.includes("function resetClientIdentity() {\n  collab.reset();"),'reset() is the first statement of resetClientIdentity');
   assert.ok(app.includes("showAuthorizedWork(result);\n  collab.identity(result);"));
   assert.ok(app.includes("collab.projects(result.projects);"));
-  assert.ok(app.includes("collab.setScope({ type: 'project', id: result.project.id, role: result.project.role });"));
-  assert.ok(app.includes("collab.setScope({ type: 'assessment', id: result.assessment.id, role: result.assessment.role });"));
-  assert.ok(app.includes("if (state.projectView) collab.setScope({ type: 'project', id: state.projectView.id, role: state.projectView.role });"),'leaving an assessment restores the still-selected project');
+  assert.ok(app.includes("collab.setScope({ type: 'project', id: result.project.id, role: result.project.direct_role ?? null });"));
+  assert.ok(app.includes("collab.setScope({ type: 'assessment', id: result.assessment.id, role: result.assessment.direct_role ?? null });"));
+  assert.ok(app.includes("if (state.projectView) collab.setScope({ type: 'project', id: state.projectView.id, role: state.projectView.direct_role ?? null });"),'leaving an assessment restores the still-selected project');
   assert.ok(app.includes("if (ws) collab.setScope({ type: 'workspace', id: ws.id, role: ws.role })"),'leaving a project restores the still-selected workspace');
   assert.ok(app.includes("createCollabHooks({ document, api, sharedMode,"));
   const mount=read('./collab-mount.js');
@@ -88,4 +88,15 @@ test('openAcceptance re-reads the workspace list after a failed first read inste
   assert.ok(app.includes("document.body.dataset.invitationEntry = 'true'"),'invite entry isolation flag set for the page lifetime');
   assert.ok(!/delete document\.body\.dataset\.invitationEntry/.test(app),'the isolation flag is never cleared');
   assert.ok(!/removeItem\('participantToken'\)[^\n]*invit/.test(app),'storage is not deleted by the invite path');
+});
+
+test('workspace snapshots preserve server grouping eligibility and containment without leaking extra project fields',()=>{
+ const factory=new Function('mountWorkspaceManager','mountScopeInvitations',read('./collab-mount.js').replace(/^import .*;\n/gm,'').replace('export function createCollabHooks','function createCollabHooks')+'\nreturn createCollabHooks;');
+ let context;const doc={getElementById:()=>({addEventListener(){}})};
+ const hooks=factory(({getContext})=>{context=getContext;return{refresh:async()=>{},reset(){},destroy(){}}},()=>({setScope(){},reset(){},destroy(){}}))({document:doc,api:async()=>({}),sharedMode:false,onReload:async()=>{}});
+ hooks.identity({principal:{id:'owner',kind:'user'}});
+ hooks.projects([{id:'eligible',name:'Project',role:'owner',direct_role:'owner',grouping_eligible:true,workspace_id:null,private_detail:'not forwarded'},{id:'partial',name:'Partial',direct_role:'owner',grouping_eligible:false,workspace_id:'other'},{id:'unknown',name:'Unknown',direct_role:'owner'}]);
+ assert.deepEqual(context().authorizedProjects.map(p=>[p.id,p.grouping_eligible,p.workspace_id]),[['eligible',true,null],['partial',false,'other'],['unknown',undefined,undefined]]);
+ assert.equal(JSON.stringify(context()).includes('not forwarded'),false);
+ hooks.reset();assert.deepEqual(context().authorizedProjects,[]);
 });

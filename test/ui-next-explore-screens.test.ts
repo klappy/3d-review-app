@@ -429,7 +429,7 @@ describe("the pinned 8.7 Explore-lane rows (ui-next/design-source/PIN a594830, b
     const a = mount(Explore, {});
     const why = a.querySelector("#explore-why")!;
     expect(why.textContent).toContain("not in the new design yet");
-    const ctl = [...a.querySelectorAll("button, select, input[value=cards]")].filter((e) => !e.closest("header"));
+    const ctl = [...a.querySelectorAll("button, select, input[value=cards]")].filter((e) => !e.closest("header") && !e.classList.contains("skip-nav"));
     expect(ctl.length).toBeGreaterThan(5);
     for (const c of ctl) expect([(c as HTMLButtonElement).disabled, c.getAttribute("aria-describedby") ?? c.closest("[aria-describedby]")?.getAttribute("aria-describedby")]).toEqual([true, "explore-why"]);
     expect(a.querySelectorAll("table.tbl tbody tr").length).toBeGreaterThan(0);

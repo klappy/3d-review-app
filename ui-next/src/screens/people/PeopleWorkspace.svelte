@@ -3,7 +3,7 @@
      The People screen at workspace scope (./People.svelte); the route's props pass through. -->
 <script>
   import People from "./People.svelte";
-  let { phone = false, theme = "light", data, oninvite, onaction, onrole } = $props(); // any ?state= renders the default (no board draws one); the rest: live (People.svelte)
+  let { phone = false, theme = "light", data, oninvite, onaction, onrole, ownershipMe, ontransferred, backHref } = $props(); // any ?state= renders the default (no board draws one); the rest: live (People.svelte)
 </script>
 
-<People scope="workspace" {phone} {theme} {...(data ? { data } : {})} {oninvite} {onaction} {onrole} />
+<People scope="workspace" {phone} {theme} {...(data ? { data } : {})} {oninvite} {onaction} {onrole} {ownershipMe} {ontransferred} {backHref} />

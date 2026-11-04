@@ -19,6 +19,7 @@
   import Ico from "./Ico.svelte";
   import { A } from "./icons.js";
   import { href } from "../href.js";
+  import { liveContext } from "../href.js";
   import { carry } from "./links.js";
 
   let { phone = false, theme = "light", title, project, stage, practice = false, meta, viewed, live, done = [], menu, deleteRefused, action, canClose = true } = $props(); // canClose: owners and members (viewers never see the close row — the stage write would be refused)
@@ -37,7 +38,7 @@
     ...(canClose ? [{ label: "Close collection now", href: href("close-collection", at), icon: A.lock }] : []),
     { label: "Meeting offline? Print and paper", href: `${href("collect", at)}#offline`, icon: A.print },
     { kind: "hr" },
-    { label: "Delete this review", danger: true, icon: A.x, refused: deleteRefused },
+    liveContext()?.aid && liveContext().aid !== "sample" ? { label: "Manage or delete this review", href: href("review-tools", at), icon: A.x } : { label: "Delete this review", danger: true, icon: A.x, refused: deleteRefused },
   ]);
   const items = $derived(menu ?? reviewMenu);
 </script>

@@ -21,6 +21,7 @@
   export const STATES = Object.freeze(["filters"]);
 </script>
 <script>
+  import ExploreLive from "./ExploreLive.svelte";
   import AppShell from "../../AppShell.svelte";
   import Page from "../../Page.svelte";
   import Stack from "../../Stack.svelte";
@@ -49,7 +50,7 @@
   const RESULTS = $derived(href("results", W));
   const HEADS = ["Review", "Project", "Language", "Region", "Organisations", "Stage", "Responses", "Team", "Community", "Church", "Updated"];
   const rows = exploreRows(data.reviews);
-  const prows = phoneRows(data.phone.rows);
+  const prows = phoneRows(data.phone?.rows ?? []);
   const match = matchCounts(rows);
   const many = (n, word) => `${n} ${word}${n === 1 ? "" : "s"}`;
   const closer = backdropClose();
@@ -68,6 +69,9 @@
 {#snippet top()}{#if phone}<PhoneHeader state="root" initials={data.user.initials} home={HOME} />{:else}<TopBar who={data.user.first} initials={data.user.initials} workspace={data.workspace} home={HOME} />{/if}{/snippet}
 {#snippet bar()}{#if phone}<div class="glass phone-bar" role="group" aria-label="Page actions"><Button label="Open the filters" variant="primary" lg block lead={list} disabled ariaDescribedby="explore-why" /></div>{/if}{/snippet}
 
+{#if data !== fixture}
+  <ExploreLive {phone} {theme} {data} />
+{:else}
 <AppShell {phone} {theme} screen {top} {bar}>
   {#if phone}
     <h1 class="title-phone">Explore</h1>
@@ -158,3 +162,5 @@
     </Page>
   {/if}
 </AppShell>
+
+{/if}

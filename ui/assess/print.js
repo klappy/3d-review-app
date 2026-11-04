@@ -137,7 +137,7 @@ const QR_DOC_CSS = `html,body{background:#fff;color:#111;margin:0;font:16px/1.4 
 @media print{.doc-tools{display:none}}`;
 
 // surveys: [{ name, fullLink, lens }] (the chosen rows); per: "survey" (one page each) | "sheet" | "one" (all on one page).
-export function qrPrintDocumentHtml({ title, surveys, per = "survey", paper = "Letter", autoPrint = false, cards = 6 }) {
+export function qrPrintDocumentHtml({ title, surveys, per = "survey", paper = "Letter", autoPrint = false, cards = 6, returnHref = "" }) {
   const rows = surveys.filter((s) => s.fullLink);
   if (!rows.length) return "";
   const line = title ? `${title}` : "";
@@ -150,7 +150,7 @@ export function qrPrintDocumentHtml({ title, surveys, per = "survey", paper = "L
       : printAllHtml(QR_CTX, { heading: title || "Surveys", items: rows.map((s) => ({ title: s.name, line: "", url: s.fullLink })) });
   const size = /a4/i.test(paper) ? "A4" : "letter";
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${esc(title || "QR pages")}</title><style>${QR_DOC_CSS}
-@page{size:${size}}</style></head><body><main><div class="doc-tools"><button type="button" onclick="print()">Print</button><span>${size === "A4" ? "A4" : "Letter"} · nothing personal on the page</span></div>${body}</main>${autoPrint ? '<script>addEventListener("load",function(){setTimeout(function(){print()},300)})</script>' : ""}</body></html>`;
+@page{size:${size}}</style></head><body><main><div class="doc-tools"><button type="button" onclick="print()">Print</button>${/^\/next\/#\/review\/[^/?#]+\/(?:collect|print|results)(?:[?#].*)?$/.test(returnHref) ? `<a href="${esc(returnHref)}">Return to review</a>` : ""}<span>${size === "A4" ? "A4" : "Letter"} · nothing personal on the page</span></div>${body}</main>${autoPrint ? '<script>addEventListener("load",function(){setTimeout(function(){print()},300)})</script>' : ""}</body></html>`;
 }
 
 // Open the document in its own tab from the click; false when the browser blocked the tab (the caller says so).

@@ -61,7 +61,7 @@ const html=read('./legacy/index.html'),app=read('./app.js'),server=read('./serve
   assert.ok(app.includes("  collab.reset(); // W/I managers clear synchronously before any other identity work\n  entityScreen?.reset();"));
   assert.ok(src.includes("const assessmentValue = () => assessments.value || granted?.value || '';"),'assessment-only grants count as an assessment selection');
   assert.ok(src.includes("granted?.addEventListener('change', render)"));
-  assert.ok(app.includes("collab.setScope({ type: 'assessment', id: result.assessment.id, role: result.assessment.role });"));
+  assert.ok(app.includes("collab.setScope({ type: 'assessment', id: result.assessment.id, role: result.assessment.direct_role ?? null });"));
   assert.ok(app.includes("lensSurveys?.set({ aid: result.assessment.id, role: result.assessment.role, stage: result.assessment.stage, surveys: result.surveys || [], templates: state.templates || [], canOpen: !$('survey-card').hidden });"));
   assert.ok(app.includes('async function chooseGrantedAssessment()')&&app.includes('if (!state.templates) await templates();'));
   assert.ok(app.includes("if (grantedBefore && state.assessment === grantedBefore) $('granted-assessments').value = grantedBefore;"),'identity rebuild keeps the granted assessment selected (Bugbot 4037753258)');

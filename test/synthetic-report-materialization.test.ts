@@ -51,6 +51,8 @@ beforeAll(async()=>{
     const sql=readFileSync(new URL('../'+file,import.meta.url),'utf8').split('\n').filter(l=>!l.trimStart().startsWith('--')).join('\n');
     const statements=sql.split(';\n').map(s=>s.trim()).filter(Boolean);for(let i=0;i<statements.length;i+=50)await db.batch(statements.slice(i,i+50).map(s=>db.prepare(s)));
   }
+ // Keep existing direct-grant race fixtures exact; inherited revocation is covered by workspace-assessment-access.
+ await db.prepare('DELETE FROM "grant" WHERE principal_id=\'person_mara\' AND scope_type=\'workspace\'').run();
   marker=await testBundle();variant=await testBundle('test-marker-scorer-v2');
 },60000);
 beforeEach(async()=>{
@@ -96,9 +98,9 @@ describe('private marker isolation and exact D1 commands',()=>{
     expect(await refusing.buildMaterialized(context(),aid)).toEqual({ok:false,reason:'UNAVAILABLE'});
     expect((await db.prepare('SELECT count(*) n FROM synthetic_report').first<any>()).n).toBe(1);
   });
-  it('pins the global viewer-read CTE and leaves the original B1 build capture unchanged',()=>{
+  it('pins the effective workspace-aware viewer-read CTE and leaves the original B1 capture unchanged',()=>{
     const normalized=REPORT_CAPTURE_CTE.split('\n').filter(l=>!l.trimStart().startsWith('--')).join('\n').trim();
-    expect(createHash('sha256').update(normalized).digest('hex')).toBe('645681a3ede9eb28749bec3d398e2fb366b15de0fb704a7a2025e0befefaa56e');
+    expect(createHash('sha256').update(normalized).digest('hex')).toBe('e8d073f4644391e9f373b75a028521717ebd33403a74c662ec734aba3d276976');
     expect(createHash('sha256').update(B1_CAPTURE_SQL).digest('hex')).toBe('8e3f51e2f5cb7350c2a7824e5a78c91c64fb17a1966d79b9fe3f064c711598c6');
   });
   it('keeps reports immutable under actual D1 triggers and surfaces a forced constraint failure',async()=>{

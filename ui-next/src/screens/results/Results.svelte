@@ -62,6 +62,7 @@
 <AppShell {phone} {theme} screen {top} {bar}>
   {#if phone}
     <ReviewHead {review} phone hit />
+    <LevelLegend />
     <Row gap={2}>
       {#if canRead}<Button label="See the answers" href={href("results-answers")} lead={list} block />{:else}<Button label="See the answers" lead={list} block disabled ariaDescribedby="answers-why" />{/if}
       <Button label="Reports" href={href("report")} lead={doc} block />

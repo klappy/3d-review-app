@@ -38,6 +38,8 @@ beforeAll(async()=>{
   const sql=readFileSync(new URL('../'+file,import.meta.url),'utf8').split('\n').filter(l=>!l.trimStart().startsWith('--')).join('\n');
   const statements=sql.split(';\n').map(s=>s.trim()).filter(Boolean);for(let i=0;i<statements.length;i+=50)await db.batch(statements.slice(i,i+50).map(s=>db.prepare(s)));
  }
+ // Keep existing direct-grant race fixtures exact; inherited revocation is covered by workspace-assessment-access.
+ await db.prepare('DELETE FROM "grant" WHERE principal_id=\'person_mara\' AND scope_type=\'workspace\'').run();
 },60000);
 const corpusOperation = new SerialOperation();
 // Await timed-out bodies before any subsequent test can clear or reuse the D1 fixture.

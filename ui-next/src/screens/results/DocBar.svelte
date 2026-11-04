@@ -14,7 +14,8 @@
   import Glyph from "./Glyph.svelte";
   import { G } from "./icons.js";
   import { href } from "../href.js";
-  let { title, other, otherHref } = $props();
+  import PdfActions from '../actions/PdfActions.svelte';
+  let { title, other, otherHref, pdfUrl = null, pdfToken = null } = $props();
   if (!(typeof title === "string" && title.trim())) throw new TypeError("DocBar: the document title is required");
   const print = () => globalThis.print?.();
 </script>
@@ -22,14 +23,14 @@
 {#snippet arrow()}<Glyph d={G.arrow} />{/snippet}
 {#snippet download()}<Glyph d={G.download} />{/snippet}
 
-<header class="top" data-variant="document">
+<header class="top" data-variant="document" data-pdf={pdfUrl ? '' : undefined}>
   <a class="brand" href={href("results")}><Mark /><span>3D Review</span></a>
   <span class="small" aria-hidden="true">/</span>
   <span class="h3" {title}>{title}</span>
   <div class="top-end">
     <span class="small">Two reports, built from the same answers.</span>
     <Button label={other} variant="quiet" href={otherHref} trail={arrow} />
-    {#if live}<span title="PDF export is not in the new design yet; print this page, or export from the current design."><Button label="Download this report (PDF)" variant="primary" disabled ariaDescribedby="doc-pdf-why" lead={download} /></span><span class="sr-only" id="doc-pdf-why">PDF export is not in the new design yet; print this page, or export from the current design.</span>{:else}<Button label="Download this report (PDF)" variant="primary" href="#download" lead={download} />{/if}
+    {#if pdfUrl}<PdfActions url={pdfUrl} token={pdfToken} label="Download full report PDF" />{:else if live}<span title="PDF export is not in the new design yet; print this page, or export from the current design."><Button label="Download this report (PDF)" variant="primary" disabled ariaDescribedby="doc-pdf-why" lead={download} /></span><span class="sr-only" id="doc-pdf-why">PDF export is not in the new design yet; print this page, or export from the current design.</span>{:else}<Button label="Download this report (PDF)" variant="primary" href="#download" lead={download} />{/if}
     <button class="btn" type="button" onclick={print}><Glyph d={G.printer} />Print</button>
   </div>
 </header>

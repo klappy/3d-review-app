@@ -31,6 +31,8 @@ beforeAll(async()=>{
  db=await mf.getD1Database('DB');for(const f of ['migrations/0001_init.sql','migrations/0002_code_escrow.sql','migrations/0003_language_archive.sql','migrations/0004_pinned_instruments.sql','migrations/0006_oauth_code_redemption.sql','migrations/0007_shared_link_context.sql','migrations/0008_synthetic_report.sql','seed/synthetic.sql','seed/synthetic-responses.sql']){
   const statements=readFileSync(new URL('../'+f,import.meta.url),'utf8').split('\n').filter(l=>!l.trimStart().startsWith('--')).join('\n').split(';\n').map(s=>s.trim()).filter(Boolean);for(let i=0;i<statements.length;i+=50)await db.batch(statements.slice(i,i+50).map(s=>db.prepare(s)));
  }
+ // This suite isolates direct-grant revocation; workspace inheritance is covered separately.
+ await db.prepare("DELETE FROM \"grant\" WHERE principal_id='person_mara' AND scope_type='workspace'").run();
  env={DB:db,SESSION_SECRET:'synthetic-public-test-secret',OAUTH_KV:await mf.getKVNamespace('OAUTH_KV'),ENVIRONMENT:'dev'};
  token=await mintSession(env,'person_mara','user');support=await mintSession(env,'person_mara','support');participant=await mintSession(env,'person_mara','participant');
 },60000);

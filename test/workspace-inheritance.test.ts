@@ -27,6 +27,7 @@ describe("workspace → project role inheritance", () => {
     const sql = (path: string) => readFileSync(new URL(path, import.meta.url), "utf8").split("\n").filter((l) => !l.trimStart().startsWith("--")).join("\n");
     const stmts = (path: string) => sql(path).split(";").map((s) => s.trim()).filter(Boolean).map((s) => db.prepare(s));
     await db.batch(stmts("../migrations/0001_init.sql"));
+    await db.batch(stmts("../migrations/0011_context.sql"));
     const now = new Date("2026-10-15T21:00:00.000Z");
     const at = now.toISOString();
     let trace = 0;
@@ -75,8 +76,8 @@ describe("workspace → project role inheritance", () => {
     expect(JSON.stringify(hidden)).toContain("NOT_FOUND_OR_NOT_VISIBLE");
     await expect(grantList(out, { scope: "project", id: "prj_1" })).rejects.toMatchObject({ code: "NOT_FOUND_OR_NOT_VISIBLE" });
 
-    // assessments still need their own grant (D9 unchanged): workspace owner does not open asm_1
-    await expect(assessmentGet(own, { id: "asm_1" })).rejects.toMatchObject({ code: "NOT_FOUND_OR_NOT_VISIBLE" });
+    // Workspace membership now reaches contained assessments without materialized grants.
+    expect((await assessmentGet(own, { id: "asm_1" })).result.assessment.role).toBe("owner");
 
     // workspace owner manages grouped-project grants through inheritance
     await expect(grantList(own, { scope: "project", id: "prj_2" })).resolves.toBeTruthy();

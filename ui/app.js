@@ -245,7 +245,7 @@ async function chooseProject() {
   if (!state.project) { const ws = collab.selectedWorkspace(); if (ws) collab.setScope({ type: 'workspace', id: ws.id, role: ws.role }); await languageControls.refresh(); return; } // leaving a project restores the still-selected workspace scope
   const result = await api(`/v2/projects/${path(state.project)}`);
   state.projectView = result.project;
-  collab.setScope({ type: 'project', id: result.project.id, role: result.project.role });
+  collab.setScope({ type: 'project', id: result.project.id, role: result.project.direct_role ?? null });
   await languageControls.refresh();
   await assessments();
 }
@@ -264,15 +264,15 @@ async function chooseAssessment() {
   collab.setScope(null); // R2: downstream collaborator scope resets synchronously before any await
   lensSurveys?.reset();
   text($('assessment-detail'), ''); text($('survey-detail'), ''); text($('results'), 'Select an assessment.');
-  if (!state.assessment) { if (state.projectView) collab.setScope({ type: 'project', id: state.projectView.id, role: state.projectView.role }); return; } // leaving an assessment restores the still-selected project scope (supplier a974903 intent)
+  if (!state.assessment) { if (state.projectView) collab.setScope({ type: 'project', id: state.projectView.id, role: state.projectView.direct_role ?? null }); return; } // leaving an assessment restores the still-selected project scope (supplier a974903 intent)
   const stageRead = stageSnapshot();
   if (!state.templates) await templates(); // the lens catalogue must be loaded before the snapshot (Auditor P2 root cause)
   const result = await api(`/v2/assessments/${path(state.assessment)}`);
   if (!stageCurrent(stageRead)) return;
   state.assessmentRole = result.assessment.role; showReportControls();
   renderAssessmentHeadrow(document, $('assessment-context'), result.assessment);
-  collab.setScope({ type: 'assessment', id: result.assessment.id, role: result.assessment.role });
-  text($('assessment-detail'), `${result.assessment.name} · stage ${result.assessment.stage} · exact role ${result.assessment.role}`);
+  collab.setScope({ type: 'assessment', id: result.assessment.id, role: result.assessment.direct_role ?? null });
+  text($('assessment-detail'), `${result.assessment.name} · stage ${result.assessment.stage} · effective role ${result.assessment.role}`);
   const next = { prepare: 'collect', collect: 'understand', understand: 'improve', improve: 'understand' }[result.assessment.stage];
   if (next) $('stage-target').value = next;
   for (const survey of result.surveys || []) option($('surveys'), survey.id, `${survey.template_name} · ${survey.collection_status}`);
@@ -354,8 +354,8 @@ async function chooseGrantedAssessment() {
   if (!stageCurrent(stageRead)) return;
     state.assessmentRole = result.assessment.role; showReportControls();
     renderAssessmentHeadrow(document, $('assessment-context'), result.assessment);
-    collab.setScope({ type: 'assessment', id: result.assessment.id, role: result.assessment.role });
-    text($('granted-detail'), `${result.assessment.name} · stage ${result.assessment.stage} · exact role ${result.assessment.role}`);
+    collab.setScope({ type: 'assessment', id: result.assessment.id, role: result.assessment.direct_role ?? null });
+    text($('granted-detail'), `${result.assessment.name} · stage ${result.assessment.stage} · effective role ${result.assessment.role}`);
     for (const survey of result.surveys || []) option($('surveys'), survey.id, survey.template_name || survey.id);
     lensSurveys?.set({ aid: result.assessment.id, role: result.assessment.role, stage: result.assessment.stage, surveys: result.surveys || [], templates: state.templates || [], canOpen: !$('survey-card').hidden });
     entityScreen?.render();

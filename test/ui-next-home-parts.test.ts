@@ -47,6 +47,11 @@ describe("TopBar", () => {
     expect(top.querySelector("details, nav.crumb, .av")).toBeNull();
     expect([...top.querySelectorAll(".top-end .btn")].map((b) => [b.className, b.textContent])).toEqual([["btn btn-quiet", "Help and FAQ"], ["btn", "Sign in"]]);
   });
+  it("public end=false renders the neutral brand without facilitator actions", () => {
+    const top = first(TopBar, { variant: "public", end: false });
+    expect([...top.children].map((c) => c.className)).toEqual(["brand"]);
+    expect(top.querySelector(".top-end, details, nav.crumb")).toBeNull();
+  });
   it("refuses unported variants and a public crumb", () => {
     expect(() => r(TopBar, { variant: "flow" })).toThrow(/not ported/);
     expect(() => r(TopBar, { variant: "public", crumbs: CRUMBS })).toThrow(/no breadcrumb/);

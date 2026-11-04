@@ -34,6 +34,7 @@
   <Card hi pad="hero" gap={4}>
     <h1 class="title-phone">Have a survey code?</h1>
     <p class="small t-15">It is printed on your paper survey, or the person who invited you can read it to you.</p>
+    <a class="link" href="/participate/?demo=1">Try a sample survey in the current design — nothing is sent</a>
     <form method="get" id="p-code-form" onsubmit={submit}>
       {#each fields as [name, value] (name)}<input type="hidden" {name} {value} />{/each}
       <label class="lbl" for="p-code">Code</label>

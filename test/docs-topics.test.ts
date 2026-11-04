@@ -59,3 +59,45 @@ describe("docs topics intro/faq (PACKET 2026-09-17 option A)", () => {
     expect(Buffer.byteLength(out.result.what as string, "utf8")).toBe(791);
   });
 });
+
+describe('permissions topic follows the established containment rule', () => {
+  it('explains inherited assessment access without claiming direct project inheritance or removing direct safeguards', async () => {
+    const out = await docs(stubCtx, {topic:'permissions'});
+    expect(out.result.text).toContain('Workspace roles apply to grouped projects and their contained assessments');
+    expect(out.result.text).toContain('Direct project grants alone do not open assessments');
+    expect(out.result.text).toContain('archive, deletion and direct child delegation retain their direct-grant requirements');
+    expect(out.result.text).not.toContain('an assessment opens only by its own grant');
+  });
+});
+
+describe('served child-scope delegation guidance', () => {
+  it.each(['cap.grant.invite','cap.grant.revoke_invitation'])('%s requires a direct grant at either child scope', async capability => {
+    const out = await docs(stubCtx, {capability});
+    expect(out.result.roles).toContain('project and assessment scopes need a direct member-or-owner grant at that scope');
+    expect(out.result.roles).toContain('an inherited workspace role is refused');
+  });
+  it('role changes require direct ownership for both child scopes', async () => {
+    const out = await docs(stubCtx, {capability:'cap.grant.update_role'});
+    expect(out.result.roles).toBe('O');
+    expect(out.result.rules).toContain('at a project or assessment any role change needs a direct owner at that scope');
+  });
+});
+
+it('served grant-revoke guidance names direct assessment authority and its write guard', async () => {
+  const out = await docs(stubCtx, {capability:'cap.grant.revoke'});
+  expect(out.result.rules).toContain('requires a direct assessment member-or-owner grant');
+  expect(out.result.rules).toContain('rechecked inside the guarded delete');
+});
+
+it('served acceptance rules explain the inherited-access write guard', async () => {
+  const out = await docs(stubCtx,{capability:'cap.grant.accept'});
+  expect(out.result.rules).toContain('rechecks that the invitee has no inherited workspace access');
+  expect(out.result.rules).toContain('inside the guarded grant/invitation writes');
+});
+
+it('served assessment-delete rules require direct ownership', async () => {
+  const out = await docs(stubCtx,{capability:'cap.assessment.delete'});
+  expect(out.result.roles).toBe('O');
+  expect(out.result.rules).toContain('requires a direct assessment-owner grant');
+  expect(out.result.rules).toContain('inherited workspace ownership alone cannot delete');
+});

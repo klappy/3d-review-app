@@ -1,2 +1,4 @@
 
 .app:not([data-imagery]) .g-bars{display:inline-flex}
+
+@media print{.app .lvl-legend{display:none}}

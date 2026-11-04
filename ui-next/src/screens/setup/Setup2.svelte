@@ -19,7 +19,7 @@
   import fixture from "../../../fixtures/setup/setup.json";
 
   // The board draws one state; the route's ?state= prop is not read, so any value (unknown included) renders it and never throws.
-  let { phone = false, theme = "light", data = fixture.passage, onfield, onfile, onlink, onremove, onlwc, onnext, busy = false, error = "", status = "Draft saved" } = $props();
+  let { phone = false, theme = "light", data = fixture.passage, onfield, onfile, onlink, onattach, onremove, onlwc, onnext, busy = false, error = "", status = "Draft saved" } = $props();
   const p = $derived(data);
   // Sample / gallery (no onfield): what the visitor types is kept on this screen only, so Continue enables as it would live; nothing is
   // saved anywhere (captain 2026-10-22: the sample must be clickable 1 → 5 → Launch). Live: the draft (app/setup.js) is the one source.
@@ -31,6 +31,8 @@
   const FILES = $derived(p.files ?? (phone ? [{ id: null, name: p.phoneFile.name, size: p.phoneFile.size, note: "", shows: "", href: "" }] : [{ id: null, name: p.file.name, note: p.file.note, shows: p.file.shows, size: "", href: "" }]));
   const LIVE = $derived(!!onnext);
   let fileInput = $state();
+  let attachmentTitle = $state(""), attachmentReference = $state(""), attachmentUrl = $state("");
+  const attach = () => onattach?.({ title: attachmentTitle, reference: attachmentReference, url: attachmentUrl });
   const chosen = (e) => { const f = e.currentTarget.files?.[0]; if (f && onfile) onfile(f); e.currentTarget.value = ""; };
   // A tile's Preview opens the passage in its own tab; its Remove deletes the passage (shared Button has no onclick: delegate).
   const tile = (f) => (el) => { const h = (e) => { const b = e.target instanceof Element ? e.target.closest(".btn") : null; if (!b) return; if (b.getAttribute("aria-label") === "Remove file") { if (f.id) onremove?.(f.id); } else if (f.href) globalThis.open(f.href, "_blank", "noopener"); }; el.addEventListener("click", h); return () => el.removeEventListener("click", h); };
@@ -42,6 +44,15 @@
 {#snippet eye()}<Glyph name="eye" />{/snippet}
 {#snippet x()}<Glyph name="x" />{/snippet}
 {#snippet plus()}<Glyph name="plus" />{/snippet}
+{#snippet attachment()}
+  {#if LIVE && onattach}<div class="solid l-card l-stack" data-pad="form" data-gap="3">
+    <p class="small">Add a named passage without a file, or label a link for participants.</p>
+    <label class="l-stack" data-gap="1">Passage title (optional)<input class="in" bind:value={attachmentTitle} /></label>
+    <label class="l-stack" data-gap="1">Passage reference<input class="in" bind:value={attachmentReference} placeholder="For example, Mark 1–4" /></label>
+    <label class="l-stack" data-gap="1">Passage link (optional)<input class="in" type="url" bind:value={attachmentUrl} placeholder="https://…" /></label>
+    <button class="btn" type="button" disabled={busy || (!attachmentReference.trim() && !attachmentUrl.trim())} onclick={attach}>Add passage</button>
+  </div>{/if}
+{/snippet}
 {#snippet choose(label, block)}<button class={block ? "btn btn-block" : "btn"} type="button" onclick={() => fileInput?.click()}>{#if block}<Glyph name="upload" />{/if}{label}</button>{/snippet}
 
 <SetupFrame {phone} {theme} step={2} title="What will people respond to?" phoneTitle="The passage" next={phone ? {} : { blocked }} {onnext} {busy} {error} {status}>
@@ -50,7 +61,8 @@
     <p class="small">What participants will read, hear or watch.</p>
     {#if LIVE}<Field label="What will people respond to?" id="pass-p"><input class="in" id="pass-p" value={name} required oninput={edit} /></Field>{/if}
     <div class="dz su-col" {@attach linking}>{@render choose("Choose a file", true)}<Button label="Paste a link" lead={link} block /></div>
-    {#each FILES as f (f.id ?? f.name)}<div class="l-row small" data-gap="2" {@attach tile(f)}><Glyph name="file" size={16} />{f.name} · {f.size || f.note} <Button label="Preview" variant="quiet" />{#if LIVE && f.id}<Button icon={x} ariaLabel="Remove file" variant="quiet" />{/if}</div>{/each}
+    {@render attachment()}
+    {#each FILES as f (f.id ?? f.name)}<div class="l-row small" data-gap="2" {@attach tile(f)}><Glyph name="file" size={16} />{f.name} · {f.size || f.note}{#if LIVE && f.reference} · {f.reference}{/if} {#if !LIVE || f.href}<Button label="Preview" variant="quiet" />{/if}{#if LIVE && f.id}<Button icon={x} ariaLabel="Remove file" variant="quiet" />{/if}</div>{/each}
     <Field label="Survey languages" id="sl" group help="Participants pick their language on the first screen.">
       <div class="l-row" data-wrap data-gap="2">{#each p.languages as [, short, code]}<span class="chip">{short} {#if !(LIVE && !code)}<button type="button" aria-label={`Remove ${short}`} onclick={() => onlwc?.("remove", code)}><Glyph name="x" size={14} /></button>{/if}</span>{/each}{#if LIVE}<span class="su-search"><Glyph name="search" /><input class="in" aria-label="Add a language" placeholder="Add a language…" onchange={addLwc} /></span>{:else}<Button label="Add" lead={plus} />{/if}</div>
     </Field>
@@ -68,11 +80,12 @@
           {@render choose("Choose file", false)}
           <Button label="Paste a link" lead={link} />
         </div>
+        {@render attachment()}
         {#each FILES as f (f.id ?? f.name)}
           <div class="solid su-tile l-row" data-gap="4" {@attach tile(f)}>
             <span class="icn icn-lens" data-lens="team" aria-hidden="true"><Glyph name="file" /></span>
             <div class="l-stack" data-gap="1" data-grow><div class="h3">{f.name} <span class="micro">{f.note}</span></div><p class="small">{f.shows}</p></div>
-            <Button label="Preview" lead={eye} />
+            {#if !LIVE || f.href}<Button label="Preview" lead={eye} />{/if}
             <Button icon={x} ariaLabel="Remove file" variant="quiet" />
           </div>
         {/each}

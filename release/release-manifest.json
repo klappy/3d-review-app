@@ -1,30 +1,42 @@
 {
-  "version": "0.37.2",
+  "version": "0.38.2",
   "cookbook_repo": "klappy/3d-review-cookbook",
-  "cookbook_commit": "84dd71208a8e4e03e3b05749a5a2f28446ab91c9",
+  "cookbook_commit": "728cd10349708df8bdda89b04a450efa6c270b3f",
   "records": [
     {
-      "path": "planning/2026-09-16-parity-build/releases/0.37.2.md",
-      "blob_sha": "105e0287666e70832e51efcd6a1e2bf0446ec82b",
-      "sha256": "728f8d4d015b7e4520dc85ce20fa3011ff85e3c0d8b324aed06f7dbee184d26f"
+      "path": "planning/2026-09-16-parity-build/releases/0.38.2.md",
+      "blob_sha": "cf72fe30faa27541c967ee3112222ac52457b6a8",
+      "sha256": "3e8dffb007a714005a83e8075be839c6e50bafc7784663ca9cd022821713f870"
     },
     {
       "path": "planning/2026-09-16-parity-build/releases/releases.json",
-      "blob_sha": "33262904d27d8f88b643cfc0039b26437d413700",
-      "sha256": "ab5773c05ac1f3927ebde5ba0257e4346e8a4efe0a9082ad165b03c09baeb516"
+      "blob_sha": "0a3fe0465afbf7844c44adf92a2e27fe758233f6",
+      "sha256": "ce804fdff7ee0079ea64a529e51eac100700c8b7f07b67936483ac34fcd6e8ec"
     }
   ],
   "changelog": {
     "sections": {
       "fixed": [
-        "UI Next screens at `/next/` (Landing, About, Home and lane screens) now use the phone layout on viewports narrower than 720px instead of only when the link carries `?w=phone`, and switch when the window crosses that width; `?w=phone` and `?w=desktop` still force a layout.",
-        "Next UI results and report navigation starts independent reads together, and following an in-page anchor no longer repeats data reads. Existing access checks, required-read errors, explicit report-build confirmation and current UI default are preserved. Automated and local synthetic evidence is distinct from pending DEV and production verification."
+        "Next account navigation opens over the mounted destination using a bounded fresh identity read, and closes without repeating destination aggregate reads. Menu failures and retries remain local.",
+        "Same-context updates retain the displayed route and model with local pending or error state. Closing a menu discards superseded snapshot reads while preserving active mutation busy state, confirmed readback and Undo; late success and failure cannot replace another requested route.",
+        "Public Landing and Projects use their actual destination structure during initial reads. Projects fences old child/create completions and offers reversible All projects or With responses filtering with shown/total, reset and unknown-count visibility; existing human context labels distinguish duplicate names.",
+        "Missing-report presentation distinguishes collected responses from a saved report using the displayed authorized model, without new reads, automatic builds or PDF changes.",
+        "Later bounded corrections separate participant entry from facilitator session/chrome and keep changing preview/build outcomes in a polite atomic live-status region.",
+        "Verified menu identity retains its server-served level minimum. Workspace write rejections are not reported as saved or restored; confirmed writes with failed authoritative view reads are reported as saved but unverified, including completion while the account menu is open.",
+        "Phone project/review management menus carry their explicit entity scope and return to the mounted origin. Menu Close preserves real Back history and displayed anchors; the overlay follows stored viewer theme and live theme-radio changes."
       ],
       "changed": [
-        "The UI Next preview at `/next/` is built by the standard typecheck and test steps on all branches, including production. Production compiles out fixture galleries and mounts the live app; the current UI at `/` stays the default, with an explicit “Try the new design” menu opt-in.",
-        "Cumulative source includes the existing PR554 build integration, PR574 responsive layout and PR576 production opt-in alongside PR581 navigation performance. Workspace inheritance from the separate unmerged 0.37.1 candidate is excluded. Automated/local evidence and unmeasured physical-device or real-human outcomes remain distinct from pending deployed acceptance.",
-        "Inherited PR576 report behavior is unchanged from the existing production source: DEV uses one-response report/per-perspective floors; production retains its existing disclosure gates and thresholds. Report-build admission, member grants, viewer eligibility, pre-close access and coverage cues remain source- and environment-specific; their six-scenario fresh acceptance denominator is explicitly untested here.",
-        "At app c88df937, Operator automated/local production-build and menu-opt-in checks passed 2/2; Facilitator automated/local responsive-layout checks passed 15/15, with zero failures. The six inherited report scenarios (Facilitator/member: DEV floors, member build admission, pre-close access and coverage cues; Facilitator/viewer: eligibility; Operator: production disclosure and threshold retention) have 0 attempted, 0 passed, 0 failed, 6 untested. Operator/Facilitator hosted standard-build, responsive and opt-in scenarios have 0 attempted, 0 passed, 0 failed, 3 untested. No real-human study; satisfaction, confusion and frustration NOT MEASURED."
+        "Compatible PATCH from accepted 0.38.1, app PR597. The original reviewed product source was dc964eeb369711b2209d5e18f1e39358d007b33d, tree b1dbbb5e8ae3e7997058e35d1952bb4d54e53ceb. That source remains historical provenance; it is not the corrected functional-source checkpoint identified below. Authorization, My/Global scope, disclosure and mutation authority remain unchanged; no API, schema, migration, credential or response-data change.",
+        "Historical bounded persona scorecard at the original product checkpoint: anonymous visitor opening public Landing and verified facilitator using account-menu/update lifecycle. Automated local component and synthetic GET-only browser evidence: 2 named scenarios attempted, 2 passed, 0 failed, 0 untested within that fixed two-scenario scope. Facilitator viewport repetitions are not added to the persona total. Member, view-only, project-only and participant workflows were not qualified as complete persona journeys. Hosted persistence and physical installed-PWA acceptance remain unverified.",
+        "Historical dc964eeb checkpoint: 1137 UI tests across 70 files, typecheck/guarded build and lint passed; independent native review passed 19 lifecycle checks. Source CI41209525126 passed all four jobs. These results cover that historical source, not later correction heads.",
+        "Historical packaging checkpoint 7a7808cc6187fb2727af8e1f5764d9980f804961, tree dc5f86007ac8a82f005eecec8c543c6297bca8b2, pinned accepted cookbook snapshot 0e0c2b6d5d55041e45089da735730246b1c893f6. Its six-file metadata-only delta preserved dc964eeb product bytes. Independent canonical and packaging review passed; exact-head version/roadmap-metadata tests passed 37 with one existing skip, roadmap Node tests passed 11, and CI41214046993 passed all four jobs. That pin and those results remain historical and do not pre-accept a future repackaging commit.",
+        "Historical correction checkpoint e81b532d958d6f16b6fd83cc4e728d0b83575f10, tree 60eb51ebbbe1f3dbb86ad41af285a576b0b5b6a0: participant-boundary and announcement corrections passed 89 author-targeted tests. Independent original-finding review passed 62 affected cases and a negative control restoring the earlier files failed eight new cases. CI41218930675 passed all four jobs. Later findings at this checkpoint are preserved as superseded findings, not erased by that scoped acceptance.",
+        "Historical correction checkpoint 388837e50ab5c2d464cccd78610cdb50baf47071, tree 92e32c9bc5ab0630cfc806a8f9be09cbb662b28d: author affected tests passed 98; independent native review passed 59 distinct action/menu/cache-policy cases. Local Chromium at actual 390x844 and 1280x844 separately confirmed served minimum 1 and real Back traversal using synthetic GET-only fixtures. CI41245357113 passed all four jobs. Subsequent write-success/readback-failure, management-origin and overlay-theme findings at this source are corrected at the next checkpoint; its earlier 59-case acceptance remains scoped historical evidence.",
+        "Corrected functional-source checkpoint fc7250be1ec1d3978fd0df9bd913787fb4c922be, tree 147f1075579b45f31da71dee7fe0f28cf9872ae7: frozen author checks passed 103 targeted tests across five files, typecheck/guarded build and lint with zero violations in 228 scanned files. Existing independent native local review passed 58 actual cases and closed the three functional findings. A negative control restoring only the old EntityTools after the actual management heading caused both origin cases to fail. These counts overlap earlier suites and must not be summed into a persona or full-product completion score.",
+        "At the corrected functional-source checkpoint, fc7250be was local-only and had no remote CI or formal GitHub approval. Its six existing packaging files remained byte-identical to the accepted 0e0-based 0.38.2 package. A later canonical backfill commit and app pin/packaging commit have not been predetermined or accepted by this record. Their actual immutable hashes, fresh exact-head CI and independent metadata review must be observed through the normal release chain; no circular final-package SHA is asserted.",
+        "Subsequent functional-source publication checkpoint: fc7250be1ec1d3978fd0df9bd913787fb4c922be was pushed normally to existing app PR597, and CI41246976817 (run537) completed all four jobs successfully: test, mjs-test, ci and ui-test. This verifies that same functional tree147f1075579b45f31da71dee7fe0f28cf9872ae7; it does not pre-accept a later canonical backfill or app metadata/packaging head. No canonical backfill publication, app-copy/pin change, formal approval, merge, tag or deployment occurred at this checkpoint.",
+        "Evidence classes remain automated/local component, controlled synthetic HTTP/browser and independent native review. The new management-origin, view-verification and theme cases are targeted regressions, not fresh hosted persona acceptance. Satisfaction, confusion and frustration NOT MEASURED; human-study sample size 0. No real responses, credentials or grants were created for these checks.",
+        "Built local and independently reviewed bounded corrected functional source; canonical backfill acceptance, publication, new pins and packaged-head checks remain pending at this checkpoint. DEV live pending; Production live pending for 0.38.2. The separate compact Personal/Support chrome continuation, white iPhone top-band investigation, roadmap work and unshipped 0.39.0 PDF format candidate remain excluded."
       ]
     }
   }

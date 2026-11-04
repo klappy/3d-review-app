@@ -38,7 +38,7 @@
       <Button icon={help} ariaLabel="Help" variant="quiet" href="#help" />
       <Menu id="acct" summary={acct} title="Account menu" label={`Account menu, ${who}`} items={acctItems} open={accountOpen} />
     </div>{/if}
-  {:else}
+  {:else if end}
     <div class="top-end">
       <Button label="Help and FAQ" variant="quiet" href="#help" />
       <Button label="Sign in" href="#signin" />
