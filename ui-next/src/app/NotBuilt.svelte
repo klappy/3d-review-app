@@ -16,7 +16,7 @@
   <Page width="read" gap={4}>
     <Card hi pad="hero" gap={3} label="Not built yet">
       <h1 class="title-phone">Not built yet</h1>
-      {#if context}<p class="small t-15">{context.context}</p><p class="small t-15" role="status">{context.message}</p>{#if context.guidance}<p class="small t-15">{context.guidance}</p>{/if}{#if message}<p class="small t-15">{message}</p>{/if}{:else}<p class="small t-15" role="status">{message}</p>{/if}
+      {#if context}<p class="small t-15">{context.context}</p><p class="small t-15" role="status">{context.message}</p>{#if context.guidance}<p class="small t-15">{context.guidance}</p>{/if}{#if message}<p class="small t-15" role="status" aria-live="polite" aria-atomic="true">{message}</p>{/if}{:else}<p class="small t-15" role="status">{message}</p>{/if}
       {@render children?.()}
       {#if back}<Row gap={2}><Button label={backLabel} variant="quiet" href={back} /></Row>{/if}
     </Card>

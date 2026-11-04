@@ -77,8 +77,10 @@
   let viewHash = $state(globalThis.location?.hash ?? "");
   let refreshing = $state(false), refreshError = $state(""), actionBusy = $state(false);
   let menuState = $state(null), menuSeq = 0, refreshAfterMenu = false, menuReturnFocus = null;
+  let menuEntryFrom = null, pendingReadRoute = null;
   const routeKey = r => JSON.stringify([r.name, r.params, r.query.toString()]);
   const scopeKey = r => {
+    if (PARTICIPANT.has(r.name)) return "participant";
     const c = contextForRoute(r);
     return c.aid ? `review:${c.aid}` : c.pid ? `project:${c.pid}` : c.wid ? `workspace:${c.wid}` : PUBLIC.has(r.name) ? "public" : "account";
   };
@@ -89,7 +91,7 @@
   const replace = (h) => { history.replaceState(null, "", globalThis.location.pathname + globalThis.location.search + h); hash = h; };
 
   onMount(() => {
-    const onHash = () => { capturePrivateInvitation(); hash = globalThis.location.hash; };
+    const onHash = event => { if (event.newURL && new URL(event.newURL).hash !== globalThis.location.hash) return; menuEntryFrom = event.oldURL ? new URL(event.oldURL).hash : null; capturePrivateInvitation(); hash = globalThis.location.hash; };
     let focusCheck = 0;
     const onFocus = async () => {
       if (!session) return;
@@ -221,7 +223,8 @@
   function closeMenu() {
     const m = menuState; if (!m || m.closing) return;
     menuState = { ...m, closing: true };
-    replace(m.returnHash || to("home"));
+    if (m.origin && m.backToOrigin) globalThis.history.back();
+    else replace(m.returnHash || to("home"));
   }
   async function openMenu(r, { invalidate = false } = {}) {
     if (!menuState) menuReturnFocus = globalThis.document?.activeElement;
@@ -229,9 +232,9 @@
     const my = ++menuSeq, credential = token();
     const origin = page.status === "ready" && !!session?.principal?.id && credential === sessionCredential && scopeKey(r) === scopeKey(route);
     const prior = session?.principal;
-    const returnHash = origin ? viewHash : to("home");
+    const returnHash = origin ? (menuEntryFrom && routeKey(parse(menuEntryFrom)) === routeKey(route) ? menuEntryFrom : viewHash) : to("home");
     if (!origin) { seq++; refreshing = false; refreshError = ""; actionBusy = false; route = r; page = { status: "loading", key: "menu", data: null, error: null }; session = undefined; applyChrome(null); }
-    menuState = { pending: true, error: "", data: null, origin, returnHash, credential };
+    menuState = { pending: true, error: "", data: null, origin, returnHash, credential, backToOrigin: origin && menuEntryFrom === returnHash };
     const current = () => my === menuSeq && requestedRoute.name === "menu" && credential === token();
     try {
       const me = await loadMenuIdentity();
@@ -243,10 +246,10 @@
         refreshing = false; refreshError = ""; actionBusy = false; route = r;
         page = { status: "loading", key: "menu", data: null, error: null }; viewHash = "";
       }
-      S.forget(); // An uncached menu identity must never leave the former actor in the session cache.
+      S.adoptFresh(me); // Keep the verified identity and its served level minimum together.
       session = me; applyChrome(me);
       const data = accountMenuModel(me, { onSignOut: signOut, currentDesign: legacyHref(r, contextForRoute(r)) });
-      menuState = { pending: false, error: "", data, origin: origin && !changed, returnHash: changed ? to("home") : returnHash, credential };
+      menuState = { pending: false, error: "", data, origin: origin && !changed, returnHash: changed ? to("home") : returnHash, credential, backToOrigin: origin && !changed && menuEntryFrom === returnHash };
     } catch (e) {
       if (!current()) return;
       if (["unauthenticated", "refused"].includes(classify(e))) {
@@ -256,20 +259,22 @@
       } else menuState = { ...menuState, pending: false, error: String(e?.message || "The menu could not be read. Try again.") };
     }
   }
-  async function load({ invalidate = false, navigation = false } = {}) {
-    const r = requestedRoute, credential = token(), requestHash = hash;
+  async function load({ invalidate = false, navigation = false, refreshView = false } = {}) {
+    const refreshBehindMenu = refreshView && menuState?.origin;
+    const r = refreshBehindMenu ? route : requestedRoute, credential = token(), requestHash = refreshBehindMenu ? viewHash : hash;
     if (r.name === "menu") {
       if (!invalidate && menuState?.origin && !navigation) { refreshAfterMenu = true; return; }
       return openMenu(r, { invalidate });
     }
-    if (menuState) {
+    if (menuState && !refreshBehindMenu) {
       const m = menuState; menuState = null; menuSeq++;
       if (!invalidate && m.origin && credential === m.credential && page.status === "ready" && routeKey(r) === routeKey(route)) {
-        if (!refreshAfterMenu) { if (refreshing) { seq++; refreshing = false; refreshError = ""; } const target = menuReturnFocus; menuReturnFocus = null; await tick(); if (requestedRoute.name !== "menu" && target?.isConnected) target.focus(); return; } // Close/back restores the SAME mounted view; no aggregate reload.
+        if (!refreshAfterMenu) { if (refreshing && pendingReadRoute !== routeKey(route)) { seq++; refreshing = false; refreshError = ""; } const target = menuReturnFocus; menuReturnFocus = null; await tick(); if (requestedRoute.name !== "menu" && target?.isConnected) target.focus(); return; } // Close/back restores the SAME mounted view; no aggregate reload.
       }
     }
     refreshAfterMenu = false;
-    const my = ++seq; viewRead++;
+    const my = ++seq; viewRead++; pendingReadRoute = routeKey(r);
+    const requestedReadCurrent = () => routeKey(r) === routeKey(requestedRoute) || (!!menuState?.origin && routeKey(r) === routeKey(route));
     const retained = !invalidate && page.status === "ready" && !!session?.principal?.id && credential === sessionCredential && scopeKey(r) === scopeKey(route);
     const prior = session?.principal;
     refreshError = ""; actionBusy = false; refreshing = retained;
@@ -294,7 +299,7 @@
       }
       const principal = session?.principal?.id, accessMode = session?.principal?.access_mode;
       const data = await loader(r);
-      if (my !== seq || routeKey(r) !== routeKey(requestedRoute) || credential !== token() || principal !== session?.principal?.id || accessMode !== session?.principal?.access_mode) return;
+      if (my !== seq || !requestedReadCurrent() || credential !== token() || principal !== session?.principal?.id || accessMode !== session?.principal?.access_mode) return;
       if (data.setupState) { suSt = data.setupState; suBusy = false; suError = ""; bump(); }
       if (data.redirect) { replace(data.redirect); return; }
       if (data.screen === null) return;
@@ -304,16 +309,18 @@
       if (pid && !r.params.pid) setLiveContext({ ...liveContext(), pid });
       if (data.results?.reportId) setLiveContext({ ...liveContext(), report: data.results.reportId });
       page = { status: "ready", key: r.name, data, error: null };
+      return true;
     } catch (e) {
-      if (my !== seq || routeKey(r) !== routeKey(requestedRoute) || credential !== token()) return;
+      if (my !== seq || !requestedReadCurrent() || credential !== token()) return;
       const kind = classify(e);
       if (retained && page.status === "ready" && kind === "failed") {
         refreshError = String(e?.message || "This view could not be updated.");
       } else {
         route = r;
-        if (kind === "unauthenticated") { menuState = null; menuSeq++; S.forget(); session = null; applyChrome(null); page = { status: "ready", key: r.name, data: { screen: "sign-in", next: hash }, error: null }; return; }
+        if (kind === "unauthenticated") { menuState = null; menuSeq++; S.forget(); session = null; applyChrome(null); page = { status: "ready", key: r.name, data: { screen: "sign-in", next: hash }, error: null }; return false; }
         page = { status: "error", key: r.name, data: null, error: { kind, message: String(e?.message || "Request could not be completed.") } };
       }
+      return false;
     } finally { if (my === seq) refreshing = false; }
   }
   // Print QR pages for real: the chosen surveys' sheets (ui/assess/share.js) in their own tab, printing itself (app/print.js).
@@ -453,13 +460,13 @@
   async function reopenCollection() { const aid = route.params.aid; try { await D.setStage(aid, "collect"); go(to("share", { aid })); } catch (e) { page = { status: "error", key: route.name, data: null, error: { kind: classify(e), message: e?.message || "Collection could not be reopened." } }; } }
   // People actions (app/data.js: the same routes the current UI's permissions page calls); each lands on a fresh read, or the shell's error.
   const peopleScope = () => page.data?.data?.scope;
-  const act = async (label, fn, committed = () => {}) => {
+  const act = async (label, fn, committed = () => {}, { propagate = false } = {}) => {
     const generation = seq, credential = token(), principal = session?.principal?.id, originHash = viewHash;
     const current = () => generation === seq && credential === token() && principal === session?.principal?.id;
     if (actionBusy || refreshing || refreshError) return;
     actionBusy = true;
-    try { const result = await fn(); if (!current()) return; committed(result); if (menuState) refreshAfterMenu = true; else if (globalThis.location.hash === originHash) await load(); }
-    catch (e) { if (!current()) return; if (classify(e) === "failed") refreshError = `${label}: ${e?.message || "the change could not be confirmed"}`; else { route = requestedRoute; page = { status: "error", key: route.name, data: null, error: { kind: classify(e), message: `${label}: ${e?.message || "the change was refused"}` } }; } }
+    try { const result = await fn(); if (!current()) return; committed(result); if (menuState?.origin || globalThis.location.hash === originHash) { const verified = await load({ refreshView: true }); if (verified === false) throw new Error("The change was saved, but the refreshed view could not be verified. Reload before continuing."); } }
+    catch (e) { if (!current()) { if (propagate) throw e; return; } if (classify(e) === "failed") refreshError = `${label}: ${e?.message || "the change could not be confirmed"}`; else { route = requestedRoute; page = { status: "error", key: route.name, data: null, error: { kind: classify(e), message: `${label}: ${e?.message || "the change was refused"}` } }; } if (propagate) throw e; }
     finally { if (current()) actionBusy = false; }
   };
   // Send invitation = preview (dry run) → the person confirms recipient, role and scope in the current design's sentence
@@ -540,7 +547,7 @@
   const reportFor = (m, screen) => D.liveReport(m, { phone, screen });
   setContext("next-view-pending", { busy: () => refreshing || actionBusy, inactive: () => refreshing || actionBusy || !!refreshError || !!menuState, render: () => refreshNotice });
   setContext("next-account-chrome", { session: () => session, chrome: () => chrome, available: () => !page.data?.sample && !PARTICIPANT.has(route.name), access: () => accessControl });
-  setContext("next-review-utilities", { visible: () => (page.status === "ready" || (page.status === "loading" && route.name === "projects" && !!session)) && (!!page.data?.results?.reports?.length || !!metadataUndo), render: () => utilities });
+  setContext("next-review-utilities", { visible: () => !PARTICIPANT.has(route.name) && (page.status === "ready" || (page.status === "loading" && route.name === "projects" && !!session)) && (!!(session?.principal?.super_admin && !page.data?.sample) || !!page.data?.results?.reports?.length || !!metadataUndo), render: () => utilities });
 </script>
 
 <!-- The build confirm (report-build.js: one plain sentence with the response count, confirm "Build the results", cancel "Not now").
@@ -694,7 +701,7 @@
   <C {phone} {theme} data={page.data.data} state={route.query.get("state") ?? undefined} />
 {:else if page.data.screen === "workspace" || page.data.screen === "workspace-group"}
   {@const C = REGISTRY[page.data.screen]}
-  <C {phone} {theme} data={page.data.data} ongroup={groupProject} onrename={name => act("Workspace not renamed", () => renameWorkspace(page.data.data, name), saved => { workspaceUndo = saved.undo; })} undo={workspaceUndo} onundo={receipt => act("Workspace rename not undone", () => undoWorkspaceRename(receipt), () => { workspaceUndo = null; })} onungroup={project => act("Project not removed", () => ungroupProject(page.data.data, project))} />
+  <C {phone} {theme} data={page.data.data} ongroup={groupProject} onrename={name => act("Workspace not renamed", () => renameWorkspace(page.data.data, name), saved => { workspaceUndo = saved.undo; }, { propagate: true })} undo={workspaceUndo} onundo={receipt => act("Workspace rename not undone", () => undoWorkspaceRename(receipt), () => { workspaceUndo = null; }, { propagate: true })} onungroup={project => act("Project not removed", () => ungroupProject(page.data.data, project), undefined, { propagate: true })} />
 {:else if page.data.screen === "people" || page.data.screen === "people-workspace"}
   {#if page.data.empty}
     <Status {phone} {theme} kind="empty" message={page.data.emptyText} back={to("home")} backLabel="Your reviews" />
