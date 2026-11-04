@@ -1,4 +1,5 @@
-<!-- Neutral pending content: no cached review, counts or workspace names. Static shapes avoid motion in every preference mode. -->
+<!-- Fallback for routes without destination-owned pending presentation (Landing and Projects bypass this frame).
+     Neutral pending content: no cached review, counts or workspace names. Static shapes avoid motion in every preference mode. -->
 <script>
   import AppShell from "../AppShell.svelte";
   import Page from "../Page.svelte";

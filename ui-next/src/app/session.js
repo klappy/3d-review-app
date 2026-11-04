@@ -10,6 +10,11 @@ export async function me({ fresh = false } = {}) {
   catch (e) { if (classify(e) === "unauthenticated") { cached = null; return null; } throw e; }
   return cached;
 }
+// Adopt an already verified, current /v2/me read without dropping its served policy.
+export function adoptFresh(identity) {
+  if (!identity?.principal?.id || identity.principal.kind === "anonymous") { forget(); return null; }
+  cached = identity; useSessionLevelMinimum(identity.level_minimum_responses); return cached;
+}
 export const forget = () => { cached = undefined; useSessionLevelMinimum(null); }; // a forgotten session leaves no served policy behind
 export function initialsOf(p) {
   const n = String(p?.display_name || "").trim();
