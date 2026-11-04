@@ -16,6 +16,14 @@ Scripts (Node ≥ 22, Playwright 1.58 + pixelmatch 5 + pngjs 7 installed in a sc
   `AID2=<review with a built report>` and `ONLY=Board,Board`. Writes `board-*`, `app-*`, `diff-*` PNGs and `measure-live.json`.
 - `boards.mjs` — reference renders of boards alone at the shipping viewports, light + dark, provenance off.
 
+## Readiness checks and execution boundary
+
+`readiness.mjs` rejects pending loading frames, including “Loading content…” and “Loading review content…”, and blank shells. A normal journey must reach usable content; a negative scenario must explicitly allow a terminal error with a recovery action. Account-menu acceptance requires visible Account settings, Projects and Sign out controls, then a usable signed-out screen. Menu click failures propagate.
+
+`test/ui-next-acceptance-readiness.test.ts` covers these guards with rendered Svelte components and mocked browser calls. That is local component evidence, not execution of the persisted browser journey above.
+
+The existing `journey.mjs` setup reads the synthetic facilitator bearer into its Node process for API seeding. Do not run it where credential extraction or API seeding is prohibited. Use an authorized existing session or an isolated browser fixture runner for the permitted subset, and label that evidence separately from hosted persistence and physical installed-PWA acceptance.
+
 ## Isolated synthetic data (what the harness actually used, 2026-10-22, local Worker)
 The README's `migrate:local && … 0002_platform_ext.sql && seed:local` recipe names a file that does not exist; the procedure that works:
 

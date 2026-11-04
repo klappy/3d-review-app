@@ -86,11 +86,33 @@ test('workspaces: cards link to #workspace/<id>', async () => {
   assert.ok(h.includes('href="#workspace/ws%201"')); assert.ok(h.includes('href="#workspace/ws2"')); assert.ok(h.includes('Archived'));
 });
 test('workspace (owner): project cards, add select excludes grouped, remove + rename + permissions', async () => {
-  const ctx = ctxWith({ 'GET /v2/workspaces/ws1': { workspace: { id: 'ws1', name: 'W', role: 'owner', archived_at: '2026-02-02' }, projects: [{ id: 'p1', name: 'In', archived_at: null }] }, 'GET /v2/projects': { projects: [{ id: 'p1', name: 'In', role: 'owner' }, { id: 'p2', name: 'Out', role: 'owner' }] } });
+  const ctx = ctxWith({ 'GET /v2/workspaces/ws1': { workspace: { id: 'ws1', name: 'W', role: 'owner', archived_at: '2026-02-02' }, projects: [{ id: 'p1', name: 'In', archived_at: null }] }, 'GET /v2/projects': { projects: [{ id: 'p1', name: 'In', role: 'owner', direct_role: 'owner', grouping_eligible: true }, { id: 'p2', name: 'Out', role: 'owner', direct_role: 'owner', grouping_eligible: true }] } });
   const h = pages.workspace.render(ctx, await pages.workspace.load(ctx, { id: 'ws1' }));
   assert.ok(h.includes('href="#project/p1"')); assert.ok(h.includes('<option value="p2">Out</option>')); assert.ok(!h.includes('<option value="p1"'));
   assert.ok(h.includes('data-remove="p1"')); assert.ok(h.includes('id="rename-form"')); assert.ok(h.includes('>Archived<'));
   assert.ok(!h.includes('Your role: owner</p><p'), 'no people list'); assert.ok(!/principal|invitation/i.test(h), 'no people listed at workspace level on this page');
+});
+test('workspace grouping picker disables unverified or partial ownership and cannot submit a disabled candidate', async () => {
+  const candidates = [
+    { id: 'partial', name: 'Partial ownership', direct_role: 'owner', grouping_eligible: false },
+    { id: 'unknown', name: 'Not checked', direct_role: 'owner' },
+    { id: 'inherited', name: 'Inherited owner', direct_role: null, grouping_eligible: true },
+    { id: 'eligible', name: 'All reviews owned', direct_role: 'owner', grouping_eligible: true },
+    { id: 'elsewhere', name: 'Elsewhere', direct_role: 'owner', grouping_eligible: true, workspace_id: 'ws2' },
+  ];
+  const ctx = ctxWith({ 'GET /v2/workspaces/ws1': { workspace: { id: 'ws1', name: 'W', role: 'member' }, projects: [] }, 'GET /v2/projects': { projects: candidates }, 'POST /v2/workspaces/ws1/projects/eligible': {} });
+  const model = await pages.workspace.load(ctx, { id: 'ws1' }), html = pages.workspace.render(ctx, model);
+  for (const id of ['partial', 'unknown', 'inherited']) assert.match(html, new RegExp(`<option value="${id}" disabled`));
+  assert.ok(html.includes('<option value="eligible">All reviews owned</option>'));
+  assert.ok(!html.includes('<option value="elsewhere"'));
+  assert.match(html, /every review/);
+  const root = mount(pages.workspace, ctx, model), form = root.querySelector('#add-project');
+  form.elements.pid.value = 'partial'; await form.fire('submit');
+  assert.equal(ctx.calls.some(c => c.key.startsWith('POST')), false);
+  form.elements.pid.value = 'eligible'; await form.fire('submit');
+  assert.equal(ctx.calls.filter(c => c.key.startsWith('POST')).length, 1);
+  const none = pages.workspace.render(ctx, { ...model, candidates: candidates.slice(0, 3) });
+  assert.match(none, /type="submit" disabled/);
 });
 test('projects: cards link to #project/<id>', async () => {
   const ctx = ctxWith({ 'GET /v2/projects': { projects: [{ id: 'p1', name: 'One', role: 'owner' }] } });

@@ -1,5 +1,5 @@
 {
-  "_source": "3d-review-cookbook design/2026-10-15-glass-redesign/canvas Workspace.dc.html, WorkspacePhone.dc.html, WorkspaceGroup.dc.html, WorkspaceGroupPhone.dc.html. The group dialog's candidates carry the caller's workspace role and DIRECT project role, the two inputs of ui/workspace-manager.js mayGroup().",
+  "_source": "3d-review-cookbook design/2026-10-15-glass-redesign/canvas Workspace.dc.html, WorkspacePhone.dc.html, WorkspaceGroup.dc.html, WorkspaceGroupPhone.dc.html. Candidates carry the workspace role, DIRECT project role and server-computed grouping eligibility (direct ownership of every contained review) used by ui/workspace-manager.js mayGroup().",
   "user": { "first": "Bincy", "initials": "BK" },
   "name": "Bridge Connectivity Solutions · India",
   "short": "BCS · India",
@@ -16,9 +16,9 @@
   "group": {
     "workspaceRole": "member",
     "candidates": [
-      { "title": "Psalms reading group", "directRole": "owner" },
-      { "title": "Kurubaru Scripture", "directRole": "owner" },
-      { "title": "Lao Old Testament", "directRole": null }
+      { "title": "Psalms reading group", "directRole": "owner", "groupingEligible": true },
+      { "title": "Kurubaru Scripture", "directRole": "owner", "groupingEligible": true },
+      { "title": "Lao Old Testament", "directRole": null, "groupingEligible": false }
     ]
   }
 }

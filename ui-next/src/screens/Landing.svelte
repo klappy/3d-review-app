@@ -26,7 +26,7 @@
 
   // videoSrc: the intro video through the Transcode proxy (generate_transcode_url) once it exists; absent = placeholder frame (Media card contract).
   // home (live, signed in): the logo goes to the signed-in home, not back to this page (cookbook work/active/2026-10-26-3d-logged-in-home).
-  let { phone = false, theme = "light", w, videoSrc, home } = $props();
+  let { phone = false, theme = "light", w, videoSrc, home, pending = false } = $props();
   let SELF = $derived(screenHref("landing", { phone, theme, w }));
   const LOGO = $derived(home ?? SELF);
   const SAMPLE = "#results", VIDEO = "#video", CODE = "#survey-code", HELP = "#help";
@@ -60,6 +60,8 @@
 {#snippet lead()}<Icon d={I.play} />{/snippet}
 {#snippet bar()}{#if phone}<PhoneBar label="Try the sample review" href={SAMPLE} />{/if}{/snippet}
 
+{#if pending}<span class="sr-only" role="status" aria-live="polite">Checking sign-in…</span>{/if}
+<div data-destination="landing" aria-busy={pending}>
 <AppShell {phone} {theme} screen rhythm="marketing" {top} {bar}>
   {#if phone}
     <Card hi pad="hero" gap={3}>
@@ -110,3 +112,5 @@
     </Page>
   {/if}
 </AppShell>
+
+</div>

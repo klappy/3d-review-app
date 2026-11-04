@@ -1,4 +1,5 @@
 import { sandboxToolsEnabled } from './sandbox-tools.js';
+import { mayGroup } from '../workspace-manager.js';
 // Scope pages — entry · workspaces · workspace · projects · project (UI overhaul contract, 2026-09-17).
 // Each page = { load(ctx, params) → model, render(ctx, model) → html, bind(ctx, root, model) }.
 // ctx = { api, esc, enc, go, note(msg, alert), state, routes, cards, setToken? }.
@@ -368,8 +369,8 @@ const workspace = {
     catch (e) { return { ...fail(e, safeMessage), params }; }
     const model = { status: 'loaded', params, workspace: core.workspace || {}, projects: core.projects || [], candidates: [], candidatesStatus: 'skipped' };
     if (CAN_EDIT.has(model.workspace.role)) {
-      // Projects the identity can open that are not already grouped here; the server decides share authority on add.
-      try { const r = await ctx.api('/v2/projects'); const here = new Set(model.projects.map(p => p.id)); model.candidates = (r.projects || []).filter(p => !here.has(p.id) && !p.archived_at); model.candidatesStatus = 'loaded'; }
+      // Keep visible, ungrouped projects with their server-computed share eligibility. The write rechecks authority.
+      try { const r = await ctx.api('/v2/projects'); const here = new Set(model.projects.map(p => p.id)); model.candidates = (r.projects || []).filter(p => !here.has(p.id) && !p.workspace_id && !p.archived_at); model.candidatesStatus = 'loaded'; }
       catch (e) { model.candidatesStatus = classify(e); }
     }
     return model;
@@ -377,9 +378,10 @@ const workspace = {
   render(ctx, model) {
     const g = gate(ctx, model, { href: ctx.routes.workspaces, label: 'All workspaces' }); if (g) return g;
     const w = model.workspace, edit = CAN_EDIT.has(w.role), owner = w.role === 'owner';
+    const eligible = p => mayGroup(w.role, p.direct_role, 'group', p.grouping_eligible);
     // Management lives on the card itself (root visual delta, loc-27): one card per project, its own Remove control beneath it.
     const rows = '';
-    const add = edit ? `<section class="panel" style="margin-top:22px"><h2>Add a project</h2><p class="small" id="grouping-access-notice">Adding a project gives everyone in this workspace access to the project, its assessments and their available reports at their workspace role. Removing the project ends inherited access; people added to a project directly keep their access.</p>${model.candidatesStatus === 'loaded' ? (model.candidates.length ? `<form id="add-project"><label class="field">Project<select name="pid" required><option value="">Choose a project…</option>${model.candidates.map(p => `<option value="${ctx.esc(p.id)}">${ctx.esc(p.name)}</option>`).join('')}</select></label><div class="actions"><button class="primary" type="submit" aria-describedby="grouping-access-notice">Add to workspace</button></div></form>` : '<p class="muted">Every project you can open is already grouped here, or you have no projects yet.</p>') : '<p class="muted">The project list could not be loaded right now.</p>'}</section>` : '';
+    const add = edit ? `<section class="panel" style="margin-top:22px"><h2>Add a project</h2><p class="small" id="grouping-access-notice">Adding a project gives everyone in this workspace access to the project, its assessments and their available reports at their workspace role. You must directly own the project and every review it contains, including archived reviews. Removing the project ends inherited access; people added to a project directly keep their access.</p>${model.candidatesStatus === 'loaded' ? (model.candidates.length ? `<form id="add-project"><label class="field">Project<select name="pid" required><option value="">Choose a project…</option>${model.candidates.map(p => `<option value="${ctx.esc(p.id)}"${eligible(p) ? '' : ' disabled'}>${ctx.esc(p.name)}${eligible(p) ? '' : p.grouping_eligible === undefined ? ' · Eligibility unavailable; reload' : ' · Direct project and review ownership required'}</option>`).join('')}</select></label><div class="actions"><button class="primary" type="submit"${model.candidates.some(eligible) ? '' : ' disabled'} aria-describedby="grouping-access-notice">Add to workspace</button></div></form>` : '<p class="muted">No ungrouped projects are available. Remove a project from its current workspace before moving it here.</p>') : '<p class="muted">The project list could not be loaded right now. Reload before grouping a project.</p>'}</section>` : '';
     const rename = owner ? `<section class="panel" style="margin-top:22px"><h2>Rename</h2><form id="rename-form"><label class="field">Workspace name<input name="name" maxlength="100" required value="${ctx.esc(w.name)}"></label><div class="actions"><button class="primary" type="submit">Save name</button></div></form></section>` : '';
     const r = readModel('workspace', model);
     // Read region: kit cards for grouped projects. Action region: the existing per-card Remove controls, Add and Rename forms (same selectors).
@@ -396,6 +398,10 @@ const workspace = {
       ev.preventDefault();
       const form = ev.target, pid = val(form, 'pid');
       if (!pid) return;
+      const candidate = model.candidates.find(p => p.id === pid);
+      if (!candidate || !mayGroup(model.workspace.role, candidate.direct_role, 'group', candidate.grouping_eligible)) {
+        ctx.note('Grouping requires direct ownership of the project and every review. Reload to check current eligibility.', true); return;
+      }
       const r = await write(ctx, form.querySelector('button[type=submit]'), 'Add project', () => ctx.api(`/v2/workspaces/${ctx.enc(id)}/projects/${ctx.enc(pid)}`, { method: 'POST' }));
       if (r) { ctx.note('Project added.'); await reload(); }
     });

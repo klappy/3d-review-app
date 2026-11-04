@@ -26,13 +26,13 @@ it('an inherited assessment owner cannot see the direct-owner deletion action', 
   const v = render(Tools, { type: 'assessment', entity: { id: 'a', name: 'Review', role: 'owner', direct_role: null } });
   expect(v.queryByText('Preview deletion')).toBeNull();
 });
-it('archive requires independently matching state, and deletion requires absence from the actual list', async () => {
+it('archive requires independently matching state, and project deletion requires absence from the actual list', async () => {
   await expect(archiveEntity('project', { id: 'p' }, true, async () => ({ project: { id: 'p', archived_at: null } }))).rejects.toThrow('could not be verified');
   const calls: any[] = [];
-  await expect(deleteEntity('assessment', { id: 'a', project_id: 'p' }, { confirm_token: 'x' }, async (url, init) => {
-    calls.push({ url, init }); return init ? { deleted: true } : { assessments: [{ id: 'a' }] };
+  await expect(deleteEntity('project', { id: 'p' }, { confirm_token: 'x' }, async (url, init) => {
+    calls.push({ url, init }); return init ? { deleted: true } : { projects: [{ id: 'p' }] };
   })).rejects.toThrow('could not be verified');
-  expect(calls[1].url).toBe('/v2/projects/p/assessments');
+  expect(calls[1].url).toBe('/v2/projects');
 });
 it('project creation can cancel without writes and return the verified new project to the retained setup draft', async () => {
   const calls: string[] = [];

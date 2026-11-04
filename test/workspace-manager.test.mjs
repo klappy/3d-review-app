@@ -29,11 +29,12 @@ function fixture({role='owner',kind='user',provisioned=true,projects=[],grouped=
   const open=async()=>{await api.refresh();await click('Open workspace');};
   return{api,root,calls,click,open,selected,get changes(){return changes;},setContext:patch=>{ctx={...ctx,...patch};},override:fn=>{override=fn;}};
 }
-test('grouping mirrors the server: group = ws member+ and DIRECT project owner; ungroup = ws owner or DIRECT project owner',()=>{
+test('grouping mirrors the server: direct project plus all-review ownership; ungroup rules are unchanged',()=>{
  for(const w of ['owner','member','viewer',undefined])for(const p of ['owner','member','viewer',null,undefined]){
   const wsMember=w==='owner'||w==='member';
-  assert.equal(mayGroup(w,p),wsMember&&p==='owner',`group ${w}/${p}`);
-  assert.equal(mayGroup(w,p,'group'),wsMember&&p==='owner');
+  assert.equal(mayGroup(w,p,'group',true),wsMember&&p==='owner',`group ${w}/${p}`);
+  assert.equal(mayGroup(w,p),false,'missing eligibility never grants grouping');
+  assert.equal(mayGroup(w,p,'group',false),false,'negative eligibility never grants grouping');
   assert.equal(mayGroup(w,p,'ungroup'),wsMember&&(w==='owner'||p==='owner'),`ungroup ${w}/${p}`);
  }
  // Bugbot 4289479043: ws owner + direct project member, or an inherited (non-direct) owner, may NOT group
@@ -50,7 +51,7 @@ test('unprovisioned user and support do not see create; viewer sees no owner act
  for(const options of [{provisioned:false},{kind:'support',provisioned:true},{role:'viewer',provisioned:false}]){const f=fixture(options);await f.open();assert.doesNotMatch(text(f.root),/Create workspace/);if(options.role==='viewer')assert.doesNotMatch(text(f.root),/Rename workspace|Archive workspace|Preview deletion/);}
 });
 test('grouped names never confer access or group removal; authorized role enables actual endpoint',async()=>{
- const f=fixture({role:'member',projects:[{id:'p2',name:'Owned',role:'owner',direct_role:'owner'},{id:'p3',name:'Member',role:'member',direct_role:'member'},{id:'p4',name:'Inherited owner',role:'owner',direct_role:null}],grouped:[{id:'p1',name:'Listing only'}]});await f.open();assert.match(text(f.root),/Listing only/);assert.doesNotMatch(text(f.root),/Remove from workspace/);const options=walk(f.root).filter(n=>n.tagName==='option');assert.deepEqual(options.map(n=>n.value),['p2']);await f.click('Add project to workspace');assert.ok(f.calls.some(c=>c.path==='/v2/workspaces/ws1/projects/p2'&&c.method==='POST'));assert.equal(f.calls.filter(c=>c.path.startsWith('/v2/projects')).length,0);
+ const f=fixture({role:'member',projects:[{id:'p2',name:'Owned',role:'owner',direct_role:'owner',grouping_eligible:true},{id:'p3',name:'Member',role:'member',direct_role:'member'},{id:'p4',name:'Inherited owner',role:'owner',direct_role:null},{id:'p5',name:'Missing review ownership',direct_role:'owner',grouping_eligible:false},{id:'p6',name:'Unchecked',direct_role:'owner'}],grouped:[{id:'p1',name:'Listing only'}]});await f.open();assert.match(text(f.root),/Listing only/);assert.doesNotMatch(text(f.root),/Remove from workspace/);const options=walk(f.root).filter(n=>n.tagName==='option');assert.deepEqual(options.map(n=>n.value),['p2']);await f.click('Add project to workspace');assert.ok(f.calls.some(c=>c.path==='/v2/workspaces/ws1/projects/p2'&&c.method==='POST'));assert.equal(f.calls.filter(c=>c.path.startsWith('/v2/projects')).length,0);
 });
 test('delete is explicit preview/confirm; token never rendered; cancellation cannot execute',async()=>{
  const f=fixture();await f.open();await f.click('Preview deletion');assert.doesNotMatch(text(f.root),/secret-confirm/);assert.match(text(f.root),/grants: 1/);await f.click('Cancel');assert.equal(f.calls.some(c=>c.body?.mode==='execute'),false);await f.click('Preview deletion');await f.click('Confirm deletion');assert.deepEqual(f.calls.find(c=>c.body?.mode==='execute').body,{mode:'execute',confirm_token:'secret-confirm'});assert.equal(f.selected.at(-1),null);
@@ -87,7 +88,7 @@ test('explicit refresh clears host scope before pending list read and never rest
 });
 
 test('legacy grouping discloses inherited project assessment and report access before action', async () => {
- const f=fixture({projects:[{id:'owned',name:'Owned',role:'owner',direct_role:'owner'}]});await f.open();
+ const f=fixture({projects:[{id:'owned',name:'Owned',role:'owner',direct_role:'owner',grouping_eligible:true}]});await f.open();
  const shown=text(f.root);
  assert.match(shown,/Grouping gives everyone in this workspace access to the project, its assessments and their available reports at their workspace role/);
  assert.match(shown,/Removing it ends inherited access; people added to a project directly keep their access/);

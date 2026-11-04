@@ -26,24 +26,27 @@
   import { A } from "./icons.js";
   import { href } from "../href.js";
   import { carry } from "./links.js";
+  import { qrModules } from "../../app/data.js";
   import R0 from "../../../fixtures/actions/review.json";
   import D0 from "../../../fixtures/actions/action-plan.json";
 
   // data: the fixture shape (gallery) or app/data.js nextStepModel (live): the plan's talk rows are the built report's gaps and weakest
-  // areas; noticed / next / facts / share have no store (no plan store, no plan share link in the API), so the sheet says so and draws
-  // no link, no QR and no PDF.
+  // areas; notes remain the saved review's notes. A live share URL is an authenticated review route, not a grant or anonymous link.
   let { phone = false, theme = "light", data = null, user = R0.user } = $props();
   const live = $derived(!!data);
   const D = $derived(data ? { doc: data.doc, meta: data.meta, talk: data.talk, noticed: data.noticed ?? "", next: data.next ?? "", facts: [["Built on", data.review.builtOn || "—"], ["Responses", String(data.review.responses)], ["Agreed by", "—"]], share: data.share ?? null, foot: data.foot, phone: { crumb: `${data.review.title} · ${data.stage === "reviewed" ? "improve" : "understand"}`, meta: `${data.review.project} · ${data.talk.length} item${data.talk.length === 1 ? "" : "s"} · from the built report`, items: data.talk.map(([t, apart]) => [t, apart]) } } : D0);
+  const requiresAccess = $derived(live || D.share?.authenticated === true);
+  const planQr = $derived(live && D.share?.url ? qrModules(D.share.url) : null);
+  const ACCESS = "Only people who sign in with existing access to this review can open this link. It shows the current saved notes.";
   let emailOpen = $state(false);
   const R = $derived(data ? { ...R0, user, review: { title: data.review.title } } : R0);
   const at = $derived(carry(phone, theme));
   // "Print" prints this page through the browser, as the current UI's print buttons do (ui/stage-screens.js doc.defaultView.print()).
   const printPage = () => globalThis.print?.();
   let refused = $state(false);
-  const emailBody = $derived([`Next steps: ${R.review.title}`, D.meta, "What we will talk about", ...D.talk.map(([topic, detail], i) => `${i + 1}. ${topic}${detail ? ` — ${detail}` : ""}`), `What we noticed: ${D.noticed}`, `The next step: ${D.next}`, ...(D.share?.authenticated ? [`Plan link (existing review access required): ${D.share.url}`] : [])].filter(Boolean).join("\n\n"));
+  const emailBody = $derived([`Next steps: ${R.review.title}`, D.meta, "What we will talk about", ...D.talk.map(([topic, detail], i) => `${i + 1}. ${topic}${detail ? ` — ${detail}` : ""}`), `What we noticed: ${D.noticed}`, `The next step: ${D.next}`, ...(D.share?.url && requiresAccess ? [`Plan link (sign-in and existing review access required): ${D.share.url}`] : [])].filter(Boolean).join("\n\n"));
   const NO_NOTES = "No notes recorded yet.";
-  const NO_SHARE = "A read-only link to the plan is not available yet: the API has no plan share link. Print this page instead.";
+  const NO_SHARE = "No share link is available for this plan. Print this page instead.";
 </script>
 
 {#snippet mail()}<Ico d={A.mail} />{/snippet}
@@ -65,7 +68,7 @@
     {#if live}<Card gap={2} label="Saved notes"><b>What we noticed</b><p class="small">{D.noticed || NO_NOTES}</p><b>The next step</b><p class="small">{D.next || NO_NOTES}</p></Card>{/if}
     <Card gap={2} label="Share">
       <span class="micro">Share</span>
-      {#if D.share}<p class="small">{D.share.authenticated ? "Only people with access to this review can open this link. It shows the current saved notes." : "Read-only link, expires in 90 days."}</p>
+      {#if D.share}<p class="small">{requiresAccess ? ACCESS : "Read-only link, expires in 90 days."}</p>
       <Row wrap gap={2}><CopyButton text={D.share.url} label="Copy link" block bind:failed={refused} /><EmailDraft {phone} bind:opened={emailOpen} subject={`Next steps: ${R.review.title}`} body={emailBody} label="Email it" /></Row>
       {#if refused}<input class="in small" readonly value={D.share.url} aria-label="Link to this plan" />{/if}
       {:else}<p class="small">{NO_SHARE}</p><Row wrap gap={2}><EmailDraft {phone} bind:opened={emailOpen} subject={`Next steps: ${R.review.title}`} body={emailBody} label="Email it" /></Row>{/if}
@@ -88,8 +91,8 @@
         </div>
         <div class="plan-dates">{#each D.facts as [k, v]}<div><div class="plan-dt">{k}</div><div class="plan-dd">{v}</div></div>{/each}</div>
         <div class="plan-share">
-          {#if D.share}<div><strong>Share this plan.</strong> Anyone with this link can read the plan and the overview report — no account, nothing editable. <span class="mono">{D.share.url}</span> · {D.share.line}</div>
-          <Qr bits={R.qr.plan} size={72} />{:else}<div><strong>Share this plan.</strong> {NO_SHARE}</div>{/if}
+          {#if D.share}<div><strong>Share this plan.</strong> {requiresAccess ? ACCESS : "Anyone with this link can read the plan and the overview report — no account, nothing editable."} <span class="mono">{D.share.url}</span>{#if D.share.line} · {D.share.line}{/if}</div>
+          <Qr bits={planQr?.cells ?? R.qr.plan} n={planQr?.n ?? 21} size={72} variant="plan" />{:else}<div><strong>Share this plan.</strong> {NO_SHARE}</div>{/if}
         </div>
         <div class="pfoot"><span class="pf-text">{D.foot}</span><span class="pn">1 of 1</span></div>
     </article>

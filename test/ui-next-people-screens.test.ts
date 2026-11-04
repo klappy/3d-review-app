@@ -39,8 +39,8 @@ const BOARDS: [string, string, boolean, string[]][] = [
   ["PeopleWorkspacePhone", "people-workspace", true, ["People in this workspace", "BCS · India", "People · 4"]],
   ["Workspace", "workspace", false, ["Bridge Connectivity Solutions · India", "Partners never see each other's workspaces.", "Completed this year", "No results yet", "lists everything you facilitate."]],
   ["WorkspacePhone", "workspace", true, ["BCS · India", "Projects · 5", "Collecting · Hindi · Written", "Your reviews across workspaces", "New project"]],
-  ["WorkspaceGroup", "workspace-group", false, ["Add a project to this workspace", "Only a direct project owner can group it; a role inherited from a workspace is never enough.", "Inherited · cannot group", "Add to workspace"]],
-  ["WorkspaceGroupPhone", "workspace-group", true, ["Add a project to this workspace", "Cannot group: your access comes from the workspace, not a project grant", "Add to workspace"]],
+  ["WorkspaceGroup", "workspace-group", false, ["Add a project to this workspace", "You must directly own the project and every review it contains, including archived reviews; inherited access is not enough.", "Inherited · cannot group", "Add to workspace"]],
+  ["WorkspaceGroupPhone", "workspace-group", true, ["Add a project to this workspace", "Cannot group: a direct project owner grant is required; inherited access is not enough", "Add to workspace"]],
   ["Invitations", "invitations", false, ["Your invitations", "Odia New Testament · project", "From Andy V. · as a Member — you can start and run reviews · expires 24 Oct", "Psalms reading group · review", "Back to your reviews"]],
   ["InvitationsPhone", "invitations", true, ["Invitations", "Steve invited you to facilitate reviews in this workspace · 2 days ago", "Accepted · Aug 2026", "Accept and open the workspace"]],
   ["SignInCheck", "sign-in-check", false, ["Check your email", "It works for 30 minutes. Check your spam folder if it is slow.", "I've opened the link", "Link not working? Use the 6-digit code instead"]],
@@ -245,7 +245,7 @@ describe("people-data.js adapts through the current UI's modules", () => {
     expect(inviteOptions("viewer", people.inviteLabels)).toEqual([]);
     expect(inviteOptions("owner", people.inviteLabels).map(([r]: string[]) => r)).toEqual(["viewer", "member", "owner"]);
     expect(groupRows({ workspaceRole: "viewer", candidates: [{ title: "A", directRole: "owner" }] })[0].can).toBe(false);
-    expect(groupRows({ workspaceRole: "member", candidates: [{ title: "A", directRole: "owner" }, { title: "B", directRole: "member" }] }).map((r: { can: boolean }) => r.can)).toEqual([true, false]);
+    expect(groupRows({ workspaceRole: "member", candidates: [{ title: "A", directRole: "owner", groupingEligible: true }, { title: "B", directRole: "member" }, { title: "C", directRole: "owner" }] }).map((r: { can: boolean }) => r.can)).toEqual([true, false, false]);
     const rows = invitationRows({ invitations: [...invites.desktop.invitations, { id: "", role: "viewer", scope: { type: "project" } }, { id: "x", scope: { type: "project", name: "No role" } }] }, { kinds: invites.kinds, can: invites.can, roles: invites.roles });
     expect(rows.map((r: { title: string }) => r.title)).toEqual(["Odia New Testament · project", "Psalms reading group · review"]);
     // F3: a scope name the server did not send (pendingInvitations sets null) reads the current UI's words, never "null"

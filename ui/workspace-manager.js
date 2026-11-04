@@ -5,12 +5,12 @@
 // No token storage, implicit grants, project-content requests, or automatic retries.
 const enc = encodeURIComponent;
 // Mirrors src/handlers/workspace.ts shareAuthority: directProjectRole is the caller's DIRECT project grant (never the
-// inherited/effective role). The project picker requires workspace member+ AND direct project owner; the server also
-// requires direct ownership of every contained review. Ungroup: workspace owner OR direct project owner.
-export function mayGroup(workspaceRole, directProjectRole, op = 'group') {
+// inherited/effective role). The picker also requires the server's positive all-review ownership check.
+// Unknown eligibility is disabled. Ungroup: workspace owner OR direct project owner, unchanged.
+export function mayGroup(workspaceRole, directProjectRole, op = 'group', groupingEligible = false) {
   const wsMember = workspaceRole === 'owner' || workspaceRole === 'member';
   if (op === 'ungroup') return wsMember && (workspaceRole === 'owner' || directProjectRole === 'owner');
-  return wsMember && directProjectRole === 'owner';
+  return wsMember && directProjectRole === 'owner' && groupingEligible === true;
 }
 export function mountWorkspaceManager({ document: doc, root, request, getContext, onWorkspaceSelected = () => {}, onMutation = () => {} }) {
   let revision = 0, destroyed = false, busy = false, selected = null, workspaces = [], detail = null, pending = null, message = '';
@@ -134,15 +134,15 @@ export function mountWorkspaceManager({ document: doc, root, request, getContext
       section.append(row);
     }
     if (!projects.length) section.append(node('p', 'No projects grouped here.'));
-    const candidates = authorized.filter(p => mayGroup(w.role, p.direct_role) && !projects.some(row => row.id === p.id));
+    const candidates = authorized.filter(p => mayGroup(w.role, p.direct_role, 'group', p.grouping_eligible) && !p.workspace_id && !projects.some(row => row.id === p.id));
     if (candidates.length) {
       const label = node('label', 'Group an authorized project'); const picker = node('select'); picker.disabled = busy;
       for (const p of candidates) { const option = node('option', p.name); option.value = p.id; picker.append(option); }
       picker.value = candidates[0].id; label.append(picker); section.append(label, button('Add project to workspace', () => {
         const p = (context().authorizedProjects || []).find(a => a.id === picker.value);
-        if (p && mayGroup(w.role, p.direct_role)) return mutation(`/v2/workspaces/${enc(w.id)}/projects/${enc(p.id)}`, 'POST');
+        if (p && mayGroup(w.role, p.direct_role, 'group', p.grouping_eligible)) return mutation(`/v2/workspaces/${enc(w.id)}/projects/${enc(p.id)}`, 'POST');
       }));
-    }
+    } else if (w.role === 'owner' || w.role === 'member') section.append(node('p', 'No eligible ungrouped projects. You must directly own the project and every review it contains; refresh after ownership changes.'));
     if (w.role === 'owner') section.append(button('Preview deletion', previewDelete));
     if (pending) {
       const box = node('section', undefined, 'wm-confirm'); box.append(node('h4', 'Delete this workspace?'));

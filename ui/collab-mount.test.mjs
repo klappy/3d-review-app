@@ -89,3 +89,14 @@ test('openAcceptance re-reads the workspace list after a failed first read inste
   assert.ok(!/delete document\.body\.dataset\.invitationEntry/.test(app),'the isolation flag is never cleared');
   assert.ok(!/removeItem\('participantToken'\)[^\n]*invit/.test(app),'storage is not deleted by the invite path');
 });
+
+test('workspace snapshots preserve server grouping eligibility and containment without leaking extra project fields',()=>{
+ const factory=new Function('mountWorkspaceManager','mountScopeInvitations',read('./collab-mount.js').replace(/^import .*;\n/gm,'').replace('export function createCollabHooks','function createCollabHooks')+'\nreturn createCollabHooks;');
+ let context;const doc={getElementById:()=>({addEventListener(){}})};
+ const hooks=factory(({getContext})=>{context=getContext;return{refresh:async()=>{},reset(){},destroy(){}}},()=>({setScope(){},reset(){},destroy(){}}))({document:doc,api:async()=>({}),sharedMode:false,onReload:async()=>{}});
+ hooks.identity({principal:{id:'owner',kind:'user'}});
+ hooks.projects([{id:'eligible',name:'Project',role:'owner',direct_role:'owner',grouping_eligible:true,workspace_id:null,private_detail:'not forwarded'},{id:'partial',name:'Partial',direct_role:'owner',grouping_eligible:false,workspace_id:'other'},{id:'unknown',name:'Unknown',direct_role:'owner'}]);
+ assert.deepEqual(context().authorizedProjects.map(p=>[p.id,p.grouping_eligible,p.workspace_id]),[['eligible',true,null],['partial',false,'other'],['unknown',undefined,undefined]]);
+ assert.equal(JSON.stringify(context()).includes('not forwarded'),false);
+ hooks.reset();assert.deepEqual(context().authorizedProjects,[]);
+});
