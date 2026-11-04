@@ -47,3 +47,10 @@ export async function loadMenuModel(me, { onSignOut, currentDesign, readHome = h
     };
   }
 }
+
+// The live account overlay is navigation, not another Home read. Identity is the only required read.
+export function accountMenuModel(me, { onSignOut, currentDesign } = {}) {
+  requireIdentity(me);
+  const model = menuModel(me, { user: { initials: initialsOf(me.principal) }, workspace: 'Your workspace', groups: [], completed: [] }, { onSignOut, currentDesign });
+  return { ...model, reviews: [], chips: [], completed: null, items: model.items.map(row => row[1] === 'Your workspace — your workspace' ? [row[0], 'Your workspaces', row[2]] : row) };
+}
