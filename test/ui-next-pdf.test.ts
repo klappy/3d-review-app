@@ -51,3 +51,13 @@ it.each([false,true])('wires full-report binary controls on overview and detaile
   }
   setLiveContext(null);
 });
+it.each([[Report,'overview'],[ReportDetailed,'detailed']])('requests the named new-layout PDF and retains explicit full fallback',async(C,format)=>{
+ setLiveContext({aid:'local',pid:'local'});
+ const fetched:string[]=[];const original=globalThis.fetch;globalThis.fetch=async(url:any)=>{fetched.push(String(url));return new Response('%PDF-1.7\nfixture',{headers:{'content-type':'application/pdf'}});};
+ try{
+  const view=render(C,{phone:true,pdfUrl:'/v2/reports/stored/pdf'});
+  await fireEvent.click(screen.getByRole('button',{name:`Download ${format} report PDF`}));await waitFor(()=>expect(fetched[0]).toBe(`/v2/reports/stored/pdf?format=${format}`));
+  await waitFor(()=>expect(screen.getByRole('link',{name:'Save PDF'})).toBeDefined());await fireEvent.click(screen.getByRole('button',{name:'Download full report PDF'}));await waitFor(()=>expect(fetched[1]).toBe('/v2/reports/stored/pdf'));
+  view.unmount();
+ }finally{globalThis.fetch=original;setLiveContext(null);}
+});
