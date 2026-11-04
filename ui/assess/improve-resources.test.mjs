@@ -1,5 +1,5 @@
 // node --test ui/assess/improve-resources.test.mjs — Improve: a resource line under each suggested area
-// (cookbook work/active/2026-10-26-3d-improve-resources-links, Done when 2). The shipped table is empty until its owner delivers it.
+// (cookbook work/active/2026-10-26-3d-improve-resources-links, Done when 2). Curated resources are source-backed.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { IMPROVE_RESOURCES, RESOURCES_COMING, resourcesFor, resourcesMarkup } from './improve-resources.js';
@@ -9,8 +9,8 @@ import { esc, enc, routes } from './cards.js';
 // Fixture table only: example.org placeholders, never shipped.
 const T = { listening: [{ title: 'Listening guide', url: 'https://example.org/listening' }], Church: [{ title: 'Church <starter>', url: 'https://example.org/church?a=1&b=2' }, { title: 'Bad', url: 'javascript:alert(1)' }, { title: '', url: 'https://example.org/x' }] };
 
-test('shipped table is empty: no resource is invented before the owner delivers the table', () => {
-  assert.deepEqual(Object.keys(IMPROVE_RESOURCES), []);
+test('supplied table is populated and unknown categories remain empty', () => {
+  assert.equal(Object.keys(IMPROVE_RESOURCES).length, 16);
   assert.ok(Object.isFrozen(IMPROVE_RESOURCES));
   assert.deepEqual(resourcesFor('Church'), []);
 });
@@ -28,7 +28,7 @@ test('markup: links (escaped, new tab) when present; "More resources coming." wh
   assert.equal(resourcesMarkup('Community', esc, T), `<p class="small muted" data-resources-for="Community">${RESOURCES_COMING}</p>`);
 });
 
-test('Improve page: each suggested area carries its resource line; with the empty table every one says "More resources coming."', async () => {
+test('Improve page: unmatched suggested categories carry the fallback "More resources coming."', async () => {
   const surveys = [
     { id: 's1', template_id: 't1', perspective: 'Translation Team', state: 'selected', archived_at: null },
     { id: 's2', template_id: 't2', perspective: 'Church', state: 'selected', archived_at: null },
