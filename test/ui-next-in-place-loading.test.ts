@@ -33,29 +33,29 @@ describe('real destination stays in place during loading', () => {
     expect(view.container.querySelector('header')).toBe(header);
     vi.unstubAllGlobals();
   });
-  it('keeps Projects heading, controls, card and verified access region mounted while real fields resolve', async () => {
+  it('keeps Projects heading, controls, card and verified compact access control mounted while real fields resolve', async () => {
     vi.spyOn(S,'me').mockResolvedValue(actor); const data=deferred<typeof projects>(); vi.spyOn(D,'projects').mockReturnValue(data.promise);
     location.hash='#/projects'; const view=render(Live as never,{props:{}});
-    await waitFor(() => expect(view.getByRole('region',{name:'Super admin access'})).not.toBeNull());
+    await waitFor(() => expect(view.getByRole('combobox',{name:'Access mode'})).not.toBeNull());
     const root=view.container.querySelector('[data-destination="projects"]')!;
     const heading=view.getByRole('heading',{name:'Projects'}), search=view.getByRole('searchbox',{name:'Search projects'}), filter=view.getByRole('combobox',{name:'Show projects'});
-    const card=root.querySelector('[data-project-entry] .l-card'), access=view.getByRole('region',{name:'Super admin access'}), header=view.container.querySelector('header');
+    const card=root.querySelector('[data-project-entry] .l-card'), access=view.getByRole('combobox',{name:'Access mode'}), header=view.container.querySelector('header');
     expect((search as HTMLInputElement).disabled).toBe(true); expect((filter as HTMLSelectElement).disabled).toBe(true);
     expect(view.queryByText('No projects match this view.')).toBeNull();
     expect((root.querySelector('[data-project-entry]') as HTMLElement).inert).toBe(true);
     data.resolve(projects); await waitFor(() => expect(view.getByRole('link',{name:'Current project'})).not.toBeNull());
     expect(view.getByRole('heading',{name:'Projects'})).toBe(heading); expect(view.getByRole('searchbox',{name:'Search projects'})).toBe(search);
     expect(view.getByRole('combobox',{name:'Show projects'})).toBe(filter); expect(root.querySelector('[data-project-entry] .l-card')).toBe(card);
-    expect(view.getByRole('region',{name:'Super admin access'})).toBe(access); expect(view.container.querySelector('header')).toBe(header);
+    expect(view.getByRole('combobox',{name:'Access mode'})).toBe(access); expect(view.container.querySelector('header')).toBe(header);
     expect((search as HTMLInputElement).disabled).toBe(false); expect(root.getAttribute('aria-busy')).toBe('false');
   });
   it('keeps unknown identity neutral and never borrows previous-account rows or chrome', async () => {
     const identity=deferred<typeof actor>(); vi.spyOn(S,'me').mockReturnValue(identity.promise); const data=deferred<typeof projects>(); vi.spyOn(D,'projects').mockReturnValue(data.promise);
     setLiveChrome({who:'Old Account',initials:'OA',workspace:'Secret Workspace'}); location.hash='#/projects'; const view=render(Live as never,{props:{}});
     await waitFor(() => expect(view.getByRole('searchbox',{name:'Search projects'})).not.toBeNull());
-    expect(view.container.textContent).not.toMatch(/Old Account|Secret Workspace/); expect(view.queryByRole('region',{name:'Super admin access'})).toBeNull();
+    expect(view.container.textContent).not.toMatch(/Old Account|Secret Workspace/); expect(view.queryByRole('combobox',{name:'Access mode'})).toBeNull();
     expect(view.container.querySelector('[data-project-entry]')).not.toBeNull();
-    identity.resolve(actor); await waitFor(() => expect(view.getByRole('region',{name:'Super admin access'})).not.toBeNull());
+    identity.resolve(actor); await waitFor(() => expect(view.getByRole('combobox',{name:'Access mode'})).not.toBeNull());
     data.resolve(projects); await waitFor(() => expect(view.getByRole('link',{name:'Current project'})).not.toBeNull());
   });
   it('separates loading, error+Retry, and real empty outcomes', async () => {
