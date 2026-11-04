@@ -43,6 +43,39 @@ describe('PDF endpoints preserve existing authorization and report policy',()=>{
   it('renders only an authorized stored report, with exact aggregates and no raw answers',async()=>{
     render.mockClear();const r=await request(`/v2/reports/${reportId}/pdf?paper=a4`);expect(r.status).toBe(200);const html=(render.mock.calls as any)[0][1].html;expect(html).toContain('<svg');expect(html).toContain('<table');expect(html).not.toContain('answersRaw');expect(html).not.toContain('responseId');
   });
+  it('strict named formats preserve full/default bytes, paper, filenames and authorized reads',async()=>{
+    const before=(await db.prepare('SELECT id,payload_sha256,capture_digest,created_at FROM synthetic_report ORDER BY id').all()).results;
+    const htmls=new Map<string,string>();
+    for(const format of ['full','overview','detailed']){
+      render.mockClear();const r=await request(`/v2/reports/${reportId}/pdf?format=${format}`);expect(r.status,format).toBe(200);
+      expect(r.headers.get('content-disposition')).toContain(`report-${reportId}${format==='full'?'':'-'+format}.pdf`);
+      expect(r.headers.get('cache-control')).toContain('no-store');const opts=(render.mock.calls as any)[0][1];htmls.set(format,opts.html);
+      expect(opts.pdfOptions.format).toBe(format==='full'?'letter':'a4');
+      expect(opts.html).not.toMatch(/answersRaw|SECRET EXCERPT|Skip to main content|Download full report PDF/);
+    }
+    expect(htmls.get('overview')).toContain('What stands out');expect(htmls.get('detailed')).toContain('Every area, with evidence');expect(htmls.get('overview')).not.toBe(htmls.get('detailed'));
+    render.mockClear();await request(`/v2/reports/${reportId}/pdf`);expect((render.mock.calls as any)[0][1].html).toBe(htmls.get('full'));
+    for(const q of ['format=','format=unknown','format=Overview','format=overview&format=full','paper=a4&paper=letter','format=questions','html=raw','lang=en'])expect((await request(`/v2/reports/${reportId}/pdf?${q}`)).status).toBe(400);
+    expect((await request(`${survey}?format=overview`)).status).toBe(400);
+    expect((await db.prepare('SELECT id,payload_sha256,capture_digest,created_at FROM synthetic_report ORDER BY id').all()).results).toEqual(before);
+  });
+  it('named formats retain privacy, outsider, unavailable and actual session-revocation refusals',async()=>{
+    for(const format of ['overview','detailed']){
+      const path=`/v2/reports/${reportId}/pdf?format=${format}`;render.mockClear();
+      expect((await request(path,other,{PDF_BROWSER:undefined})).status).toBe(404);expect((await request('/v2/reports/not-visible/pdf?format='+format,other)).status).toBe(404);
+      expect((await request(path,null)).status).toBe(401);expect((await request(path,owner,{ENVIRONMENT:'production'})).status).toBe(409);expect(render).not.toHaveBeenCalled();
+      expect((await request(path,owner,{PDF_BROWSER:undefined})).status).toBe(503);
+      const temporary=await mintSession(env,'person_mara','user');expect((await request(path,temporary)).status).toBe(200);
+      await db.prepare('DELETE FROM session WHERE token_hash = ?').bind(createHash('sha256').update(temporary).digest('hex')).run();render.mockClear();expect((await request(path,temporary)).status).toBe(401);expect(render).not.toHaveBeenCalled();
+    }
+  });
+  it('named export cannot reuse an earlier authorized read after assessment-grant revocation',async()=>{
+    const rows=(await db.prepare('SELECT * FROM "grant" WHERE principal_id=?').bind('person_mara').all<Record<string,unknown>>()).results;
+    expect(rows.length).toBeGreaterThan(0);
+    try{await db.prepare('DELETE FROM "grant" WHERE principal_id=?').bind('person_mara').run();render.mockClear();
+      for(const format of ['full','overview','detailed'])expect((await request(`/v2/reports/${reportId}/pdf?format=${format}`)).status).toBe(404);expect(render).not.toHaveBeenCalled();
+    }finally{for(const row of rows)await db.prepare(`INSERT INTO "grant" (${Object.keys(row).join(',')}) VALUES (${Object.keys(row).map(()=>'?').join(',')})`).bind(...Object.values(row)).run();}
+  });
   it('rechecks report visibility instead of trusting the id from a prior download',async()=>{
     render.mockClear();const r=await request(`/v2/reports/${reportId}/pdf`,other);expect(r.status).toBe(404);expect(render).not.toHaveBeenCalled();
   });
@@ -68,7 +101,7 @@ describe('PDF endpoints preserve existing authorization and report policy',()=>{
     const printed=await request(survey.replace('print.pdf','print'));const result=(await printed.json() as any).result;
     const strings=[...Object.values(PRINT_WORDS),...result.items.flatMap((i:any)=>[i.text,...(i.options||[]).map((o:any)=>o.text)])];
     for(const text of new Set(strings))await db.prepare("INSERT OR REPLACE INTO translation_memory (locale,source_hash,source_text,text,status,provider,created_at) VALUES ('hi',?,?,?,'machine','local-fixture','2026-10-29')").bind(createHash('sha256').update(text as string).digest('hex'),text,'यह परीक्षण के लिए हिन्दी अनुवाद है।').run();
-    for(const [name,path]of [['endpoint-survey-en',survey],['endpoint-survey-hi',`${survey}?lang=hi&paper=a4`],['endpoint-report',`/v2/reports/${reportId}/pdf`]]){
+    for(const [name,path]of [['endpoint-survey-en',survey],['endpoint-survey-hi',`${survey}?lang=hi&paper=a4`],['endpoint-report',`/v2/reports/${reportId}/pdf`],['endpoint-overview',`/v2/reports/${reportId}/pdf?format=overview`],['endpoint-detailed',`/v2/reports/${reportId}/pdf?format=detailed`]]){
       const response=await request(path,owner,{PDF_BROWSER:localBrowser});expect(response.status,name).toBe(200);expect(response.headers.get('content-type')).toBe('application/pdf');
       const data=new Uint8Array(await response.arrayBuffer());expect(new TextDecoder().decode(data.slice(0,5))).toBe('%PDF-');expect(data.length).toBeGreaterThan(15_000);writeFileSync(`${out}/${name}.pdf`,data);writeFileSync(`${out}/${name}.html`,readFileSync(`${out}/endpoint-render.html`));
     }
