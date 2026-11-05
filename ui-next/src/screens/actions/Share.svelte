@@ -52,7 +52,7 @@
 </script>
 
 {#snippet top()}{#if phone}<PhoneHeader state="nested" title="Share the survey" parent="Collect" back={href("collect", at)} initials={R.user.initials} menuHref={href("menu", at)} />{:else}<TopBar home={href("home", at)} who={R.user.first} initials={R.user.initials} workspace={R.workspace} {crumbs} />{/if}{/snippet}
-{#snippet bar()}{#if phone}<PhoneBar demoted={emailOpen} label="Show all QR codes to the room" href={href("qr-room", at)} />{/if}{/snippet}
+{#snippet bar()}{#if phone}<PhoneBar demoted={emailOpen} label="Show all QR codes to the room" href={href("qr-room", { ...at, w: "desktop" })} />{/if}{/snippet}
 {#snippet meta()}{R.project} · {R.review.language} · {R.review.modality} · Updated {R.review.updated ?? "just now"}{/snippet}
 {#snippet qr()}<Ico d={A.qr} />{/snippet}
 {#snippet mail()}<Ico d={A.mail} />{/snippet}

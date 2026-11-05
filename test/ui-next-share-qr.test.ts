@@ -27,12 +27,12 @@ for (const phone of [false, true]) describe(`Share presenter (${phone ? 'phone' 
       return d;
     };
     let d = check(3);
-    for (let i = 2; i >= 0; i--) { await fireEvent.keyDown(d, { key: 'ArrowLeft' }); d = check(i); }
+    for (let i = 2; i >= 0; i--) { await fireEvent.keyDown(window, { key: 'ArrowLeft' }); d = check(i); }
     expect((v.getByRole('button', { name: 'Previous survey' }) as HTMLButtonElement).disabled).toBe(true);
-    await fireEvent.keyDown(d, { key: 'ArrowLeft' }); check(0);
+    await fireEvent.keyDown(window, { key: 'ArrowLeft' }); check(0);
     for (let i = 1; i < 7; i++) { await fireEvent.click(v.getByRole('button', { name: 'Next survey' })); d = check(i); }
     expect((v.getByRole('button', { name: 'Next survey' }) as HTMLButtonElement).disabled).toBe(true);
-    await fireEvent.keyDown(d, { key: 'ArrowRight' }); check(6);
+    await fireEvent.keyDown(window, { key: 'ArrowRight' }); check(6);
     await fireEvent.click(v.getByRole('button', { name: 'Close QR code' }));
     expect(v.container.querySelector('dialog[open]')).toBeNull();
     await fireEvent.click(row(1)); check(1);
@@ -43,6 +43,6 @@ for (const phone of [false, true]) describe(`Share presenter (${phone ? 'phone' 
     const v = render(Share, { props: { data: { ...data, surveys: [{ ...surveys[0], code: '' }] }, phone } });
     await fireEvent.click(v.getByRole('button', { name: `${phone ? 'QR for' : 'QR code for'} Role 1` }));
     expect(v.container.querySelector('dialog .qr')).toBeNull();
-    expect(v.container.querySelector('dialog [role=status]')?.textContent).toContain('link is unavailable');
+    expect(v.container.querySelector('dialog[open] [role=status]')?.textContent).toContain('link is unavailable');
   });
 });

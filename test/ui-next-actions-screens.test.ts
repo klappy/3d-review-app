@@ -145,7 +145,8 @@ describe("actions lane links: the shared href() helper, literal names, w/theme c
         for (const q of links) {
           expect(q.get("ui_next")).toBe("on");
           expect(declared.has(q.get("screen") ?? ""), `${q}`).toBe(true);
-          expect(q.get("w"), `${q}`).toBe(props.phone ? "phone" : null);
+          const allCodes = name === "share" && q.get("screen") === "qr-room";
+          expect(q.get("w"), `${q}`).toBe(props.phone ? (allCodes ? "desktop" : "phone") : null);
           expect(q.get("theme"), `${q}`).toBe(props.theme === "dark" ? "dark" : null);
         }
       });

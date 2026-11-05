@@ -19,3 +19,10 @@ dialog.survey-qr-presenter {
 .survey-qr-content .qr[data-size="page"] { width: min(54vh, 440px, 82vw); height: min(54vh, 440px, 82vw); flex-shrink: 0; }
 .survey-qr-link { overflow-wrap: anywhere; max-width: 100%; }
 .survey-qr-controls { display: flex; flex-wrap: wrap; justify-content: center; gap: var(--sp-3); }
+
+/* The all-code route is explicitly selected by Share even on a phone; keep every tile readable there. */
+@media (max-width: 600px) {
+  .qr-head + .l-grid[data-cols="5"] { grid-template-columns: minmax(0, 1fr); }
+  .top[data-variant="room"], .top[data-variant="room"] .top-end { flex-wrap: wrap; height: auto; }
+  .qr-tile .kbd { overflow-wrap: anywhere; max-width: 100%; }
+}

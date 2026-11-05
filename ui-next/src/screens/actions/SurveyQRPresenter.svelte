@@ -16,6 +16,7 @@
   });
   function move(delta) { at = Math.max(0, Math.min(surveys.length - 1, at + delta)); }
   function keydown(e) {
+    if (!dialog?.open) return;
     if (e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return;
     if (e.key === "ArrowRight" || e.key === "ArrowLeft") {
       e.preventDefault(); move(e.key === "ArrowRight" ? 1 : -1);
@@ -23,7 +24,9 @@
   }
 </script>
 
-<dialog class="survey-qr-presenter" bind:this={dialog} aria-labelledby={`${uid}-title`} aria-describedby={`${uid}-help`} onclose={onclose} onkeydown={keydown} {@attach modal}>
+<!-- A disabled boundary button can release focus to body; keep arrows working while this modal is open. -->
+<svelte:window onkeydown={keydown} />
+<dialog class="survey-qr-presenter" bind:this={dialog} aria-labelledby={`${uid}-title`} aria-describedby={`${uid}-help`} onclose={onclose} {@attach modal}>
   <div class="survey-qr-heading">
     <p class="small">{project} · {review}</p>
     <button type="button" class="btn" data-autofocus onclick={() => closeDialog(dialog)}>Close QR code</button>
