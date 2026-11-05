@@ -46,8 +46,8 @@ export function reportPdfDocument(result, {paper='letter',minimum=3}={}) {
   const disclosed=new Set((payload?.lenses||[]).map(l=>key(l.lens)));
   for(const i of payload?.standalone_indicators||[])disclosed.add(key(i.lens));
   for(const row of [...(payload?.cross_lens_multi||[]),...(payload?.cross_lens_single||[])])for(const l of row.lens_scores||[])disclosed.add(key(l.lens));
-  if(payload?.translation_type_agreement?.team_values?.length)disclosed.add('team');
-  if(payload?.translation_type_agreement?.church_values?.length)disclosed.add('church');
+  if(payload?.translation_type_agreement?.team_values?.length||payload?.translation_type_agreement?.team_statuses?.length)disclosed.add('team');
+  if(payload?.translation_type_agreement?.church_values?.length||payload?.translation_type_agreement?.church_statuses?.length)disclosed.add('church');
   // This full-detail renderer includes exact scores. Hold the export if any perspective would be hidden by the UI.
   // A missing snapshot count is unknown, never permission to disclose; no live-answer fallback or rescoring.
   if ([...counts.values()].some(n=>n<minimum)||[...disclosed].some(l=>!counts.has(l)||counts.get(l)<minimum)||

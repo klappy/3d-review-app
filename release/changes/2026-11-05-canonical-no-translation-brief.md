@@ -1,0 +1,6 @@
+bump: patch
+lane: canonical translation brief correction · source Decision 25 @ 605edb4
+- Fixed - TR-Q2 and ML-Q2 offer the canonical role-specific no-translation-brief option for all uses of those surveys, including existing participant links, assisted entry, print and PDF. Stored template versions and historical answers remain unchanged.
+- Fixed - Newly built reports show no-brief/no-prior-agreement/not-aware as findings excluded from translation-type comparison. Other remains excluded entirely and saved Other answers are never reinterpreted. Overview, detailed and full report output use the same findings text.
+- Changed - New submissions and reports record the exact canonical amendment pin. New reports have a distinct scorer identity; the exact compiled historical renderer continues validating old reports, hashes and captures. Unknown renderer tuples fail closed.
+- Pending - Draft candidate only: canonical patch-version/release-pin packaging, independent exact-head review/security review, current-base PDF artifact reconciliation with #608, required CI, DEV and production validation remain release gates. No remote data migration, imported-demo replacement or deployment performed.

@@ -35,7 +35,15 @@ const cap = value => { const text = String(value); return text.charAt(0).toUpper
 export function agreementSentence(agreement) {
   const words = values => (Array.isArray(values) ? values : []).map(cap).join(', ') || '—';
   const verdict = agreement.agree === true ? copy.matches : agreement.agree === false ? copy.differs : copy.notComparableSentence;
-  return `${copy.agreed}: ${words(agreement.team_values)} · ${copy.seenAs}: ${words(agreement.church_values)} · ${verdict}`;
+  const statusText = {
+    'no-brief': 'No translation brief',
+    'no-agreement': 'No prior agreement on translation type',
+    'not-aware': 'Not aware of the agreed translation type',
+  };
+  const findings = (label, values) => (Array.isArray(values) ? values : [])
+    .filter(code => Object.hasOwn(statusText, code)).map(code => `${label}: ${statusText[code]}`);
+  const statuses = [...findings('Translation team', agreement.team_statuses), ...findings('Church', agreement.church_statuses)];
+  return `${copy.agreed}: ${words(agreement.team_values)} · ${copy.seenAs}: ${words(agreement.church_values)} · ${verdict}${statuses.length ? ` · Findings: ${statuses.join('; ')}. These findings are excluded from the agreement comparison.` : ''}`;
 }
 function el(doc, tag, textContent) {
   const node = doc.createElement(tag);

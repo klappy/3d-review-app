@@ -1,5 +1,6 @@
 import { ensureLegacyTemplates, LEGACY_TEMPLATE_IDS } from "../legacy-templates";
 import { withDisplayName } from "../display-names";
+import { translationBriefItems } from "../translation-brief-amendment";
 // Shared helpers for data handlers: ids, hashing, params, visibility/role checks.
 // Roles come from `grant` rows at the exact scope, through containment
 // (3d-review-cookbook work/active/2026-10-15-3d-workspace-permissions): a workspace
@@ -246,7 +247,7 @@ export interface TemplateItem {
   standalone_indicator?: boolean;      // e.g. ML-Q10: never pooled into group means (FIX-03)
 }
 export function parseItems(t: TemplateRow): TemplateItem[] {
-  try { return JSON.parse(t.items_json) as TemplateItem[]; } catch { return []; }
+  try { return translationBriefItems(JSON.parse(t.items_json) as TemplateItem[]); } catch { return []; }
 }
 /** Render-ready projection: stable ids, options, labels; no scoring internals. */
 // C01 (captain 2026-09-28): an "Other (please describe)" option carries a free-text description. Source items mark it

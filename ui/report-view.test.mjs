@@ -186,3 +186,15 @@ test('R12 three or more shared areas: renderReport places the radar right after 
   const r1 = fakeNode('section'); renderReport({ doc, root: r1, report: REPORT });
   assert.equal(r1.children.some(s => s.children[0]?.textContent === radarCopy.heading), false);
 });
+
+test('Decision 25 status findings are visible and excluded from agreement; Other is not a finding', () => {
+  const root = fakeNode('div');
+  renderReport({doc,root,report:{...REPORT,payload:{...REPORT.payload,translation_type_agreement:{team_values:[],church_values:[],agree:null,team_statuses:['no-brief','other'],church_statuses:['no-agreement','not-aware']}}}});
+  const text = sectionRows(root,copy.translationAgreement).join(' ');
+  assert.match(text,/Not comparable/);
+  assert.match(text,/Translation team: No translation brief/);
+  assert.match(text,/Church: No prior agreement on translation type/);
+  assert.match(text,/Church: Not aware of the agreed translation type/);
+  assert.match(text,/excluded from the agreement comparison/);
+  assert.doesNotMatch(text,/Other|Matches|Differs/);
+});

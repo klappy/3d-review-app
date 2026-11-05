@@ -1,3 +1,7 @@
+import {form,submit} from '../src/handlers/response';
+import {print as printSurvey} from '../src/handlers/survey';
+import {render as renderTemplate} from '../src/handlers/template';
+import {parseItems} from '../src/handlers/common';
 import {participantReportsAllowed} from '../src/report-admission';
 import {readFileSync} from 'node:fs';
 import {beforeAll,afterAll,describe,it,expect} from 'vitest';
@@ -77,3 +81,29 @@ describe('participant-source reports (DEV only)',()=>{
   expect(await attestCapture(src,rows,participantReportsAllowed({ENVIRONMENT:'production',PARTICIPANT_REPORTS:'enabled'}))).toEqual({eligible:false,reason:'BELOW_MINIMUM'});
  });
 });
+
+ it('Decision 25 is shared by existing survey form, print, template render and submission without changing old rows',async()=>{
+   const before=(await db.prepare('SELECT * FROM response WHERE assessment_survey_id IN (SELECT id FROM assessment_survey WHERE assessment_id=?) ORDER BY id').bind(aid).all()).results;
+   const storedTemplates=(await db.prepare('SELECT * FROM survey_template ORDER BY id,version').all()).results;
+   for(const [tid,itemId,text] of [['tpl_validation','TR-Q2','We do not have a translation brief'],['tpl_mid_level','ML-Q2','The team does not have a translation brief']]){
+     const existing=await db.prepare('SELECT id FROM assessment_survey WHERE assessment_id=? AND template_id=? AND template_version=2').bind(aid,tid).first<{id:string}>();
+     const sid=existing?.id??'amendment_'+tid;
+     if(existing)await run("UPDATE assessment_survey SET state='selected',collection_status='open' WHERE id=?",sid);
+     else await run("INSERT INTO assessment_survey (id,assessment_id,template_id,template_version,state,collection_status,created_at) VALUES (?,?,?,2,'selected','open','2026-11-05')",sid,aid,tid);
+     const c={...ctx('dev'),env:{...ctx('dev').env,DB:db},traceId:'tr_decision25',log:()=>{},principal:{kind:'participant',id:'decision25_'+tid,respondentId:'decision25_'+tid,participantSurveyId:sid}} as unknown as Ctx;
+     const presented=await form(c,{});
+     const items=presented.result.items as any[];
+     expect(items.find(i=>i.id===itemId).options).toEqual(expect.arrayContaining([expect.objectContaining({code:'no-brief',text})]));
+     const member={...c,principal:{kind:'user',id:'person_mara'}} as Ctx;
+     const printed=await printSurvey(member,{aid,sid});expect(printed.result.html).toContain(text);
+     const template=await renderTemplate(member,{id:tid,ver:2});expect((template.result.items as any[]).find(i=>i.id===itemId).options).toEqual(expect.arrayContaining([expect.objectContaining({code:'no-brief',text})]));
+     const raw=await db.prepare('SELECT * FROM survey_template WHERE id=? AND version=2').bind(tid).first<any>();
+     const full=parseItems(raw),answers=Object.fromEntries(full.map(i=>[i.id,i.type==='text'?'fixture':i.type==='multi'?[i.options![0].code]:i.options![0].code]));answers[itemId]='no-brief';
+     const submitted=await submit(c,{idempotency_key:'decision25_'+tid,answers});
+     const response=await db.prepare('SELECT * FROM response WHERE id=?').bind(submitted.result.response_id).first<any>();
+     expect(JSON.parse(response.answers_json)[itemId]).toBe('no-brief');expect(response.template_version).toBe(2);expect(JSON.parse(response.provenance_json).instrument_amendment).toBe('605edb47d2280568f0f5860f7b1921c12a814222');
+     expect((await submit(c,{idempotency_key:'decision25_'+tid,answers})).result.duplicate).toBe(true);
+   }
+   expect((await db.prepare('SELECT * FROM survey_template ORDER BY id,version').all()).results).toEqual(storedTemplates);
+   for(const row of before)expect(await db.prepare('SELECT * FROM response WHERE id=?').bind(row.id).first()).toEqual(row);
+ },60000);

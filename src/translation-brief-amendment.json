@@ -1,0 +1,26 @@
+{
+  "source": "klappy/3d-quality-review",
+  "commit": "605edb47d2280568f0f5860f7b1921c12a814222",
+  "decision": 25,
+  "options_csv_sha256": "79f224cc7e5ea40a806c69dccb6509deb07b9a089c7d4304be0939da06c26c02",
+  "options": {
+    "TR-Q2": {
+      "code": "no-brief",
+      "text": "We do not have a translation brief",
+      "source_order": 5,
+      "source_score": null,
+      "weight": null,
+      "flag": "descriptive",
+      "source_notes": "Not a translation type — excluded from the type comparison; reported as its own finding."
+    },
+    "ML-Q2": {
+      "code": "no-brief",
+      "text": "The team does not have a translation brief",
+      "source_order": 5,
+      "source_score": null,
+      "weight": null,
+      "flag": "descriptive",
+      "source_notes": "Not a translation type — excluded from the type comparison; reported as its own finding."
+    }
+  }
+}
