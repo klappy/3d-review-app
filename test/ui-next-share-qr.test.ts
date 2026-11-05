@@ -2,6 +2,8 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, fireEvent, cleanup } from '@testing-library/svelte';
 import Share from '../ui-next/src/screens/actions/Share.svelte';
+import QRRoom from '../ui-next/src/screens/collect/QRRoom.svelte';
+import collect from '../ui-next/fixtures/collect/collect.json';
 import R from '../ui-next/fixtures/actions/review.json';
 // @ts-expect-error plain JS
 import { qrModules } from '../ui-next/src/app/data.js';
@@ -45,4 +47,13 @@ for (const phone of [false, true]) describe(`Share presenter (${phone ? 'phone' 
     expect(v.container.querySelector('dialog .qr')).toBeNull();
     expect(v.container.querySelector('dialog[open] [role=status]')?.textContent).toContain('link is unavailable');
   });
+});
+
+it('mobile all-code mode preserves phone navigation and renders every code; normal room phone mode remains a pager', () => {
+  const all = render(QRRoom, { props: { phone: true, state: 'all', data: collect } });
+  expect(all.container.querySelectorAll('.qr')).toHaveLength(collect.groups.flatMap(g => g.surveys).length);
+  expect(all.getByRole('link', { name: 'Back to Collect' }).getAttribute('href')).toContain('w=phone');
+  all.unmount();
+  const single = render(QRRoom, { props: { phone: true, state: '3', data: collect } });
+  expect(single.container.querySelectorAll('.qr')).toHaveLength(1);
 });
