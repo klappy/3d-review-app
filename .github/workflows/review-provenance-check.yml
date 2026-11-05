@@ -1,0 +1,30 @@
+name: review-provenance-check
+# Warning only: flags reviews that lack the self-reported review-provenance@1 block.
+# Never fails, never writes to the PR, never deploys. Not a required check.
+on:
+  pull_request_review:
+    types: [submitted]
+  workflow_dispatch:
+    inputs:
+      pr:
+        description: PR number to check
+        required: true
+permissions:
+  contents: read
+  pull-requests: read
+jobs:
+  check:
+    name: review-provenance
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+      - run: node scripts/review-provenance-check.mjs --self-test
+      - name: warn on reviews without a provenance block
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number || inputs.pr }}
+        run: node scripts/review-provenance-check.mjs "$GITHUB_REPOSITORY" "$PR_NUMBER"
