@@ -34,3 +34,16 @@ it('renders actual question-results PDF only under explicit local evidence optio
  mkdirSync(out,{recursive:true});const path=out+'/question-results-synthetic',snapshot=prepareQuestionResults(input,1);writeFileSync(path+'.json',snapshot);writeFileSync(path+'.html',questionResultsDocument(snapshot));execFileSync(chrome,['--headless','--no-sandbox','--no-pdf-header-footer',`--print-to-pdf=${path}.pdf`,`file://${path}.html`],{timeout:30000,stdio:'pipe'});expect(readFileSync(path+'.pdf').subarray(0,5).toString()).toBe('%PDF-');
 });
 it('tampered count and unsafe labels cannot inject markup',()=>{const m=JSON.parse(prepareQuestionResults(input,1));m.questions[0].answered='<script>bad</script>';expect(()=>questionResultsDocument(JSON.stringify(m))).toThrow();const safe=structuredClone(input);safe.questions[0].text='<script>question</script>';expect(questionResultsDocument(prepareQuestionResults(safe,1))).not.toContain('<script>');});
+
+it('holds a multi-select question whose option has a small complementary cell (answered - count)',()=>{
+ const multi:AggregateInput['questions']=[{id:'m',text:'Multiple',kind:'multi',options:[{code:'a',text:'A'},{code:'b',text:'B'}]}];
+ const rows=(answers:string[][])=>answers.map(m=>({source:'synthetic' as const,answers:{m}}));
+ // Five answered, four pick A, all five pick B: A's complement (1) would reveal the one respondent who did not pick A.
+ const leaky=rows([['a','b'],['a','b'],['a','b'],['a','b'],['b']]);
+ const held=JSON.parse(prepareQuestionResults({...input,questions:multi,rows:leaky},3)).questions[0];
+ expect(held).toEqual({id:'m',text:'Multiple',kind:'multi',status:'held'});
+ expect(JSON.stringify(held)).not.toMatch(/answered|count/);
+ // Complement is large enough on every option, so the question is still published.
+ const safe=rows([['a'],['a'],['a'],['b'],['b'],['b']]);
+ expect(JSON.parse(prepareQuestionResults({...input,questions:multi,rows:safe},3)).questions[0]).toMatchObject({status:'ready',answered:6,options:[{count:3},{count:3}]});
+});

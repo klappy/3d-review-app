@@ -30,7 +30,8 @@ export function prepareQuestionResults(input:AggregateInput, minimum:number) {
     }
     const missing=input.rows.length-answered;
     // Conservative whole-question hold: no complementary small cell, missing-count or zero-cell leakage.
-    const held=input.rows.length<minimum||answered<minimum||(missing>0&&missing<minimum)||[...counts.values()].some(n=>n>0&&n<minimum);
+    // Multi-select options are independent, so each option's complement (answered - count) is checked too.
+    const held=input.rows.length<minimum||answered<minimum||(missing>0&&missing<minimum)||[...counts.values()].some(n=>n>0&&n<minimum)||(q.kind==='multi'&&[...counts.values()].some(n=>answered-n>0&&answered-n<minimum));
     if(held)return {id:q.id,text:q.text,kind:q.kind,status:'held' as const};
     return {id:q.id,text:q.text,kind:q.kind,status:'ready' as const,answered,missing,options:q.options.filter(o=>!o.missing).map(o=>({text:o.text,count:counts.get(o.code)!,percentage:Math.round(100*counts.get(o.code)!/answered)}))};
   });
