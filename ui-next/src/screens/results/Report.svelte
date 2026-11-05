@@ -10,6 +10,7 @@
      (validator R3-3): cards and rows are iterated, unresolved areas are left out, never thrown. The detailed report's page count
      is its sheets for this report (data.js detailedPages, R4-5). -->
 <script>
+  import { reportPdfFormatUrl } from '../../../../ui/pdf/download.js';
   import AppShell from "../../AppShell.svelte";
   import LevelLegend from "./LevelLegend.svelte";
   import Card from "../../Card.svelte";
@@ -35,6 +36,7 @@
   // state "overview" (phone): the overview reading view (design-system.md Phone report reading); the hub otherwise.
   let { phone = false, theme = "light", report, state: view, pdfUrl = null, pdfToken = null } = $props();
   const reading = $derived(phone && view === "overview");
+  const namedPdfUrl = $derived(pdfUrl ? reportPdfFormatUrl(pdfUrl,'overview') : null);
   const D = $derived(report ?? (phone && !reading ? REPORT.phone : REPORT.desktop)); // the reading view draws the overview sheet
   const cards = $derived(lensCards(D.payload, D.counts, { sent: D.sent }));
   const pages = $derived(detailedPages(cards));
@@ -52,12 +54,12 @@
 
 {#snippet eye()}<Glyph d={G.eye} />{/snippet}
 {#snippet share()}<Glyph d={G.share} />{/snippet}
-{#snippet top()}{#if reading}<PhoneHeader state="nested" title="Overview" parent="Reports" back={href("report")} menuHref={out("menu")} />{:else if phone}<PhoneHeader state="nested" title="Reports" parent="Results" back={href("results")} menuHref={out("menu")} />{:else}<DocBar title={`Overview report · 1 page · ${D.review.title}`} other={`Open the detailed report · ${pages} pages`} otherHref={href("report-detailed")} {pdfUrl} {pdfToken} /><LevelLegend />{/if}{/snippet}
+{#snippet top()}{#if reading}<PhoneHeader state="nested" title="Overview" parent="Reports" back={href("report")} menuHref={out("menu")} />{:else if phone}<PhoneHeader state="nested" title="Reports" parent="Results" back={href("results")} menuHref={out("menu")} />{:else}<DocBar title={`Overview report · 1 page · ${D.review.title}`} other={`Open the detailed report · ${pages} pages`} otherHref={href("report-detailed")} pdfUrl={namedPdfUrl} {pdfToken} /><LevelLegend />{/if}{/snippet}
 {#snippet bar()}{#if !pdfUrl}{#if reading}<div class="glass phone-bar" role="group" aria-label="Page actions"><button class="btn btn-primary btn-lg btn-block" type="button" disabled aria-describedby="pdf-why">Download the overview (PDF)</button></div>{:else if phone}<PhoneBar label="Download the overview (PDF)" href={live ? undefined : "#download"} disabled={live} ariaDescribedby={live ? "doc-pdf-why" : undefined} />{/if}{/if}{/snippet}
 
 <AppShell {phone} {theme} screen rhythm="report" {top} {bar}><!-- §8.3 Report frame: main.l-main[data-rhythm=report] > .paper sheets (desktop) -->
   {#if phone}<LevelLegend />{/if}
-  {#if phone && pdfUrl}<PdfActions url={pdfUrl} token={pdfToken} label="Download full report PDF" />{/if}
+  {#if phone && pdfUrl}<PdfActions url={namedPdfUrl} token={pdfToken} label="Download overview report PDF" />{/if}
   {#if reading}
     <!-- design-system.md Phone report reading (QA-LIVE N2): the overview sheet scaled to the width, the PDF reason in the page. -->
     <span class="micro">Overview · 1 page · A4 scaled to the width; pinch to zoom</span>

@@ -1,8 +1,9 @@
 <script>
-  import { to } from "./router.js";
+  import "../../components/access-mode.css";
   import { switchAccessMode, watchAccessMode } from "./access-mode.js";
-  let { principal, sample = false, oninvalidate = () => {} } = $props();
+  let { principal, sample = false, oninvalidate = () => {}, pending = false, error = "", onfailure = () => {} } = $props();
   let busy = $state(false);
+  const uid = $props.id();
   let channel;
   const eligible = $derived(!sample && principal?.super_admin === true);
   $effect(() => {
@@ -12,20 +13,22 @@
     return () => { stop(); channel?.close(); };
   });
   function change(mode) {
-    if (!eligible || busy || mode === principal.access_mode) return;
+    if (!eligible || busy || pending || mode === principal.access_mode) return;
+    const servedPrincipal = principal;
     busy = true; oninvalidate();
     let storage; try { storage = globalThis.localStorage; } catch {}
-    switchAccessMode(principal, mode, { document, location, storage, channel });
+    try { if (!switchAccessMode(servedPrincipal, mode, { document, location, storage, channel })) onfailure(); } catch { onfailure(); }
   }
 </script>
 
 {#if eligible}
-  <section class="glass l-card l-stack" data-pad="work" data-gap="2" aria-label="Super admin access" aria-busy={busy}>
-    <div class="l-row" data-gap="2" role="group" aria-label="Access mode">
-      <button class="btn" type="button" disabled={busy} aria-pressed={principal.access_mode !== "global"} onclick={() => change("my")}>My Access</button>
-      <button class="btn" type="button" disabled={busy} aria-pressed={principal.access_mode === "global"} onclick={() => change("global")}>Global Access</button>
-    </div>
-    <p class="small" role="status">{busy ? "Access changed. Reloading…" : principal.access_mode === "global" ? "Global Access · Browse every workspace and project." : "My Access · Your workspaces and projects."}</p>
-    {#if !busy}<div class="l-row" data-gap="3"><a class="link" href={to("workspaces")}>{principal.access_mode === "global" ? "All workspaces" : "My workspaces"}</a><a class="link" href={to("projects")}>{principal.access_mode === "global" ? "All projects" : "My projects"}</a></div>{/if}
-  </section>
+  <label class="access-mode" data-access-mode={principal.access_mode === "global" ? "support" : "personal"} aria-busy={busy || pending}>
+    <span class="sr-only">Access mode</span>
+    <select class="in" aria-label="Access mode" value={principal.access_mode === "global" ? "global" : "my"} disabled={busy || pending} aria-describedby={`${uid}-scope`} onchange={e => change(e.currentTarget.value)}>
+      <option value="my">Personal</option>
+      <option value="global">Support</option>
+    </select>
+    <span id={`${uid}-scope`} class="sr-only" role="status">{busy || pending ? "Checking access change…" : principal.access_mode === "global" ? "Support mode: browse all workspaces and projects." : "Personal mode: your workspaces and projects."}</span>
+  </label>
+  {#if error}<div class="access-mode-error" role="alert"><p class="small">{error}</p><button class="btn" type="button" onclick={() => location.reload()}>Reload to verify access</button></div>{/if}
 {/if}
