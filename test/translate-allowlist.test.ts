@@ -233,3 +233,18 @@ describe("the server mirror equals what the participant page sends", () => {
     }
   });
 });
+
+describe('Decision 25 canonical amendment translation parity',()=>{
+  it('allows each role-specific new label in its published form scope without rewriting templates',async()=>{
+    const before=(await db.prepare("SELECT id,version,items_json FROM survey_template WHERE id IN ('tpl_validation','tpl_mid_level') ORDER BY id,version").all()).results;
+    for(const [templateId,text] of [['tpl_validation','We do not have a translation brief'],['tpl_mid_level','The team does not have a translation brief']]){
+      const allowed=await allowedHashes(db,{kind:'form',templateId});expect(allowed.has(await sha256Hex(text))).toBe(true);
+      const up=upstream();const response=await handleTranslate(req(`participant-form:${templateId}`,{option:text}),env,{fetch:up.fetch});
+      expect(response.status).toBe(200);expect((await response.json() as any).translated.option).toBe(`ລາວ ${text}`);
+      expect(up.calls.flatMap(c=>Object.values(c.sourceTexts))).toEqual([text]);
+      expect(await stored(text)).toBe(1);
+    }
+    expect((await db.prepare("SELECT id,version,items_json FROM survey_template WHERE id IN ('tpl_validation','tpl_mid_level') ORDER BY id,version").all()).results).toEqual(before);
+    expect((await allowedHashes(db,{kind:'form',templateId:'tpl_unpublished_no_brief'})).size).toBe(0);
+  });
+});
