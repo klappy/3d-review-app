@@ -5,10 +5,13 @@ import {Miniflare,convertV4MiniflareOptions} from 'miniflare';
 import {list as responseList} from '../src/handlers/response';
 import {summary} from '../src/handlers/results';
 import {build,get as reportGet,list as reportList} from '../src/handlers/report';
+import app from '../src/index';
+import {mintSession} from '../src/auth';
 import type {Ctx} from '../src/handlers/types';
 import {participantReportMinimum,perspectiveLevelMinimum,translationAgreementMinimum} from '../src/report-admission';
 import {storedReportDocument} from '../ui/pdf/report-formats.js';
 import {lensRespondents} from '../ui/report-lenses.js';
+import {perspectiveRadarModels} from '../ui/report-perspective-radar.js';
 import {radarModel} from '../ui/report-radar.js';
 const mf=new Miniflare(convertV4MiniflareOptions({workers:[{name:'summit-one-response',modules:true,script:"export default {fetch(){return new Response('x')}}",d1Databases:{DB:'summit-one-response'}}]}));
 let db:D1Database;
@@ -24,7 +27,7 @@ async function clone(aid:string,limit:number){
 }
 beforeAll(async()=>{
  db=await mf.getD1Database('DB');
- for(const file of ['migrations/0001_init.sql','migrations/0002_code_escrow.sql','migrations/0003_language_archive.sql','migrations/0004_pinned_instruments.sql','migrations/0006_oauth_code_redemption.sql','migrations/0007_shared_link_context.sql','migrations/0008_synthetic_report.sql','seed/synthetic.sql','seed/synthetic-responses.sql']){
+ for(const file of ['migrations/0001_init.sql','migrations/0002_code_escrow.sql','migrations/0003_language_archive.sql','migrations/0004_pinned_instruments.sql','migrations/0006_oauth_code_redemption.sql','migrations/0007_shared_link_context.sql','migrations/0008_synthetic_report.sql','seed/synthetic.sql','seed/synthetic-responses.sql','migrations/0011_context.sql','migrations/0012_translation.sql','migrations/0013_passages.sql']){
   const sql=readFileSync(new URL('../'+file,import.meta.url),'utf8').split('\n').filter(l=>!l.trimStart().startsWith('--')).join('\n');
   const statements=sql.split(';\n').map(s=>s.trim()).filter(Boolean);for(let i=0;i<statements.length;i+=50)await db.batch(statements.slice(i,i+50).map(s=>db.prepare(s)));
  }
@@ -55,15 +58,33 @@ it('actual single-response D1 capture builds, reads, lists, and renders Overview
  const payload=got.report.payload;expect(payload.lenses.length).toBe(1);expect([...lensRespondents(payload).values()]).toEqual([1]);
  const before=JSON.stringify(got);
  const out=process.env.SUMMIT_EVIDENCE,chrome=process.env.PDF_LOCAL_CHROME;
+ const session=await mintSession(c.env,'person_mara','user');
+ let rendered=0;
  for(const format of ['overview','detailed','full']){
   const html=storedReportDocument(got,{minimum:got.level_minimum_responses,format,identity:{title:'One-response local fixture'}});
   expect(html).toContain('<html');expect(html).not.toContain('NaN');
-  if(out){mkdirSync(out,{recursive:true});const path=`${out}/one-response-${format}`;writeFileSync(path+'.html',html);
-   if(chrome){execFileSync(chrome,['--headless','--no-sandbox','--disable-crash-reporter',`--user-data-dir=${out}/chrome-profile`,'--no-pdf-header-footer',`--print-to-pdf=${path}.pdf`,`file://${path}.html`],{timeout:30000,stdio:'pipe'});expect(readFileSync(path+'.pdf').subarray(0,5).toString()).toBe('%PDF-');}}
+  if(format !== 'overview'){expect(html).toContain('data-perspective-radar');expect(html).toContain('Community subdimensions');expect(html).toContain('<polygon');}
+  const browser={quickAction:async (_:string,options:any)=>{
+   rendered++;expect(options.html).not.toContain('answersRaw');
+   if(format!=='overview')expect(options.html).toContain('data-perspective-radar');
+   if(out){mkdirSync(out,{recursive:true});const path=`${out}/one-response-${format}`;writeFileSync(path+'.html',options.html);
+    if(chrome){execFileSync(chrome,['--headless','--no-sandbox','--disable-crash-reporter',`--user-data-dir=${out}/chrome-profile`,'--no-pdf-header-footer',`--print-to-pdf=${path}.pdf`,`file://${path}.html`],{timeout:30000,stdio:'pipe'});return new Response(readFileSync(path+'.pdf'),{headers:{'content-type':'application/pdf'}});}
+   }
+   return new Response('%PDF-1.7 local transport fixture',{headers:{'content-type':'application/pdf'}});
+  }};
+  const response=await app.fetch(new Request(`https://local.invalid/v2/reports/${made.report.id}/pdf?format=${format}`,{headers:{authorization:`Bearer ${session}`}}),{...c.env,PDF_BROWSER:browser} as any);
+  expect(response.status,format).toBe(200);expect(response.headers.get('cache-control')).toContain('no-store');expect(response.headers.get('content-type')).toBe('application/pdf');
+  expect(new TextDecoder().decode(new Uint8Array(await response.arrayBuffer()).slice(0,5))).toBe('%PDF-');
+  const rolledBack=await app.fetch(new Request(`https://local.invalid/v2/reports/${made.report.id}/pdf?format=${format}`,{headers:{authorization:`Bearer ${session}`}}),{...c.env,SUMMIT_ONE_RESPONSE_REPORTS:undefined,PDF_BROWSER:browser} as any);
+  expect(rolledBack.status).toBe(409);
+
  }
- expect(JSON.stringify(got)).toBe(before);
+ expect(rendered).toBe(3);expect(JSON.stringify(got)).toBe(before);
  // Exercise the actual radar input: a single perspective has real subdimensions, but no shared-construct comparison axes.
  expect(payload.lenses[0].sub_dimensions.length).toBeGreaterThanOrEqual(3);expect(radarModel(got.report)).toBeNull();
+ const models=perspectiveRadarModels(got.report,got.level_minimum_responses);expect(models).toHaveLength(1);
+ expect(models[0].lenses[0].scores).toEqual(payload.lenses[0].sub_dimensions.map((s:any)=>s.score));
+ expect(models[0].n).toBe(1);
  if(out)writeFileSync(out+'/one-response-payload.json',JSON.stringify(got,null,2));
  // Rollback re-attests and holds this same immutable report again; zero responses never qualify.
  expect((await reportGet(ctx('production'),{id:made.report.id})).result.suppressed).toBe(true);

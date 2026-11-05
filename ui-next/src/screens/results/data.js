@@ -1,3 +1,4 @@
+import { subdimensionRadarModels } from '../../../../ui/report-perspective-radar.js';
 // UI Next (v4) results lane: data adapter. Status: provisional (playbook rule 12).
 // Reads the built-report shape the current UI already reads and derives every level through the current UI's pure modules
 // (import only, no backend change): ui/assess/v3-assessment.js v3ScoreBand + V3_BAND_CUTOFFS (band words, provisional cut-offs,
@@ -133,7 +134,7 @@ export function lensCards(raw, counts, { prefer = "report", sent } = {}) {
     if (l.absent) return l;
     const n = responses(l.lens);
     return {
-      lens: l.lens, label: lensLabel(l.lens), n, newer: newer(l.lens), level: levelOf(l.score, n),
+      lens: l.lens, label: lensLabel(l.lens), n, snapshotN: lensRespondents(payload).get(l.lens) ?? null, newer: newer(l.lens), level: levelOf(l.score, n),
       rows: (Array.isArray(l.sub_dimensions) ? l.sub_dimensions : []).filter(Boolean).map((s) => {
         const level = levelOf(s.score, n);
         return { name: s.sub_dimension, score: level === "more" ? null : s.score ?? null, level, items: s.items ?? s.n_items_included, note: s.note };
@@ -298,6 +299,11 @@ export function radar(report, names, counts) {
   const drawn = LENS_ORDER.filter((lens) => model.lenses.some((l) => l.lens === lens));
   const asked = LENS_ORDER.filter((lens) => named.some((a) => scored(a).some((s) => s.lens === lens)));
   const notes = LENS_ORDER.filter((lens) => !drawn.includes(lens)).map((lens) => `${lensLabel(lens)} ${asked.includes(lens) ? "more input needed" : "not asked"}`);
+  return radarGeometry(model, drawn, notes);
+}
+
+/** Shared drawing geometry; measure selection remains with each named model. */
+function radarGeometry(model, drawn = model.lenses.map(l => l.lens), notes = []) {
   const C = [210, 185], R = 118, L = 141.6, k = model.spokes.length;
   const at = (i, r) => { const a = -Math.PI / 2 + (2 * Math.PI * i) / k; return [C[0] + r * Math.cos(a), C[1] + r * Math.sin(a)]; };
   const pts = (r) => model.spokes.map((_, i) => at(i, r).map((v) => v.toFixed(1)).join(",")).join(" ");
@@ -331,10 +337,11 @@ export function radar(report, names, counts) {
 
 /** A small count in words for copy that names it ("The two perspectives as one shape"); past six, the digits. */
 export const countWord = (n) => ["no", "one", "two", "three", "four", "five", "six"][n] ?? String(n);
-/** Detailed report sheets: 1 head + radar + tensions, 2 all areas, then the evidence two perspectives a sheet; no sheet is
- *  empty, so a report with two perspectives has three pages, not an empty "(continued)" one (R4-5). */
+/** Detailed sheets: shared comparison and reading guide, one own-subdimension radar per qualifying perspective,
+ * then evidence two perspectives a sheet. Empty/held perspectives add no radar or empty evidence sheet. */
 export const evidenceSheets = (cards) => list(cards).filter((c) => list(c.rows).length).flatMap((c, i, a) => (i % 2 ? [] : [a.slice(i, i + 2)])); // a perspective with no areas (none at build time) has no evidence table
-export const detailedPages = (cards) => 2 + evidenceSheets(cards).length;
+export const perspectiveRadars = cards => subdimensionRadarModels(cards, currentLevelMin()).map(model => ({...model, shape:radarGeometry(model)}));
+export const detailedPages = (cards) => 2 + perspectiveRadars(cards).length + evidenceSheets(cards).length;
 
 /** Held state: who is below the minimum, in the board's words ("Church 1 — needs 2 more"). */
 export function heldLines(counts) {

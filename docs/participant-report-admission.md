@@ -18,7 +18,7 @@ The Summit decision authorizes numeric reports from one participant response. Th
 
 Rollback: remove `SUMMIT_ONE_RESPONSE_REPORTS` from production vars and release through normal gates. Revisit after Summit. Previously viewed/downloaded aggregates cannot be retracted. One-response numeric aggregates represent that person's answers; retain true counts and limited-coverage cues. Raw responses, demographic/small-cell answer splits and question disclosure remain held under existing rules. Translation-type categorical agreement retains the prior per-environment 3-response production minimum rather than inheriting the temporary numeric override.
 
-Radar limitation: Detailed's shared-construct overlay is not Steve's per-perspective subdimension radar. One response supplies only one perspective; its genuine subdimensions exist, but no cross-perspective axes qualify. Do not fabricate missing scores or zero-fill to close that chart. A separate per-perspective chart presentation is needed for preview parity; this threshold candidate does not change chart semantics.
+Radar presentation: Detailed and full reports now add separate radars of each perspective's own stored subdimensions, matching the measure in Steve's previews. The existing shared-construct comparison is preserved. A perspective needs at least three genuine scored subdimensions and a known snapshot response count meeting the numeric level floor. Missing scores leave gaps; no axis is zero-filled. Detailed adds one page per qualifying perspective and all page counters follow that count. A one-response chart is labeled with its true count and limited-data wording.
 
 ## Verification boundaries and documentation debt
 

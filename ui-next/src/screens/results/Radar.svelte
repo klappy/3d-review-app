@@ -9,10 +9,10 @@
      scores reach the model: a perspective under the minimum responses has no polygon, point or <title> (validator R3-1). -->
 <script>
   import { fmtScore } from "./data.js";
-  let { model } = $props();
+  let { model, measure = "shared areas" } = $props();
 </script>
 
-<svg class="svg-visible" width="420" height="370" viewBox="0 0 420 370" role="img" aria-label={`Radar of ${model.legend.map((l) => l.label).join(", ")} across ${model.spokes.length} shared areas`}>
+<svg class="svg-visible" width="420" height="370" viewBox="0 0 420 370" role="img" aria-label={`Radar of ${model.legend.map((l) => l.label).join(", ")} across ${model.spokes.length} ${measure}`}>
   {#each model.rings as points}<polygon {points} fill="none" stroke="var(--line)" stroke-width="1" />{/each}
   {#each model.spokes as s}<line x1="210" y1="185" x2={s.x} y2={s.y} stroke="var(--line)" />{/each}
   {#each model.lenses as l}
