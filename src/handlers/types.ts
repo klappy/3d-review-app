@@ -19,6 +19,8 @@ export interface Principal {
 export interface Env { ROADMAP_PUBLISHER_IDS?: string; ROADMAP_VERIFIER_IDS?: string; ROADMAP_SUMMARY_REVIEWER_IDS?: string; DB: D1Database; SESSION_SECRET: string; CODE_ESCROW_SECRET?: string; ENVIRONMENT?: string; ACCESS_TEAM_DOMAIN?: string; ACCESS_AUD?: string;
   /** Default-off production report admission; exact "enabled" only after policy approval. */
   PARTICIPANT_REPORTS?: string;
+  /** Temporary Summit numeric report/level minimum; exact enabled only. */
+  SUMMIT_ONE_RESPONSE_REPORTS?: string;
   /** Native Cloudflare Email Sending; no API secret or inbound routing required. */
   EMAIL?: SendEmail;
   MAIL_FROM?: string; MAIL_ALLOWLIST_SHA256?: string; PUBLIC_ORIGIN?: string;

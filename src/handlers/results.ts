@@ -1,7 +1,7 @@
 import type { Ctx, Handler } from "./types";
 import { notVisible } from "./errors";
 import { gate, reqStr, responseCountForAssessment, effectiveRoleAt } from "./common";
-import { participantReportMinimum, perspectiveLevelMinimum } from "../report-admission";
+import { participantReportMinimum, perspectiveLevelMinimum, type ReportMinimumEnvironment } from "../report-admission";
 import { observeBuildDecision } from "../synthetic-report-store";
 import { demographicsEnabled, demographicsProjection } from "../context-fields";
 
@@ -10,7 +10,7 @@ import { demographicsEnabled, demographicsProjection } from "../context-fields";
  * name the same numbers — the assessment's response count (the one Collect and the assessment card show) and the minimum.
  * Callers read it only after their own grant check. Null at or above the minimum: those views stay exactly as they were. */
 export type MinimumHold = { responses_in: number; responses_needed: number; reason: string };
-export async function minimumHold(ctx: Pick<Ctx, "db"> & { env?: { ENVIRONMENT?: string } }, aid: string): Promise<MinimumHold | null> {
+export async function minimumHold(ctx: Pick<Ctx, "db"> & { env?: ReportMinimumEnvironment }, aid: string): Promise<MinimumHold | null> {
   const { responses: n } = await responseCountForAssessment(ctx as Ctx, aid);
   const min = participantReportMinimum(ctx.env);
   if (n >= min) return null;

@@ -1,0 +1,75 @@
+import {readFileSync,mkdirSync,writeFileSync} from 'node:fs';
+import {execFileSync} from 'node:child_process';
+import {beforeAll,afterAll,it,expect} from 'vitest';
+import {Miniflare,convertV4MiniflareOptions} from 'miniflare';
+import {list as responseList} from '../src/handlers/response';
+import {summary} from '../src/handlers/results';
+import {build,get as reportGet,list as reportList} from '../src/handlers/report';
+import type {Ctx} from '../src/handlers/types';
+import {participantReportMinimum,perspectiveLevelMinimum,translationAgreementMinimum} from '../src/report-admission';
+import {storedReportDocument} from '../ui/pdf/report-formats.js';
+import {lensRespondents} from '../ui/report-lenses.js';
+import {radarModel} from '../ui/report-radar.js';
+const mf=new Miniflare(convertV4MiniflareOptions({workers:[{name:'summit-one-response',modules:true,script:"export default {fetch(){return new Response('x')}}",d1Databases:{DB:'summit-one-response'}}]}));
+let db:D1Database;
+const src='assess_syn_earning-trust-2026-01', one='assess_s28_one', full='assess_s28_full', zero='assess_s28_zero', three='assess_s28_three';
+// production (reports enabled) keeps the five-response floor; DEV's floor is one response (report-admission.ts participantReportMinimum).
+const ctx=(ENVIRONMENT='dev'):Ctx=>({env:{DB:db,SESSION_SECRET:'s28-test',ENVIRONMENT,PARTICIPANT_REPORTS:'enabled'} as unknown as Ctx['env'],db,principal:{id:'person_mara',kind:'user'},traceId:'tr_s28',now:()=>new Date('2026-09-30T16:00:00.000Z'),log:()=>{}});
+const run=(sql:string,...a:unknown[])=>db.prepare(sql).bind(...a).run();
+async function clone(aid:string,limit:number){
+ await run(`INSERT INTO assessment (id,project_id,language_id,name,purpose,period,format,stage,created_at,created_by) SELECT ?1,project_id,language_id,name||' (participant)',purpose,period,format,stage,created_at,created_by FROM assessment WHERE id=?2`,aid,src);
+ await run(`INSERT INTO "grant" (id,principal_id,scope_type,scope_id,role,created_at) SELECT ?1||id,principal_id,scope_type,?1,role,created_at FROM "grant" WHERE scope_type='assessment' AND scope_id=?2`,aid,src);
+ await run(`INSERT INTO assessment_survey (id,assessment_id,template_id,template_version,state,collection_status,created_at) SELECT ?1||id,?1,template_id,template_version,state,collection_status,created_at FROM assessment_survey WHERE assessment_id=?2`,aid,src);
+ await run(`INSERT INTO response (id,assessment_survey_id,respondent_id,idempotency_key,answers_json,template_id,template_version,source,submitted_at) SELECT ?1||r.id,?1||r.assessment_survey_id,?1||r.respondent_id,?1||r.idempotency_key,r.answers_json,r.template_id,r.template_version,'participant',r.submitted_at FROM response r JOIN assessment_survey s ON s.id=r.assessment_survey_id WHERE s.assessment_id=?2 ORDER BY r.id LIMIT ?3`,aid,src,limit);
+}
+beforeAll(async()=>{
+ db=await mf.getD1Database('DB');
+ for(const file of ['migrations/0001_init.sql','migrations/0002_code_escrow.sql','migrations/0003_language_archive.sql','migrations/0004_pinned_instruments.sql','migrations/0006_oauth_code_redemption.sql','migrations/0007_shared_link_context.sql','migrations/0008_synthetic_report.sql','seed/synthetic.sql','seed/synthetic-responses.sql']){
+  const sql=readFileSync(new URL('../'+file,import.meta.url),'utf8').split('\n').filter(l=>!l.trimStart().startsWith('--')).join('\n');
+  const statements=sql.split(';\n').map(s=>s.trim()).filter(Boolean);for(let i=0;i<statements.length;i+=50)await db.batch(statements.slice(i,i+50).map(s=>db.prepare(s)));
+ }
+ await clone(one,1);await clone(zero,0);
+},60000);
+afterAll(()=>mf.dispose());
+const reports=async(aid:string)=>Number((await db.prepare('SELECT count(*) AS n FROM synthetic_report WHERE assessment_id=?').bind(aid).first<{n:number}>())?.n);
+
+const summit=():Ctx=>{const c=ctx('production');return {...c,env:{...c.env,SUMMIT_ONE_RESPONSE_REPORTS:'enabled'}}};
+it('Summit override is exact, known-environment only, reversible, and does not lower categorical disclosure',()=>{
+ for(const flag of [undefined,'disabled','true','ENABLED',' enabled ']){
+  const env={ENVIRONMENT:'production',SUMMIT_ONE_RESPONSE_REPORTS:flag};expect(participantReportMinimum(env)).toBe(5);expect(perspectiveLevelMinimum(env)).toBe(3);
+ }
+ for(const ENVIRONMENT of ['staging','PRODUCTION','',undefined]){
+  const env={ENVIRONMENT,SUMMIT_ONE_RESPONSE_REPORTS:'enabled'};expect(participantReportMinimum(env)).toBe(5);expect(perspectiveLevelMinimum(env)).toBe(3);
+ }
+ expect(participantReportMinimum(summit().env)).toBe(1);expect(perspectiveLevelMinimum(summit().env)).toBe(1);expect(translationAgreementMinimum(summit().env)).toBe(3);
+});
+it('actual single-response D1 capture builds, reads, lists, and renders Overview/Detailed/full PDF source without changing scores',async()=>{
+ const c=summit();
+ expect((await summary(c,{aid:one})).result).toMatchObject({report_build_allowed:true,level_minimum_responses:1});
+ expect((await build(c,{aid:one},{dryRun:true})).result.status).toBe('ready');
+ const made:any=(await build(c,{aid:one})).result;expect(made.suppressed).toBe(false);expect(made.report).toBeTruthy();
+ const got:any=(await reportGet(c,{id:made.report.id})).result;expect(got.suppressed).toBe(false);expect(got.level_minimum_responses).toBe(1);
+ expect((await reportList(c,{aid:one})).result.reports).toHaveLength(1);
+ expect((await responseList(c,{aid:one})).result.responses).toEqual([]);
+ expect(got.report.payload.translation_type_agreement).toBeNull();
+ const payload=got.report.payload;expect(payload.lenses.length).toBe(1);expect([...lensRespondents(payload).values()]).toEqual([1]);
+ const before=JSON.stringify(got);
+ const out=process.env.SUMMIT_EVIDENCE,chrome=process.env.PDF_LOCAL_CHROME;
+ for(const format of ['overview','detailed','full']){
+  const html=storedReportDocument(got,{minimum:got.level_minimum_responses,format,identity:{title:'One-response local fixture'}});
+  expect(html).toContain('<html');expect(html).not.toContain('NaN');
+  if(out){mkdirSync(out,{recursive:true});const path=`${out}/one-response-${format}`;writeFileSync(path+'.html',html);
+   if(chrome){execFileSync(chrome,['--headless','--no-sandbox','--disable-crash-reporter',`--user-data-dir=${out}/chrome-profile`,'--no-pdf-header-footer',`--print-to-pdf=${path}.pdf`,`file://${path}.html`],{timeout:30000,stdio:'pipe'});expect(readFileSync(path+'.pdf').subarray(0,5).toString()).toBe('%PDF-');}}
+ }
+ expect(JSON.stringify(got)).toBe(before);
+ // Exercise the actual radar input: a single perspective has real subdimensions, but no shared-construct comparison axes.
+ expect(payload.lenses[0].sub_dimensions.length).toBeGreaterThanOrEqual(3);expect(radarModel(got.report)).toBeNull();
+ if(out)writeFileSync(out+'/one-response-payload.json',JSON.stringify(got,null,2));
+ // Rollback re-attests and holds this same immutable report again; zero responses never qualify.
+ expect((await reportGet(ctx('production'),{id:made.report.id})).result.suppressed).toBe(true);
+ expect((await build(c,{aid:zero})).result.suppressed).toBe(true);
+ const noAdmission={...c,env:{...c.env,PARTICIPANT_REPORTS:undefined}};
+ expect((await summary(noAdmission,{aid:one})).result.report_build_allowed).toBe(false);
+ const ungranted={...c,principal:{kind:'user' as const,id:'not-granted'}};
+ await expect(reportGet(ungranted,{id:made.report.id})).rejects.toThrow();
+},120000);
