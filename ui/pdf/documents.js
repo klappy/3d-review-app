@@ -53,7 +53,7 @@ export function reportPdfDocument(result, {paper='letter',minimum=3}={}) {
   if ([...counts.values()].some(n=>n<minimum)||[...disclosed].some(l=>!counts.has(l)||counts.get(l)<minimum)||
     (payload?.standalone_indicators||[]).some(i=>!Number.isFinite(i.n_responses)||i.n_responses<minimum)) throw new Error('PDF_REPORT_HELD');
   const root = node('div');
-  if (!renderReport({doc,root,report:result.report})) throw new Error('Report unavailable.');
+  if (!renderReport({doc,root,report:result.report,minimum})) throw new Error('Report unavailable.');
   // PDF documents have no interactive disclosure: retain provenance on paper.
   // Only this isolated print tree is opened; the shared screen renderer stays closed.
   for (const child of root.children) if (child.tag === 'details') child.setAttribute('open', '');

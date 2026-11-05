@@ -49,7 +49,7 @@ const REPORT = {
       { item_id: 'i1', lens: 'community', sub_dimension: 'clarity', question_text: 'Is the meaning clear?', score: 82.5, n_responses: 9 },
     ],
     translation_type_agreement: { construct_name: 'Translation type agreement', team_values: ['meaning-based'], church_values: ['literal', 'meaning-based'], agree: false },
-    evidence: [{ form_type: 'team', label: 'Team form', n: 4 }, { form_type: 'church', label: 'Church form', n: 2 }],
+    evidence: [{ form_type: 'team', label: 'Translation Team — Translators', n: 4 }, { form_type: 'church', label: 'Church — Involved Pastor', n: 4 }],
     narrative: ['Team scores are highest on process.', 'One lens has no comparable data.'],
   },
 };
@@ -90,7 +90,7 @@ test('R4 standalone indicators, evidence and narrative rows', () => {
   const root = fakeNode('section');
   renderReport({ doc, root, report: REPORT });
   assert.deepEqual(sectionRows(root, copy.standalone), ['Is the meaning clear?', 'community · clarity', 'Score (out of 100)', '82.5', 'Responses', '9']);
-  assert.deepEqual(sectionRows(root, copy.evidence), ['Team form', 'Submissions', '4', 'Church form', 'Submissions', '2']);
+  assert.deepEqual(sectionRows(root, copy.evidence), ['Translation Team — Translators', 'Submissions', '4', 'Church — Involved Pastor', 'Submissions', '4']);
   assert.deepEqual(sectionRows(root, copy.narrative), ['Team scores are highest on process.', 'One lens has no comparable data.']);
 });
 
@@ -116,7 +116,7 @@ test('R6 agree null prints "not comparable"; translation section absent when the
 test('R7 empty arrays announce no section', () => {
   const root = fakeNode('section');
   renderReport({ doc, root, report: { ...REPORT, payload: { ...REPORT.payload, lenses: [], cross_lens_multi: [], cross_lens_single: [], standalone_indicators: [], evidence: [], narrative: [] } } });
-  assert.deepEqual(root.children.slice(2).map(s => s.children[0].textContent), [copy.translationAgreement]);
+  assert.deepEqual(root.children.slice(2).map(s => s.children[0].textContent), []);
 });
 
 test('R8 held or malformed results render nothing at all', () => {

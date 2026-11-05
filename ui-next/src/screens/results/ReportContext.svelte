@@ -1,12 +1,14 @@
 <script>
   import { agreementSentence } from "../../../../ui/report-view.js";
+  import { translationAgreementFor } from "../../../../ui/report-agreement.js";
+  import { currentLevelMin } from "./data.js";
   let { report } = $props();
   const payload = $derived(report?.payload ?? {});
   const rows = (value) => Array.isArray(value) ? value : [];
   const narrative = $derived(rows(payload.narrative));
   const indicators = $derived(rows(payload.standalone_indicators));
   const evidence = $derived(rows(payload.evidence));
-  const agreement = $derived(payload.translation_type_agreement);
+  const agreement = $derived(translationAgreementFor(payload, currentLevelMin()));
 </script>
 
 {#if narrative.length || indicators.length || evidence.length || agreement || payload.source_commit || payload.versions}

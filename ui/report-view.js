@@ -2,6 +2,7 @@ import { renderReportCards } from './report-card.js';
 import { lensesCopy, renderLensesAgree } from './report-lenses.js';
 import { renderLensRadar } from './report-radar.js';
 import { humanDate } from './assess/cards.js'; // one shared local-time formatter (B31)
+import { translationAgreementFor } from './report-agreement.js';
 // Synthetic report rendering. Dependency-free and importable under node --test with an injected doc.
 // Text nodes only: every value comes from the payload as returned (String(), no rounding, no word
 // mapping except the agreement sentence below, no colour), plus the fixed labels in `copy`. Nothing here fetches or authorizes.
@@ -71,7 +72,7 @@ function metrics(doc, pairs) {
 }
 const rows = value => (Array.isArray(value) ? value : []);
 // A held or malformed result renders nothing at all rather than a partial report.
-export function renderReport({ doc, root, report }) {
+export function renderReport({ doc, root, report, minimum = 3 }) {
   root.replaceChildren();
   const payload = report && typeof report === 'object' ? report.payload : null;
   if (!payload || typeof payload !== 'object' || Array.isArray(payload)) return false;
@@ -100,7 +101,7 @@ export function renderReport({ doc, root, report }) {
       return li;
     }))]));
   }
-  const agreement = payload.translation_type_agreement;
+  const agreement = translationAgreementFor(payload, minimum);
   if (agreement && typeof agreement === 'object') {
     out.push(section(doc, copy.translationAgreement, [el(doc, 'p', agreementSentence(agreement))]));
   }

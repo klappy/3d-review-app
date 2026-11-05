@@ -1,3 +1,4 @@
+import {get as getReport} from '../src/handlers/report';
 import {form,submit} from '../src/handlers/response';
 import {print as printSurvey} from '../src/handlers/survey';
 import {render as renderTemplate} from '../src/handlers/template';
@@ -106,4 +107,29 @@ describe('participant-source reports (DEV only)',()=>{
    }
    expect((await db.prepare('SELECT * FROM survey_template ORDER BY id,version').all()).results).toEqual(storedTemplates);
    for(const row of before)expect(await db.prepare('SELECT * FROM response WHERE id=?').bind(row.id).first()).toEqual(row);
+ },60000);
+
+ it('production report transport hides the one church status in a 3-team/1-church/1-community snapshot',async()=>{
+   const target='assess_decision25_privacy';
+   const source=await captureForBuild(ctx(),src);if(!source.eligible)throw new Error('fixture capture unavailable');
+   await run('INSERT INTO assessment (id,project_id,language_id,name,purpose,period,format,stage,created_at,created_by) SELECT ?,project_id,language_id,name,purpose,period,format,stage,created_at,created_by FROM assessment WHERE id=?',target,src);
+   await run('INSERT INTO "grant" (id,principal_id,scope_type,scope_id,role,created_at) VALUES (?, ?, ?, ?, ?, ?)',target+'_grant','person_mara','assessment',target,'owner','2026-11-05');
+   let index=0;
+   for(const [templateId,n] of [['tpl_validation',3],['tpl_involved_pastor',1],['tpl_written',1]] as const){
+     const example=source.capture.rows.find(r=>r.selectedTemplateId===templateId);if(!example)throw new Error('missing fixture template '+templateId);
+     const sid=target+'_'+templateId;
+     await run("INSERT INTO assessment_survey (id,assessment_id,template_id,template_version,state,collection_status,created_at) VALUES (?,?,?,?, 'selected','open','2026-11-05')",sid,target,templateId,example.selectedTemplateVersion);
+     const answers=JSON.parse(example.answersRaw);if(templateId==='tpl_validation')answers['TR-Q2']='no-brief';if(templateId==='tpl_involved_pastor')answers['CHIP-Q1']='not-aware';
+     for(let i=0;i<n;i++)await run("INSERT INTO response (id,assessment_survey_id,respondent_id,idempotency_key,answers_json,template_id,template_version,source,submitted_at) VALUES (?,?,?,?,?,?,?,'participant','2026-11-05')",target+'_r'+index,sid,target+'_respondent'+index,'key'+index++,JSON.stringify(answers),templateId,example.selectedTemplateVersion);
+   }
+   const c={...ctx('production'),env:{ENVIRONMENT:'production',PARTICIPANT_REPORTS:'enabled'},traceId:'tr_decision25_privacy',log:()=>{}} as unknown as Ctx;
+   const built=await store.buildMaterialized(c,target);if(!built.ok)throw new Error('fixture build held');
+   expect((built.value.payload as any).translation_type_agreement.church_statuses).toEqual(['not-aware']);
+   const disclosed=await getReport(c,{id:built.value.id});
+   const visible=(disclosed.result.report as any).payload.translation_type_agreement;
+   expect(disclosed.result.level_minimum_responses).toBe(3);
+   expect(visible.team_statuses).toEqual(['no-brief']);expect(visible.church_statuses).toEqual([]);expect(visible.church_values).toEqual([]);expect(visible.agree).toBe(null);
+   expect(JSON.stringify(disclosed.result)).not.toContain('not-aware');
+   // Disclosure never mutates the immutable stored payload or capture.
+   const stored=await store.readMaterialized(c,built.value.id);expect(stored.ok&&stored.value.payload).toEqual(built.value.payload);
  },60000);
