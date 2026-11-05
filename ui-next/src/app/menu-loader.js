@@ -35,14 +35,14 @@ export async function loadMenuIdentity({ read = () => api('/v2/me'), timeoutMs =
 export async function loadMenuModel(me, { onSignOut, currentDesign, readHome = homeModel, timeoutMs = MENU_READ_LIMIT_MS } = {}) {
   requireIdentity(me);
   try {
-    const home = await boundedRead(() => readHome(me), timeoutMs, 'The review list did not finish loading.');
+    const home = await boundedRead(() => readHome(me), timeoutMs, 'The project list did not finish loading.');
     return { ...menuModel(me, home, { onSignOut, currentDesign }), historyStatus: 'ready' };
   } catch (error) {
     if (classify(error) === 'unauthenticated') throw error;
-    const menu = menuModel(me, { user: { initials: initialsOf(me.principal) }, workspace: 'Your workspace', groups: [], completed: [] }, { onSignOut, currentDesign });
+    const menu = menuModel(me, { user: { initials: initialsOf(me.principal) }, workspace: 'Your workspace', projectCards: [] }, { onSignOut, currentDesign });
     return {
-      ...menu, chips: [], completed: null, historyStatus: 'unavailable',
-      historyMessage: 'Your review list could not be loaded. Account actions are still available.',
+      ...menu, chips: [], projectCards: [], historyStatus: 'unavailable',
+      historyMessage: 'Your project list could not be loaded. Account actions are still available.',
       items: menu.items.map(row => row[1] === 'Your workspace — your workspace' ? [row[0], 'Your workspaces', row[2]] : row),
     };
   }
@@ -51,6 +51,6 @@ export async function loadMenuModel(me, { onSignOut, currentDesign, readHome = h
 // The live account overlay is navigation, not another Home read. Identity is the only required read.
 export function accountMenuModel(me, { onSignOut, currentDesign } = {}) {
   requireIdentity(me);
-  const model = menuModel(me, { user: { initials: initialsOf(me.principal) }, workspace: 'Your workspace', groups: [], completed: [] }, { onSignOut, currentDesign });
-  return { ...model, reviews: [], chips: [], completed: null, items: model.items.map(row => row[1] === 'Your workspace — your workspace' ? [row[0], 'Your workspaces', row[2]] : row) };
+  const model = menuModel(me, { user: { initials: initialsOf(me.principal) }, workspace: 'Your workspace', projectCards: [] }, { onSignOut, currentDesign });
+  return { ...model, projectCards: [], chips: [], items: model.items.map(row => row[1] === 'Your workspace — your workspace' ? [row[0], 'Your workspaces', row[2]] : row) };
 }

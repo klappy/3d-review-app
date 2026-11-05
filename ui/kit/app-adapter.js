@@ -37,7 +37,11 @@ export function treeNodes(routes, known = {}) {
   const projById = new Map(projects.map(p => [p.id, p]));
   if (page?.kind === 'workspace' && page.model?.status === 'loaded') for (const p of page.model.projects || []) if (!projById.has(p.id)) projById.set(p.id, p);
   if (page?.kind === 'project' && page.model?.status === 'loaded') { const p = page.model.project || {}; if (p.id && !projById.has(p.id)) projById.set(p.id, p); }
+  // Owner rule: a review is listed only inside an opened project: the project page, or a review opened from it. Every other
+  // project in the tree is a plain project node.
+  const openPid = page?.kind === 'project' ? (page.model?.project?.id || null) : (known.current?.assessment?.project_id || null);
   const assessmentsOf = pid => {
+    if (!openPid || pid !== openPid) return [];
     const l = lists.get(pid);
     if (page?.kind === 'project' && page.model?.status === 'loaded' && page.model.project?.id === pid && page.model.assessmentsStatus === 'loaded') return page.model.assessments || [];
     return l?.status === 'loaded' ? (l.list || []) : [];
@@ -53,7 +57,7 @@ export function treeNodes(routes, known = {}) {
 // Ancestry/title/role for the current route from loaded data only. `current` is state.current (assessment) or null.
 export function shellModel({ route, routes, principal, known = {}, current = null, page = null, identityLabel = '', sectionLabel, contextCollapsible = false, welcome = false }) {
   const kind = route?.kind || 'entry';
-  const nodes = treeNodes(routes, { ...known, page });
+  const nodes = treeNodes(routes, { ...known, page, current: kind === 'assessment' || kind === 'survey' ? current : null });
   const projects = known.projects || [];
   const findProject = pid => projects.find(p => p.id === pid) || (page?.kind === 'project' && page.model?.project?.id === pid ? page.model.project : null) || (page?.kind === 'workspace' ? (page.model?.projects || []).find(p => p.id === pid) : null);
   const findWorkspace = wid => { const cached = (known.workspaces || new Map()).get(wid); const fromPage = page?.kind === 'workspace' && page.model?.workspace?.id === wid ? page.model.workspace : null; return cached ? (fromPage?.role && !cached.role ? { ...cached, role: fromPage.role } : cached) : fromPage; };

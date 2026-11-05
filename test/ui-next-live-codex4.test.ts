@@ -5,11 +5,10 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { fireEvent, render, waitFor } from "@testing-library/svelte";
 // @ts-expect-error -- plain .js module, no type declarations
-import { reports, newestReport, resultsModel, projectModel, setupModel, shortDate, levelsOf, respondentsOf, levelTriples } from "../ui-next/src/app/data.js";
+import { reports, newestReport, resultsModel, projectModel, setupModel, shortDate, levelsOf, respondentsOf } from "../ui-next/src/app/data.js";
 // @ts-expect-error -- plain .js module, no type declarations
 import { forget, me as sessionMe } from "../ui-next/src/app/session.js";
-import { exploreModel, liveReport, gapsOf, phonePayload } from "../ui-next/src/app/data.js";
-import { exploreRows } from "../ui-next/src/screens/explore/explore-data.js";
+import { liveReport, gapsOf, phonePayload } from "../ui-next/src/app/data.js";
 import Help from "../ui-next/src/screens/explore/Help.svelte";
 import ReportDetailed from "../ui-next/src/screens/results/ReportDetailed.svelte";
 import Report from "../ui-next/src/screens/results/Report.svelte";
@@ -159,7 +158,6 @@ describe("projectModel (P2: workspace, trend gaps, surfaced failures)", () => {
     expect(respondentsOf(snap, { team: 6, community: 6 })).toEqual({ team: 1, community: 2 });
     expect(respondentsOf(payload, { team: 6, community: 6 })).toEqual({ team: 6, community: 6 }); // no evidence n: the live count stands in
     expect(levelsOf({ ...snap, evidence: [{ label: "Translation Team — Translators", n: 0 }, { label: "Community — Community", n: 2 }] }, { team: 6, community: 6 })).toEqual({ team: "more", community: "support" });
-    expect(levelTriples({ team: { score: 80, responses: 2 }, church: { score: 50, responses: 0 } })).toEqual([["team", "strong", 2], ["church", "more", 0]]);
     serve(routes({ "GET /v2/reports/r1": { report: { id: "r1", created_at: "2026-08-02T00:00:00Z", payload: snap } } }));
     const m = await projectModel(PID);
     expect(m.reviews.find((r: { id: string }) => r.id === "a1").levels).toEqual([["team", "strong", 1], ["community", "support", 2]]);
@@ -284,7 +282,7 @@ describe("report build confirm (P1: Live.svelte)", () => {
   });
 });
 
-describe("the served level minimum reaches Help, Explore and the detailed report (Codex P2s on 5d3633e)", () => {
+describe("the served level minimum reaches Help and the detailed report (Codex P2s on 5d3633e)", () => {
   const faqNeed = (el: Element) => [...el.querySelectorAll("details .disc-body, .disc-body")].map((d) => d.textContent ?? "").find((t) => t.startsWith("A perspective shows its level")) ?? "";
   it("Help: a fresh DEV session reads level_minimum_responses from /v2/me before the page and says 1; without it, the safe 3", async () => {
     useLevelMinimum(undefined);
@@ -312,40 +310,17 @@ describe("the served level minimum reaches Help, Explore and the detailed report
     useLevelMinimum(undefined);
     expect(currentLevelMin()).toBe(3);
   });
-  it("Explore bands with the session's served cut-off, as Project does: 2 responses show a level on DEV, are held at 3 or unread", async () => {
-    const snap = { lenses: [{ lens: "Translation Team", score: 80, sub_dimensions: [] }], cross_lens_multi: [], evidence: [{ label: "Translation Team — Translators", n: 2 }] };
-    const routes = (min: unknown) => ({
-      "GET /v2/projects": { projects: [{ id: PID, name: "Kikuyu" }] }, "GET /v2/workspaces": { workspaces: [] },
-      [`GET /v2/projects/${PID}/assessments`]: { assessments: [{ id: "a1", name: "First", stage: "understand", created_at: "2026-08-01T00:00:00Z", language_name: "Kikuyu" }] },
-      "GET /v2/assessments/a1": { assessment: { id: "a1", project_id: PID, stage: "understand", role: "owner" }, surveys: [{ id: "s1", perspective: "Translation Team" }] },
-      "GET /v2/assessments/a1/surveys/s1": { survey: {}, counts: { responses: 2, respondents: 2 } },
-      "GET /v2/assessments/a1/reports": { reports: [{ id: "r1", created_at: "2026-08-02T00:00:00Z" }], next_cursor: null },
-      "GET /v2/reports/r1": { report: { id: "r1", created_at: "2026-08-02T00:00:00Z", payload: snap } },
-    });
-    // the session's served policy (Codex P2 4384112233): never a per-review /results read
-    const team = async (min: unknown) => { forget(); useSessionLevelMinimum(min as number); serve(routes(min)); const m = await exploreModel({ principal: { id: "p1", display_name: "Kay" }, grants: [] }); expect(calls.filter((c) => /\/results$/.test(c.url.split("?")[0]))).toEqual([]); return [m.levelMinimum, exploreRows(m.reviews)[0].levels.team]; };
-    expect(await team(1)).toEqual([1, "strong"]);
-    expect(await team(3)).toEqual([3, "more"]);
-    expect(await team(undefined)).toEqual([3, "more"]);
-  });
-  it("Codex P2 4384112233: the Workspace roll-up bands with the session's policy and reads no review's /results", async () => {
-    const snap = { lenses: [{ lens: "Translation Team", score: 80, sub_dimensions: [] }], cross_lens_multi: [], evidence: [{ label: "Translation Team — Translators", n: 2 }] };
+  it("owner rule: the Workspace view reads no review (no assessment list, report or /results) and carries no level", async () => {
     const routes = {
-      "GET /v2/workspaces/w1": { workspace: { id: "w1", name: "WS", role: "owner" }, projects: [{ id: PID, name: "Kikuyu" }] }, "GET /v2/projects": { projects: [] },
-      [`GET /v2/projects/${PID}/assessments`]: { assessments: [{ id: "a1", name: "First", stage: "understand", created_at: "2026-08-01T00:00:00Z", language_name: "Kikuyu" }, { id: "a2", name: "Second", stage: "improve", created_at: "2026-07-01T00:00:00Z" }] },
-      "GET /v2/assessments/a1": { assessment: { id: "a1", project_id: PID, stage: "understand", role: "owner" }, surveys: [{ id: "s1", perspective: "Translation Team" }] },
-      "GET /v2/assessments/a1/surveys/s1": { survey: {}, counts: { responses: 2, respondents: 2 } },
-      "GET /v2/assessments/a1/reports": { reports: [{ id: "r1", created_at: "2026-08-02T00:00:00Z" }], next_cursor: null },
-      "GET /v2/reports/r1": { report: { id: "r1", created_at: "2026-08-02T00:00:00Z", payload: snap } },
+      "GET /v2/workspaces/w1": { workspace: { id: "w1", name: "WS", role: "owner" }, projects: [{ id: PID, name: "Kikuyu", assessment_count: 2, response_count: 4 }] }, "GET /v2/projects": { projects: [] },
     };
     // @ts-expect-error -- plain .js module
     const { workspaceModel } = await import("../ui-next/src/app/data.js");
-    for (const [min, want] of [[1, "strong"], [3, "more"]] as const) {
-      forget(); useSessionLevelMinimum(min); serve(routes);
-      const m = await workspaceModel("w1", { principal: { id: "p1", display_name: "Kay" }, grants: [] });
-      expect(m.projects[0].levels, String(min)).toEqual([["team", want, 2]]);
-      expect(calls.filter((c) => /\/results$/.test(c.url.split("?")[0]))).toEqual([]);
-    }
+    forget(); useSessionLevelMinimum(1); serve(routes);
+    const m = await workspaceModel("w1", { principal: { id: "p1", display_name: "Kay" }, grants: [] });
+    expect(m.projects[0].levels).toBeUndefined();
+    expect(m.projects[0].stage).toBeUndefined();
+    expect(calls.filter((c) => /\/assessments|\/reports|\/results/.test(c.url.split("?")[0]))).toEqual([]);
   });
   it("Codex P2 4384112215: a fresh signed-in DEV load at #/help waits for /v2/me, so its copy says the served 1, never the safe 3", async () => {
     forget(); useLevelMinimum(undefined);

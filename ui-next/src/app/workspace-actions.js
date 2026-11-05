@@ -21,7 +21,9 @@ export async function ungroupProject(workspace, project, request = api) {
 }
 export function workspaceProjects(projects, query = '', view = 'Active') {
   const find = String(query).trim().toLocaleLowerCase();
-  return projects.filter(p => (view === 'All' || (view === 'Archived' ? !!p.archived_at : !p.archived_at)) && (!find || [p.title,p.language,p.format].some(v => String(v ?? '').toLocaleLowerCase().includes(find))));
+  // Project-only search (owner rule: no review data outside an opened project): the card's title and its organisation names.
+  const fields = p => [p.title, ...(Array.isArray(p.orgs) ? p.orgs.map(o => Array.isArray(o) ? o[0] : o) : [])];
+  return projects.filter(p => (view === 'All' || (view === 'Archived' ? !!p.archived_at : !p.archived_at)) && (!find || fields(p).some(v => String(v ?? '').toLocaleLowerCase().includes(find))));
 }
 
 export async function createWorkspace(value, request = api) {

@@ -92,40 +92,22 @@ export const setRole = (scope, gid, role) => confirmed(`/v2/${SCOPE_SEG[scope.ty
 export const revokeGrant = (scope, gid) => api(`/v2/${SCOPE_SEG[scope.type]}/${enc(scope.id)}/grants/${enc(gid)}`, { method: "DELETE" });
 export const revokeInvitation = (id) => api(`/v2/invitations/${enc(id)}`, { method: "DELETE" });
 export const acceptInvitation = (id) => acceptInvitationById(api, id);
+const fmt = (a) => (a.format ? a.format[0].toUpperCase() + a.format.slice(1) : "");
 export const addProject = (wid, pid) => api(`/v2/workspaces/${enc(wid)}/projects/${enc(pid)}`, { method: "POST" });
 
-// Home: fixtures/home.json's shape from the account's real projects and reviews, so the approved screens/Home.svelte composition draws
-// it unchanged: groups by stage (results | collecting | setup), completed (stage improve), the account, the first workspace. No invitation
-// store is read tonight (invitations: null draws no invitation card; parity-loop row).
-const fmt = (a) => (a.format ? a.format[0].toUpperCase() + a.format.slice(1) : "");
+// Home: fixtures/home.json's shape from the account's real projects, so the approved screens/Home.svelte composition draws it. Owner
+// rule: nobody sees a review or assessment outside an opened project, so Home reads and lists projects only (never a project's reviews,
+// never the account's direct review grants); a review is reached by opening its project (projectModel). No invitation store is read
+// tonight (invitations: null draws no invitation card; parity-loop row).
+const countText = (n, unit) => (Number.isSafeInteger(n) && n >= 0 ? `${n} ${unit}${n === 1 ? "" : "s"}` : "");
 export async function homeModel(me) {
   const [ps, ws] = await Promise.all([projects(), workspaces().catch(() => [])]);
-  // A project's reviews failing to load is an error the shell shows (retryable), never an empty list that would draw a first-review
-  // welcome to an established account.
-  const lists = await Promise.all(ps.filter((p) => !p.archived_at).map((p) => assessmentsOf(p.id).then((as) => as.map((a) => ({ a, p })))));
-  // A review the account holds a direct grant on (invited to one review, not its project): /v2/projects lists no parent for it, so
-  // the grant itself is read (as the current design does); a failed read is the shell's error. Codex round 5 P1 on e546ccca.
-  const listed = new Set(lists.flat().map(({ a }) => a.id));
-  const direct = (me?.grants ?? []).filter((g) => g.scope_type === "assessment" && !listed.has(g.scope_id)).map((g) => g.scope_id);
-  const extra = await Promise.all([...new Set(direct)].map(async (aid) => { const { assessment: a } = await api(`/v2/assessments/${enc(aid)}`); return { a, p: ps.find((p) => p.id === a.project_id) ?? { id: a.project_id, name: a.project_name || "Shared review" } }; }));
-  const rowsAll = lists.flat().concat(extra).filter(({ a }) => !a.archived_at);
-  const langCache = new Map(); // one languages read per project (Codex round 5 P2: list rows carry language_id, not language_name)
-  await Promise.all(rowsAll.map(async ({ a }) => { if (a.language_name || !a.language_id || !a.project_id) return; if (!langCache.has(a.project_id)) langCache.set(a.project_id, api(`/v2/projects/${enc(a.project_id)}/languages`).then((r) => r?.languages ?? []).catch(() => [])); a.language_name = (await langCache.get(a.project_id)).find((l) => l.id === a.language_id)?.name || ""; }));
-  const all = rowsAll.sort((x, y) => String(y.a.created_at).localeCompare(String(x.a.created_at)));
-  const n = (a) => Number(a.response_count ?? 0);
-  const row = ({ a, p }) => {
-    const stage = STAGE_OF[a.stage] ?? "setup";
-    const base = { id: a.id, project: p.name, language: a.language_name || "", title: a.name };
-    if (stage === "results") return { ...base, meta: `${n(a)} response${n(a) === 1 ? "" : "s"}`, tag: a.stage === "understand" ? "Not yet reviewed" : undefined, action: "Read the results", href: to("results", { aid: a.id }) };
-    if (stage === "collecting") return { ...base, meta: `${n(a)} response${n(a) === 1 ? "" : "s"} so far`, phoneMeta: `${n(a)} response${n(a) === 1 ? "" : "s"} so far`, until: "", action: "Share the survey", href: to("collect", { aid: a.id }) };
-    return { ...base, meta: `Setup not finished · started ${shortDate(a.created_at)}`, phoneMeta: "Setup not finished", action: "Continue setup", href: to("review", { aid: a.id }) };
-  };
-  const HEAD = { results: ["Results ready", "read and plan the next step"], collecting: ["Collecting", "share the link or QR, watch the counts"], setup: ["Setting up", "pick up where you left off"] };
-  const groups = ["results", "collecting", "setup"].map((stage) => ({ stage, heading: HEAD[stage][0], help: HEAD[stage][1], reviews: all.filter(({ a }) => (STAGE_OF[a.stage] ?? "setup") === stage && !v3IsComplete(a)).map(row) })).filter((g) => g.reviews.length);
-  const completed = all.filter(({ a }) => v3IsComplete(a)).map(({ a, p }) => ({ title: a.name, meta: `${p.name} · reviewed`, href: to("results", { aid: a.id }) }));
+  const live = ps.filter((p) => !p.archived_at).sort((x, y) => String(y.created_at ?? "").localeCompare(String(x.created_at ?? "")));
+  // Aggregate counts the project list already carries (no review is read or named); an unknown count is left out, never invented.
+  const projectCards = live.map((p) => ({ id: p.id, title: p.name, meta: [p.organization, countText(p.assessment_count, "review"), countText(p.response_count, "response")].filter(Boolean).join(" · "), href: to("project", { pid: p.id }) }));
   const first = String(me?.principal?.display_name || "").trim().split(/\s+/)[0] || "You";
   const initials = (String(me?.principal?.display_name || "").trim().split(/\s+/).slice(0, 2).map((w) => w[0]?.toUpperCase() ?? "").join("")) || "";
-  return { practiceAvailable: false, user: { first, name: me?.principal?.display_name || "", initials }, workspace: ws[0]?.name ?? "Your workspace", workspaces: ws, projects: ps, invitation: null, phoneOrder: ["collecting", "setup", "results"], groups, completed, empty: !all.length, start: to("setup1"), rows: all };
+  return { practiceAvailable: false, user: { first, name: me?.principal?.display_name || "", initials }, workspace: ws[0]?.name ?? "Your workspace", workspaces: ws, projects: ps, invitation: null, projectCards, empty: !live.length, start: to("setup1") };
 }
 
 // Project: fixtures/setup/project.json's shape for screens/setup/Project.svelte (desktop two tracks, phone list). Levels per review come
@@ -519,14 +501,14 @@ export function nextStepModel(m) {
   };
 }
 
-// The phone account menu sheet (actions/MenuSheet.svelte, live): HomePhone's list from the home model, the signed-in account and the
+// The phone account menu sheet (actions/MenuSheet.svelte, live): HomePhone's project list from the home model, the signed-in account and the
 // sheet's seven rows; no invitation store is read (the invitation card is not drawn), no workspace switch (one workspace tonight).
 export function menuModel(me, home, { onSignOut, currentDesign = "/#projects" } = {}) {
   const name = me?.principal?.display_name || "Signed in";
   const who = [name, me?.principal?.email].filter(Boolean).join(" · ");
-  const reviews = home.groups.flatMap((g) => g.reviews.map((r) => ({ project: r.project, title: r.title, stage: g.stage, meta: r.phoneMeta ?? r.meta, action: r.action, href: r.href })));
+  const projectCards = (home.projectCards ?? []).map((c) => ({ title: c.title, meta: c.meta, href: c.href }));
   return {
-    who, initials: home.user.initials, invitation: null, chips: [home.workspace, "Mine"], reviews, completed: home.completed.length,
+    who, initials: home.user.initials, invitation: null, chips: [home.workspace, "Mine"], projectCards,
     items: [
       ["list", "Projects", to("projects")], ["people", "Workspaces", to("workspaces")], ["out", "Current design", currentDesign],
       ["people", "Account settings", to("account")], ["list", "Version and changes", to("account", {}, { view: "release" })], ["list", "Roadmap", to("account", {}, { view: "roadmap" })], ["list", "Request activity", to("activity")],
@@ -538,7 +520,6 @@ export function menuModel(me, home, { onSignOut, currentDesign = "/#projects" } 
 // ---- Workspace, People, Invitations, Explore (cookbook work/active/2026-10-21-ui-next-demo-wiring: the people and explore lanes' screens
 // read the live stores; the fixtures stay for the harness). Status: provisional.
 const userOf = (me) => { const name = String(me?.principal?.display_name || "").trim(); return { first: name.split(/\s+/)[0] || "You", initials: name ? name.split(/\s+/).slice(0, 2).map((w) => w[0]?.toUpperCase() ?? "").join("") : "Y", name }; };
-const PILL_OF = Object.freeze({ prepare: "setup", collect: "collecting", understand: "results", improve: "done" }); // the Workspace board's Stage pill words (Pill.svelte STAGE_LABELS)
 export const ROLES = Object.freeze({ owner: "Owner", member: "Member", viewer: "Viewer" });
 // The boards' words for what each role can do (fixtures/people/people.json); the server's gating is ui/scope-invitations.js, through people-data.js.
 export const CAN = Object.freeze({
@@ -593,55 +574,22 @@ export async function peopleModel(scope, me) {
   return { ...base, user: { ...base.user, workspace: "" }, review, workspace: null };
 }
 
-// A review's newest built report as { team: { score, responses }, … } (the Explore lane's levelOf input; levelWords for the Workspace
-// card). null when no report is built; a failed report read is null too, as projectModel's trend reads it (a level beside a review is
-// decoration; the review list itself is the shell's error when it fails).
-export async function reviewLenses(a) {
-  if (!["understand", "improve"].includes(a.stage)) return null;
-  try {
-    const r = await reports(a.id);
-    const newest = (r.reports ?? []).filter((x) => x?.id).sort((x, y) => String(y.created_at || "").localeCompare(String(x.created_at || "")))[0];
-    if (!newest) return null;
-    const rep = newest.payload ? newest : await report(newest.id);
-    const { counts, sent } = await lensSurvey(a.id), ns = respondentsOf(rep.payload, counts, sent); // snapshot first: the report's own evidence n, else the live count; sent-but-absent perspectives at 0
-    const out = {};
-    for (const l of rep.payload?.lenses ?? []) { const k = lensKeyOf(l.lens) ?? l.lens; out[k] = { score: Number(l.score), responses: Number(ns[k] ?? 0) }; }
-    for (const k of sent) if (!(k in out)) out[k] = { score: null, responses: 0 }; // sent out, no response at build time: More input needed, no score
-    return Object.keys(out).length ? inLensOrder(out) : null;
-  } catch { return null; }
-}
-export const levelWords = (lenses) => Object.fromEntries(Object.entries(lenses ?? {}).map(([k, v]) => [k, LEVEL_KEY[v3ScoreBand(Number(v.score), Number(v.responses), levelCutoffs())] ?? "more"]));
-/** [lens, level, respondents] for the summary cards (Workspace): the count travels with each level so a low-evidence level is never bare. */
-export const levelTriples = (lenses) => Object.entries(levelWords(lenses)).map(([k, l]) => [k, l, Number.isFinite(Number(lenses[k]?.responses)) ? Number(lenses[k].responses) : null]);
-const monthOf = (iso) => { const d = new Date(iso); return isNaN(d) ? "" : d.toLocaleDateString("en-US", { month: "short", year: "numeric" }); };
-const formatIconOf = (formats) => (formats.some((f) => /audio|oral/i.test(f)) ? "mic" : formats.some((f) => /video|sign/i.test(f)) ? "video" : "list");
 
 // Workspace (fixtures/people/workspace.json's shape for screens/people/Workspace.svelte): GET /v2/workspaces/{id} names the grouped
-// projects with their counts; each project's reviews give its stage, languages, formats, activity and (from the newest review with
-// a built report) its levels. The group dialog's candidates are the account's own ungrouped projects with their direct role (GET
+// projects with their counts (no review is read: owner rule, reviews appear only inside an opened project). The group dialog's candidates are the account's own ungrouped projects with their direct role (GET
 // /v2/projects direct_role: ui/workspace-manager.js mayGroup decides, through people-data.js groupRows).
 export async function workspaceModel(wid, me) {
   const [{ workspace: w, projects: wps }, mine] = await Promise.all([workspace(wid), projects()]);
   const live = wps ?? [];
-  const lists = await Promise.all(live.map((p) => assessmentsOf(p.id).then((as) => as.filter((a) => !a.archived_at).sort((x, y) => String(y.created_at).localeCompare(String(x.created_at))))));
-  const all = lists.flat();
-  useSessionPolicy();
-  const cards = await Promise.all(live.map(async (p, i) => {
-    const as = lists[i];
-    const langs = [...new Set(as.map((a) => a.language_name).filter(Boolean))];
-    const formats = [...new Set(as.map(fmt).filter(Boolean))];
-    const reported = as.find((a) => ["understand", "improve"].includes(a.stage));
-    const lenses = reported ? await reviewLenses(reported) : null;
-    return {
-      id: p.id, title: p.name, archived_at: p.archived_at, directRole: mine.find(x => x.id === p.id)?.direct_role ?? null, href: to("project", { pid: p.id }), stage: as[0] ? PILL_OF[as[0].stage] ?? "setup" : "setup",
-      language: langs.join(" · ") || "Language not set", format: formats.join(" · ") || "Format not set", formatIcon: formatIconOf(formats),
-      orgs: p.organization ? [[p.organization, false]] : [], reviews: Number(p.assessment_count ?? as.length), responses: Number(p.response_count ?? 0),
-      activity: as[0] ? ago(as[0].updated_at || as[0].created_at) : "no review yet", levels: lenses ? levelTriples(lenses) : null,
-      phone: [langs[0], formats[0]].filter(Boolean).join(" · ") || "No review yet",
-    };
+  // Owner rule: a workspace lists its projects only. No review is read here, so no review's stage, level, language, format or
+  // activity is drawn on a project card; the aggregate counts the project list carries stay.
+  const cards = live.map((p) => ({
+    id: p.id, title: p.name, archived_at: p.archived_at, directRole: mine.find(x => x.id === p.id)?.direct_role ?? null, href: to("project", { pid: p.id }),
+    orgs: p.organization ? [[p.organization, false]] : [], reviews: Number(p.assessment_count ?? 0), responses: Number(p.response_count ?? 0),
+    phone: [countText(p.assessment_count, "review"), countText(p.response_count, "response")].filter(Boolean).join(" · ") || "No counts yet",
   }));
-  const year = String(new Date().getFullYear());
-  const stats = [["Projects", live.length], ["Languages", new Set(all.map((a) => a.language_name).filter(Boolean)).size], ["Reviews collecting", all.filter((a) => a.stage === "collect").length], ["Results ready", all.filter((a) => a.stage === "understand").length], ["Completed this year", all.filter((a) => a.stage === "improve" && String(a.updated_at || a.created_at).startsWith(year)).length]];
+  const sum = (key) => live.reduce((n, p) => n + (Number.isSafeInteger(p[key]) && p[key] > 0 ? p[key] : 0), 0);
+  const stats = [["Projects", live.length], ["Reviews", sum("assessment_count")], ["Responses", sum("response_count")]];
   const candidates = (mine ?? []).filter((p) => !p.archived_at && !p.workspace_id).map((p) => ({ id: p.id, title: p.name, directRole: p.direct_role ?? null, groupingEligible: p.grouping_eligible }));
   return {
     id: w.id, role: w.role, user: userOf(me), name: w.name, short: w.name,
@@ -662,21 +610,4 @@ export async function invitationsModel(me) {
     kinds: INVITATION_KINDS, can: { owner: "you can change everything", member: "you can start and run reviews", viewer: "you can read results" },
     phoneCan: { owner: "change everything", member: "facilitate reviews", viewer: "read results" }, roles: ROLES,
   };
-}
-
-// Explore (fixtures/explore/explore.json's shape for screens/explore/Explore.svelte): every review the account can see, from Home's real
-// projects and reviews (a failed read is the shell's error), with each review's real response count and, where a report is built, its
-// per-perspective score and count (explore-data.js levelOf bands them). No filter, grouping or saved view is wired (the server has
-// no list/roll-up capability for them), so none is claimed: the chips, group-by options and add-filter rows are empty.
-export async function exploreModel(me) {
-  const home = await homeModel(me);
-  // Explore bands with the results lane's cut-off (explore-data.js levelOf): the session's served policy, never a per-review read.
-  const levelMinimum = useSessionPolicy();
-  const rows = await Promise.all(home.rows.map(async ({ a, p }) => ({
-    id: a.id, title: a.name, project: p.name, projectId: a.project_id || p.id, projectHref: to("project", { pid: a.project_id || p.id }), updatedAt: a.updated_at || a.created_at, language: a.language_name || "", region: "", orgs: p.organization || "",
-    stage: Object.hasOwn(PILL_OF, a.stage) ? a.stage : "prepare", responses: { n: Number(a.response_count ?? 0) }, lenses: await reviewLenses(a),
-    updated: ago(a.updated_at || a.created_at), href: to(a.stage === "prepare" ? "review" : a.stage === "collect" ? "collect" : "results", { aid: a.id }),
-  })));
-  const phone = rows.map((r) => ({ title: r.title, href: r.href, meta: [r.project, monthOf(home.rows.find((x) => x.a.id === r.id)?.a.created_at)].filter(Boolean).join(" · "), team: r.lenses?.team ?? null, lenses: r.lenses ?? null }));
-  return { viewKey: me?.principal?.id ? `${me.principal.id}:${me.principal.access_mode || "my"}` : null, levelMinimum, projects: home.projects, user: home.user, workspace: home.workspace, visible: rows.length, filters: [], groupBy: { options: ["None"], selected: "None" }, addFilter: [], reviews: rows, phone: { chips: [], rows: phone, sheet: [] } };
 }

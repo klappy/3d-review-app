@@ -60,7 +60,7 @@ const SCREENS: [string, C, string[] | null, string[]][] = [
     ["Practice copy · not a real review", "of 30 simulated", "Share the practice survey", "Delete this practice copy", "Fill with simulated responses"]],
   ["paper-entry", PaperEntry, ["Enter a paper answer", "Code on the paper", "Most of it is easy, but some parts are hard", "Save and enter the next paper", "Entered today", "Last receipt · Reference R2048732 · "],
     ["Paper · Community · sheet 7 · question 1 of 13", "Their words", "Next question"]],
-  ["menu", MenuSheet, null, ["Your reviews", "Bincy K · bincy@bcs.org.in", "BCS · India — switch workspace", "Sign out", "Start a 3D Review"]],
+  ["menu", MenuSheet, null, ["Your projects", "Bincy K · bincy@bcs.org.in", "BCS · India — switch workspace", "Sign out", "Start a 3D Review"]],
 ];
 
 describe("actions lane registry and routes", () => {
@@ -126,7 +126,7 @@ describe("actions lane links: the shared href() helper, literal names, w/theme c
       const src = readFileSync(join(LANE_DIR, f), "utf8").replace(/<!--[\s\S]*?-->/g, "").replace(/^\s*\/\/.*$/gm, "");
       expect(src.match(/[?&]screen=/g), f).toBeNull();
     }
-    expect([...declared].sort()).toEqual(["about", "action-plan", "close-collection", "collect", "explore", "feedback", "help", "home", "invitations", "landing", "menu", "next-step", "paper-entry", "people", "print", "project", "qr-room", "results", "review-links", "review-tools", "sandbox", "setup1", "setup5", "share", "sign-in", "workspace"]);
+    expect([...declared].sort()).toEqual(["about", "action-plan", "close-collection", "collect", "feedback", "help", "home", "invitations", "landing", "menu", "next-step", "paper-entry", "people", "print", "project", "qr-room", "results", "review-links", "review-tools", "sandbox", "setup1", "setup5", "share", "sign-in", "workspace"]);
   });
   it("no fixture carries a link (links are built in the .svelte files, where the shared link test reads them)", () => {
     const dir = resolve(__dirname, "../ui-next/fixtures/actions");
@@ -155,7 +155,7 @@ describe("actions lane links: the shared href() helper, literal names, w/theme c
     const n = mount(NextStep, { phone: true });
     expect(n.querySelector("a[aria-label='More actions']")?.getAttribute("href")).toBe("?ui_next=on&screen=collect&w=phone&state=menu");
     const m = mount(MenuSheet);
-    expect([...m.querySelectorAll("a.card-link")].map((el) => new URLSearchParams(el.getAttribute("href") ?? "").get("screen"))).toEqual(["invitations", "collect", "setup1", "results", "sandbox"]);
+    expect([...m.querySelectorAll("a.card-link")].map((el) => new URLSearchParams(el.getAttribute("href") ?? "").get("screen"))).toEqual(["invitations", "project", "project", "sandbox"]);
   });
 });
 
@@ -508,8 +508,8 @@ describe("actions lane controls act, and the ones that cannot yet are named debt
   // "label → screen[state]#hash". NAV: the label names where it goes, or it leaves without acting. STAND_IN: it should act but only
   // navigates, each named debt in RESULTS-actions round 4. A new control in neither list fails, so no stand-in is silent.
   const NAV = [
-    "+ filter → explore", "Cancel → collect", "Cancel → sandbox", "Close collection now → close-collection", "Discard → collect", "Done → collect",
-    "Edit details and dates → setup1", "Explore all → explore", "Help and FAQ → help", "Hindi New Testament → project", "Invitations · 1 new → invitations",
+    "Cancel → collect", "Cancel → sandbox", "Close collection now → close-collection", "Discard → collect", "Done → collect",
+    "Edit details and dates → setup1", "Help and FAQ → help", "Hindi New Testament → project", "Invitations · 1 new → invitations",
     "Luke 1–2 · improve → next-step", "Mark 1–4 draft → collect", "Meeting offline? Print and paper → collect#offline", "Meeting offline? card on Collect → collect#offline",
     "More actions → collect[menu]", "People with access → people", "Print or share the plan → action-plan", "Print {survey} survey → print",
     "QR code for {survey} → qr-room", "QR for {survey} → qr-room", "See all results → results", "Public website home → landing", "Send app feedback → feedback", "Share the practice survey → share",

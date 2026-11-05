@@ -53,31 +53,13 @@ describe('project card totals use only the supplied authorized aggregates', () =
     expect(request).not.toHaveBeenCalled();
   });
 
-  it('a project-only zero and empty authorized child list do not claim the backend project has no reviews', async () => {
+  it('a project card never lists or fetches its reviews outside the project (owner rule), and its totals stay the server aggregates', () => {
     const request = readsOnly();
-    const view = render(Projects, { phone: true, projects: [{ ...base, id: 'project-only', role: 'owner', assessment_count: 0, response_count: 0 }] });
-    await fireEvent.click(view.getByRole('button', { name: 'Show reviews in Synthetic project' }));
-    await waitFor(() => expect(view.getByText('No reviews available to you in this project.')).toBeTruthy());
-    expect(view.queryByText('No reviews in this project yet.')).toBeNull();
-    expect(request).toHaveBeenCalledTimes(1);
-    expect(request.mock.calls[0][0]).toBe('/v2/projects/project-only/assessments');
-  });
-
-  it('archived-review visibility does not silently change the server totals or recompute them from displayed rows', async () => {
-    const request = vi.fn(async () => new Response(JSON.stringify({ ok: true, result: { assessments: [
-      { id: 'active', name: 'Active review', response_count: 5 },
-      { id: 'archived', name: 'Archived review', response_count: 3, archived_at: '2026-10-30' },
-    ] } })));
-    vi.stubGlobal('fetch', request);
     const view = render(Projects, { phone: true, projects: [{ ...base, assessment_count: 2, response_count: 8 }] });
-    await fireEvent.click(view.getByRole('button', { name: 'Show reviews in Synthetic project' }));
-    await view.findByRole('link', { name: 'Active review' });
-    expect(view.queryByRole('link', { name: 'Archived review · Archived' })).toBeNull();
+    expect(view.queryByRole('button', { name: /Show reviews/ })).toBeNull();
+    expect(view.queryByRole('checkbox', { name: /archived reviews/i })).toBeNull();
     expect(view.getByText('Synthetic · viewer · 2 reviews · 8 responses')).toBeTruthy();
-    await fireEvent.click(view.getByRole('checkbox', { name: 'Include archived reviews inside projects' }));
-    expect(view.getByRole('link', { name: 'Archived review · Archived' })).toBeTruthy();
-    expect(view.getByText('Synthetic · viewer · 2 reviews · 8 responses')).toBeTruthy();
-    expect(request).toHaveBeenCalledTimes(1);
+    expect(request).not.toHaveBeenCalled();
   });
 
   it('an empty authorized project result displays no invented project or response total', () => {

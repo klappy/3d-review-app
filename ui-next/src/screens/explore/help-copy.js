@@ -29,8 +29,8 @@ export const TOPICS = Object.freeze([
     "Under Understand, every perspective is placed on the same levels — Strong, Growing, Needs support, Needs urgent attention, or More input needed when too few have answered — and they are never averaged into one number. Read the gaps first: two perspectives two levels apart or more is where to start talking. Improve holds what you will talk about and do next."],
   ["h6", "Privacy", [privacy(SAFE_LEVEL_MIN)], privacy(SAFE_LEVEL_MIN)],
   ["h7", "What changed",
-    ["Addresses from the old 3D Review site now forward to the new app: to the same project where there is a match, otherwise to Your reviews. The help that used to sit inside the steps now lives on this page, so the steps stay short. Forwarding moves no answers: anything entered on the old site stays there."],
-    "Addresses from the old 3D Review site now forward to the new app: to the same project where there is a match, otherwise to Your reviews. The help that used to sit inside the steps now lives on this page, so the steps stay short. Forwarding moves no answers: anything entered on the old site stays there."],
+    ["Addresses from the old 3D Review site now forward to the new app: to the same project where there is a match, otherwise to Your projects. The help that used to sit inside the steps now lives on this page, so the steps stay short. Forwarding moves no answers: anything entered on the old site stays there."],
+    "Addresses from the old 3D Review site now forward to the new app: to the same project where there is a match, otherwise to Your projects. The help that used to sit inside the steps now lives on this page, so the steps stay short. Forwarding moves no answers: anything entered on the old site stays there."],
 ]);
 export const FAQ_TITLE = Object.freeze(["h8", "Common questions"]);
 export const FAQ = Object.freeze([

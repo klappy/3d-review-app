@@ -29,7 +29,14 @@ describe('workspace lifecycle', () => {
   expect(workspaceProjects(cards).map(x=>x.id)).toEqual(['1']);
   expect(workspaceProjects(cards,'','All')).toHaveLength(2);
   expect(workspaceProjects(cards,'beta','Archived').map(x=>x.id)).toEqual(['2']);
-  expect(workspaceProjects(cards,'french','All').map(x=>x.id)).toEqual(['1']);
+  expect(workspaceProjects(cards,'french','All').map(x=>x.id)).toEqual([]);
+ });
+ it('searches project-only fields: title and organisation, never review language or format (PR606 P2)', () => {
+  const cards=[{id:'1',title:'Alpha',orgs:[['Wycliffe Nigeria',false]]},{id:'2',title:'Beta',orgs:[]}];
+  expect(workspaceProjects(cards,'wycliffe','All').map(x=>x.id)).toEqual(['1']);
+  expect(workspaceProjects(cards,'alp','All').map(x=>x.id)).toEqual(['1']);
+  expect(workspaceProjects(cards,'beta','All').map(x=>x.id)).toEqual(['2']);
+  expect(workspaceProjects(cards,'english','All')).toEqual([]);
  });
  it('keeps each removable desktop project and its independent action in one grid cell', () => {
   const data={...fixture,id:w.id,role:'owner',projects:fixture.projects.slice(0,2).map((p,i)=>({...p,id:`p${i}`,directRole:'owner'}))};

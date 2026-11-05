@@ -56,18 +56,18 @@
         <a class="card-link list-row" href={WORKSPACE}>{@render tile(I.check)}<div class="list-body"><div class="list-title">{e.name}</div><div class="small">Accepted · {e.when}</div></div></a>
       {/each}
     </Card>{/if}
-    <a class="link" href={HOME}>Back to your reviews</a>
+    <a class="link" href={HOME}>Back to your projects</a>
   {:else}
     <Page width="read">
       <Card hi gap={5} label="Your invitations">
-        <Stack gap={2}><h1 class="h1">Your invitations</h1><p class="small t-15">Accepting adds the project or review to <strong>Your reviews</strong>.</p></Stack>
+        <Stack gap={2}><h1 class="h1">Your invitations</h1><p class="small t-15">Accepting adds the project to <strong>Your projects</strong>; a review-only invitation opens that review.</p></Stack>
         {#each rows as r, i (r.key)}
           <div class="solid l-card l-row" data-pad="form" data-gap="4" role="group" aria-labelledby={`inv-${r.key}`} {@attach accepting(r.key)}>
             {@render tile(I.mail)}<div data-grow=""><div class="h3" id={`inv-${r.key}`}>{r.title}</div><p class="small">{r.line}</p></div>
             <Button label="Decline" variant="quiet" href={HOME} />{#if i === 0}<Button label="Accept" variant="primary" href={HOME} />{:else}<Button label="Accept" href={HOME} lead={check} />{/if}
           </div>
         {/each}
-        <a class="link" href={HOME}>Back to your reviews</a>
+        <a class="link" href={HOME}>Back to your projects</a>
       </Card>
     </Page>
   {/if}

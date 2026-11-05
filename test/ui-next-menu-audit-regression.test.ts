@@ -11,7 +11,7 @@ import { setLiveContext } from '../ui-next/src/screens/href.js';
 import { loadMenuIdentity, loadMenuModel, MENU_READ_LIMIT_MS } from '../ui-next/src/app/menu-loader.js';
 
 const me = { principal: { id: 'synthetic-owner', display_name: 'Synthetic Owner', email: 'owner@example.invalid', access_mode: 'my' }, grants: [] };
-const home = { user: { first: 'Synthetic', name: 'Synthetic Owner', initials: 'SO' }, workspace: 'Synthetic workspace', workspaces: [], projects: [], groups: [], completed: [], empty: true };
+const home = { user: { first: 'Synthetic', name: 'Synthetic Owner', initials: 'SO' }, workspace: 'Synthetic workspace', workspaces: [], projects: [], projectCards: [], empty: true };
 afterEach(() => { cleanup(); vi.useRealTimers(); vi.restoreAllMocks(); vi.unstubAllGlobals(); S.forget(); setLiveChrome(null); setLiveContext(null); history.replaceState(null, '', '/next/?ui_next=on'); });
 
 function phone() {
@@ -109,14 +109,15 @@ it.each(['reject', 'timeout'])('optional review history %s keeps account actions
   await vi.advanceTimersByTimeAsync(MENU_READ_LIMIT_MS + 1);
   const model = await pending;
   expect(model.historyStatus).toBe('unavailable');
-  expect(model.completed).toBeNull();
-  expect(model.reviews).toEqual([]);
+  expect(model.projectCards).toEqual([]);
+  expect(model.reviews).toBeUndefined();
+  expect(model.completed).toBeUndefined();
   const view = render(MenuSheet, { data: model });
   expect(view.getByRole('navigation', { name: 'Workspace and account' })).toBeTruthy();
-  expect(view.getByRole('status').textContent).toContain('review list could not be loaded');
-  expect(view.getByRole('link', { name: 'Open your reviews to retry' })).toBeTruthy();
+  expect(view.getByRole('status').textContent).toContain('project list could not be loaded');
+  expect(view.getByRole('link', { name: 'Open your projects to retry' })).toBeTruthy();
   expect(view.queryByText('Completed · 0')).toBeNull();
-  late.resolve({ ...home, groups: [{ stage: 'collecting', reviews: [{ title: 'Late private history' }] }] });
+  late.resolve({ ...home, projectCards: [{ id: 'late', title: 'Late private history', href: '#p' }] });
   await flush();
   expect(view.container.textContent).not.toContain('Late private history');
   expect(readHome).toHaveBeenCalledOnce();
@@ -130,7 +131,8 @@ it('a delayed authorized history read uses its actual menu data before the bound
   late.resolve(home);
   const model = await pending;
   expect(model.historyStatus).toBe('ready');
-  expect(model.completed).toBe(0); // known zero from a successfully read, empty authorized history
+  expect(model.projectCards).toEqual([]); // a successfully read, empty authorized project list
+  expect(model.reviews).toBeUndefined();
   expect(model.items.map((row: any[]) => row[1])).toContain('Projects');
 });
 

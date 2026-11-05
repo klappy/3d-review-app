@@ -24,7 +24,7 @@ describe("/next/ route for registered lane screens", () => {
     expect("state" in route(p("?screen=fake-screen"), on(), FAKE).props).toBe(true);
   });
   it("an unknown or unregistered name falls back to Home", () => {
-    const home = { view: "home", props: { state: "reviews", phone: false, theme: "light" } };
+    const home = { view: "home", props: { state: "projects", phone: false, theme: "light" } };
     expect(route(p("?screen=nope"), on(), FAKE)).toEqual(home);
     expect(route(p("?screen=fake-screen"), on(), [])).toEqual(home);
     expect(route(p("?screen=fake-screen"), on())).toEqual(home);
