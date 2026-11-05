@@ -34,6 +34,7 @@
   import PhoneBar from "../PhoneBar.svelte";
   import Button from "../Button.svelte";
   import Icon from "../Icon.svelte";
+  import Tag from "../Tag.svelte";
   import { I } from "../icons.js";
   import fixture from "../../fixtures/home.json";
 
@@ -70,7 +71,7 @@
     {#if data.invitation}<a class="card-link glass l-card l-row inv-banner" data-pad="bar" data-gap="3" href="#invitations"><span class="icn" data-size="32" data-lens="church"><Icon d={I.mail} /></span><span class="small"><b>1 invitation</b> · {data.invitation.phone}</span><Icon d={I.chev} /></a>{/if}
     {#each data.projectCards ?? [] as c}
       <Card href={c.href} gap={2}>
-        <span class="h2">{c.title}</span>
+        <Row wrap gap={2}><span class="h2">{c.title}</span>{#if c.limited}<Tag label="Assessment only" />{/if}</Row>
         {#if c.meta}<span class="small">{c.meta}</span>{/if}
         <span class="link l-row" data-gap="2">Open project<Icon d={ARROW} /></span>
       </Card>
@@ -112,7 +113,7 @@
         <Section heading="Projects" help="open a project to see its reviews">
           {#each data.projectCards ?? [] as c}
             <Card href={c.href} gap={3}>
-              <Row wrap gap={3}><h3 class="h2">{c.title}</h3></Row>
+              <Row wrap gap={3}><h3 class="h2">{c.title}</h3>{#if c.limited}<Tag label="Assessment only" />{/if}</Row>
               {#if c.meta}<span class="small">{c.meta}</span>{/if}
               <Row><span class="btn">Open project<Icon d={ARROW} /></span></Row>
             </Card>
