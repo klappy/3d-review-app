@@ -316,11 +316,16 @@ function writeLines(doc, className, count) {
   for (let k = 0; k < count; k++) lines.append(el(doc, 'div'));
   return lines;
 }
-// S31: the one link a printed survey may carry — the survey's shared entry link (origin/#survey=<token>) with its QR as an
-// inline SVG data URI. Anything else (codes, other URLs, markup) is dropped, so the paper falls back to "no shared link".
-export const SURVEY_LINK_RE = /^https?:\/\/[^/?#\s"<>]+\/#survey=[A-Za-z0-9_-]+$/;
+// S31: only the supported shared survey entry routes — root (individual PDF/current UI) or Next's explicit opt-in route.
+// Preserve the supplied URL and participant client. Other paths, queries, codes and markup still fall back to "no shared link".
+export const SURVEY_LINK_RE = /^https?:\/\/[^/?#\s"<>]+\/(?:next\/\?ui_next=on)?#survey=[A-Za-z0-9_-]+$/;
+export function isSurveyLinkUrl(url) {
+  if (typeof url !== 'string' || !SURVEY_LINK_RE.test(url)) return false;
+  try { const parsed = new URL(url); return !parsed.username && !parsed.password; }
+  catch { return false; }
+}
 export function printableLink(link) {
-  if (!link || typeof link.url !== 'string' || !SURVEY_LINK_RE.test(link.url)) return null;
+  if (!link || !isSurveyLinkUrl(link.url)) return null;
   if (typeof link.qr !== 'string' || !link.qr.startsWith('data:image/svg+xml,')) return null;
   return { url: link.url, qr: link.qr };
 }

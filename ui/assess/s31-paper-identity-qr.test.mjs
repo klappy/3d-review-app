@@ -49,6 +49,23 @@ test('only the survey entry link is ever drawn; codes stay refused', async () =>
   assert.equal(refused.reason, 'unsafe-print');
 });
 
+test('Next paper preserves the exact existing URL and participant client; both supported routes print', () => {
+  const next = URL1.replace('/#', '/next/?ui_next=on#');
+  const link = paperLink({ url: next });
+  assert.equal(link.url, next);
+  assert.deepEqual(printableLink(link), link);
+  assert.notEqual(link.qr, paperLink({ url: URL1 }).qr, 'different entry clients keep their exact URL in the QR');
+  const html = printDocumentHtml({ ...base, link });
+  assert.ok(html.includes(`<div class="p-url">${next}</div>`));
+  assert.match(html, /<img class="qr"/);
+  assert.doesNotMatch(html, /No shared link/);
+  for (const url of [next.replace('?ui_next=on', ''), next.replace('ui_next=on', 'ui_next=off'), next.replace('ui_next=on', 'ui_next=on&redirect=x'), next.replace('/next/', '/other/'), next + '&extra=x', next.replace('link_AbC123-_x', 'bad%20token'), 'https://user:pass@x.test/#survey=abc', 'https://x.test:bad/#survey=abc', 'javascript:alert(1)', '', null]) {
+    assert.equal(paperLink({ url }), null, String(url));
+    assert.equal(printableLink({ url, qr: link.qr }), null, 'renderer also refuses ' + String(url));
+  }
+  assert.equal(paperLink(null), null);
+});
+
 test('activeSurveyLink reads the active link through issue_link and never mints one', async () => {
   const calls = [];
   const api = active => async (url, init) => { calls.push({ url, mode: init.body.mode }); return init.body.mode === 'dry_run' ? { confirm_token: 'ct', ...(active ? { reuses: 'invite_1' } : {}) } : { link_id: 'invite_1', entry_fragment: '#survey=link_AbC123-_x', reused: true }; };
