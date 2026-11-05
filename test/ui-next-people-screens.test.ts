@@ -184,7 +184,7 @@ describe("Workspace and the group dialog", () => {
   it("N2: the project search field is sized to its whole placeholder (no clipped words; the board's 260px has no width row)", () => {
     const f = mount(Workspace).querySelector(".in-search input") as HTMLInputElement;
     expect(f.size).toBe(f.placeholder.length);
-    expect(f.placeholder).toBe("Find a project or language");
+    expect(f.placeholder).toBe("Find a project or organisation");
   });
   it("phone links keep &w=phone and ?theme= (F4): header back, crumb and 'Your projects across workspaces'", () => {
     window.history.replaceState(null, "", "/next/?ui_next=on&screen=people-workspace&w=phone&theme=dark");

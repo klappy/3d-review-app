@@ -75,7 +75,7 @@
   const selectedRow = $derived(rows.find((c) => c.can && (c.id ?? c.title) === picked) ?? rows.find((c) => c.can));
   const selected = $derived(selectedRow?.id ?? selectedRow?.title ?? null);
   const grouping = (el) => { const f = (e) => { if (ongroup && e.target instanceof Element && e.target.closest(".btn-primary") && selected != null) { e.preventDefault(); ongroup(selected); } }; el.addEventListener("click", f); return () => el.removeEventListener("click", f); };
-  const FIND = "Find a project or language";
+  const FIND = "Find a project or organisation";
   // Escape closes the native modal (close event): drop the dialog and restore New project as the primary, at the Cancel target's address.
   let closed = $state(false);
   const open = $derived(group && !closed);
