@@ -108,3 +108,20 @@ it('every available seeded survey form can build a single-response Summit report
   if(dimensions.filter((d:any)=>typeof d.score==='number'&&Number.isFinite(d.score)).length<3)expect(models).toHaveLength(0);
  }
 },60000);
+
+it('G02 history guard: changing current zero-response survey selection cannot change an existing named PDF',async()=>{
+ const c=summit(),made:any=(await build(c,{aid:one})).result;
+ const session=await mintSession(c.env,'person_mara','user');let rendered='';
+ const browser={quickAction:async(_:string,options:any)=>{rendered=options.html;return new Response('%PDF-local',{headers:{'content-type':'application/pdf'}})}};
+ const get=async(format:string)=>{
+  const response=await app.fetch(new Request(`https://local.invalid/v2/reports/${made.report.id}/pdf?format=${format}`,{headers:{authorization:`Bearer ${session}`}}),{...c.env,PDF_BROWSER:browser} as any);
+  expect(response.status).toBe(200);expect(rendered).toContain('Other perspectives’ participation is unknown.');return rendered;
+ };
+ const zeroSurveys=(await db.prepare('SELECT s.id,s.state FROM assessment_survey s LEFT JOIN response r ON r.assessment_survey_id=s.id WHERE s.assessment_id=? GROUP BY s.id HAVING count(r.id)=0').bind(one).all<{id:string;state:string}>()).results;
+ expect(zeroSurveys.length).toBeGreaterThan(0);
+ const before=new Map();for(const f of ['overview','detailed'])before.set(f,await get(f));
+ try{
+  for(const s of zeroSurveys)await run("UPDATE assessment_survey SET state='archived' WHERE id=?",s.id);
+  for(const f of ['overview','detailed'])expect(await get(f),f).toBe(before.get(f));
+ }finally{for(const s of zeroSurveys)await run('UPDATE assessment_survey SET state=? WHERE id=?',s.state,s.id);}
+},60000);

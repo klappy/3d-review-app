@@ -169,9 +169,9 @@ const byName = (all, names) => list(names).map((name) => all.find((a) => a.name 
 export function bandRow(report, counts, name) {
   const row = areas(report).find((r) => r.name === name);
   if (!row) throw new TypeError(`results: no cross-perspective area "${name}" in the report`);
-  return band(row, responsesFor(report?.payload, counts));
+  return band(row, responsesFor(report?.payload, counts), report);
 }
-function band(row, responses) {
+function band(row, responses, report) {
   const { name, question } = row;
   const asked = LENS_ORDER.filter((lens) => row.lenses.some((s) => s.lens === lens));
   const levelled = asked.map((lens) => {
@@ -181,7 +181,9 @@ function band(row, responses) {
   const dots = levelled.filter((d) => BANDS.includes(d.level));
   const scores = dots.map((d) => d.score);
   const spread = scores.length < 2 ? null : dots.length === row.lenses.length ? row.spread : Math.max(...scores) - Math.min(...scores);
-  const more = levelled.filter((d) => !BANDS.includes(d.level)).map((d) => d.label);
+  // Only a selected perspective with no recorded responses is waiting for input. A responded perspective can still be unasked about this area.
+  const zeroSelected = LENS_ORDER.filter(lens => list(report?.sent).includes(lens) && !asked.includes(lens) && !(responses(lens) > 0));
+  const more = [...levelled.filter((d) => !BANDS.includes(d.level)).map((d) => d.label), ...zeroSelected.map(lensLabel)];
   for (const band of BANDS) {
     const here = dots.filter((d) => d.level === band);
     here.forEach((d, i) => { d.x = bandCentre(band) + 5 * (i - (here.length - 1) / 2); });
@@ -190,15 +192,15 @@ function band(row, responses) {
   const apart = idx.length ? Math.max(...idx) - Math.min(...idx) : 0;
   const span = apart >= 2 ? { from: 12.5 + 25 * Math.min(...idx), to: 12.5 + 25 * Math.max(...idx) } : null;
   const verdict = dots.length < 2 ? "too few perspectives to compare" : apart >= 2 ? `${apart} bands apart — talk about this` : apart === 1 ? "1 band apart" : "same band";
-  const notAsked = LENS_ORDER.filter((lens) => !asked.includes(lens)).map(lensLabel);
-  const notes = [...more.map((l) => `${l} more input needed`), ...notAsked.map((l) => `${l} not asked`)];
+  const notAsked = LENS_ORDER.filter((lens) => !asked.includes(lens) && !zeroSelected.includes(lens)).map(lensLabel);
+  const notes = [...more.map((l) => `${l} more input needed`), ...notAsked.map((l) => `${l} ${report?.selectionKnown === false ? "no recorded score" : "not asked"}`)];
   return { name, question, dots, more, apart, span, verdict, notAsked, notes, spread, perspectives: asked.length };
 }
 
 /** bandRow for each name the report has as a cross-perspective area; a name the payload lacks is skipped, never thrown (R3-3). */
 export function bandRows(report, counts, names) {
   const responses = responsesFor(report?.payload, counts);
-  return byName(areas(report), names).map((a) => band(a, responses));
+  return byName(areas(report), names).map((a) => band(a, responses, report));
 }
 
 /** design-system.md section 4 report copy by the level minimum in force (Codex P1 4382475714): the footer's privacy clause (after
@@ -259,8 +261,8 @@ export const AGREE_NONE = "No compared area has every placed perspective in the 
  *  lensSpreadRows' full-spread order. */
 export function scoreRows(report, counts, names) {
   const all = areas(report), responses = responsesFor(report?.payload, counts);
-  if (names) return byName(all, names).map((a) => scoreRow(a, responses));
-  return all.map((a) => ({ a, row: scoreRow(a, responses) }))
+  if (names) return byName(all, names).map((a) => scoreRow(a, responses, report));
+  return all.map((a) => ({ a, row: scoreRow(a, responses, report) }))
     .sort(({ a: x, row: p }, { a: y, row: q }) => (p.spread === null) - (q.spread === null) || (q.spread ?? 0) - (p.spread ?? 0) || x.order - y.order)
     .map(({ row }) => row);
 }
@@ -275,10 +277,10 @@ export function gapRows(report, counts) {
  *  blank or odd names kept as constructName reads them (R4-3). */
 export function comparedRows(report, counts) {
   const responses = responsesFor(report?.payload, counts);
-  return areas(report).filter((a) => a.multi).map((a) => scoreRow(a, responses));
+  return areas(report).filter((a) => a.multi).map((a) => scoreRow(a, responses, report));
 }
-function scoreRow(area, responses) {
-  const b = band(area, responses), scores = b.dots.map((d) => d.score);
+function scoreRow(area, responses, report) {
+  const b = band(area, responses, report), scores = b.dots.map((d) => d.score);
   return { name: area.name, spread: b.spread, from: scores.length ? Math.min(...scores) : 0, to: scores.length ? Math.max(...scores) : 0, alarm: b.apart >= 2, notes: b.notes,
     dots: [...b.dots].sort((x, y) => x.score - y.score).map((d) => ({ lens: d.lens, label: d.label, score: d.score })) };
 }
@@ -298,7 +300,7 @@ export function radar(report, names, counts) {
   if (!model) return null;
   const drawn = LENS_ORDER.filter((lens) => model.lenses.some((l) => l.lens === lens));
   const asked = LENS_ORDER.filter((lens) => named.some((a) => scored(a).some((s) => s.lens === lens)));
-  const notes = LENS_ORDER.filter((lens) => !drawn.includes(lens)).map((lens) => `${lensLabel(lens)} ${asked.includes(lens) ? "more input needed" : "not asked"}`);
+  const notes = LENS_ORDER.filter((lens) => !drawn.includes(lens)).map((lens) => `${lensLabel(lens)} ${asked.includes(lens) || (list(report?.sent).includes(lens) && !(responses(lens) > 0)) ? "more input needed" : report?.selectionKnown === false ? "no recorded score" : "not asked"}`);
   return radarGeometry(model, drawn, notes);
 }
 

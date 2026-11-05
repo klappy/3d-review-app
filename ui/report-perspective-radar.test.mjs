@@ -27,3 +27,9 @@ test('each perspective retains its own genuine axis count, including 5/4/6 previ
  const models=subdimensionRadarModels([5,4,6].map((n,i)=>({lens:['team','community','church'][i],n:1,rows:Array.from({length:n},(_,j)=>({name:'Own dimension '+j,score:j*13}))})),1);
  assert.deepEqual(models.map(m=>m.spokes.length),[5,4,6]);assert.deepEqual(models.map(m=>m.lenses.length),[1,1,1]);
 });
+test('Next/export scope: the current screen renderer keeps its previous radar behavior',async()=>{
+ const {renderReport}=await import('./report-view.js');
+ const doc=new JSDOM('<html><body><main></main></body></html>').window.document,root=doc.querySelector('main');
+ const r=report();r.payload.source_commit='local-fixture';r.payload.versions={scorer:'fixture',narrative:'fixture',policy:'fixture'};
+ assert.equal(renderReport({doc,root,report:r,minimum:1}),true);assert.equal(root.querySelector('[data-perspective-radar]'),null);
+});

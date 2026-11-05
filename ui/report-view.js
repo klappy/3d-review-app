@@ -1,6 +1,5 @@
 import { renderReportCards } from './report-card.js';
 import { lensesCopy, renderLensesAgree } from './report-lenses.js';
-import { renderPerspectiveRadars } from './report-perspective-radar.js';
 import { renderLensRadar } from './report-radar.js';
 import { humanDate } from './assess/cards.js'; // one shared local-time formatter (B31)
 import { translationAgreementFor } from './report-agreement.js';
@@ -92,7 +91,6 @@ export function renderReport({ doc, root, report, minimum = 3 }) {
   // DEC-0014: the radar (high-numeracy view) follows the agree / disagree block; null below three shared areas.
   const radar = renderLensRadar({ doc, report });
   if (radar) out.push(radar);
-  out.push(...renderPerspectiveRadars({doc, report, minimum}));
   const cards = renderReportCards({ doc, report });
   if (cards) out.push(cards);
   const standalone = rows(payload.standalone_indicators);

@@ -1,5 +1,6 @@
 // A PDF is the existing paper/report presentation of an authorized read, never a new report build.
 import { paperHtml, PRINT_DOC_CSS } from '../assess/print.js';
+import { renderPerspectiveRadars } from '../report-perspective-radar.js';
 import { renderReport } from '../report-view.js';
 import { lensesCss, lensRespondents } from '../report-lenses.js';
 import { pdfFontCss } from './font.js';
@@ -54,6 +55,8 @@ export function reportPdfDocument(result, {paper='letter',minimum=3}={}) {
     (payload?.standalone_indicators||[]).some(i=>!Number.isFinite(i.n_responses)||i.n_responses<minimum)) throw new Error('PDF_REPORT_HELD');
   const root = node('div');
   if (!renderReport({doc,root,report:result.report,minimum})) throw new Error('Report unavailable.');
+  // Own-perspective radars belong to this export and Next; preserve the current screen renderer.
+  root.append(...renderPerspectiveRadars({doc,report:result.report,minimum}));
   // PDF documents have no interactive disclosure: retain provenance on paper.
   // Only this isolated print tree is opened; the shared screen renderer stays closed.
   for (const child of root.children) if (child.tag === 'details') child.setAttribute('open', '');

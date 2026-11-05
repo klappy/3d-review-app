@@ -71,8 +71,10 @@ export function installPdf(app:Hono<{Bindings:Env}>,context:(request:Request,env
     try {
       let identity={},surveys:unknown[]=[];
       if(format!=='full'){
-        // surveys: selected perspectives, so a zero-response one keeps its card as in the live report (G02).
-        const got=await read(ctx,'cap.assessment.get',{id:stored.assessment_id}),assessment=got.assessment;surveys=Array.isArray(got.surveys)?got.surveys:[];
+        // Identity may resolve from current assessment metadata; participation must never borrow current survey selection.
+        // Existing stored captures do not record selected zero-response perspectives. Keep that state unknown.
+        // Named formats still honor an explicit surveys list (G02) when a later snapshot supplies one.
+        const {assessment}=await read(ctx,'cap.assessment.get',{id:stored.assessment_id});
         let project='',language=assessment.language_name||assessment.language||'';
         try{project=(await read(ctx,'cap.project.get',{id:assessment.project_id})).project.name;const listed=await read(ctx,'cap.language.list',{pid:assessment.project_id});language=listed.languages.find((l:Record<string,any>)=>l.id===assessment.language_id)?.name||language;}
         catch(e){if(!(e instanceof PdfError)||![403,404].includes(e.status))throw e;}

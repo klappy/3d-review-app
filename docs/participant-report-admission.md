@@ -18,7 +18,7 @@ The Summit decision authorizes numeric reports from one participant response. Th
 
 Rollback: remove `SUMMIT_ONE_RESPONSE_REPORTS` from production vars and release through normal gates. Revisit after Summit. Previously viewed/downloaded aggregates cannot be retracted. One-response numeric aggregates represent that person's answers; retain true counts and limited-coverage cues. Raw responses, demographic/small-cell answer splits and question disclosure remain held under existing rules. Translation-type categorical agreement retains the prior per-environment 3-response production minimum rather than inheriting the temporary numeric override.
 
-Radar presentation: Detailed and full reports now add separate radars of each perspective's own stored subdimensions, matching the measure in Steve's previews. The existing shared-construct comparison is preserved. A perspective needs at least three genuine scored subdimensions and a known snapshot response count meeting the numeric level floor. Missing scores leave gaps; no axis is zero-filled. Detailed adds one page per qualifying perspective and all page counters follow that count. A one-response chart is labeled with its true count and limited-data wording.
+Radar presentation: Next Detailed and full-report PDF exports add separate radars of each perspective's own stored subdimensions, matching the measure in Steve's previews. The existing shared-construct comparison and current/legacy report screen are preserved. A perspective needs at least three genuine scored subdimensions and a known snapshot response count meeting the numeric level floor. Missing scores leave gaps; no axis is zero-filled. Detailed adds one page per qualifying perspective and all page counters follow that count. A one-response chart is labeled with its true count and limited-data wording.
 
 ## Verification boundaries and documentation debt
 
@@ -29,3 +29,9 @@ The projected `cap.report.build/get/list` capability descriptions still say synt
 ## Historical candidate state
 
 Before explicit activation, the 0.30.0 candidate left production disabled and changed no Worker variable or deployment configuration. It required disclosure-policy approval, independent review and normal release gates before activation. That earlier default-off state is superseded by the recorded activation above; its tests and approval chronology remain in the cookbook.
+
+## Prepared PDF provenance integration
+
+Named Overview and Detailed documents show saved report identity, build time, source and scorer/narrative/policy versions outside closed disclosures. Explicitly supplied selection evidence labels a selected perspective with no responses as More input needed across cards and comparisons. The endpoint does not substitute current survey selection for an old report: existing captures do not persist selected zero-response perspectives, so other perspectives' participation remains explicitly unknown. Changing today's zero-response selections must not change an existing named PDF.
+
+Complete selected-zero-response card acceptance still requires the report custodian's authoritative build-time selection snapshot contract. No migration, backfill, report-key or immutable capture/scoring change is included in this preparation. Old unknown selections cannot be reconstructed from current settings.

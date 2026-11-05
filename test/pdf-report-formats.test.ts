@@ -39,6 +39,8 @@ it('Other-only visible side and suppressed status presence have identical PDF ou
 const dropLens=(x:any,lens:string):any=>Array.isArray(x)?x.filter(v=>!(v&&typeof v==='object'&&v.lens===lens)).map(v=>dropLens(v,lens)):x&&typeof x==='object'?Object.fromEntries(Object.entries(x).map(([k,v])=>[k,dropLens(v,lens)])):x;
 function zeroChurch(){
  const id=ids[0],payload=dropLens({...structuredClone(corpus.contexts[id]),synthetic:true,source_commit:corpus.source_commit,versions:{scorer:'fixture',narrative:'fixture',policy:'fixture'}},'Church');
+ payload.evidence=payload.evidence.filter((e:any)=>!String(e.label).startsWith('Church — '));
+ if(payload.translation_type_agreement)payload.translation_type_agreement={...payload.translation_type_agreement,church_values:[],church_statuses:[],agree:null};
  expect(JSON.stringify(payload.lenses)).not.toContain('Church');
  return {suppressed:false,report:{id:'rep_g02_provenance',created_at:'2026-11-05T12:00:00Z',payload}};
 }
@@ -68,4 +70,22 @@ it('zero-response perspective card is present-with-no-data: held level, 0 respon
 it('detailed named PDF carries the saved report id and top-level created_at',()=>{
  const html=storedReportDocument(zeroChurch(),{minimum:1,format:'detailed',paper:'a4',surveys});
  expect(html).toContain('Report: rep_g02_provenance');expect(html).toContain('Built: 2026-11-05T12:00:00Z');
+});
+
+it('G02 integration: provenance is visible outside details in BOTH named documents and selected zero-response notes stay consistent',()=>{
+ const stored=zeroChurch();
+ for(const format of ['overview','detailed'] as const){
+  const html=storedReportDocument(stored,{minimum:1,format,paper:'a4',surveys});
+  const withoutDetails=html.replace(/<details\b[\s\S]*?<\/details>/g,'');
+  expect(withoutDetails,format).toContain('Report: rep_g02_provenance');expect(withoutDetails).toContain('Built: 2026-11-05T12:00:00Z');
+  expect(withoutDetails).toContain('data-report-provenance');expect(withoutDetails).not.toContain('Church not asked');
+  expect(withoutDetails).toContain('Church more input needed');
+ }
+});
+it('G02 integration: missing historical selection is explicitly unknown, not reconstructed from invented zero-response cards',()=>{
+ for(const format of ['overview','detailed'] as const){
+  const html=storedReportDocument(zeroChurch(),{minimum:1,format,paper:'a4'});
+  expect(tile(html,'church')).toBe(false);expect(html).toContain('Other perspectives’ participation is unknown.');
+  expect(html).not.toContain('Church not asked');
+ }
 });
