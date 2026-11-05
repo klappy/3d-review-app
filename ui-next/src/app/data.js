@@ -373,8 +373,11 @@ export const phonePayload = (payload) => ({ ...payload, lenses: (payload.lenses 
  *  level minimum never chooses or names the area (Codex P2 4383033523). null when no report is built. */
 export function liveReport(m, { phone = false, screen = "" } = {}) {
   if (!m?.payload) return null;
-  const full = m.payload, cards = lensCards(full, m.counts, { sent: m.sent }), rows = gapRows({ payload: full }, m.counts);
-  return { reportId: m.reportId, created_at: m.created_at, review: m.review, counts: m.counts, sent: m.sent, payload: phone && screen === "results" ? phonePayload(full) : full,
+  // Results is a current collection hub. Saved-report readers must not borrow today's selected surveys for old snapshots.
+  // Existing captures record responding perspectives only; selected-but-unanswered participation remains unknown.
+  const collectionHub = screen === "results", sent = collectionHub ? m.sent : [];
+  const full = m.payload, cards = lensCards(full, m.counts, { sent }), rows = gapRows({ payload: full }, m.counts);
+  return { reportId: m.reportId, created_at: m.created_at, review: m.review, counts: m.counts, sent, selectionKnown: collectionHub ? undefined : false, payload: phone && screen === "results" ? phonePayload(full) : full,
     gaps: gapsOf(full, m.counts), radar: radarOf(full), lookNext: lookNextOf(cards), standsOut: standsOutOf(cards, rows) };
 }
 

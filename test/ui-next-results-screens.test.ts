@@ -1161,3 +1161,20 @@ it('Summit one-response Detailed draws the genuine own-perspective radar on desk
   useLevelMinimum(3);
   expect(mount(ReportDetailed,{report}).querySelector('[data-perspective-radar]')).toBeNull();
 });
+
+it('G02: Next saved-report readers cannot inherit changing live selection; collection hub remains current',()=>{
+ const community=REPORT.desktop.payload.lenses.find((l:any)=>l.lens==='community');
+ const payload={...REPORT.desktop.payload,lenses:[community],cross_lens_multi:[],cross_lens_single:[],evidence:[{label:'community — Written',n:1}]};
+ const base={payload,reportId:'saved-snapshot',created_at:'2026-11-05T12:00:00Z',review:REPORT.desktop.review,counts:{community:99,team:0,church:0},sent:['team','community','church']};
+ const before=JSON.stringify(base);
+ for(const screen of ['report','report-detailed','results-gaps','results-answers'])for(const phone of [false,true]){
+  const a=liveReport(base,{screen,phone}),b=liveReport({...base,sent:['community']},{screen,phone});
+  expect(a.sent).toEqual([]);expect(a.selectionKnown).toBe(false);expect(a).toEqual(b);expect(a.payload).toBe(payload);
+ }
+ const report=liveReport(base,{screen:'report'});
+ for(const C of [Report,ReportDetailed]){
+  const view=mount(C,{report});expect(text(view)).toContain('Other perspectives’ participation is unknown.');
+  expect(view.querySelector('.sheet-tile[data-lens=church]')).toBeNull();expect(text(view)).not.toContain('Church not asked');
+ }
+ expect(liveReport(base,{screen:'results'}).sent).toEqual(base.sent);expect(JSON.stringify(base)).toBe(before);
+});
