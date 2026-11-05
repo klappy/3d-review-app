@@ -69,15 +69,16 @@ export function installPdf(app:Hono<{Bindings:Env}>,context:(request:Request,env
     if(stored.suppressed!==false||!stored.report)throw new PdfError('PDF_REPORT_HELD','This report is unavailable under the current reporting policy.',409);
     let html:string;
     try {
-      let identity={};
+      let identity={},surveys:unknown[]=[];
       if(format!=='full'){
-        const {assessment}=await read(ctx,'cap.assessment.get',{id:stored.assessment_id});
+        // surveys: selected perspectives, so a zero-response one keeps its card as in the live report (G02).
+        const got=await read(ctx,'cap.assessment.get',{id:stored.assessment_id}),assessment=got.assessment;surveys=Array.isArray(got.surveys)?got.surveys:[];
         let project='',language=assessment.language_name||assessment.language||'';
         try{project=(await read(ctx,'cap.project.get',{id:assessment.project_id})).project.name;const listed=await read(ctx,'cap.language.list',{pid:assessment.project_id});language=listed.languages.find((l:Record<string,any>)=>l.id===assessment.language_id)?.name||language;}
         catch(e){if(!(e instanceof PdfError)||![403,404].includes(e.status))throw e;}
         identity={title:assessment.name,project,language};
       }
-      html=storedReportDocument(stored,{paper,format,identity,minimum:perspectiveLevelMinimum(ctx.env)});
+      html=storedReportDocument(stored,{paper,format,identity,surveys,minimum:perspectiveLevelMinimum(ctx.env)});
     }
     catch(e) {if(e instanceof Error&&e.message==='PDF_REPORT_HELD')throw new PdfError('PDF_REPORT_HELD','This report cannot be exported until every included perspective has enough responses.',409);throw e;}
     return {html,name:`report-${c.req.param('id')}${format==='full'?'':'-'+format}`};

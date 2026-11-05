@@ -35,3 +35,37 @@ it('Other-only visible side and suppressed status presence have identical PDF ou
   expect(outcome(payload)).toBe(outcome({...payload,translation_type_agreement:null}));
  }
 });
+// G02 (PR #605 review r4481475123 / r4481475133): named PDFs keep selected zero-response perspectives and carry report provenance.
+const dropLens=(x:any,lens:string):any=>Array.isArray(x)?x.filter(v=>!(v&&typeof v==='object'&&v.lens===lens)).map(v=>dropLens(v,lens)):x&&typeof x==='object'?Object.fromEntries(Object.entries(x).map(([k,v])=>[k,dropLens(v,lens)])):x;
+function zeroChurch(){
+ const id=ids[0],payload=dropLens({...structuredClone(corpus.contexts[id]),synthetic:true,source_commit:corpus.source_commit,versions:{scorer:'fixture',narrative:'fixture',policy:'fixture'}},'Church');
+ expect(JSON.stringify(payload.lenses)).not.toContain('Church');
+ return {suppressed:false,report:{id:'rep_g02_provenance',created_at:'2026-11-05T12:00:00Z',payload}};
+}
+const surveys=[{id:'s1',perspective:'Translation Team',state:'selected'},{id:'s2',perspective:'Community',state:'selected'},{id:'s3',perspective:'Church',state:'selected',secret:'SECRET-SURVEY-FIELD'}];
+const tile=(html:string,lens:string)=>new RegExp(`class="sheet-tile"[^>]*data-lens="${lens}"`).test(html);
+it('selected zero-response perspective stays present (no data) in overview and detailed named PDFs',()=>{
+ const stored=zeroChurch();
+ for(const format of ['overview','detailed'] as const){
+  const html=storedReportDocument(stored,{minimum:1,format,paper:'a4',surveys});
+  expect(tile(html,'team')).toBe(true);expect(tile(html,'community')).toBe(true);
+  expect(tile(html,'church')).toBe(true);expect(html).toContain('Church');
+  expect(html).not.toContain('SECRET-SURVEY-FIELD');
+ }
+ // Without a selected-survey list nothing is invented; an archived or unselected perspective stays hidden.
+ expect(tile(storedReportDocument(stored,{minimum:1,format:'overview',paper:'a4'}),'church')).toBe(false);
+ expect(tile(storedReportDocument(stored,{minimum:1,format:'overview',paper:'a4',surveys:[{perspective:'Church',state:'selected',archived_at:'2026-11-01'},{perspective:'Church',state:'unselected'}]}),'church')).toBe(false);
+});
+it('zero-response perspective card is present-with-no-data: held level, 0 responses, no score',()=>{
+ for(const format of ['overview','detailed'] as const){
+  const html=storedReportDocument(zeroChurch(),{minimum:1,format,paper:'a4',surveys});
+  const start=html.search(/class="sheet-tile"[^>]*data-lens="church"/);expect(start).toBeGreaterThan(-1);
+  const card=html.slice(start,html.indexOf('</div></div>',start)+12).replace(/<svg[\s\S]*?<\/svg>/g,'');
+  expect(card).toContain('data-level="more"');expect(card).toContain('More input needed');expect(card).toContain('0 responses');
+  expect(card).not.toMatch(/\b\d+\.\d+\b/);
+ }
+});
+it('detailed named PDF carries the saved report id and top-level created_at',()=>{
+ const html=storedReportDocument(zeroChurch(),{minimum:1,format:'detailed',paper:'a4',surveys});
+ expect(html).toContain('Report: rep_g02_provenance');expect(html).toContain('Built: 2026-11-05T12:00:00Z');
+});
