@@ -98,7 +98,7 @@
 
 <AppShell {phone} {theme} screen {top} {bar}>
   {#if onrename && d.role === "owner"}<button class="btn btn-quiet" type="button" onclick={beginRename} disabled={busy || mustReload}>Rename workspace</button>{/if}
-  {#if phone}<label class="lbl">Find a project<input class="in" type="search" bind:value={query} /></label><label class="lbl">Show projects<select class="in" bind:value={view}>{#each d.views as v}<option>{v}</option>{/each}</select></label>{/if}
+  {#if phone}<label class="lbl">Find a project or organisation<input class="in" type="search" bind:value={query} /></label><label class="lbl">Show projects<select class="in" bind:value={view}>{#each d.views as v}<option>{v}</option>{/each}</select></label>{/if}
   {#if undo && !undo.used && onundo}<button class="btn" type="button" onclick={undoRename} disabled={busy || mustReload}>Undo workspace rename</button>{/if}
   {#if !visible.length}<p class="small" role="status">No projects match this view.</p>{/if}
   {#if message}<p class="small" role="status">{message}</p>{/if}
@@ -136,7 +136,7 @@
         <h2 class="h2">Projects</h2>
         <Row gap={3}>
           <div class="seg" data-size="wide" role="radiogroup" aria-label="Show projects">{#each d.views as v, i}<label><input type="radio" name="ws-view" checked={view === v} onchange={() => view = v} />{v}</label>{/each}</div>
-          <span class="in-search"><Icon d={P.search} /><input class="in" type="search" aria-label="Find a project" bind:value={query} placeholder={FIND} size={FIND.length} /></span>
+          <span class="in-search"><Icon d={P.search} /><input class="in" type="search" aria-label={FIND} bind:value={query} placeholder={FIND} size={FIND.length} /></span>
         </Row>
       </Row>
       <Grid cols={2} gap={4}>

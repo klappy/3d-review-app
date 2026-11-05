@@ -185,6 +185,11 @@ describe("Workspace and the group dialog", () => {
     const f = mount(Workspace).querySelector(".in-search input") as HTMLInputElement;
     expect(f.size).toBe(f.placeholder.length);
     expect(f.placeholder).toBe("Find a project or organisation");
+    expect(f.getAttribute("aria-label")).toBe("Find a project or organisation");
+  });
+  it("PR606 P2: the phone search label names what it searches, the same words as the desktop placeholder", () => {
+    const lbl = [...mount(Workspace, { phone: true }).querySelectorAll("label.lbl")].find((l) => l.querySelector("input[type=search]"))!;
+    expect(text(lbl)).toBe("Find a project or organisation");
   });
   it("phone links keep &w=phone and ?theme= (F4): header back, crumb and 'Your projects across workspaces'", () => {
     window.history.replaceState(null, "", "/next/?ui_next=on&screen=people-workspace&w=phone&theme=dark");
@@ -204,6 +209,9 @@ describe("Workspace and the group dialog", () => {
 describe("Invitations and sign-in", () => {
   it("desktop invitations: the first Accept is the primary, the second a secondary with a check", () => {
     const a = mount(lane.invitations);
+    // a review-only grant does not add a project to Your projects (PR606), so the lead says what each kind does
+    expect(text(a)).toContain("Accepting adds the project to Your projects; a review-only invitation opens that review.");
+    expect(text(a)).not.toContain("adds the project or review");
     const accepts = [...a.querySelectorAll(".btn")].filter((b) => b.textContent === "Accept");
     expect(accepts.map((b) => b.classList.contains("btn-primary"))).toEqual([true, false]);
   });
