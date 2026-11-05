@@ -81,3 +81,9 @@ test('greet by name (CONTRACT § 4–5): "Welcome, <name>" is the one H1 (escape
   assert.match(homeView({ projects: [], listFor: () => ({}), name: 'ana@example.invalid' }), /<h1 class="fs-h1" data-v3h-welcome>Welcome, ana@example\.invalid<\/h1>/); // § 4 email fallback
   for (const name of ['', '   ', null, undefined, 42]) assert.doesNotMatch(homeView({ projects: [], listFor: () => ({}), name }), /data-v3h-welcome/);
 });
+// Codex P2 on the PR: /v2/projects returns oldest first, but Home says "newest first".
+test('home sorts project cards newest first by created_at', () => {
+  const h = homeView({ projects: [{ id: 'old', name: 'Old', created_at: '2026-01-01T00:00:00Z' }, { id: 'new', name: 'New', created_at: '2026-06-01T00:00:00Z' }, { id: 'mid', name: 'Mid', created_at: '2026-03-01T00:00:00Z' }] });
+  const ids = [...h.matchAll(/data-v3h-project="([^"]+)"/g)].map(m => m[1]);
+  assert.deepEqual(ids, ['new', 'mid', 'old']);
+});

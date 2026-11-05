@@ -21,7 +21,8 @@ export function homeView({ projects = [], start = '', title = '', invitations = 
   const head = `<link rel="stylesheet" href="${HOME_CSS}"><div class="v3h-head"><div class="v3h-title">${h1}<p class="v3h-sub">Your projects, newest first.</p>${invitationsHint(invitations)}</div>${start}</div>`;
   if (!projects.length) return `<div class="v3h">${head}<div class="v3h-card"><h2>You have no projects yet.</h2><p class="v3h-meta">Start a new 3D Review to set one up.</p></div></div>`;
   // Owner rule: Home lists projects only. No review is listed, searched or counted into a card here; open a project to see its reviews.
-  const cards = projects.map(p => {
+  const newest = [...projects].sort((a, b) => String(b?.created_at ?? '').localeCompare(String(a?.created_at ?? '')));
+  const cards = newest.map(p => {
     const plink = `<h3><a href="#project/${encodeURIComponent(p.id)}">${ESC(p.name)}</a></h3>`;
     if (p.archived_at) return `<section class="v3h-card v3h-archived" data-v3h-project="${ESC(p.id)}"><div class="v3h-row-head"><span class="v3h-eyebrow">Project</span><span class="v3h-pill v3h-pill-done">Archived</span></div>${plink}</section>`;
     return `<section class="v3h-card" data-v3h-project="${ESC(p.id)}"><span class="v3h-eyebrow">Project</span>${plink}${countsLine([[p.assessment_count, 'assessment'], [p.response_count, 'response']])}<p class="v3h-meta"><a href="#project/${encodeURIComponent(p.id)}">Open project</a></p></section>`;
