@@ -55,7 +55,7 @@
 </script>
 
 {#snippet top()}<DocBar title={`Detailed report · ${PAGES} pages · ${D.review.title}`} other="Open the overview · 1 page" otherHref={href("report")} pdfUrl={namedPdfUrl} {pdfToken} /><LevelLegend />{/snippet}
-{#snippet foot(n)}<ReportProvenance report={D} /><div class="pfoot"><span class="pf-text">{FOOT}</span><span class="pn">{n} of {PAGES}</span></div>{/snippet}
+{#snippet foot(n)}{#if n === 2}<ReportProvenance report={D} />{/if}<div class="pfoot"><span class="pf-text">{FOOT}</span><span class="pn">{n} of {PAGES}</span></div>{/snippet}
 {#snippet scores(rows)}
   {#each rows as row}
     <div class="barbell-row" data-kind="score"><!-- the numeric paper row (.paper .barbell-row[data-kind=score]); bb-label / bb-verdict -->
