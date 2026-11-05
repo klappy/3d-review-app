@@ -9,7 +9,7 @@ import R from '../ui-next/fixtures/actions/review.json';
 import { qrModules } from '../ui-next/src/app/data.js';
 const surveys = Array.from({ length: 7 }, (_, i) => ({ ...R.surveys[0], name: `Role ${i + 1}`, code: `https://example.invalid/next/?ui_next=on#survey=unchanged-token-${i}`, lens: 'team' }));
 const data = { ...R, host: '', shortHost: '', surveys };
-afterEach(() => { cleanup(); vi.restoreAllMocks(); });
+afterEach(() => { cleanup(); vi.restoreAllMocks(); window.history.replaceState({}, '', '/'); });
 function browserDialog() {
   Object.defineProperty(HTMLDialogElement.prototype, 'showModal', { configurable: true, value: function(this: HTMLDialogElement) { this.setAttribute('open', ''); } });
   Object.defineProperty(HTMLDialogElement.prototype, 'close', { configurable: true, value: function(this: HTMLDialogElement) { this.removeAttribute('open'); this.dispatchEvent(new Event('close')); } });
@@ -50,6 +50,7 @@ for (const phone of [false, true]) describe(`Share presenter (${phone ? 'phone' 
 });
 
 it('mobile all-code mode preserves phone navigation and renders every code; normal room phone mode remains a pager', () => {
+  window.history.replaceState({}, '', '?w=phone');
   const all = render(QRRoom, { props: { phone: true, state: 'all', data: collect } });
   expect(all.container.querySelectorAll('.qr')).toHaveLength(collect.groups.flatMap(g => g.surveys).length);
   expect(all.getByRole('link', { name: 'Back to Collect' }).getAttribute('href')).toContain('w=phone');

@@ -21,7 +21,7 @@ dialog.survey-qr-presenter {
 .survey-qr-controls { display: flex; flex-wrap: wrap; justify-content: center; gap: var(--sp-3); }
 
 /* The all-code route is explicitly selected by Share even on a phone; keep every tile readable there. */
-@media (max-width: 600px) {
+@media (max-width: 719.98px) {
   .qr-head + .l-grid[data-cols="5"] { grid-template-columns: minmax(0, 1fr); }
   .qr-tile .kbd { overflow-wrap: anywhere; max-width: 100%; }
 }
