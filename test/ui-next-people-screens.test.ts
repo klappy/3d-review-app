@@ -37,11 +37,11 @@ const BOARDS: [string, string, boolean, string[]][] = [
   ["PeoplePhone", "people", true, ["People with access", "Invite by email", "People · 4", "Invited · 3 days ago", "Send invitation"]],
   ["PeopleWorkspace", "people-workspace", false, ["People in this workspace", "Someone invited only to a project or a review does not appear here.", "Can create projects and run reviews in all of them"]],
   ["PeopleWorkspacePhone", "people-workspace", true, ["People in this workspace", "BCS · India", "People · 4"]],
-  ["Workspace", "workspace", false, ["Bridge Connectivity Solutions · India", "Partners never see each other's workspaces.", "Completed this year", "No results yet", "lists everything you facilitate."]],
-  ["WorkspacePhone", "workspace", true, ["BCS · India", "Projects · 5", "Collecting · Hindi · Written", "Your reviews across workspaces", "New project"]],
+  ["Workspace", "workspace", false, ["Bridge Connectivity Solutions · India", "Partners never see each other's workspaces.", "Your projects lists everything you can open."]],
+  ["WorkspacePhone", "workspace", true, ["BCS · India", "Projects · 5", "Hindi New Testament", "Your projects across workspaces", "New project"]],
   ["WorkspaceGroup", "workspace-group", false, ["Add a project to this workspace", "You must directly own the project and every review it contains, including archived reviews; inherited access is not enough.", "Inherited · cannot group", "Add to workspace"]],
   ["WorkspaceGroupPhone", "workspace-group", true, ["Add a project to this workspace", "Cannot group: a direct project owner grant is required; inherited access is not enough", "Add to workspace"]],
-  ["Invitations", "invitations", false, ["Your invitations", "Odia New Testament · project", "From Andy V. · as a Member — you can start and run reviews · expires 24 Oct", "Psalms reading group · review", "Back to your reviews"]],
+  ["Invitations", "invitations", false, ["Your invitations", "Odia New Testament · project", "From Andy V. · as a Member — you can start and run reviews · expires 24 Oct", "Psalms reading group · review", "Back to your projects"]],
   ["InvitationsPhone", "invitations", true, ["Invitations", "Steve invited you to facilitate reviews in this workspace · 2 days ago", "Accepted · Aug 2026", "Accept and open the workspace"]],
   ["SignInCheck", "sign-in-check", false, ["Check your email", "It works for 30 minutes. Check your spam folder if it is slow.", "I've opened the link", "Link not working? Use the 6-digit code instead"]],
   ["SignInCheckPhone", "sign-in-check", true, ["Check your email", "Open it on this phone to sign in.", "I've opened the link", "Send it again"]],
@@ -124,21 +124,19 @@ describe("People: roster gating comes from ui/scope-invitations.js", () => {
 });
 
 describe("Workspace and the group dialog", () => {
-  it("desktop: five stats, five project cards with stage pills, levels or No results yet, New project is the primary", () => {
+  it("desktop: three stats, five project cards that name projects only (no stage, level, language or review), New project is the primary", () => {
     const a = mount(Workspace);
-    expect([...a.querySelectorAll('.l-grid[data-cols="5"] .num[data-size="36"]')].map((n) => n.textContent)).toEqual(["12", "9", "3", "2", "7"]);
+    expect([...a.querySelectorAll('.l-grid[data-cols="3"] .num[data-size="36"]')].map((n) => n.textContent)).toEqual(["5", "10", "133"]);
     const cards = [...a.querySelectorAll("a.card-link.glass")];
     expect(cards.map((c) => c.querySelector("h3")!.textContent)).toEqual(["Hindi New Testament", "Odia New Testament", "Kurubaru Scripture", "ISL Mark", "Lao Old Testament"]);
-    // F5: no aria-label on the card links, so their content (stage, language, counts, organisations, levels) names them
+    // F5: no aria-label on the card links, so their content (counts, organisations) names them
     for (const c of cards) expect(c.hasAttribute("aria-label")).toBe(false);
     expect(a.querySelectorAll('.av[data-size="28"][data-logo]').length).toBeGreaterThan(0);
-    expect([...a.querySelectorAll("a.card-link .pill")].map((x) => x.getAttribute("data-stage"))).toEqual(["collecting", "setup", "collecting", "done", "setup"]);
-    expect(a.querySelectorAll(".lvl").length).toBe(9);
-    // Codex P2 on 992b610: a count beside every level (ISL Mark's church reads its zero beside More input needed)
-    expect([...a.querySelectorAll("a.card-link [data-coverage] [data-short]")].map((c) => (c.textContent ?? "").replace(/\s+/g, " ").trim())).toEqual(["9", "10", "5", "8", "7", "0", "5", "4", "3"]);
-    // the third-width cell keeps the drops and the count on one line; the words are the title (tooltip)
-    expect([...a.querySelectorAll("a.card-link [data-coverage]")].map((c) => c.getAttribute("title")).slice(3, 6)).toEqual(["Well filled · 8 responses", "Well filled · 7 responses", "No drops yet · 0 responses"]);
-    expect([...a.querySelectorAll("a.card-link [data-coverage]")].map((c) => c.getAttribute("data-coverage")).slice(3, 6)).toEqual(["3", "3", "0"]);
+    // owner rule: no review, stage or level surface on a workspace view; reviews live only inside an opened project
+    expect(a.querySelector("a.card-link .pill")).toBeNull();
+    expect(a.querySelector(".lvl")).toBeNull();
+    expect(a.querySelector("[data-coverage]")).toBeNull();
+    expect(a.textContent).not.toMatch(/Completed this year|No results yet|Results ready|Collecting|Setting up/);
     expect(a.querySelector(".btn-primary")!.textContent).toBe("New project");
     expect(a.querySelector("dialog")).toBeNull();
   });
@@ -188,7 +186,7 @@ describe("Workspace and the group dialog", () => {
     expect(f.size).toBe(f.placeholder.length);
     expect(f.placeholder).toBe("Find a project or language");
   });
-  it("phone links keep &w=phone and ?theme= (F4): header back, crumb and 'Your reviews across workspaces'", () => {
+  it("phone links keep &w=phone and ?theme= (F4): header back, crumb and 'Your projects across workspaces'", () => {
     window.history.replaceState(null, "", "/next/?ui_next=on&screen=people-workspace&w=phone&theme=dark");
     try {
       const a = mount(lane["people-workspace"], { phone: true });
@@ -198,7 +196,7 @@ describe("Workspace and the group dialog", () => {
       expect(hrefs).toContain("?ui_next=on&screen=workspace&w=phone&theme=dark");
       window.history.replaceState(null, "", "/next/?ui_next=on&screen=workspace&w=phone");
       const w = mount(lane.workspace, { phone: true });
-      expect([...w.querySelectorAll("a.link")].find((x) => text(x) === "Your reviews across workspaces")!.getAttribute("href")).toBe("?ui_next=on&screen=home&w=phone");
+      expect([...w.querySelectorAll("a.link")].find((x) => text(x) === "Your projects across workspaces")!.getAttribute("href")).toBe("?ui_next=on&screen=home&w=phone");
     } finally { window.history.replaceState(null, "", "/"); }
   });
 });

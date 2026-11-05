@@ -25,11 +25,7 @@
   import PhoneHeader from "../../PhoneHeader.svelte";
   import PhoneBar from "../../PhoneBar.svelte";
   import Button from "../../Button.svelte";
-  import Pill, { STAGE_LABELS } from "../../Pill.svelte";
   import Tag from "../../Tag.svelte";
-  import Level from "../../Level.svelte";
-  import Coverage from "../results/Coverage.svelte";
-  import { LENSES } from "../../LensDot.svelte";
   import Icon from "../../Icon.svelte";
   import { I } from "../../icons.js";
   import { href } from "../href.js";
@@ -72,7 +68,6 @@
     finally { busy = false; }
   }
   const canUngroup = (p) => !!onungroup && (d.role === "owner" || (d.role === "member" && p.directRole === "owner"));
-  const LENS_ICON = { team: I.pen, community: I.people, church: P.church };
   const HOME = href("home"), PEOPLE = href("people-workspace"), BACK = href("workspace");
   const PROJECT = href("project"), SETUP = href("setup1"), MENU = href("menu");
   const rows = $derived(groupRows(d.group));
@@ -122,20 +117,19 @@
       {#each visible as p}
         <a class="card-link list-row" href={p.href ?? PROJECT}>
           <span class="icn" data-size="36" data-tone="neutral" aria-hidden="true"><Icon d={P.file} /></span>
-          <div class="list-body"><div class="list-title">{p.title}</div><div class="small">{STAGE_LABELS[p.stage]} · {p.phone}</div></div>
-          <Pill stage={p.stage} />
+          <div class="list-body"><div class="list-title">{p.title}</div><div class="small">{p.phone}</div></div>
         </a>
         {#if canUngroup(p)}<Row wrap gap={2}><button class="btn btn-quiet" type="button" aria-label={`Remove project ${p.title} from workspace`} onclick={() => beginUngroup(p)} disabled={busy || mustReload}>Remove project</button></Row>{/if}
       {/each}
     </section>
-    <a class="link" href={HOME}>Your reviews across workspaces <Icon d={I.arrow} /></a>
+    <a class="link" href={HOME}>Your projects across workspaces <Icon d={I.arrow} /></a>
   {:else}
     <Page gap={5}>
       <Row split gap={4}>
         <div><span class="micro">Workspace</span><h1 class="title-page">{d.name}</h1><p class="small t-15">{d.lead}</p></div>
         <Row gap={2}><Button label="People in this workspace" href={PEOPLE} lead={people} /><Button label="New project" variant={open ? "secondary" : "primary"} href={SETUP} lead={plus} /></Row>
       </Row>
-      <div class="l-grid" data-cols="5" data-gap="3">
+      <div class="l-grid" data-cols="3" data-gap="3">
         {#each d.stats as [label, n]}<Card gap={1} {label}><span class="small">{label}</span><span class="num" data-size="36">{n}</span></Card>{/each}
       </div>
       <Row split gap={3}>
@@ -149,9 +143,8 @@
         {#each visible as p}
           <Stack gap={2}>
           <Card href={p.href ?? PROJECT} gap={4}>
-            <Row split gap={3}><Row gap={3}><h3 class="h2">{p.title}</h3><Pill stage={p.stage} /></Row><span class="go" aria-hidden="true"><Icon d={I.arrow} /></span></Row>
+            <Row split gap={3}><h3 class="h2">{p.title}</h3><span class="go" aria-hidden="true"><Icon d={I.arrow} /></span></Row>
             <Row split gap={4}>
-              <Row wrap gap={4}><span class="small l-row" data-gap="1" title="Language"><Icon d={I.globe} />{p.language}</span><span class="small l-row" data-gap="1" title="Translation format"><Icon d={P[p.formatIcon]} />{p.format}</span></Row>
               <span class="l-row" data-gap="1" role="img" aria-label={`Organisations: ${p.orgs.map(([o]) => o).join(", ")}`}>{#each p.orgs as [org, logo]}<span class="av" data-size="28" data-logo={logo ? "" : undefined} title={org} aria-hidden="true">{logo ? "logo" : org.slice(0, 1)}</span>{/each}</span>
             </Row>
             <Row split gap={4}>
@@ -159,20 +152,13 @@
                 <span class="l-row" data-gap="2" title="Reviews" aria-label={`Reviews: ${p.reviews}`}><Icon d={P.reviews} /><span class="num" data-size="20">{p.reviews}</span></span>
                 <span class="l-row" data-gap="2" title="Responses" aria-label={`Responses: ${p.responses}`}><Icon d={I.people} /><span class="num" data-size="20">{p.responses}</span></span>
               </Row>
-              <span class="small l-row" data-gap="1" title="Last activity"><Icon d={I.clock} />{p.activity}</span>
             </Row>
-            <hr class="hr" />
-            {#if p.levels}
-              <Grid cols={3} gap={3}>{#each p.levels as [lens, level, n]}<Row gap={2}><span class="icn icn-lens su-icn-s" data-lens={lens} role="img" aria-label={LENSES[lens]}><Icon d={LENS_ICON[lens]} /></span><Stack gap={1}><Level {level} /><Coverage {n} variant="count" /></Stack></Row>{/each}</Grid>
-            {:else}
-              <span class="small l-row" data-gap="2"><Icon d={I.clock} />No results yet</span>
-            {/if}
           </Card>
           {#if canUngroup(p)}<Row wrap gap={2}><button class="btn btn-quiet" type="button" aria-label={`Remove project ${p.title} from workspace`} onclick={() => beginUngroup(p)} disabled={busy || mustReload}>Remove project</button></Row>{/if}
           </Stack>
         {/each}
       </Grid>
-      <p class="small">Looking for your own reviews across projects? <a class="link" href={HOME}>Your reviews</a> lists everything you facilitate.</p>
+      <p class="small">Looking for your own projects across workspaces? <a class="link" href={HOME}>Your projects</a> lists everything you can open.</p>
     </Page>
   {/if}
   {#if open}

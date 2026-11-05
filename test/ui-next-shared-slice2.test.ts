@@ -29,7 +29,7 @@ describe("B2. the phone bar stays in the thumb zone on every phone screen (secti
   const SCREENS: [string, () => unknown][] = [
     ["Landing phone", () => render(Landing, { props: { phone: true } })],
     ["Home phone", () => render(Home, { props: { phone: true } })],
-    ["Home reviews phone", () => render(Home, { props: { phone: true, state: "reviews" } })],
+    ["Home projects phone", () => render(Home, { props: { phone: true, state: "projects" } })],
     ["About phone", () => render(About, { props: { phone: true } })],
   ];
   it("each phone screen renders .app.l-screen[data-w=phone] > .layer.l-shell > main.l-phone + one .phone-bar, the bar last", () => {

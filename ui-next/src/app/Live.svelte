@@ -125,7 +125,7 @@
   async function loader(r) {
     const { name, params } = r;
     if (PARTICIPANT.has(name)) return participant(r);
-    if (name === "home") { const me = await S.me(); if (!me) return { screen: "landing" }; const home = await D.homeModel(me); return { screen: "home", home, state: home.empty ? "first" : "reviews" }; }
+    if (name === "home") { const me = await S.me(); if (!me) return { screen: "landing" }; const home = await D.homeModel(me); return { screen: "home", home, state: home.empty ? "first" : "projects" }; }
     if (name === "external") { globalThis.location.assign(params.href); return { screen: null }; } // the sample review in the current design
     // The sample review is a closed world (captain 2026-10-22 10:36 ET: a clickable journey across every screen, nothing live): any
     // route carrying the sample id — review, project, setup ?review=, people ?review= — renders its approved fixture with the
@@ -154,7 +154,6 @@
     if (name === "setup5") return { redirect: to("home") }; // a review's own page is its Setup 5 while preparing (name === "review")
     // People and workspaces read the live stores (app/data.js): a workspace's grouped projects, a scope's roster (members and owners
     // only: a viewer's refusal is shown as such), the account's own invitations, every review it can see.
-    if (name === "explore") return { screen: name, data: await D.exploreModel(me) };
     if (name === "workspace" || name === "workspace-group") return { screen: name, data: await D.workspaceModel(params.wid, me) };
     if (name === "people-workspace") return { screen: name, data: await D.peopleModel({ type: "workspace", id: params.wid }, me) };
     if (name === "people" && r.query.get("project")) return { screen: name, projectScope: true, data: await D.peopleModel({ type: "project", id: r.query.get("project") }, me) };
@@ -631,7 +630,7 @@
     <C {phone} {theme} data={page.data.plan} user={{ first: who?.first ?? "", initials: who?.initials ?? "" }} workspace="Your workspace" onsave={planActions.save} oncomplete={planActions.complete} />
   {/if}
 {:else if page.data.screen === "home"}
-  <Home {phone} {theme} data={page.data.home} state={phone ? "reviews" : page.data.state} />
+  <Home {phone} {theme} data={page.data.home} state={phone ? "projects" : page.data.state} />
 {:else if page.data.screen === "review-links"}
   {#key `${page.data.assessment.id}:${session?.principal?.id}`}<SurveyLinks {phone} {theme} aid={page.data.assessment.id} surveys={page.data.surveys} principalId={session?.principal?.id} role={page.data.assessment.role} title={page.data.assessment.name} user={{ first: who?.first, initials: who?.initials }} onrevoked={() => D.clearLinks()} />{/key}
 {:else if page.data.screen === "activity"}
@@ -696,15 +695,12 @@
     {@const C = REGISTRY[page.data.screen]}
     <C {phone} {theme} report={rep} state={route.query.get("state") ?? undefined} />
   {/if}
-{:else if page.data.screen === "explore"}
-  {@const C = REGISTRY.explore}
-  <C {phone} {theme} data={page.data.data} state={route.query.get("state") ?? undefined} />
 {:else if page.data.screen === "workspace" || page.data.screen === "workspace-group"}
   {@const C = REGISTRY[page.data.screen]}
   <C {phone} {theme} data={page.data.data} ongroup={groupProject} onrename={name => act("Workspace not renamed", () => renameWorkspace(page.data.data, name), saved => { workspaceUndo = saved.undo; }, { propagate: true })} undo={workspaceUndo} onundo={receipt => act("Workspace rename not undone", () => undoWorkspaceRename(receipt), () => { workspaceUndo = null; }, { propagate: true })} onungroup={project => act("Project not removed", () => ungroupProject(page.data.data, project), undefined, { propagate: true })} />
 {:else if page.data.screen === "people" || page.data.screen === "people-workspace"}
   {#if page.data.empty}
-    <Status {phone} {theme} kind="empty" message={page.data.emptyText} back={to("home")} backLabel="Your reviews" />
+    <Status {phone} {theme} kind="empty" message={page.data.emptyText} back={to("home")} backLabel="Your projects" />
   {:else if page.data.data.refused}
     <Status {phone} {theme} kind="refused" message="Permissions are managed by members and owners: a viewer cannot read who has access here. Ask an owner if you need to manage people." back={page.data.data.review ? to("review", { aid: page.data.data.review.id }) : to("workspace", { wid: page.data.data.workspace.id })} backLabel={page.data.data.review ? "Back to the review" : "Back to the workspace"} />
   {:else}

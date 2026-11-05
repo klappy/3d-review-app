@@ -345,7 +345,7 @@ const workspaces = {
   render(ctx, model) {
     const g = gate(ctx, model); if (g) return g;
     const r = readModel('workspaces', model);
-    return readRegion(`${pageHead(ctx, r)}<p class="muted">${model.globalAccess ? 'Every workspace is available in Global Access. Open a workspace to browse its projects and assessments.' : 'Workspaces group projects shared with you.'} <a href="${ctx.routes.projects}">All projects</a></p>${kitGrid(ctx, r.items, r.empty)}`)
+    return readRegion(`${pageHead(ctx, r)}<p class="muted">${model.globalAccess ? 'Every workspace is available in Global Access. Open a workspace to browse its projects.' : 'Workspaces group projects shared with you.'} <a href="${ctx.routes.projects}">All projects</a></p>${kitGrid(ctx, r.items, r.empty)}`)
       + actionRegion(`<section class="panel" style="margin-top:22px"><h2>Create a workspace</h2><form id="create-workspace"><label class="field">Workspace name<input name="name" maxlength="100" required placeholder="For example, Lake region"></label><div class="actions"><button class="primary" type="submit">Create workspace</button></div></form></section>`);
   },
   bind(ctx, root, model) {
@@ -439,22 +439,8 @@ const projects = {
     // pendingInvitations); any failure → none, Home unchanged. Started here (after the signed-out return above, so a signed-out
     // visitor makes no request) so it runs alongside the assessment and /v2/me reads instead of after them.
     const mine = ctx.api('/v2/me/invitations').then(pendingInvitations, () => []);
-    // v3 lane 9: each project's assessments, read-only, same endpoint the project page uses; first 20 projects, the rest link out.
-    const lists = {};
-    await Promise.allSettled(list.filter(p => !p.archived_at).slice(0, 20).map(async p => {
-      try { const a = await ctx.api(`/v2/projects/${encodeURIComponent(p.id)}/assessments`); lists[p.id] = { status: 'loaded', list: (a.assessments || []).filter(x => !x.archived_at) }; }
-      catch (e) { lists[p.id] = { status: classify(e) }; }
-    }));
-    // B03 (Bincy F01/F02): an assessment shared directly (assessment grant, no project role) is not in /v2/projects. Home lists it
-    // from the caller's own grants (/v2/me) + the assessment read the grant already allows — no new server surface.
-    let shared = [];
-    try {
-      const me = await ctx.api('/v2/me'), here = new Set(list.map(p => p.id));
-      const ids = [...new Set((me?.grants || []).filter(g => g.scope_type === 'assessment').map(g => g.scope_id))].slice(0, 20);
-      const reads = await Promise.allSettled(ids.map(id => ctx.api(`/v2/assessments/${encodeURIComponent(id)}`)));
-      shared = reads.filter(r => r.status === 'fulfilled').map(r => r.value?.assessment).filter(a => a && !a.archived_at && !here.has(a.project_id));
-    } catch { shared = []; }
-    return { status: 'loaded', params, projects: list, lists, shared, invitations: await mine };
+    // Owner rule: Home never reads or lists any project's reviews; they load only once a project is opened (the project page).
+    return { status: 'loaded', params, projects: list, invitations: await mine };
   },
   render(ctx, model) {
     const g = gate(ctx, model); if (g) return g;
@@ -462,7 +448,7 @@ const projects = {
     // CONTRACT § 4–5: the welcome is the page title, by saved name (same cleaner as the header, rev461 N2), else the email; with
     // neither, the existing "Projects" head stays.
     const greet = (ctx.displayName ? ctx.displayName(ctx.state?.principal?.display_name) : '') || ctx.state?.accountEmail || '';
-    const home = homeView({ projects: model.projects || [], shared: model.shared || [], listFor: id => (model.lists || {})[id], stageLabel: s => ctx.esc(ctxStage(s)), start: START_REVIEW, invitations: (model.invitations || []).length, name: greet });
+    const home = homeView({ projects: model.projects || [], start: START_REVIEW, invitations: (model.invitations || []).length, name: greet });
     return readRegion(`${greet ? '' : pageHead(ctx, r)}${home}<p class="small muted"><a href="${ctx.routes.workspaces}">Organize projects in a workspace</a> · Optional</p>`);
   },
   bind(ctx, root, model) {

@@ -6,7 +6,7 @@
 //
 // Route table: [name, pattern]. `name` is the registered screen name (screens/<lane>/index.js) or a built-in view; `:x` segments are
 // params. `#survey=<token>` (a production survey link opened under /next/) is the participant entry; `#session=` is left to the
-// current UI. A bare `#name` (the lanes' literal "#home", "#setup", "#explore" links) resolves to the route of that name with no
+// current UI. A bare `#name` (the lanes' literal "#home", "#setup" links) resolves to the route of that name with no
 // params, so the seven lanes' hand-written anchors keep working as normal links.
 export const ROUTES = Object.freeze([
   ["home", "/"],
@@ -18,7 +18,6 @@ export const ROUTES = Object.freeze([
   ["sign-in-check", "/signin/check"],
   ["help", "/help"],
   ["feedback", "/feedback"],
-  ["explore", "/explore"],
   ["projects", "/projects"],
   ["workspaces", "/workspaces"],
   ["workspace", "/workspace/:wid"],
