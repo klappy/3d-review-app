@@ -1,0 +1,21 @@
+/* Opaque full-screen presentation: never leave a second code visible through the modal. */
+dialog.survey-qr-presenter {
+  inset: 0;
+  margin: 0;
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  max-height: none;
+  box-sizing: border-box;
+  border: 0;
+  padding: var(--sp-4);
+  background: var(--ground);
+  color: var(--ink);
+  overflow: auto;
+}
+.survey-qr-presenter::backdrop { background: var(--ground); }
+.survey-qr-heading { display: flex; justify-content: space-between; align-items: center; gap: var(--sp-3); }
+.survey-qr-content { display: flex; flex-direction: column; align-items: center; gap: var(--sp-3); text-align: center; margin-top: var(--sp-3); }
+.survey-qr-content .qr[data-size="page"] { width: min(54vh, 440px, 82vw); height: min(54vh, 440px, 82vw); flex-shrink: 0; }
+.survey-qr-link { overflow-wrap: anywhere; max-width: 100%; }
+.survey-qr-controls { display: flex; flex-wrap: wrap; justify-content: center; gap: var(--sp-3); }
