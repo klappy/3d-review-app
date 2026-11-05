@@ -19,11 +19,11 @@ const src='assess_syn_earning-trust-2026-01', one='assess_s28_one', full='assess
 // production (reports enabled) keeps the five-response floor; DEV's floor is one response (report-admission.ts participantReportMinimum).
 const ctx=(ENVIRONMENT='dev'):Ctx=>({env:{DB:db,SESSION_SECRET:'s28-test',ENVIRONMENT,PARTICIPANT_REPORTS:'enabled'} as unknown as Ctx['env'],db,principal:{id:'person_mara',kind:'user'},traceId:'tr_s28',now:()=>new Date('2026-09-30T16:00:00.000Z'),log:()=>{}});
 const run=(sql:string,...a:unknown[])=>db.prepare(sql).bind(...a).run();
-async function clone(aid:string,limit:number){
+async function clone(aid:string,limit:number,template:string|null=null){
  await run(`INSERT INTO assessment (id,project_id,language_id,name,purpose,period,format,stage,created_at,created_by) SELECT ?1,project_id,language_id,name||' (participant)',purpose,period,format,stage,created_at,created_by FROM assessment WHERE id=?2`,aid,src);
  await run(`INSERT INTO "grant" (id,principal_id,scope_type,scope_id,role,created_at) SELECT ?1||id,principal_id,scope_type,?1,role,created_at FROM "grant" WHERE scope_type='assessment' AND scope_id=?2`,aid,src);
  await run(`INSERT INTO assessment_survey (id,assessment_id,template_id,template_version,state,collection_status,created_at) SELECT ?1||id,?1,template_id,template_version,state,collection_status,created_at FROM assessment_survey WHERE assessment_id=?2`,aid,src);
- await run(`INSERT INTO response (id,assessment_survey_id,respondent_id,idempotency_key,answers_json,template_id,template_version,source,submitted_at) SELECT ?1||r.id,?1||r.assessment_survey_id,?1||r.respondent_id,?1||r.idempotency_key,r.answers_json,r.template_id,r.template_version,'participant',r.submitted_at FROM response r JOIN assessment_survey s ON s.id=r.assessment_survey_id WHERE s.assessment_id=?2 ORDER BY r.id LIMIT ?3`,aid,src,limit);
+ await run(`INSERT INTO response (id,assessment_survey_id,respondent_id,idempotency_key,answers_json,template_id,template_version,source,submitted_at) SELECT ?1||r.id,?1||r.assessment_survey_id,?1||r.respondent_id,?1||r.idempotency_key,r.answers_json,r.template_id,r.template_version,'participant',r.submitted_at FROM response r JOIN assessment_survey s ON s.id=r.assessment_survey_id WHERE s.assessment_id=?2 AND (?4 IS NULL OR r.template_id=?4) ORDER BY r.id LIMIT ?3`,aid,src,limit,template);
 }
 beforeAll(async()=>{
  db=await mf.getD1Database('DB');
@@ -94,3 +94,17 @@ it('actual single-response D1 capture builds, reads, lists, and renders Overview
  const ungranted={...c,principal:{kind:'user' as const,id:'not-granted'}};
  await expect(reportGet(ungranted,{id:made.report.id})).rejects.toThrow();
 },120000);
+
+it('every available seeded survey form can build a single-response Summit report without inventing missing dimensions',async()=>{
+ const templates=(await db.prepare('SELECT DISTINCT r.template_id AS id FROM response r JOIN assessment_survey s ON s.id=r.assessment_survey_id WHERE s.assessment_id=? ORDER BY r.template_id').bind(src).all<{id:string}>()).results;
+ expect(templates.length).toBeGreaterThanOrEqual(3);
+ for(const {id} of templates){
+  const aid='assess_summit_form_'+id;await clone(aid,1,id);
+  const result:any=(await build(summit(),{aid})).result;expect(result.suppressed,id).toBe(false);
+  const report=result.report,counts=[...lensRespondents(report.payload).values()];expect(counts,id).toEqual([1]);
+  const dimensions=report.payload.lenses.flatMap((l:any)=>l.sub_dimensions);
+  const models=perspectiveRadarModels(report,1);
+  for(const model of models)expect(model.spokes.length).toBe(dimensions.length);
+  if(dimensions.filter((d:any)=>typeof d.score==='number'&&Number.isFinite(d.score)).length<3)expect(models).toHaveLength(0);
+ }
+},60000);
