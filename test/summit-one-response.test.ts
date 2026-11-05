@@ -6,6 +6,8 @@ import {list as responseList} from '../src/handlers/response';
 import {summary} from '../src/handlers/results';
 import {build,get as reportGet,list as reportList} from '../src/handlers/report';
 import app from '../src/index';
+import {JSDOM} from 'jsdom';
+import {renderReport as renderCurrentReport} from '../ui/report-view.js';
 import {mintSession} from '../src/auth';
 import type {Ctx} from '../src/handlers/types';
 import {participantReportMinimum,perspectiveLevelMinimum,translationAgreementMinimum} from '../src/report-admission';
@@ -59,6 +61,15 @@ it('actual single-response D1 capture builds, reads, lists, and renders Overview
  const before=JSON.stringify(got);
  const out=process.env.SUMMIT_EVIDENCE,chrome=process.env.PDF_LOCAL_CHROME;
  const session=await mintSession(c.env,'person_mara','user');
+ // The current interface consumes this same authenticated GET and served minimum. Preserve its design while proving one-response content.
+ const currentRead=await app.fetch(new Request(`https://local.invalid/v2/reports/${made.report.id}`,{headers:{authorization:`Bearer ${session}`}}),c.env);
+ expect(currentRead.status).toBe(200);const current=(await currentRead.json() as any).result;
+ expect(current.level_minimum_responses).toBe(1);
+ const currentDoc=new JSDOM('<html><body><main></main></body></html>').window.document,currentRoot=currentDoc.querySelector('main')!;
+ expect(renderCurrentReport({doc:currentDoc,root:currentRoot,report:current.report,minimum:current.level_minimum_responses})).toBe(true);
+ expect(currentRoot.textContent).toContain('1 response');
+ expect(currentRoot.querySelector('.report-lens-score')?.textContent).toBe(String(payload.lenses[0].score));
+ expect(currentRoot.querySelector('[data-perspective-radar]')).toBeNull();
  let rendered=0;
  for(const format of ['overview','detailed','full']){
   const html=storedReportDocument(got,{minimum:got.level_minimum_responses,format,identity:{title:'One-response local fixture'}});
