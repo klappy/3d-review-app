@@ -49,7 +49,7 @@ describe("b. gallery.css applies to the gallery pages only (lanes explore, setup
   const split = (sel: string) => { const out: string[] = []; let depth = 0, cur = ""; for (const ch of sel) { if (ch === "(") depth++; if (ch === ")") depth--; if (ch === "," && !depth) { out.push(cur.trim()); cur = ""; } else cur += ch; } return [...out, cur.trim()]; };
   const selectors = gallery.flatMap(([s]) => split(s));
   const SCREENS: [string, () => unknown][] = [
-    ["Home", () => render(Home, { props: { state: "first" } })], ["Home reviews", () => render(Home, { props: { state: "reviews" } })], ["Home phone", () => render(Home, { props: { phone: true } })],
+    ["Home", () => render(Home, { props: { state: "first" } })], ["Home projects", () => render(Home, { props: { state: "projects" } })], ["Home phone", () => render(Home, { props: { phone: true } })],
     ["About", () => render(About, {})], ["About phone", () => render(About, { props: { phone: true } })],
     ["Landing", () => render(Landing, {})], ["Landing phone", () => render(Landing, { props: { phone: true } })],
   ];

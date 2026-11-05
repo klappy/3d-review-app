@@ -84,20 +84,16 @@ describe('real destination stays in place during loading', () => {
 });
 
 describe('persistent Projects async boundaries', () => {
-  it('never paints old child visibility or lets its finalizer clear a newer load for the same project', async () => {
+  it('never reads or paints a project\'s reviews outside the project, across a context change', async () => {
     const {default:Projects}=await import('../ui-next/src/app/Projects.svelte');
-    const old=deferred<Response>(), fresh=deferred<Response>();let reads=0;
-    vi.stubGlobal('fetch',vi.fn(()=>++reads===1?old.promise:fresh.promise));
+    const request=vi.fn(()=>new Promise<Response>(()=>{}));vi.stubGlobal('fetch',request);
     const view=render(Projects as never,{props:{projects,identityKey:'actor-A',canCreate:true}});
-    await fireEvent.click(view.getByRole('button',{name:'Show reviews in Current project'}));
+    expect(view.queryByRole('button',{name:/Show reviews/})).toBeNull();
     await view.rerender({projects:[],identityKey:'actor-A',pending:true,canCreate:false});
     await view.rerender({projects,identityKey:'actor-B',pending:false,canCreate:true});
-    await fireEvent.click(view.getByRole('button',{name:'Show reviews in Current project'}));
-    old.resolve(new Response(JSON.stringify({ok:true,result:{assessments:[{id:'private',name:'Old private child'}]}})));
-    await tick();for(let i=0;i<10;i++)await Promise.resolve();await tick();
-    expect(view.queryByText('Old private child')).toBeNull();expect(view.getByText('Loading reviews…')).not.toBeNull();
-    fresh.resolve(new Response(JSON.stringify({ok:true,result:{assessments:[{id:'visible',name:'New permitted child'}]}})));
-    await waitFor(()=>expect(view.getByRole('link',{name:'New permitted child'})).not.toBeNull());expect(view.queryByText('Old private child')).toBeNull();
+    await tick();
+    expect(view.getByRole('link',{name:'Current project'})).not.toBeNull();expect(view.queryByRole('button',{name:/Show reviews/})).toBeNull();
+    expect(view.queryByText(/Loading reviews/)).toBeNull();expect(request).not.toHaveBeenCalled();
     vi.unstubAllGlobals();
   });
   it.each([true,false])('never navigates or shows old create errors after a context change (success=%s)',async success=>{

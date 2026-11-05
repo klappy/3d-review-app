@@ -59,8 +59,8 @@ export function route(params, storage, screens = [], width) {
   const screen = params.get("screen");
   if (screens.includes(screen) && !BUILTIN_VIEWS.includes(screen)) return { view: screen, props: { phone, theme: t, state: params.get("state") ?? undefined, ...ov } };
   if (screen === "about" || screen === "landing") return { view: screen, props: { phone, theme: t, ...ov } };
-  const state = params.get("state") === "first" ? "first" : "reviews";
-  return { view: "home", props: { state: phone ? "reviews" : state, phone, theme: t, ...ov } };
+  const state = params.get("state") === "first" ? "first" : "projects";
+  return { view: "home", props: { state: phone ? "projects" : state, phone, theme: t, ...ov } };
 }
 
 // Links between mounted screens carry their presentation and flag explicitly;

@@ -67,12 +67,14 @@ describe('retained same-context reads and ordinary actions',()=>{
  });
 });
 
-it('a same-actor authoritative reread fences a previously pending private child list without remounting its destination',async()=>{
- const {default:Projects}=await import('../ui-next/src/app/Projects.svelte');const old=deferred<Response>(),fresh=deferred<Response>();let calls=0;vi.stubGlobal('fetch',vi.fn(()=>++calls===1?old.promise:fresh.promise));
+it('a same-actor authoritative reread keeps the Projects destination mounted and never reads or paints a project\'s reviews outside it',async()=>{
+ const {default:Projects}=await import('../ui-next/src/app/Projects.svelte');const request=vi.fn(()=>new Promise<Response>(()=>{}));vi.stubGlobal('fetch',request);
  const view=render(Projects,{projects:rows,identityKey:'actor-A:my',readKey:1});const heading=view.getByRole('heading',{name:'Projects'});
- await fireEvent.click(view.getByRole('button',{name:'Show reviews in Verified project'}));await view.rerender({projects:rows,identityKey:'actor-A:my',readKey:2});
- await fireEvent.click(view.getByRole('button',{name:'Show reviews in Verified project'}));old.resolve(response({assessments:[{id:'old',name:'Stale private child'}]}));await flush();
- expect(view.queryByText('Stale private child')).toBeNull();expect(view.getByText('Loading reviews…')).toBeTruthy();fresh.resolve(response({assessments:[]}));await view.findByText('No reviews available to you in this project.');expect(view.getByRole('heading',{name:'Projects'})).toBe(heading);
+ expect(view.queryByRole('button',{name:/Show reviews/})).toBeNull();
+ await view.rerender({projects:rows,identityKey:'actor-A:my',readKey:2});await flush();
+ expect(view.getByRole('heading',{name:'Projects'})).toBe(heading);expect(view.getByRole('link',{name:'Verified project'})).toBeTruthy();
+ expect(request).not.toHaveBeenCalled();expect(view.queryByText(/Loading reviews/)).toBeNull();
+ vi.unstubAllGlobals();
 });
 
 it('response focus is reversible, retains unknown counts, distinguishes duplicate context and resets on identity change',async()=>{

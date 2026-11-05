@@ -11,7 +11,7 @@ This candidate combines the existing resource, workspace-inheritance, sample-lab
 - Dates remain readable note text. They do not schedule reminders or automatically create reviews. The plan link requires the review's existing grants and displays current saved notes; it creates no anonymous access or expiration promise.
 - Grouping a project requires a direct project-owner grant and direct ownership of every contained review, including archived reviews, checked again in the database write. Existing workspace grants still inherit into projects and reviews; a project-only owner cannot use a new workspace to open someone else’s review.
 - Ownership, invitation acceptance and deletion retain server previews and confirmation tokens. Cancel sends no execute; uncertain operations do not silently retry. Receipt-backed undo uses only the server-issued inverse, never an invented compensating PATCH.
-- Saved Explore views contain browser preferences, including the search term, keyed by origin/account/access mode. They do not store result rows or credentials. Loading revalidates the selected project against the currently authorized list.
+- There is no cross-project review search, Explore screen or saved review view: reviews and assessments are listed only inside an opened project (owner rule). Home, Projects, Workspace and the phone account menu list projects and workspaces, with aggregate counts only.
 - Request activity is a bounded in-memory receipt/trace projection for this tab. It excludes request URLs, bodies, credentials, identity values and note content, and resets across identity changes. It is not a complete account history.
 
 ## Navigation and documents

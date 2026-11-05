@@ -30,7 +30,7 @@ describe("/next/ phone layout follows the viewport width", () => {
     expect(phoneOf("?screen=landing")).toBe(false);
   });
   it("home on a phone viewport takes the phone state, as ?w=phone does", () => {
-    expect(route(p("?screen=home&state=first"), on(), [], 390).props.state).toBe("reviews");
+    expect(route(p("?screen=home&state=first"), on(), [], 390).props.state).toBe("projects");
   });
 });
 

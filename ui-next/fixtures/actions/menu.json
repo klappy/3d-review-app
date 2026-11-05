@@ -6,30 +6,6 @@
   "BCS · India",
   "Mine"
  ],
- "reviews": [
-  {
-   "project": "Hindi New Testament",
-   "title": "Mark 1–4 draft",
-   "stage": "collecting",
-   "meta": "18 of 30 responses · open until 31 Oct",
-   "action": "Share the survey"
-  },
-  {
-   "project": "Lao Old Testament",
-   "title": "Genesis audio check",
-   "stage": "setup",
-   "meta": "Step 3 of 5 · Who will participate?",
-   "action": "Continue setup"
-  },
-  {
-   "project": "Hindi New Testament",
-   "title": "Luke 1–2 community review",
-   "stage": "results",
-   "meta": "24 responses · closed 12 Sep",
-   "action": "Read the results"
-  }
- ],
- "completed": 2,
  "items": [
   [
    "people",
@@ -63,5 +39,15 @@
    "out",
    "Sign out"
   ]
+ ],
+ "projectCards": [
+  {
+   "title": "Hindi New Testament",
+   "meta": "BCS · 4 reviews · 86 responses"
+  },
+  {
+   "title": "Lao Old Testament",
+   "meta": "BCS · 1 review · 0 responses"
+  }
  ]
 }
