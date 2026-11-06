@@ -91,3 +91,20 @@ it('G02 integration: missing historical selection is explicitly unknown, not rec
   expect(html).not.toContain('Church not asked');
  }
 });
+it('legacy reports without report_selection stay unknown; "not asked" requires saved selection proof',()=>{
+ const stored=zeroChurch();
+ expect(stored.report.payload).not.toHaveProperty('report_selection');
+ expect(namedReportModel(stored,{minimum:1}).selectionKnown).toBe(false);
+ expect(namedReportModel(stored,{minimum:1,surveys:[]}).selectionKnown).toBe(true);
+ for(const format of ['overview','detailed'] as const){
+  const html=storedReportDocument(stored,{minimum:1,format,paper:'a4'});
+  expect(html).toContain('Other perspectives’ participation is unknown.');
+  expect(html).not.toContain('Church not asked');
+  expect(storedReportDocument(stored,{minimum:1,format,paper:'a4',surveys:[]})).not.toContain('Other perspectives’ participation is unknown.');
+ }
+ const proved={...stored,report:{...stored.report,payload:{...stored.report.payload,report_selection:{schema:'3d-report-selection-v1',selected_perspectives:['Translation Team','Community']}}}};
+ expect(namedReportModel(proved,{minimum:1}).selectionKnown).toBe(true);
+ for(const format of ['overview','detailed'] as const){
+  expect(storedReportDocument(proved,{minimum:1,format,paper:'a4'})).not.toContain('Other perspectives’ participation is unknown.');
+ }
+});
