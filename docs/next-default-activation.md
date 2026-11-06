@@ -1,10 +1,10 @@
-# Next default entry — prepared, not activated
+# Next default entry — activation candidate
 
 This preparation belongs to existing Summit optional item 13. Chris's latest
 instruction is to switch **after the next production promotion**. It does not
-authorize early activation or video work. The current root entry is unchanged.
+authorize early activation or video work. The root bootstrap now calls the default-entry decision; production activation still follows the protected release path.
 
-`ui/default-entry.js` is intentionally unreferenced by `ui/index.html`. It is a
+`ui/index.html` now loads `ui/default-entry.js` as its one application bootstrap. It is a
 small client entry decision; it does not change API routing, cookies, session
 tokens, invitations, surveys, reports, access rules or the existing UI internals.
 
@@ -39,7 +39,7 @@ tokens, invitations, surveys, reports, access rules or the existing UI internals
    live-verification receipt**: exact production commit/version/release pin,
    canonical connected build and active runtime identity, plus affected smoke
    results. A main merge, DEV health or an open production PR is insufficient.
-   No such receipt has been consumed by this preparation.
+   Prerequisite supplied and consumed: production PR #615 merged 2026-11-06 19:21:58 UTC; coordinator live health at 19:26 UTC reported `0.39.2+09eba5e`, commit `09eba5eaa6c3d32658ea580180cd0c32f0ddd771`, build `a85350b4-36e7-450f-8d8e-792d41a047d5`, D1 OK, trace `tr_cneU7jaM3oJAbr43`. This is coordinator-attributed evidence. Its source preceded #612; the activation branch instead incorporates current main `739506dd481a8e977bcd580313a451dcdca49705`, including #612 and #618.
 2. Reconcile this preparation onto that verified source and preserve all owners'
    changes, particularly #612 and other coordinated Summit fixes. Refresh the
    existing canonical release/version/changelog chain; do not invent a second
@@ -84,5 +84,4 @@ also remains an escape route if Next JavaScript fails after a successful probe.
 
 The preparation tests cover entry decisions, exact untouched URLs/tokens,
 fallbacks, a simulated history stack and the fact that activation is absent.
-Existing Next router tests remain relevant. No authenticated hosted browser,
-real-device or post-activation production result is claimed by these tests.
+Existing Next router tests remain relevant. No authenticated hosted browser, real-device or post-activation production result is claimed by the unit tests. Deployment evidence must be added after the protected release.

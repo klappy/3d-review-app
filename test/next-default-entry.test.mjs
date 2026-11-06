@@ -88,8 +88,11 @@ test('a hash or query navigation while the entry probe is pending cannot be over
   }
 });
 
-test('preparation is inactive; rollback is restoring the original legacy bootstrap', () => {
+test('root wires one default bootstrap; legacy remains a conditional fallback', () => {
   const html = readFileSync(new URL('../ui/index.html', import.meta.url), 'utf8');
-  assert.match(html, /<script type="module" src="\/assess\/assess\.js"><\/script>/);
-  assert.doesNotMatch(html, /default-entry\.js/);
+  assert.match(html, /import \{ bootDefaultEntry \} from \"\/default-entry\.js\"; bootDefaultEntry\(\);/);
+  assert.doesNotMatch(html, /<script[^>]+src=\"\/assess\/assess\.js/);
+  assert.equal((html.match(/bootDefaultEntry\(\)/g) || []).length, 1);
+  const server = readFileSync(new URL('../ui/server.mjs', import.meta.url), 'utf8');
+  assert.match(server, /'\/default-entry\.js': \['default-entry\.js', 'text\/javascript'\]/);
 });

@@ -1,6 +1,6 @@
-// Prepared for optional Summit item 13. Deliberately NOT wired into index.html.
-// The coordinator activates the reviewed wiring only after the next production
-// promotion is deployed and independently verified. This module stores no preference.
+// Summit item 13: ordinary root entry selects Next after the prerequisite
+// production promotion was verified. Explicit legacy and existing deep links keep
+// their original handlers. This module stores no preference.
 const PRESENTATION_QUERY = new Set(['ui', 'ui_next', 'theme', 'w']);
 
 // Change the ordinary entry point, not the contracts of existing links. Hashes
