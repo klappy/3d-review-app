@@ -311,6 +311,20 @@ const KNOWN_DISAGREEMENTS: Record<string, { why: string; problems: string[] }> =
 };
 
 describe("contract parity: capabilities.json ↔ openapi.yaml (offline)", () => {
+  it('audits every public amendment-bearing boundary: open template/print envelopes, closed form and report nodes',()=>{
+    // These four projections expose amendment provenance through an intentionally
+    // generic Envelope; no closed per-capability result can silently reject it.
+    for(const id of ['cap.template.list','cap.template.get','cap.template.render','cap.survey.print']){
+      const c=caps.find(c=>c.id===id)!;expect(c.result_schema,id).toBeUndefined();expect(oasResult(c.http),id).toBeNull();
+    }
+    const form=caps.find(c=>c.id==='cap.response.form')!;
+    expect(form.result_schema.properties.template.additionalProperties).toBe(false);
+    expect(form.result_schema.properties.template.properties.instrument_amendment).toEqual({const:'605edb47d2280568f0f5860f7b1921c12a814222'});
+    // Existing parity recursion checks the matching OpenAPI nested node;
+    // real serialized form and report values are validated in the D1 suites.
+    for(const id of ['cap.report.build','cap.report.get'])expect(caps.find(c=>c.id===id)!.result_schema.oneOf[0].properties.level_minimum_responses).toEqual({type:'integer',minimum:1});
+  });
+
   it("parses openapi.yaml with one operation per capability route", () => {
     const methods = new Set(["get", "put", "post", "delete", "options", "head", "patch", "trace"]);
     const ops = Object.values(oas.paths as Record<string, Json>).reduce((n, p) => n + Object.keys(p).filter((k) => methods.has(k)).length, 0);

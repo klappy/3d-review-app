@@ -1800,6 +1800,9 @@
                   "string",
                   "null"
                 ]
+              },
+              "instrument_amendment": {
+                "const": "605edb47d2280568f0f5860f7b1921c12a814222"
               }
             },
             "required": [
@@ -1829,6 +1832,21 @@
             "items": {
               "type": "string"
             }
+          },
+          "languages": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          },
+          "passages": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          },
+          "demographics_enabled": {
+            "type": "boolean"
           }
         },
         "required": [

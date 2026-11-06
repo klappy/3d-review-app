@@ -31,3 +31,9 @@ export function reportResultErrors(capability:string,result:any){
  const op=flow(route),published=op.responses['200'].content['application/json'].schema.properties.result;
  return [...schemaErrors(c.result_schema,result,'capabilities'),...schemaErrors(published,result,'openapi')];
 }
+
+/** Audit the amendment-bearing form result against both actual published nodes. */
+export function participantFormErrors(result:any){
+ const capability=contract.capabilities.find(c=>c.id==='cap.response.form') as any;
+ return [...schemaErrors(capability.result_schema,result,'capabilities'),...schemaErrors(flow('      operationId: cap.response.form').properties.result,result,'openapi')];
+}

@@ -1,4 +1,4 @@
-import {reportResultErrors} from './report-contract-check';
+import {reportResultErrors,participantFormErrors} from './report-contract-check';
 import {get as getReport} from '../src/handlers/report';
 import {form,submit} from '../src/handlers/response';
 import {print as printSurvey} from '../src/handlers/survey';
@@ -94,6 +94,11 @@ describe('participant-source reports (DEV only)',()=>{
      else await run("INSERT INTO assessment_survey (id,assessment_id,template_id,template_version,state,collection_status,created_at) VALUES (?,?,?,2,'selected','open','2026-11-05')",sid,aid,tid);
      const c={...ctx('dev'),env:{...ctx('dev').env,DB:db},traceId:'tr_decision25',log:()=>{},principal:{kind:'participant',id:'decision25_'+tid,respondentId:'decision25_'+tid,participantSurveyId:sid}} as unknown as Ctx;
      const presented=await form(c,{});
+     const serialized=JSON.parse(JSON.stringify(presented.result));
+     expect(participantFormErrors(serialized)).toEqual([]);
+     expect(participantFormErrors({...serialized,template:{...serialized.template,instrument_amendment:'unknown'}}).length).toBeGreaterThan(0);
+     expect(participantFormErrors({...serialized,template:{...serialized.template,unexpected:true}}).length).toBeGreaterThan(0);
+     const historical=structuredClone(serialized);delete historical.template.instrument_amendment;expect(participantFormErrors(historical)).toEqual([]);
      const items=presented.result.items as any[];
      expect(items.find(i=>i.id===itemId).options).toEqual(expect.arrayContaining([expect.objectContaining({code:'no-brief',text})]));
      const member={...c,principal:{kind:'user',id:'person_mara'}} as Ctx;
