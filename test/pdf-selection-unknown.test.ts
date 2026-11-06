@@ -29,5 +29,7 @@ it.each(['overview','detailed'])('HTTP %s PDF preserves explicitly saved empty s
  reads.stored.report.payload.report_selection={schema:'3d-report-selection-v1',selected_perspectives:[]};
  const result=await render(format);
  expect(result).not.toContain('Other perspectives’ participation is unknown.');
- expect(result).toContain('not selected at report capture');
+ expect(html).not.toMatch(/class="sheet-tile"[^>]*data-lens="church"/);
+ expect(result).not.toContain('Church more input needed');
+ if(format==='detailed')expect(result).toContain('not selected at report capture');
 });
