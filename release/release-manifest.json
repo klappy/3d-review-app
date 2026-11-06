@@ -1,33 +1,30 @@
 {
-  "version": "0.39.0",
+  "version": "0.39.2",
   "cookbook_repo": "klappy/3d-review-cookbook",
-  "cookbook_commit": "e6ccdc660afd2ffbb2a28e7317b25dda11c86b6c",
+  "cookbook_commit": "f1e082f3e5e4b37fc62001cd16f7cdaf51f3a8ee",
   "records": [
     {
-      "path": "planning/2026-09-16-parity-build/releases/0.39.0.md",
-      "blob_sha": "ee15f96e59efb5f3938987414de54a9994f93313",
-      "sha256": "3ba36d1f3fe256f03f6faaf0ec402f8cf913168a22fba09071bac361b9427b92"
+      "path": "planning/2026-09-16-parity-build/releases/0.39.2.md",
+      "blob_sha": "aa47dc7d3b6f69e8568cd7ca10754b4d9cdff008",
+      "sha256": "1b39e516b3897fef64e5940196250e973a2a2404fae10ee3b9d66764c386023d"
     },
     {
       "path": "planning/2026-09-16-parity-build/releases/releases.json",
-      "blob_sha": "0f403c8eb838fd937e746d10c202639b3624cb5f",
-      "sha256": "0f849b45e5399cdd7c880e7b66c5a2ecea8e1bd85707d99bede526e4a4434f6a"
+      "blob_sha": "df232fad30f231687bc74dce89811ab66a2368d8",
+      "sha256": "ac39432bec27e798732e824c91474712b9901a08cea203243948ee321babf70a"
     }
   ],
   "changelog": {
     "sections": {
-      "added": [
-        "The existing stored-report PDF endpoint accepts explicit overview and detailed formats, rendered through the actual Next report components and styles. Full remains the default and an explicit fallback."
-      ],
       "fixed": [
-        "Overview and Detailed downloads select their named document instead of both returning the full legacy report. The file names distinguish the named formats; repeated preparation and format/session changes retain stale-file protection."
+        "Bulk paper-survey printing retains each existing Next survey URL and QR instead of showing a false missing-link fallback. Individual/current root-link printing remains supported.",
+        "The print dialog no longer promises an access code on each paper."
       ],
       "changed": [
-        "MINOR under the major-zero policy for the additive accepted HTTP format selector. Candidate against accepted main 7390415197aad5c7fb3dec618b1572a4f8333071; no released-status, formal approval or deployment claim.",
-        "Existing authorized stored reads, current suppression, server-owned perspective floors and full-report fallback remain authoritative. No scoring, new report creation, migration, public question-results cells/capability, excerpt disclosure, credential, subscription or runtime-configuration change.",
-        "Local genuine PDF evidence covers two distinct synthetic snapshots: one-page overview and four-page detailed documents, matching same-model Next labels and counters. A three-page single-perspective report is a different model. Hosted new-format and physical installed-PWA acceptance remain pending.",
-        "Qualified source 064aefdda1eb4f3f1dcf42fd623ac85c9a83c200, tree 2ef5348765d603f646205d91af3103c5e60fc0f4. All 44 accepted PR594 files remain byte-identical. PDF delta remains 19 files. Local affected tests 42 passed with actual PDF/Workers evidence; eight download helpers passed; type/build and generated freshness passed. Denominators overlap and are not human persona-completion totals. Packaged local qualification head e3762c687c141b84c5bb83de8b1edc00c53dd42a passed 58 tests with one skip; eight helpers passed; Node tests 101 passed/six skipped. Final-head identity/layout checks 18 passed/one skip overlap those checks.",
-        "Independent native bounded review at e3762c687c141b84c5bb83de8b1edc00c53dd42a PASS: 22 tests passed with one existing skip; accepted PR594 product/PDF source, SSR body, prior release history and record hashes preserved. Roadmap regeneration and immutable published-pin metadata are finalized separately, requiring fresh exact-head checks and bounded metadata review. Built local; Reviewed product source; DEV new formats pending; Production new formats pending."
+        "PATCH:existing tokens, participant destinations, bindings, permissions and expiry remain unchanged; no replacement link is issued by this correction.",
+        "Local synthetic qualification:seven distinct forms;16A4/Letter PDFs/168pages;28of28rendered QR codes decoded exactly. Full app2303pass/3skip, Next1121pass, legacy962pass, MJS101pass/6skip; overlapping suites. Human satisfaction/confusion/frustration NOT MEASURED. Hosted actual-seven and physical-device acceptance unverified.",
+        "Independent bulk-print increment only; no no-brief/report-selection/radar/one-response/footer or UI-default timing change. Candidate release packaging and DEV/production gates remain.",
+        "Production review before shipment found a malformed backslash authority edge case; correction b853161673a81ac16e718d7bf347d381f7f5ace5 explicitly refuses it. Automated local synthetic evidence on macOS/Node in the isolated task6 worktree: S31 10pass and seven-survey integration 2pass. Corrected CI, hosted DEV and production qualification remain pending; corrected main/DEV and fresh production review/checks remain required. Valid existing URLs and QR payloads unchanged. Corrected product source b853161673a81ac16e718d7bf347d381f7f5ace5 current persona denominator3: automated local synthetic macOS/Node HTML layer attempted1/passed1/failed0/untested2; S1 seven-form HTML PASS, S2 rendered-paper scan UNTESTED, S3 individual PDF/browser UNTESTED. Corrected CI, hosted DEV, production and physical-device layers each attempted0/passed0/failed0/untested3. Historical8890a707b6a8ff3da2a5af763b12bd273631eb79 PDF/QR evidence remains provenance only; human metrics NOT MEASURED/sample0."
       ]
     }
   }
