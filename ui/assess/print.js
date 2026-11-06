@@ -1,4 +1,4 @@
-import { renderBlankPrint } from '../stage-screens.js';
+import { renderBlankPrint, isSurveyLinkUrl } from '../stage-screens.js';
 import { qrSvg, oneSheetHtml, printAllHtml } from './share.js';
 import { shareUrl } from '../shared-link.js';
 
@@ -109,8 +109,13 @@ export async function activeSurveyLink(api, { aid, sid, origin = globalThis.loca
   if (!r?.link_id || typeof r.entry_fragment !== 'string' || !/^#survey=[A-Za-z0-9_-]+$/.test(r.entry_fragment)) return null;
   return { id: r.link_id, url: shareUrl(origin, r.entry_fragment), expires_at: r.expires_at || null };
 }
-// The paper's link: the URL plus its QR (the Share card's own qrSvg) as an inline SVG data URI — no network on the paper.
-export const paperLink = link => (link?.url ? { url: link.url, qr: `data:image/svg+xml,${encodeURIComponent(qrSvg(link.url))}` } : null);
+// Encode the survey's exact existing entry URL, including its intended participant client.
+// The paper validator accepts only the two supported routes; no link is issued or rewritten here.
+export function paperLink(link) {
+  if (!isSurveyLinkUrl(link?.url)) return null;
+  const url = link.url;
+  return { url, qr: `data:image/svg+xml,${encodeURIComponent(qrSvg(url))}` };
+}
 
 // S31 identity, from the facilitator's rows as the API returns them: the assessment read carries language_id only
 // (src/handlers/assessment.ts, SELECT a.*), so the evaluated language's name comes from the project's languages
