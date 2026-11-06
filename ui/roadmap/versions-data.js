@@ -9,24 +9,12 @@ export const VERSIONS = {
     "PATCH:existing tokens, participant destinations, bindings, permissions and expiry remain unchanged; no replacement link is issued by this correction.",
     "Local synthetic qualification:seven distinct forms;16A4/Letter PDFs/168pages;28of28rendered QR codes decoded exactly. Full app2303pass/3skip, Next1121pass, legacy962pass, MJS101pass/6skip; overlapping suites. Human satisfaction/confusion/frustration NOT MEASURED. Hosted actual-seven and physical-device acceptance unverified.",
     "Independent bulk-print increment only; no no-brief/report-selection/radar/one-response/footer or UI-default timing change. Candidate release packaging and DEV/production gates remain.",
-    "Production review before shipment found a malformed backslash authority edge case; correction b853161673a81ac16e718d7bf347d381f7f5ace5 explicitly refuses it. Automated local synthetic evidence on macOS/Node in the isolated task6 worktree: S31 10pass and seven-survey integration 2pass. Corrected CI, hosted DEV and production qualification remain pending; corrected main/DEV and fresh production review/checks remain required. Valid existing URLs and QR payloads unchanged. Corrected product source b853161673a81ac16e718d7bf347d381f7f5ace5 current persona denominator3: automated local synthetic macOS/Node HTML layer attempted1/passed1/failed0/untested2; S1 seven-form HTML PASS, S2 rendered-paper scan UNTESTED, S3 individual PDF/browser UNTESTED. Corrected CI, hosted DEV, production and physical-device layers each attempted0/passed0/failed0/untested3. Historical8890a707b6a8ff3da2a5af763b12bd273631eb79 PDF/QR evidence remains provenance only; human metrics NOT MEASURED/sample0."
+    "Production review before shipment found a malformed backslash authority edge case; correction b853161673a81ac16e718d7bf347d381f7f5ace5 explicitly refuses it. Automated local synthetic evidence on macOS/Node in the isolated task6 worktree: S31 10pass and seven-survey integration 2pass. Corrected CI, hosted DEV and production qualification remain pending; corrected main/DEV and fresh production review/checks remain required. Valid existing URLs and QR payloads unchanged. Corrected product source b853161673a81ac16e718d7bf347d381f7f5ace5 current persona denominator3: automated local synthetic macOS/Node HTML layer attempted1/passed1/failed0/untested2; S1 seven-form HTML PASS, S2 rendered-paper scan UNTESTED, S3 individual PDF/browser UNTESTED. Corrected CI, hosted DEV, production and physical-device layers each attempted0/passed0/failed0/untested3. Historical8890a707b6a8ff3da2a5af763b12bd273631eb79 PDF/QR evidence remains provenance only; human metrics NOT MEASURED/sample0.",
+    "Superseding technical qualification snapshot: automated GitHub Actions ubuntu-latest/Node22 CI at exact reviewed source 30d5bc603b3c6b4cf343c45ced4306160b332c03 passed2303tests/3skips. Tree-identical merge b6be7042838d6b971f5d43625813f8a016fd4fde deployed via successful connected DEV push-event build248cb042-505b-4974-8d6a-b673f44240b9; health0.39.2+b6be704 matched commit/buildUUID/canonicalf1e082f3e5e4b37fc62001cd16f7cdaf51f3a8ee, D1ok. Read-only hosted synthetic helper smoke passed7exactNextURLs/root/invalid/missing/backslash checks. This supersedes earlier pending technical CI/DEV statements; complete hosted persona/physical scenarios remain untested, distinct from helper checks. Scoped exclusion keeps historical unshipped0.39.1 out of current0.39.2 public surfaces. This metadata follow-up still requires final packaging review/checks/DEV qualification then production615; no production or physical pass is claimed."
    ],
    "fixed": [
     "Bulk paper-survey printing retains each existing Next survey URL and QR instead of showing a false missing-link fallback. Individual/current root-link printing remains supported.",
     "The print dialog no longer promises an access code on each paper."
-   ]
-  },
-  {
-   "version": "0.39.1",
-   "added": [],
-   "changed": [
-    "Source amendment: Decision 25 at 605edb47d2280568f0f5860f7b1921c12a814222. Historical template versions/capture hashes remain unchanged; new submissions and reports record the amendment pin. A new scorer identity separates new reports from the exact historical renderer used to read old reports.",
-    "Automated local synthetic fixtures, environment local source/Miniflare D1; exact tested app head 5cdb3b70f69e7e2d5c05c6e7d4461eb10f91419a. Fixed denominator 3 named scenarios: translator/facilitator answering existing TR-Q2 or ML-Q2; report reader comparing perspectives; authorized reader reopening an old report. Attempted 3, passed 3, failed 0, untested 0 at that local layer. Final exact-head full suite 2313 passed/3 skipped/0 failed; UI966 passed; Node101 passed/6 skipped. Suite totals overlap and are not persona totals. Hosted DEV, production and physical-device surfaces: each 0 attempted/0 passed/0 failed/3 untested. Satisfaction/confusion/frustration NOT MEASURED, sample size0. Independent general code review passed; required security review, cookbook acceptance and hosted release validation remain pending."
-   ],
-   "fixed": [
-    "TR-Q2 and ML-Q2 include the canonical no-translation-brief choice for everyone using those shared surveys, including existing survey links, assisted entry and printed forms.",
-    "Newly built reports show no translation brief, no prior agreement and not aware as findings excluded from translation-type comparison. Other remains excluded and historical answers keep their original meaning.",
-    "Translation-type categories, status findings and match verdicts respect immutable report perspective counts and the configured minimum in API/MCP and every report screen; newer live counts cannot lift suppression."
    ]
   },
   {
@@ -118,6 +106,20 @@ export const VERSIONS = {
    "fixed": [
     "Retained survey selections follow survey IDs across review changes. Async completion stays with its initiating review and principal, rereads current cookie-session identity before mutations and preserves notes saved during stage advancement.",
     "Access/history controls render inside the themed screen shell; loading uses scoped skeletons. Printed reports include supplied provenance without expanding the on-screen disclosure."
+   ]
+  },
+  {
+   "version": "0.37.2",
+   "added": [],
+   "changed": [
+    "The UI Next preview at `/next/` is built by the standard typecheck and test steps on all branches, including production. Production compiles out fixture galleries and mounts the live app; the current UI at `/` stays the default, with an explicit “Try the new design” menu opt-in.",
+    "Cumulative source includes the existing PR554 build integration, PR574 responsive layout and PR576 production opt-in alongside PR581 navigation performance. Workspace inheritance from the separate unmerged 0.37.1 candidate is excluded. Automated/local evidence and unmeasured physical-device or real-human outcomes remain distinct from pending deployed acceptance.",
+    "Inherited PR576 report behavior is unchanged from the existing production source: DEV uses one-response report/per-perspective floors; production retains its existing disclosure gates and thresholds. Report-build admission, member grants, viewer eligibility, pre-close access and coverage cues remain source- and environment-specific; their six-scenario fresh acceptance denominator is explicitly untested here.",
+    "At app c88df937, Operator automated/local production-build and menu-opt-in checks passed 2/2; Facilitator automated/local responsive-layout checks passed 15/15, with zero failures. The six inherited report scenarios (Facilitator/member: DEV floors, member build admission, pre-close access and coverage cues; Facilitator/viewer: eligibility; Operator: production disclosure and threshold retention) have 0 attempted, 0 passed, 0 failed, 6 untested. Operator/Facilitator hosted standard-build, responsive and opt-in scenarios have 0 attempted, 0 passed, 0 failed, 3 untested. No real-human study; satisfaction, confusion and frustration NOT MEASURED."
+   ],
+   "fixed": [
+    "UI Next screens at `/next/` (Landing, About, Home and lane screens) now use the phone layout on viewports narrower than 720px instead of only when the link carries `?w=phone`, and switch when the window crosses that width; `?w=phone` and `?w=desktop` still force a layout.",
+    "Next UI results and report navigation starts independent reads together, and following an in-page anchor no longer repeats data reads. Existing access checks, required-read errors, explicit report-build confirmation and current UI default are preserved. Automated and local synthetic evidence is distinct from pending DEV and production verification."
    ]
   }
  ],
