@@ -63,7 +63,10 @@ export function reportPdfDocument(result, {paper='letter',minimum=3}={}) {
   // The same exact stored aggregates in an accessible table beside the vector charts.
   const rows = (payload.lenses||[]).flatMap(l => (l.sub_dimensions||[]).map(s => `<tr><th scope="row">${esc(l.lens)}</th><td>${esc(s.sub_dimension)}</td><td>${esc(s.score)}</td></tr>`));
   const table = rows.length ? `<section><h2>Scores in this report</h2><table><thead><tr><th>Perspective</th><th>Area</th><th>Score (out of 100)</th></tr></thead><tbody>${rows.join('')}</tbody></table></section>` : '';
+  const selection=payload.report_selection;
+  const waiting=selection?.schema==='3d-report-selection-v1'&&Array.isArray(selection.selected_perspectives)?selection.selected_perspectives.filter(lens=>!(counts.get(key(lens))>0)):[];
+  const participation=waiting.length?`<p data-saved-participation>${waiting.map(lens=>`${esc(lens)}: More input needed (0 responses at report capture)`).join(' · ')}</p>`:'';
   // Existing chart token values (ui/design-system-v3/tokens.css), resolved for a self-contained white paper.
   const palette=':root{--paper:#fff;--ink:#111;--secondary:#555;--line:#ccc;--lens-green:#49a076;--lens-blue:#4885bb;--lens-yellow:#d8ae3c;--band-growing:#83b996;--band-needs-support:#dfc065;--band-urgent:#da8b83;--perspective-fill:#fff;--badge-fill:#edf5ef;--badge-ink:#294d37;--warning-fill:#fff5d7;--warning-ink:#664c10}';
-  return documentHtml(`<h1>3D Review report</h1>${root.children.map(html).join('')}${table}`,{paper,title:'3D Review report',css:palette+lensesCss+REPORT_PDF_CSS});
+  return documentHtml(`<h1>3D Review report</h1>${participation}${root.children.map(html).join('')}${table}`,{paper,title:'3D Review report',css:palette+lensesCss+REPORT_PDF_CSS});
 }

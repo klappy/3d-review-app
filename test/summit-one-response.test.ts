@@ -126,7 +126,7 @@ it('G02 history guard: changing current zero-response survey selection cannot ch
  const browser={quickAction:async(_:string,options:any)=>{rendered=options.html;return new Response('%PDF-local',{headers:{'content-type':'application/pdf'}})}};
  const get=async(format:string)=>{
   const response=await app.fetch(new Request(`https://local.invalid/v2/reports/${made.report.id}/pdf?format=${format}`,{headers:{authorization:`Bearer ${session}`}}),{...c.env,PDF_BROWSER:browser} as any);
-  expect(response.status).toBe(200);expect(rendered).toContain('Other perspectives’ participation is unknown.');return rendered;
+  expect(response.status).toBe(200);expect(rendered).not.toContain('Other perspectives’ participation is unknown.');return rendered;
  };
  const zeroSurveys=(await db.prepare('SELECT s.id,s.state FROM assessment_survey s LEFT JOIN response r ON r.assessment_survey_id=s.id WHERE s.assessment_id=? GROUP BY s.id HAVING count(r.id)=0').bind(one).all<{id:string;state:string}>()).results;
  expect(zeroSurveys.length).toBeGreaterThan(0);

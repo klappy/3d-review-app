@@ -3,10 +3,10 @@ import {createHash} from 'node:crypto';
 import {beforeAll,beforeEach,afterEach,afterAll,describe,it,expect,vi} from 'vitest';
 // Pass-through counter: the store's attestations are counted, never altered.
 const attestCalls=vi.hoisted(()=>({n:0,raws:[] as string[],digests:[] as (string|null)[]}));
-vi.mock('../src/report-capture',async(importOriginal)=>{const m:any=await importOriginal();return {...m,attestPackedCapture:async(...a:any[])=>{attestCalls.n++;attestCalls.raws.push(a[1]);const r=await m.attestPackedCapture(...a);attestCalls.digests.push(r.eligible?r.capture.captureDigest:null);return r;}};});
+vi.mock('../src/report-capture',async(importOriginal)=>{const m:any=await importOriginal();return {...m,attestSelectionCapture:async(...a:any[])=>{attestCalls.n++;attestCalls.raws.push(a[1]);const r=await m.attestSelectionCapture(...a);attestCalls.digests.push(r.eligible?r.capture.captureDigest:null);return r;}};});
 import {Miniflare,convertV4MiniflareOptions} from 'miniflare';
 import * as store from '../src/synthetic-report-store';
-import {captureForBuild} from '../src/report-capture';
+import {captureForBuild,attestSelectionCapture} from '../src/report-capture';
 import {renderSyntheticReport,renderLegacySyntheticReport,LEGACY_REPORT_VERSIONS,REPORT_VERSIONS,REPORT_SCHEMA} from '../src/synthetic-report-renderer';
 import {canonicalJson} from '../src/report-canonical-json';
 import type {Ctx} from '../src/handlers/types';
@@ -30,7 +30,7 @@ function intercept(fn:(sql:string,args:unknown[],method:string,next:()=>Promise<
 }
 async function clearReports(){await exec('DROP TRIGGER synthetic_report_no_delete');await exec('DELETE FROM synthetic_report');await exec(noDelete);}
 async function restoreResponse(row:Record<string,unknown>){await exec('INSERT INTO response ('+Object.keys(row).join(',')+') VALUES ('+Object.keys(row).map(()=>'?').join(',')+')',...Object.values(row));}
-async function capture(id=aid){const c=await captureForBuild(context(),id);if(!c.eligible)throw new Error('fixture capture refused');return c.capture;}
+async function capture(id=aid){const row=await db.prepare(store.REPORT_OBSERVE_SQL).bind('user',null,id,'person_mara','member').first<any>();const c=await attestSelectionCapture(id,row.current_capture);if(!c.eligible)throw new Error('fixture capture refused');return c.capture;}
 async function report(id=aid){const r=await store.buildMaterialized(context(),id);expect(r.ok,id).toBe(true);if(!r.ok)throw new Error('fixture report refused');return r.value;}
 async function alter(id:string,values:Record<string,unknown>){await exec('DROP TRIGGER synthetic_report_no_update');try{await exec('UPDATE synthetic_report SET '+Object.keys(values).map(k=>k+'=?').join(',')+' WHERE id=?',...Object.values(values),id);}finally{await exec(noUpdate);}}
 beforeAll(async()=>{
@@ -49,7 +49,8 @@ afterEach(() => corpusOperation.drain(),15000);
 afterAll(async () => { try { await corpusOperation.drain(); } finally { await mf.dispose(); } },30000);
 describe('real compiled renderer with local D1',()=>{
  it('reads exact historical reports and lists them beside new reports without rewriting old rows',async()=>{
-   const c=await capture(),legacy=await renderLegacySyntheticReport(aid,c.rows);
+   const legacyCapture=await captureForBuild(context(),aid);if(!legacyCapture.eligible)throw new Error('legacy capture refused');
+   const c=legacyCapture.capture,legacy=await renderLegacySyntheticReport(aid,c.rows);
    if(!legacy.eligible)throw new Error('legacy fixture refused');
    const tuple={sourcePin:ATTESTATION_TRUST.sourcePin,indexRoot:ATTESTATION_TRUST.indexRoot,scorerVersion:LEGACY_REPORT_VERSIONS.scorer,narrativeVersion:LEGACY_REPORT_VERSIONS.narrative,policyVersion:LEGACY_REPORT_VERSIONS.policy,outputSchemaVersion:REPORT_SCHEMA};
    const key=hash('3d-materialized-report-v1\0'+canonicalJson({schema:'3d-materialized-report-key-v1',assessmentId:aid,captureDigest:c.captureDigest,...tuple}));
@@ -85,11 +86,12 @@ describe('real compiled renderer with local D1',()=>{
    phaseStart('build');
    const start=performance.now(),r=await report(id),buildMs=performance.now()-start;
    phaseEnd('build');
-   expect(canonicalJson(r.payload)).toBe(expected.payloadJson);
+   const expectedBytes=canonicalJson({...expected.payload,report_selection:{schema:'3d-report-selection-v1',selected_perspectives:[...new Set(c.selection!.map(s=>s[4]))].sort()}});
+   expect(canonicalJson(r.payload)).toBe(expectedBytes);
    phaseStart('get');
    const readStart=performance.now(),read=await store.readMaterialized(context(),r.id),getMs=performance.now()-readStart;
    phaseEnd('get');
-   expect(read.ok).toBe(true);if(read.ok)expect(canonicalJson(read.value.payload)).toBe(expected.payloadJson);
+   expect(read.ok).toBe(true);if(read.ok)expect(canonicalJson(read.value.payload)).toBe(expectedBytes);
    phaseStart('list');
    const listStart=performance.now(),list=await store.listMaterialized(context(),id),listMs=performance.now()-listStart;
    phaseEnd('list');
@@ -100,7 +102,7 @@ describe('real compiled renderer with local D1',()=>{
    phaseStart('raw-row');
    const row=await db.prepare('SELECT * FROM synthetic_report WHERE id=?').bind(r.id).first<any>();
    phaseEnd('raw-row');
-   expect(row.payload_json).toBe(expected.payloadJson);expect(row.payload_sha256).toBe(hash(expected.payloadJson));
+   expect(row.payload_json).toBe(expectedBytes);expect(row.payload_sha256).toBe(hash(expectedBytes));
    expect([row.source_pin,row.index_root,row.scorer_version,row.narrative_version,row.policy_version,row.output_schema_version]).toEqual([sourceFixture.source_commit,'d964f81639e0929ce5f53156b28e3902732b98d2394c6d8dc31c9d14a22fb7dd',REPORT_VERSIONS.scorer,REPORT_VERSIONS.narrative,REPORT_VERSIONS.policy,REPORT_SCHEMA]);
    if(id===aid)expect(row.report_key).not.toBe('68b602d11a77162f72320c43827d30d33ed9f95fca9dfe5cb07f18905176a52d');
    measurements.push({assessmentId:id,responses:c.rows.length,captureBytes:Buffer.byteLength(c.packedCapture),payloadBytes:Buffer.byteLength(expected.payloadJson),buildMs,getMs,listMs});
@@ -128,12 +130,12 @@ describe('real compiled renderer with local D1',()=>{
   expect(spans.every(s=>s.span==='report.stage'&&Object.keys(s.data??{}).join()==='stage,ms'&&typeof s.data?.ms==='number'&&(s.data.ms as number)>=0)).toBe(true);
   expect(spans.map(s=>s.data?.stage)).toEqual(['observe_sql','attest_observe','render_preview','observe_sql','attest_observe','attest_commit','render','canonicalize','validate','hash','commit_sql','result_sql','attest_current','validate_stored']);
  });
- it('one build attests the observed capture once; an external token is re-attested; bytes unchanged',async()=>{
+ it('one build attests each wrapper/response form once; an external token is re-attested; bytes unchanged',async()=>{
   attestCalls.n=0;const r=await store.buildMaterialized(context(),aid);expect(r.ok).toBe(true);if(!r.ok)return;
-  expect(attestCalls.n).toBe(1);
+  expect(attestCalls.n).toBe(2);
   const c=await capture();attestCalls.n=0;
   const again=await store.commitMaterialized(context(),aid,c);expect(again.ok).toBe(true);if(!again.ok)return;
-  expect(attestCalls.n).toBe(1);
+  expect(attestCalls.n).toBe(2);
   expect(again.value.reportKey).toBe(r.value.reportKey);expect(again.value.captureDigest).toBe(r.value.captureDigest);expect(again.value.payload).toEqual(r.value.payload);
  });
  it('one build re-attests when captured bytes differ between uses (same length, still eligible): no reuse',async()=>{
@@ -145,7 +147,7 @@ describe('real compiled renderer with local D1',()=>{
   try{await store.buildMaterialized(context(raced),aid);}finally{await exec('UPDATE response SET answers_json=? WHERE id=?',response.answersRaw,response.responseId);}
   expect(changed).toBe(true);
   expect(attestCalls.n).toBeGreaterThanOrEqual(2);
-  expect(new Set(attestCalls.raws).size).toBe(2);expect(attestCalls.raws[0].length).toBe(attestCalls.raws[1].length);
+  expect(new Set(attestCalls.raws).size).toBe(2);const responseBytes=(raw:string)=>{const value=JSON.parse(raw);return value[0]==='3d-report-selection-capture-v1'?value[2]:raw;};expect(responseBytes(attestCalls.raws[0]).length).toBe(responseBytes(attestCalls.raws[1]).length);
   // Semantically equal bytes attest to one digest: the memo must not key on that either.
   expect(attestCalls.digests.every(d=>typeof d==='string')).toBe(true);expect(new Set(attestCalls.digests).size).toBe(1);
  });
@@ -159,7 +161,7 @@ describe('real compiled renderer with local D1',()=>{
   let result;try{result=await store.buildMaterialized(context(raced),aid);}finally{await exec('UPDATE response SET answers_json=? WHERE id=?',response.answersRaw,response.responseId);}
   expect(changed).toBe(true);expect(result).toEqual(held());
   expect(attestCalls.n).toBeGreaterThanOrEqual(2);
-  expect(new Set(attestCalls.raws).size).toBe(2);expect(attestCalls.raws[0].length).toBe(attestCalls.raws[1].length);
+  expect(new Set(attestCalls.raws).size).toBe(2);const responseBytes=(raw:string)=>{const value=JSON.parse(raw);return value[0]==='3d-report-selection-capture-v1'?value[2]:raw;};expect(responseBytes(attestCalls.raws[0]).length).toBe(responseBytes(attestCalls.raws[1]).length);
   // Two attestations, two outcomes: the observed bytes attest eligible, the moved bytes are refused.
   expect(typeof attestCalls.digests[0]).toBe('string');expect(attestCalls.digests.at(-1)).toBeNull();
  });

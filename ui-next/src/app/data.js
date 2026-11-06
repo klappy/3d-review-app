@@ -374,10 +374,11 @@ export const phonePayload = (payload) => ({ ...payload, lenses: (payload.lenses 
 export function liveReport(m, { phone = false, screen = "" } = {}) {
   if (!m?.payload) return null;
   // Results is a current collection hub. Saved-report readers must not borrow today's selected surveys for old snapshots.
-  // Existing captures record responding perspectives only; selected-but-unanswered participation remains unknown.
-  const collectionHub = screen === "results", sent = collectionHub ? m.sent : [];
+  // New saved reports carry a validated perspective-only selection snapshot. Legacy absence stays unknown.
+  const savedSelection = m.payload.report_selection?.schema === '3d-report-selection-v1' && Array.isArray(m.payload.report_selection.selected_perspectives) ? sentLenses(m.payload.report_selection.selected_perspectives.map(perspective=>({perspective,state:'selected'}))) : null;
+  const collectionHub = screen === "results", sent = collectionHub ? m.sent : savedSelection ?? [];
   const full = m.payload, cards = lensCards(full, m.counts, { sent }), rows = gapRows({ payload: full }, m.counts);
-  return { reportId: m.reportId, created_at: m.created_at, review: m.review, counts: m.counts, sent, selectionKnown: collectionHub ? undefined : false, payload: phone && screen === "results" ? phonePayload(full) : full,
+  return { reportId: m.reportId, created_at: m.created_at, review: m.review, counts: m.counts, sent, selectionKnown: collectionHub ? undefined : savedSelection !== null, payload: phone && screen === "results" ? phonePayload(full) : full,
     gaps: gapsOf(full, m.counts), radar: radarOf(full), lookNext: lookNextOf(cards), standsOut: standsOutOf(cards, rows) };
 }
 

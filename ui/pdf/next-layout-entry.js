@@ -4,8 +4,8 @@ import Report from '../../ui-next/src/screens/results/Report.svelte';
 import Detailed from '../../ui-next/src/screens/results/ReportDetailed.svelte';
 import {currentLevelMin,useLevelMinimum,sentLenses,lensCards,gapRows,scoreRows,bandRows,sameBand,lookNextOf,standsOutOf} from '../../ui-next/src/screens/results/data.js';
 // surveys: explicit selection evidence supplied by an internal caller, never today's selection borrowed for an old report.
-// As the live report does (app/data.js sentLenses), a selected perspective with no response keeps a zero-response
-// "More input needed" card instead of vanishing (G02) when selection is known.
+// New report snapshots provide saved selection; a selected perspective with no response keeps a zero-response
+// "More input needed" card instead of vanishing (G02). Legacy reports keep unknown without consulting live settings.
 export function nextReportMarkup(stored,identity,minimum,format,surveys,selectionKnown=false){
  const before=currentLevelMin();
  // Synchronous render in this private bundled module graph; restore before returning/throwing. No async/global UI mutation.

@@ -10,6 +10,8 @@ export function namedReportModel(stored,{minimum=3,identity={},surveys}={}){
  if(!Number.isInteger(minimum)||minimum<1)throw Error('PDF_REPORT_HELD');
  // Keep the existing full-detail disclosure guard, including all snapshot counts and standalone cells.
  reportPdfDocument(stored,{minimum});
+ const saved=stored?.report?.payload?.report_selection;
+ if(saved?.schema==='3d-report-selection-v1'&&Array.isArray(saved.selected_perspectives))surveys=saved.selected_perspectives.map(perspective=>({perspective,state:'selected'}));
  const model=freeze(JSON.parse(JSON.stringify({stored,identity:{title:identity.title,project:identity.project,language:identity.language},minimum,selectionKnown:Array.isArray(surveys),surveys:surveyFlags(surveys)})));
  trustedModels.add(model);return model;
 }
