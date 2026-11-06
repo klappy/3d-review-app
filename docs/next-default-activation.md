@@ -1,0 +1,78 @@
+# Next default entry — prepared, not activated
+
+This preparation belongs to existing Summit optional item 13. Chris's latest
+instruction is to switch **after the next production promotion**. It does not
+authorize early activation or video work. The current root entry is unchanged.
+
+`ui/default-entry.js` is intentionally unreferenced by `ui/index.html`. It is a
+small client entry decision; it does not change API routing, cookies, session
+tokens, invitations, surveys, reports, access rules or the existing UI internals.
+
+## Prepared behavior
+
+- Ordinary `/` and `/index.html` visits go to `/next/?ui_next=on` after a successful
+  same-origin HEAD probe. Next's existing identity/session handling decides its
+  signed-out or signed-in page. No legacy boot runs on the redirect branch.
+- `/?ui=legacy` is an explicit current-UI entry. Existing root hash links also
+  retain their current handler, including participant tokens, Access session
+  returns, invitations, projects, assessments/reports and saved setup routes.
+- Unknown query parameters remain with the current handler. This conservatively
+  preserves return URLs, demo entry and other existing query contracts rather
+  than guessing how to translate them. Presentation-only queries retain their
+  bytes when forwarded. Explicit `/next/` and participant/PDF/API paths are not
+  intercepted. This is a default-entry switch, not a migration of old deep links.
+- `location.replace` avoids adding a root entry to Back/Forward history. A failed
+  Next probe or refused navigation falls back to the existing UI. No persistent
+  default preference is introduced. The explicit Next query avoids an old DEV
+  gallery opt-out taking over the new entry.
+
+## Activation dependency and controlled wiring
+
+1. The coordinating release owner supplies the **next production promotion's
+   live-verification receipt**: exact production commit/version/release pin,
+   canonical connected build and active runtime identity, plus affected smoke
+   results. A main merge, DEV health or an open production PR is insufficient.
+   No such receipt has been consumed by this preparation.
+2. Reconcile this preparation onto that verified source and preserve all owners'
+   changes, particularly #612 and other coordinated Summit fixes. Refresh the
+   existing canonical release/version/changelog chain; do not invent a second
+   version authority.
+3. Only then replace the root's final legacy bootstrap with:
+
+   ```html
+   <script type="module">import { bootDefaultEntry } from "/default-entry.js"; bootDefaultEntry();</script>
+   ```
+
+   Keep the legacy boot exclusively inside the fallback import. If the optional
+   local `ui/server.mjs` harness is used, add its corresponding static JS mapping;
+   Cloudflare's existing `./ui` asset directory already contains the module.
+4. Recheck the actual wired build on desktop and mobile: signed-out root;
+   already signed-in root; Next sign-in/sign-out and unchanged Access callbacks;
+   explicit current/Next entries; all seven existing survey destinations; stored
+   report and invitation links; return URLs; Back/Forward; offline/missing assets.
+   Keep the seven existing tokens byte-for-byte. Do not mint, revoke or submit.
+   Update the preparation-only inactive-wiring assertion to test the reviewed
+   activated bootstrap. Unit history simulation is not browser acceptance.
+5. Obtain independent exact-head review and finished ordinary checks, then use
+   the protected main -> DEV -> separately reviewed production path. Verify the
+   default only on the resulting live production identity. Do not merge or deploy
+   this preparatory branch merely because its unit tests passed.
+
+## Rollback
+
+Restore the original root bootstrap:
+
+```html
+<script type="module" src="/assess/assess.js"></script>
+```
+
+Use the same protected corrective path and observe the resulting runtime.
+No token, cookie, preference or data reset is necessary. Explicit `/next/` stays
+available and existing root deep links keep their original handler.
+
+## Evidence limits
+
+The preparation tests cover entry decisions, exact untouched URLs/tokens,
+fallbacks, a simulated history stack and the fact that activation is absent.
+Existing Next router tests remain relevant. No authenticated hosted browser,
+real-device or post-activation production result is claimed by these tests.

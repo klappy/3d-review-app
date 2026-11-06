@@ -1,0 +1,78 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { nextDefaultTarget, bootDefaultEntry } from '../ui/default-entry.js';
+
+const locationFor = value => new URL(value, 'https://example.invalid');
+
+test('ordinary root entry selects live Next before loading the legacy identity handler', async () => {
+    let currentLoads = 0;
+    const moves = [];
+    const location = { pathname: '/', search: '', hash: '', replace: target => moves.push(target) };
+    const result = await bootDefaultEntry({ location, probeNext: async () => true, loadCurrent: () => { currentLoads++; } });
+    assert.deepEqual(result, { ui: 'next', target: '/next/?ui_next=on' });
+    assert.deepEqual(moves, ['/next/?ui_next=on']);
+    assert.equal(currentLoads, 0);
+});
+
+test('explicit legacy opt-in, opt-out and demo query keep current UI; explicit Next preserves presentation', () => {
+  for (const query of ['?ui=legacy', '?ui=current', '?ui_next=off', '?ui=next&ui=legacy', '?demo=1'])
+    assert.equal(nextDefaultTarget(locationFor('/' + query)), null, query);
+  assert.equal(nextDefaultTarget(locationFor('/?ui=next&theme=dark&w=phone')), '/next/?ui=next&theme=dark&w=phone&ui_next=on');
+  assert.equal(nextDefaultTarget(locationFor('/?ui_next=on&theme=dark')), '/next/?ui_next=on&theme=dark');
+  assert.equal(nextDefaultTarget(locationFor('/index.html')), '/next/?ui_next=on');
+});
+
+test('all seven existing invitation tokens and language query remain byte-for-byte on their existing entry path', async () => {
+  for (let i = 0; i < 7; i++) {
+    const href = `/?lang=es#survey=unchanged_existing_token_${i}`;
+    const location = locationFor(href);
+    location.replace = () => { throw Error('must not rewrite a participant link'); };
+    let currentLoads = 0;
+    assert.equal(nextDefaultTarget(location), null);
+    await bootDefaultEntry({ location, probeNext: () => { throw Error('participant entry must not probe Next'); }, loadCurrent: () => { currentLoads++; } });
+    assert.equal(currentLoads, 1);
+    assert.equal(location.pathname + location.search + location.hash, href);
+  }
+});
+
+test('existing session, invitation, report and return URLs retain their original handler and bytes', () => {
+  for (const href of ['/#session=EXISTING', '/#invite=EXISTING', '/#invite/list', '/#assessment/a/understand',
+    '/#project/p', '/#workspace/w', '/#new/a', '/#reports-card', '/?return_to=%2F%23project%2Fp',
+    '/?next=%2Fnext%2F%23%2Freview%2Fa', '/?unknown=keep%2Bexact']) {
+    const location = locationFor(href), original = location.href;
+    assert.equal(nextDefaultTarget(location), null, href);
+    assert.equal(location.href, original);
+  }
+  for (const path of ['/next/', '/next/?ui_next=on#survey=EXISTING', '/participate/#survey=EXISTING',
+    '/legacy/', '/v2/auth/access', '/v2/reports/r/pdf', '/roadmap/'])
+    assert.equal(nextDefaultTarget(locationFor(path)), null, path);
+});
+
+test('replace avoids a new root history entry; existing Back/Forward legacy destinations stay put', async () => {
+  const history = ['/previous', '/']; let index = 1;
+  await bootDefaultEntry({ location: { pathname: '/', search: '', hash: '', replace: target => { history[index] = target; } },
+    probeNext: async () => true,
+    loadCurrent: () => { throw Error('must not boot current UI on Next entry'); } });
+  assert.deepEqual(history, ['/previous', '/next/?ui_next=on']);
+  index--; assert.equal(history[index], '/previous');
+  index++; assert.equal(history[index], '/next/?ui_next=on');
+  assert.equal(nextDefaultTarget(locationFor('/?ui=legacy#project/p')), null);
+});
+
+test('missing Next assets, failed probe or refused navigation falls back to the existing UI', async () => {
+  for (const failure of ['missing', 'network', 'navigation']) {
+    let loads = 0, moves = 0;
+    const location = { pathname: '/', search: '', hash: '', replace: () => { moves++; if (failure === 'navigation') throw Error('refused'); } };
+    const result = await bootDefaultEntry({ location, probeNext: async () => { if (failure === 'network') throw Error('offline'); return failure !== 'missing'; }, loadCurrent: async () => { loads++; } });
+    assert.deepEqual(result, { ui: 'current' });
+    assert.equal(loads, 1);
+    assert.equal(moves, failure === 'navigation' ? 1 : 0);
+  }
+});
+
+test('preparation is inactive; rollback is restoring the original legacy bootstrap', () => {
+  const html = readFileSync(new URL('../ui/index.html', import.meta.url), 'utf8');
+  assert.match(html, /<script type="module" src="\/assess\/assess\.js"><\/script>/);
+  assert.doesNotMatch(html, /default-entry\.js/);
+});
