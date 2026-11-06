@@ -149,3 +149,21 @@ test('Next sign-in intent replaces an earlier legacy choice without a stored pre
  const moves=[];await bootDefaultEntry({location:{pathname:'/',search:'',hash:'#session=NEXT_AUTH_TOKEN',replace:t=>moves.push(t)},storage,probeNext:async()=>true,loadCurrent:()=>{throw Error('must return Next');}});
  assert.deepEqual(moves,['/next/?ui_next=on']);assert.equal(storage.getItem('facilitatorToken'),'NEXT_AUTH_TOKEN');assert.equal(storage.getItem('3dr-auth-return-ui'),null);
 });
+
+
+test('direct legacy and assess entries preserve their UI through the actual bare callback shape', async () => {
+  for (const entry of ['legacy', 'assess']) {
+    const html=readFileSync(new URL(`../ui/${entry}/index.html`,import.meta.url),'utf8');
+    assert.match(html, /<script type="module" src="\/legacy-auth-entry\.js"><\/script>/);
+    const values=new Map(); const storage={getItem:k=>values.get(k)??null,setItem:(k,v)=>values.set(k,v),removeItem:k=>values.delete(k)};
+    const prior=Object.getOwnPropertyDescriptor(globalThis,'sessionStorage');
+    try {
+      Object.defineProperty(globalThis,'sessionStorage',{value:storage,configurable:true});
+      await import(`../ui/legacy-auth-entry.js?entry=${entry}`);
+      assert.equal(storage.getItem('3dr-auth-return-ui'),'legacy');
+      let loads=0;const location={pathname:'/',search:'',hash:'#session=EXISTING_DIRECT_TOKEN',replace:()=>{throw Error('explicit legacy must not switch to Next');}};
+      await bootDefaultEntry({location,storage,probeNext:()=>{throw Error('legacy callback must not probe');},loadCurrent:()=>{loads++;}});
+      assert.equal(loads,1);assert.equal(location.hash,'#session=EXISTING_DIRECT_TOKEN');assert.equal(storage.getItem('3dr-auth-return-ui'),null);
+    } finally { if(prior)Object.defineProperty(globalThis,'sessionStorage',prior);else delete globalThis.sessionStorage; }
+  }
+});

@@ -28,6 +28,6 @@
     {#if !src}<span class="micro l-media-title">{line}</span>{/if}
   </div>
   {#if failed}<p class="small" role="status">The video could not play here. <a href={src}>Open the video directly</a>, or try the player again.</p>{/if}
-  {#if src}<p class="small"><a href={src}>Open video separately</a>{#if captions} · English captions are included in the image; optional text captions are available in the player.{/if}</p>{/if}
+  {#if src}<p class="small"><a href={src}>Open video separately</a>{#if captions} · English text captions are available in the player.{/if}</p>{/if}
   {#if caption}<p class="small">{caption}</p>{/if}
 </div>

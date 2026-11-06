@@ -12,7 +12,7 @@ const VTT_SHA = "cb6a2952a991c33a7fbff0d267a8db56fd2181e807345eff82bf55355f7a7e3
 
 test("Landing pins the CDN-HANDOFF overview assets and same-origin captions", () => {
   const landing = read("ui-next/src/overview-video.js");
-  assert.match(landing, new RegExp(`${CDN}/3d-review-overview-120s-8fea7f793783\\.mp4`));
+  assert.match(landing, new RegExp(`https://cdn.3dreview.app/overview/5d92d72d3946/3D-Review-120s-Raphael-narrated-draft\\.mp4`));
   assert.match(landing, new RegExp(`${CDN}/3d-review-overview-poster\\.jpg`));
   assert.match(landing, /duration: '2:00'/);
   assert.match(landing, /captions: '\/overview\/3d-review-overview\.en\.vtt'/);
