@@ -11,14 +11,18 @@ function canonical(value:unknown):string {
   if(value&&typeof value==='object')return '{'+Object.keys(value).sort().map(k=>JSON.stringify(k)+':'+canonical((value as Record<string,unknown>)[k])).join(',')+'}';
   return JSON.stringify(value);
 }
+function pinFor(id:string) {
+  return amendment.canonical_questions[id as keyof typeof amendment.canonical_questions];
+}
 function sourceQuestion(item:Item,sourceRef:unknown,amended=false):boolean {
-  const pin=amendment.canonical_questions[item.id as keyof typeof amendment.canonical_questions];
+  const pin=pinFor(item.id);
   if(!pin||sourceRef!==pin.source_ref)return false;
   if(!amended)return canonical(item)===canonical(pin.item);
   // Compare the complete projected item, including all inserted option metadata,
   // ordering and Other's adjusted order; stripping the new option would let
   // altered score/weight/flag/notes masquerade as the canonical amendment.
   const option=amendment.options[item.id as keyof typeof amendment.options];
+  if(!option)return false;
   const expected={...pin.item,options:pin.item.options.flatMap(o=>o.code==='other'?[option,{...o,source_order:option.source_order+1}]:[o])};
   return canonical(item)===canonical(expected);
 }
@@ -26,11 +30,13 @@ export function translationBriefItems<T extends Item>(items:T[],sourceRef?:unkno
   return items.map(item => {
     if (!Object.hasOwn(amendment.options, item.id)) return item;
     const option = amendment.options[item.id as keyof typeof amendment.options];
-    if (!option || !sourceQuestion(item,sourceRef) || !item.options) return item;
-    // Only extend the source translation-type question; do not reinterpret a
-    // custom item that happens to reuse its identifier or replace a future option.
+    const pin = pinFor(item.id);
+    if (!option || !pin || !sourceQuestion(item,sourceRef) || !item.options) return item;
+    // Required codes come from each pin: Q2 type codes, Q1 documented/shared-undocumented/working-on/other.
+    // Only extend the source question; do not reinterpret a custom item that happens to reuse its identifier.
     const codes = new Set(item.options.map(o=>o.code));
-    if (codes.has('no-brief') || !['corresponding','resembling','clarifying','simplifying','other'].every(c=>codes.has(c))) return item;
+    const required = pin.item.options.map(o=>o.code);
+    if (codes.has('no-brief') || !required.every(c=>codes.has(c))) return item;
     const options = item.options.flatMap(o => o.code === 'other'
       ? [{...option}, {...o, source_order: option.source_order + 1}]
       : [o]);
@@ -43,4 +49,9 @@ export function translationBriefSource(items:Item[],sourceRef?:unknown):string|n
   return items.some(item => Object.hasOwn(amendment.options,item.id) && sourceQuestion(item,sourceRef,true) &&
     item.options?.some(option=>option.code==='no-brief' && option.text===amendment.options[item.id as keyof typeof amendment.options].text))
     ? TRANSLATION_BRIEF_SOURCE : null;
+}
+
+/** Exact pinned source_ref and item bytes, for findings that are not the inserted no-brief option. */
+export function canonicalPinnedQuestion(item:Item,sourceRef?:unknown):boolean {
+  return sourceQuestion(item,sourceRef,false);
 }
