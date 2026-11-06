@@ -18,9 +18,12 @@ export function translationAgreementFor(payload, minimum = 3) {
   const array = value => Array.isArray(value) ? value : [];
   const team_values = team ? array(agreement.team_values) : [];
   const church_values = church ? array(agreement.church_values) : [];
+  const team_statuses = team ? array(agreement.team_statuses) : [];
+  const church_statuses = church ? array(agreement.church_statuses) : [];
+  if (![team_values, church_values, team_statuses, church_statuses].some(values => values.length)) return null;
   return {...agreement, team_values, church_values,
-    ...('team_statuses' in agreement ? {team_statuses: team ? array(agreement.team_statuses) : []} : {}),
-    ...('church_statuses' in agreement ? {church_statuses: church ? array(agreement.church_statuses) : []} : {}),
+    ...('team_statuses' in agreement ? {team_statuses} : {}),
+    ...('church_statuses' in agreement ? {church_statuses} : {}),
     agree: team && church && team_values.length && church_values.length ? agreement.agree : null};
 }
 

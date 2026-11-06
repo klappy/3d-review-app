@@ -21,3 +21,11 @@ test('configured DEV minimum1 permits both sides; exact threshold3 permits compa
  input.evidence[1].n=3;assert.equal(translationAgreementFor(input,3).agree,true);
  input.translation_type_agreement.team_values=[];assert.equal(translationAgreementFor(input,3).agree,null);
 });
+test('visible Other-only side cannot reveal that a hidden side supplied any category/status',()=>{
+ const input=payload();input.translation_type_agreement.team_values=[];input.translation_type_agreement.team_statuses=[];
+ const before=JSON.stringify(input);assert.equal(translationAgreementFor(input,3),null);
+ assert.equal(discloseTranslationAgreement(input,3).translation_type_agreement,null);
+ assert.equal(JSON.stringify(input),before);
+ input.translation_type_agreement.church_statuses=[];input.translation_type_agreement.church_values=[];
+ assert.equal(translationAgreementFor(input,3),null);
+});

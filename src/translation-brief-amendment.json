@@ -22,5 +22,139 @@
       "flag": "descriptive",
       "source_notes": "Not a translation type — excluded from the type comparison; reported as its own finding."
     }
+  },
+  "canonical_questions": {
+    "TR-Q2": {
+      "source_ref": "klappy/3d-quality-review@f042cde553761a6a7f24132cef7802f956378ee0:rubric_csv/Items.csv+Options.csv",
+      "item": {
+        "id": "TR-Q2",
+        "group": "Translation Process & Brief",
+        "text": "If your team has a brief, what type of translation does it describe?",
+        "type": "single",
+        "required": true,
+        "requiredness": "working-required",
+        "answer_semantics": null,
+        "source_type": "descriptive",
+        "source_q_num": 2,
+        "source_score_max": null,
+        "source_weight_in_subdim": 1.0,
+        "source_notes": "Descriptive — captures translation type (filter, not score). Triangulates with CHIP/CHCP/CHDL-Q1.",
+        "source_cross_lens_construct": "translation-brief-alignment",
+        "standalone_indicator": false,
+        "options": [
+          {
+            "code": "corresponding",
+            "text": "Corresponding — very close to the original Greek or Hebrew",
+            "source_order": 1,
+            "source_score": null,
+            "weight": null,
+            "flag": "descriptive",
+            "source_notes": null
+          },
+          {
+            "code": "resembling",
+            "text": "Resembling — close to the original with some adjustments for clarity",
+            "source_order": 2,
+            "source_score": null,
+            "weight": null,
+            "flag": "descriptive",
+            "source_notes": null
+          },
+          {
+            "code": "clarifying",
+            "text": "Clarifying — focused on understandability in natural language",
+            "source_order": 3,
+            "source_score": null,
+            "weight": null,
+            "flag": "descriptive",
+            "source_notes": null
+          },
+          {
+            "code": "simplifying",
+            "text": "Simplifying — easy to understand, using contemporary everyday language",
+            "source_order": 4,
+            "source_score": null,
+            "weight": null,
+            "flag": "descriptive",
+            "source_notes": null
+          },
+          {
+            "code": "other",
+            "text": "Other (please describe)",
+            "source_order": 5,
+            "source_score": null,
+            "weight": null,
+            "flag": "descriptive",
+            "source_notes": null
+          }
+        ]
+      }
+    },
+    "ML-Q2": {
+      "source_ref": "klappy/3d-quality-review@f042cde553761a6a7f24132cef7802f956378ee0:rubric_csv/Items.csv+Options.csv",
+      "item": {
+        "id": "ML-Q2",
+        "group": "Translation Process & Brief",
+        "text": "If the team has a brief, what type of translation does it describe?",
+        "type": "single",
+        "required": true,
+        "requiredness": "working-required",
+        "answer_semantics": null,
+        "source_type": "descriptive",
+        "source_q_num": 2,
+        "source_score_max": null,
+        "source_weight_in_subdim": 1.0,
+        "source_notes": "Descriptive — captures translation type (filter, not score). Triangulates with CHIP/CHCP/CHDL-Q1.",
+        "source_cross_lens_construct": "translation-brief-alignment",
+        "standalone_indicator": false,
+        "options": [
+          {
+            "code": "corresponding",
+            "text": "Corresponding — very close to the original Greek or Hebrew",
+            "source_order": 1,
+            "source_score": null,
+            "weight": null,
+            "flag": "descriptive",
+            "source_notes": null
+          },
+          {
+            "code": "resembling",
+            "text": "Resembling — close to the original with some adjustments for clarity",
+            "source_order": 2,
+            "source_score": null,
+            "weight": null,
+            "flag": "descriptive",
+            "source_notes": null
+          },
+          {
+            "code": "clarifying",
+            "text": "Clarifying — focused on understandability in natural language",
+            "source_order": 3,
+            "source_score": null,
+            "weight": null,
+            "flag": "descriptive",
+            "source_notes": null
+          },
+          {
+            "code": "simplifying",
+            "text": "Simplifying — easy to understand, using contemporary everyday language",
+            "source_order": 4,
+            "source_score": null,
+            "weight": null,
+            "flag": "descriptive",
+            "source_notes": null
+          },
+          {
+            "code": "other",
+            "text": "Other (please describe)",
+            "source_order": 5,
+            "source_score": null,
+            "weight": null,
+            "flag": "descriptive",
+            "source_notes": null
+          }
+        ]
+      }
+    }
   }
 }

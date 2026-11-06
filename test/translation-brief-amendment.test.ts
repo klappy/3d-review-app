@@ -2,7 +2,7 @@ import {beforeAll,describe,it,expect} from 'vitest';
 import {readPinnedSources,buildIndex} from '../tools/build-synthetic-attestation';
 import {parseItems,renderItems} from '../src/handlers/common';
 import {validateAnswers} from '../src/handlers/response';
-import {translationBriefItems,TRANSLATION_BRIEF_SOURCE} from '../src/translation-brief-amendment';
+import {translationBriefItems,translationBriefSource,TRANSLATION_BRIEF_SOURCE} from '../src/translation-brief-amendment';
 import {translationTypeReference} from '../src/reference-rollup';
 import {renderSyntheticReport,renderLegacySyntheticReport} from '../src/synthetic-report-renderer';
 import type {CaptureRow} from '../src/report-attestation';
@@ -30,6 +30,18 @@ describe('canonical Decision 25 amendment, all uses of the shared instrument',()
   });
   it('never adds the choice to unrelated or noncanonical questions',()=>{
     for(const item of [{id:'unrelated',source_type:'descriptive',options:[]},{id:'TR-Q2',source_type:'ordinal-scored',options:[]},{id:'TR-Q2',source_type:'descriptive',options:[{code:'custom',text:'Custom'}]}])expect(translationBriefItems([item])).toEqual([item]);
+  });
+  it('refuses custom published lookalikes even with matching IDs, types and option codes',()=>{
+    for(const id of ['tpl_validation','tpl_mid_level']){
+      const template=templates.find(t=>t.id===id),base=JSON.parse(template.items_json),question=base.find((i:any)=>['TR-Q2','ML-Q2'].includes(i.id));
+      for(const altered of [{...question,text:'Custom question'}, {...question,options:question.options.map((o:any,i:number)=>i?o:{...o,text:'Custom choice'})}, {...question,source_notes:'Custom source'}]){
+        expect(translationBriefItems([altered],template.source_ref)).toEqual([altered]);
+        expect(translationBriefSource([altered],template.source_ref)).toBe(null);
+      }
+      expect(translationBriefItems(base,'custom-published-source')).toEqual(base);
+      const amended=translationBriefItems(base,template.source_ref);expect(translationBriefSource(amended,'custom-published-source')).toBe(null);
+      expect(translationBriefSource(amended,template.source_ref)).toBe(TRANSLATION_BRIEF_SOURCE);
+    }
   });
   it('keeps absence/awareness as findings, never agreement or disagreement; Other disappears',()=>{
     expect(translationTypeReference([row('TR-Q2','other'),row('CHIP-Q1','other')])).toEqual([]);

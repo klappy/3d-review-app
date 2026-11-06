@@ -28,3 +28,10 @@ it('Decision 25 findings are visible in all three PDF documents; missing status-
  const missing={suppressed:false,report:{id:'missing-count',payload:{lenses:[],evidence:[],translation_type_agreement:payload.translation_type_agreement}}};
  expect(()=>storedReportDocument(missing,{minimum:1,format:'full'})).toThrow('PDF_REPORT_HELD');
 });
+it('Other-only visible side and suppressed status presence have identical PDF outcomes',()=>{
+ const payload={...structuredClone(corpus.contexts[ids[0]]),source_commit:corpus.source_commit,versions:{scorer:'fixture'},translation_type_agreement:{team_values:[],church_values:[],agree:null,team_statuses:[],church_statuses:['not-aware']},evidence:[{label:'Translation Team — Translators',n:3},{label:'Church — Involved Pastor',n:1}]};
+ for(const format of ['overview','detailed','full']){
+  const outcome=(p:any)=>{try{return storedReportDocument({suppressed:false,report:{id:'privacy',payload:p}},{minimum:3,format});}catch(e){return (e as Error).message;}};
+  expect(outcome(payload)).toBe(outcome({...payload,translation_type_agreement:null}));
+ }
+});

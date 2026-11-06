@@ -18,3 +18,10 @@ for(const Component of [Overview,Detailed,Context])it(`${Component.name} protect
  cleanup();useLevelMinimum(1);view=render(Component,{report:report()});
  expect(view.container.textContent).toContain('Church: Not aware');
 });
+for(const Component of [Overview,Detailed,Context])it(`${Component.name} does not reveal hidden categorical presence through an empty agreement section`,()=>{
+ const data=report();data.payload.translation_type_agreement.team_statuses=[];
+ const a=render(Component,{report:data}).container.textContent;
+ cleanup();data.payload.translation_type_agreement=null as any;
+ const b=render(Component,{report:data}).container.textContent;
+ expect(a).toBe(b);
+});

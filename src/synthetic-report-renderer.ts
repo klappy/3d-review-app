@@ -70,10 +70,10 @@ function assemble(aid:string,rows:readonly CaptureRow[],legacy=false) {
   const itemMap=new Map<string,{item:SourceItem;lens:string;key:string}>(),evidenceCounts=new Map<string,number>();
   // Parse each distinct template string once and compute each item's equality key once.
   // Keyed by exact bytes: a template differing by any byte is parsed and keyed on its own.
-  const parsed=new Map<string,{t:{items:SourceItem[];perspective:string};keys:string[]}>();
+  const parsed=new Map<string,{t:{items:SourceItem[];perspective:string;sourceRef:string};keys:string[]}>();
   for(const row of rows){
     let tk=parsed.get(row.templateRaw);
-    if(!tk){const raw=parseBoundedJson(row.templateRaw,65536) as unknown as {items:SourceItem[];perspective:string};const t=legacy?raw:{...raw,items:translationBriefItems(raw.items)};tk={t,keys:t.items.map(item=>canonicalJson(item))};parsed.set(row.templateRaw,tk);}
+    if(!tk){const raw=parseBoundedJson(row.templateRaw,65536) as unknown as {items:SourceItem[];perspective:string;sourceRef:string};const t=legacy?raw:{...raw,items:translationBriefItems(raw.items,raw.sourceRef)};tk={t,keys:t.items.map(item=>canonicalJson(item))};parsed.set(row.templateRaw,tk);}
     const {t,keys}=tk;
     const answers=parseBoundedJson(row.answersRaw,8192) as Record<string,unknown>;
     const form=formTypes.get(row.selectedTemplateId);if(!form)refuse();evidenceCounts.set(form,(evidenceCounts.get(form)??0)+1);

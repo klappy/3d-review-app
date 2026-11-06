@@ -247,7 +247,7 @@ export interface TemplateItem {
   standalone_indicator?: boolean;      // e.g. ML-Q10: never pooled into group means (FIX-03)
 }
 export function parseItems(t: TemplateRow): TemplateItem[] {
-  try { return translationBriefItems(JSON.parse(t.items_json) as TemplateItem[]); } catch { return []; }
+  try { return translationBriefItems(JSON.parse(t.items_json) as TemplateItem[],t.source_ref); } catch { return []; }
 }
 /** Render-ready projection: stable ids, options, labels; no scoring internals. */
 // C01 (captain 2026-09-28): an "Other (please describe)" option carries a free-text description. Source items mark it

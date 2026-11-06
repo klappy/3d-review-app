@@ -171,10 +171,10 @@ export async function allowedHashes(db: D1Database | undefined, scope: Translate
 async function formHashes(db: D1Database | undefined, templateId: string): Promise<Set<string>> {
   if (!db) return new Set();
   try {
-    const { results } = await db.prepare("SELECT items_json FROM survey_template WHERE id = ? AND published_at IS NOT NULL").bind(templateId).all<{ items_json: string }>();
+    const { results } = await db.prepare("SELECT items_json, source_ref FROM survey_template WHERE id = ? AND published_at IS NOT NULL").bind(templateId).all<{ items_json: string; source_ref: string }>();
     if (!results.length) return new Set();
     const texts: string[] = [];
-    for (const r of results) { try { texts.push(...instrumentStrings(translationBriefItems(JSON.parse(r.items_json)))); } catch { /* skip a bad row */ } }
+    for (const r of results) { try { texts.push(...instrumentStrings(translationBriefItems(JSON.parse(r.items_json),r.source_ref))); } catch { /* skip a bad row */ } }
     return hashAll(texts);
   } catch { return new Set(); }
 }

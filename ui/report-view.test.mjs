@@ -198,3 +198,9 @@ test('Decision 25 status findings are visible and excluded from agreement; Other
   assert.match(text,/excluded from the agreement comparison/);
   assert.doesNotMatch(text,/Other|Matches|Differs/);
 });
+test('Other-only visible side does not render a section revealing hidden status presence',()=>{
+ const p={...REPORT.payload,evidence:[{label:'Translation Team — Translators',n:3},{label:'Church — Involved Pastor',n:1}],translation_type_agreement:{construct_name:'Translation type',team_values:[],church_values:[],agree:null,team_statuses:[],church_statuses:['not-aware']}};
+ const a=fakeNode('section'),b=fakeNode('section');
+ renderReport({doc,root:a,report:{...REPORT,payload:p},minimum:3});renderReport({doc,root:b,report:{...REPORT,payload:{...p,translation_type_agreement:null}},minimum:3});
+ assert.equal(flat(a),flat(b));assert.equal(sectionRows(a,copy.translationAgreement),null);
+});
