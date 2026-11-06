@@ -72,7 +72,9 @@ export function installPdf(app:Hono<{Bindings:Env}>,context:(request:Request,env
       let identity={};
       if(format!=='full'){
         // Identity may resolve from current assessment metadata; participation must never borrow current survey selection.
-        // namedReportModel uses saved selection when present (G02); legacy absence stays unknown.
+        // namedReportModel uses saved selection when present (G02). Do not pass surveys=[]:
+        // an empty array is treated as known-empty and labels absent perspectives "not asked".
+        // Leave surveys undefined so legacy reports without report_selection stay unknown.
         const {assessment}=await read(ctx,'cap.assessment.get',{id:stored.assessment_id});
         let project='',language=assessment.language_name||assessment.language||'';
         try{project=(await read(ctx,'cap.project.get',{id:assessment.project_id})).project.name;const listed=await read(ctx,'cap.language.list',{pid:assessment.project_id});language=listed.languages.find((l:Record<string,any>)=>l.id===assessment.language_id)?.name||language;}
