@@ -1,3 +1,4 @@
+import { authReturnUI, rememberAuthReturn, clearAuthReturn } from './auth-return.js';
 // Summit item 13: ordinary root entry selects Next after the prerequisite
 // production promotion was verified. Explicit legacy and existing deep links keep
 // their original handlers. This module stores no preference.
@@ -27,6 +28,12 @@ export async function bootDefaultEntry({ location = globalThis.location,
   probeNext = async signal => (await fetch('/next/', { method: 'HEAD', cache: 'no-store', credentials: 'same-origin', redirect: 'error', signal })).ok,
   probeTimeoutMs = 2000, storage,
   loadCurrent = () => import('./assess/assess.js') } = {}) {
+  const callback = /^#session=([A-Za-z0-9_]+)$/.exec(location?.hash || '');
+  if (callback && authReturnUI(storage) === 'legacy') {
+    clearAuthReturn(storage);
+    await loadCurrent();
+    return { ui: 'current' };
+  }
   const target = nextDefaultTarget(location);
   const initialHash = location?.hash;
   if (target) {
@@ -38,14 +45,16 @@ export async function bootDefaultEntry({ location = globalThis.location,
       const available = await Promise.race([Promise.resolve().then(() => probeNext(controller.signal)),
         new Promise(resolve => { timer = setTimeout(() => { controller.abort(); resolve(false); }, probeTimeoutMs); })]);
       if (available && location.hash === initialHash && nextDefaultTarget(location) === target) {
-        const callback = /^#session=([A-Za-z0-9_]+)$/.exec(location.hash || '');
         if (callback) (storage ?? globalThis.sessionStorage).setItem('facilitatorToken', callback[1]);
+        clearAuthReturn(storage);
         location.replace(target); // no extra root history entry or Back/Forward loop
         return { ui: 'next', target };
       }
     } catch { /* unavailable entry, storage or navigation: retain current handler */ }
     finally { clearTimeout(timer); }
   }
+  if (callback) clearAuthReturn(storage);
+  else rememberAuthReturn('legacy', storage);
   await loadCurrent();
   return { ui: 'current' };
 }

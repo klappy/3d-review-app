@@ -124,3 +124,28 @@ test('callback storage failure and explicit legacy remain on the current handler
     assert.equal(loads,1);assert.equal(location.hash,'#session=EXISTING');
   }
 });
+
+
+test('real bare callback preserves legacy sign-in choice and pending private invitation continuation', async () => {
+  const {rememberAuthReturn,authReturnUI}=await import('../ui/auth-return.js');
+  for(const invitation of [false,true]) {
+    const values=new Map();const storage={getItem:k=>values.get(k)??null,setItem:(k,v)=>values.set(k,v),removeItem:k=>values.delete(k)};
+    let loads=0;
+    await bootDefaultEntry({location:{pathname:'/',search:'?ui=legacy',hash:''},storage,loadCurrent:()=>{loads++;}});
+    assert.equal(authReturnUI(storage),'legacy');
+    if(invitation){rememberAuthReturn('next',storage);storage.setItem('pendingInvite','EXISTING_PRIVATE_INVITE');}
+    const callback={pathname:'/',search:'',hash:'#session=EXISTING_AUTH_TOKEN',replace:()=>{throw Error('must keep current invitation/UI handler');}};
+    await bootDefaultEntry({location:callback,storage,probeNext:()=>{throw Error('must not probe');},loadCurrent:()=>{loads++;}});
+    assert.equal(loads,2);assert.equal(callback.hash,'#session=EXISTING_AUTH_TOKEN');
+    assert.equal(storage.getItem('3dr-auth-return-ui'),null);
+    if(invitation)assert.equal(storage.getItem('pendingInvite'),'EXISTING_PRIVATE_INVITE');
+  }
+});
+
+test('Next sign-in intent replaces an earlier legacy choice without a stored preference', async()=>{
+ const {rememberAuthReturn}=await import('../ui/auth-return.js');
+ const values=new Map();const storage={getItem:k=>values.get(k)??null,setItem:(k,v)=>values.set(k,v),removeItem:k=>values.delete(k)};
+ rememberAuthReturn('legacy',storage);rememberAuthReturn('next',storage);
+ const moves=[];await bootDefaultEntry({location:{pathname:'/',search:'',hash:'#session=NEXT_AUTH_TOKEN',replace:t=>moves.push(t)},storage,probeNext:async()=>true,loadCurrent:()=>{throw Error('must return Next');}});
+ assert.deepEqual(moves,['/next/?ui_next=on']);assert.equal(storage.getItem('facilitatorToken'),'NEXT_AUTH_TOKEN');assert.equal(storage.getItem('3dr-auth-return-ui'),null);
+});
