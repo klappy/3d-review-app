@@ -54,8 +54,8 @@ const SCREENS: [string, C, string[] | null, string[]][] = [
     ["Luke 1–2 · improve", "Listening session with the two villages", "Read-only link, expires in 90 days.", "Share the PDF"]],
   ["print", Print, ["Print paper surveys", "Which surveys", "Language on paper", "Paper size", "2 phrases are not translated into Hindi yet", "Print 2 surveys", "Community survey"],
     ["Paper surveys", "Odia · translating…", "Language", "Print 2 surveys"]],
-  ["share", Share, ["Share the survey", "Copied", "Show QR codes for the room", "Access codes, for people who lose the link"],
-    ["Each survey has its own link. Send it, show the QR, or hand the phone over.", "8/15", "Email the links to someone", "Show QR codes for the room"]],
+  ["share", Share, ["Share the survey", "Copied", "Show all QR codes to the room", "Access codes, for people who lose the link"],
+    ["Each survey has its own link. Send it, show the QR, or hand the phone over.", "8/15", "Email the links to someone", "Show all QR codes to the room"]],
   ["sandbox", Sandbox, ["Mark 1–4 draft · practice", "Practice copy · not a real review", "Simulated responses", "Where this stays", "Generate 30 responses", "Responses", "Fill with simulated responses"],
     ["Practice copy · not a real review", "of 30 simulated", "Share the practice survey", "Delete this practice copy", "Fill with simulated responses"]],
   ["paper-entry", PaperEntry, ["Enter a paper answer", "Code on the paper", "Most of it is easy, but some parts are hard", "Save and enter the next paper", "Entered today", "Last receipt · Reference R2048732 · "],
@@ -512,8 +512,8 @@ describe("actions lane controls act, and the ones that cannot yet are named debt
     "Edit details and dates → setup1", "Help and FAQ → help", "Hindi New Testament → project", "Invitations · 1 new → invitations",
     "Luke 1–2 · improve → next-step", "Mark 1–4 draft → collect", "Meeting offline? Print and paper → collect#offline", "Meeting offline? card on Collect → collect#offline",
     "More actions → collect[menu]", "People with access → people", "Print or share the plan → action-plan", "Print {survey} survey → print",
-    "QR code for {survey} → qr-room", "QR for {survey} → qr-room", "See all results → results", "Public website home → landing", "Send app feedback → feedback", "Share the practice survey → share",
-    "Share the survey → share", "Show QR codes for the room → qr-room", "Start a 3D Review → setup1", "BCS · India — switch workspace → workspace",
+    "QR code for {survey} → qr-room", "See all results → results", "Public website home → landing", "Send app feedback → feedback", "Share the practice survey → share",
+    "Share the survey → share", "Show all QR codes to the room → qr-room", "Show all QR codes to the room → qr-room[all]", "Start a 3D Review → setup1", "BCS · India — switch workspace → workspace",
     "Why 3D Review exists → about", "Open email app → mailto",
   ];
   const STAND_IN: Record<string, string> = {

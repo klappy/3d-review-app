@@ -7,7 +7,7 @@ import { build } from 'esbuild';
 import { beforeAll, beforeEach, afterAll, describe, it, expect } from 'vitest';
 import { Miniflare, convertV4MiniflareOptions } from 'miniflare';
 import * as production from '../src/synthetic-report-store';
-import { B1_CAPTURE_SQL, REPORT_CAPTURE_CTE, captureForBuild } from '../src/report-capture';
+import { B1_CAPTURE_SQL, REPORT_CAPTURE_CTE, attestSelectionCapture } from '../src/report-capture';
 import type { Ctx } from '../src/handlers/types';
 const mf=new Miniflare(convertV4MiniflareOptions({workers:[{name:'report-materialization-b2',modules:true,script:"export default {fetch(){return new Response('synthetic fixture only')}}",d1Databases:{DB:'report-b2-fixture'}}]}));
 let db:D1Database,marker:typeof production,variant:typeof production;
@@ -61,7 +61,7 @@ beforeEach(async()=>{
 });
 afterAll(async()=>{await mf.dispose();rmSync(temporary,{recursive:true,force:true});});
 async function report(){const r=await marker.buildMaterialized(context(),aid);expect(r.ok).toBe(true);if(!r.ok)throw new Error('fixture build refused');return r.value;}
-async function captured(){const r=await captureForBuild(context(),aid);expect(r.eligible).toBe(true);if(!r.eligible)throw new Error('fixture capture refused');return r.capture;}
+async function captured(){const row=await db.prepare(marker.REPORT_OBSERVE_SQL).bind('user',null,aid,'person_mara','member').first<any>();const r=await attestSelectionCapture(aid,row.current_capture);expect(r.eligible).toBe(true);if(!r.eligible)throw new Error('fixture capture refused');return r.capture;}
 async function alterReport(id:string,values:Record<string,unknown>){
   await exec('DROP TRIGGER synthetic_report_no_update');
   try{await exec('UPDATE synthetic_report SET '+Object.keys(values).map(k=>k+'=?').join(',')+' WHERE id=?',...Object.values(values),id);}finally{await exec(noUpdate);}
@@ -87,7 +87,13 @@ describe('private marker isolation and exact D1 commands',()=>{
     const row=await db.prepare('SELECT * FROM synthetic_report').first<any>();expect(row.id).toBe(created.value.id);
     // Independently frozen Python hashlib vector over explicit accepted preimage.
     expect(created.value.captureDigest).toBe('e8d986173aae61cf158e57d4d881a3f35ecc9d885769953f455f728993bce933');
-    expect(created.value.reportKey).toBe('6da8672ed391975ded7fcdf82ed609a18158059f3af7214a32aa347480fa8858');
+    const hash=(s:string)=>createHash('sha256').update(s).digest('hex');
+    const legacyIdentity={schema:'3d-materialized-report-key-v1',assessmentId:aid,captureDigest:created.value.captureDigest,...tuple};
+    const canonical=(x:unknown):string=>JSON.stringify(x, Object.keys(x as object).sort());
+    expect(hash('3d-materialized-report-v1\0'+canonical(legacyIdentity))).toBe('6da8672ed391975ded7fcdf82ed609a18158059f3af7214a32aa347480fa8858');
+    const selection=JSON.parse(row.capture_json)[3];
+    const selectionDigest=hash(JSON.stringify(selection));
+    expect(created.value.reportKey).toBe(hash('3d-materialized-report-v2\0'+canonical({...legacyIdentity,schema:'3d-materialized-report-key-v2',selectionDigest})));
     expect(createHash('sha256').update(row.payload_json).digest('hex')).toBe(row.payload_sha256);
     console.log('B2_BIND_PROOF '+JSON.stringify(calls.map(c=>({binds:c.args.length,method:c.method,sqlBytes:Buffer.byteLength(c.sql)}))));
   });

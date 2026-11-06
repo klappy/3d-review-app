@@ -4,6 +4,7 @@ import { grantApplies } from './handlers/common.js';
 import { attestCapture, type CaptureRow } from './report-attestation.js';
 import { canonicalJson } from './report-canonical-json.js';
 import { SUPPRESSION_THRESHOLD } from './handlers/common.js';
+import selectionTemplates from './synthetic-attestation-index.json';
 
 // Exact approved B1 SQL8e3f51e2. The broader B2 target/report lookup is NOT used.
 export const B1_CAPTURE_SQL = `-- PROPOSED, NOT EXECUTED. Common prefix for the separately reviewed query variants.
@@ -112,6 +113,28 @@ function reportCapturePrefix(): string {
     .replace('-- B1 capture only: aid selects assessment; rid must be NULL. No report table reference.', '-- B2: aid selects build/list; rid selects report get. Exactly one is set.');
 }
 export const REPORT_CAPTURE_CTE = reportCapturePrefix();
+/** Future report selection and responses linearize in this one authoritative SELECT.
+ * Keep B1/legacy response packing and scoring bytes unchanged inside an explicit wrapper. */
+export const SELECTION_CAPTURE_SCHEMA = '3d-report-selection-capture-v1';
+export const REPORT_SELECTION_CAPTURE_CTE = REPORT_CAPTURE_CTE.replace('), captured AS (', '), response_captured AS (') + `
+, selection_rows AS (
+  SELECT s.id, s.assessment_id, s.template_id, s.template_version, t.perspective, t.source_ref,
+    json_array(s.id,s.assessment_id,s.template_id,s.template_version,t.perspective,t.source_ref) AS fragment
+  FROM assessment_survey s LEFT JOIN survey_template t ON t.id=s.template_id AND t.version=s.template_version
+  WHERE s.assessment_id=(SELECT id FROM target) AND s.state='selected' AND s.archived_at IS NULL
+), selection_pack AS (
+  SELECT json_group_array(json(fragment)) AS selection_json FROM (SELECT fragment FROM selection_rows ORDER BY id COLLATE BINARY)
+), selection_wrapped AS (
+  SELECT assessment_id, json_array('${SELECTION_CAPTURE_SCHEMA}', assessment_id, capture_json, json(selection_json)) AS capture_json
+  FROM response_captured CROSS JOIN selection_pack
+  WHERE (SELECT count(*) FROM selection_rows)<=9
+    AND NOT EXISTS (SELECT 1 FROM assessment_survey s WHERE s.assessment_id=response_captured.assessment_id
+      AND ((s.state='selected' AND s.archived_at IS NOT NULL) OR (s.state='archived' AND s.archived_at IS NULL)))
+), captured AS (
+  SELECT assessment_id,capture_json FROM selection_wrapped WHERE length(CAST(capture_json AS BLOB))<=524288
+)
+`;
+export type SelectedSurvey = readonly [string,string,string,number,string,string];
 export const CAPTURE_LIMITS = Object.freeze({ packedBytes: 524288, responses: 425, templates: 9, answersBytes: 8192, itemsBytes: 65536, templateBytes: 65536, idBytes: 256, submittedBytes: 128 });
 export type CapturedAssessment = Readonly<{
   assessmentId: string;
@@ -120,6 +143,8 @@ export type CapturedAssessment = Readonly<{
   responseIds: readonly string[];
   captureDigest: string;
   participant?: boolean;
+  /** Absent for exact legacy captures; [] means known-empty active selection. Internal only. */
+  selection?: readonly SelectedSurvey[];
 }>;
 export type CaptureResult =
   | { eligible: true; capture: CapturedAssessment }
@@ -179,6 +204,29 @@ export function decodePackedCapture(expectedAssessmentId: string, raw: string): 
  * branded object's rows and digest are exactly what was attested. Lets later stages of the same
  * request reuse that attestation instead of re-hashing the same frozen rows. */
 const attested = new WeakSet<object>();
+/** Store-only versioned envelope. Unknown versions, duplicate IDs and unpinned selection identities refuse.
+ * No raw object parser or current selection read is used for saved captures. */
+export async function attestSelectionCapture(expectedAssessmentId:string,raw:string,participant=false,minimum=SUPPRESSION_THRESHOLD):Promise<CaptureResult>{
+  try {
+    const envelope:unknown=JSON.parse(text(raw,CAPTURE_LIMITS.packedBytes));
+    if(Array.isArray(envelope)&&envelope.length===2)return attestPackedCapture(expectedAssessmentId,raw,participant,minimum);
+    const [schema,assessment,responses,selected]=tuple(envelope,4);
+    if(schema!==SELECTION_CAPTURE_SCHEMA||assessment!==expectedAssessmentId||!Array.isArray(selected)||selected.length>9)refuse();
+    const ids=new Set<string>(),templates=new Set<string>();const selection:SelectedSurvey[]=[];
+    for(const value of selected){
+      const [sid,aid,tid,ver,perspective,source]=tuple(value,6);
+      const survey=scalar(sid),template=scalar(tid),v=version(ver),p=scalar(perspective),ref=scalar(source);
+      const pinned=selectionTemplates.index.templates.find(t=>t.preimage.templateId===template&&t.preimage.templateVersion===v)?.preimage;
+      const key=JSON.stringify([template,v]);
+      if(aid!==expectedAssessmentId||ids.has(survey)||templates.has(key)||!pinned||pinned.perspective!==p||pinned.sourceRef!==ref)refuse();
+      ids.add(survey);templates.add(key);selection.push(Object.freeze([survey,expectedAssessmentId,template,v,p,ref]) as SelectedSurvey);
+    }
+    const result=await attestPackedCapture(expectedAssessmentId,text(responses,CAPTURE_LIMITS.packedBytes),participant,minimum);
+    if(!result.eligible)return result;
+    const capture=Object.freeze({...result.capture,packedCapture:raw,selection:Object.freeze(selection)});
+    attested.add(capture);return {eligible:true,capture};
+  }catch{return {eligible:false,reason:'HELD'};}
+}
 export function isAttestedCapture(c: unknown): boolean {
   return typeof c === 'object' && c !== null && attested.has(c);
 }

@@ -1,3 +1,4 @@
+import { subdimensionRadarModels } from '../../../../ui/report-perspective-radar.js';
 // UI Next (v4) results lane: data adapter. Status: provisional (playbook rule 12).
 // Reads the built-report shape the current UI already reads and derives every level through the current UI's pure modules
 // (import only, no backend change): ui/assess/v3-assessment.js v3ScoreBand + V3_BAND_CUTOFFS (band words, provisional cut-offs,
@@ -89,7 +90,7 @@ export function levelOf(score, responses) {
 export function responsesFor(payload, counts, { prefer = "report" } = {}) {
   const evidence = lensRespondents(canonicalPayload(payload));
   if (prefer === "live") return (lens) => counts?.[lens] ?? evidence.get(lens) ?? null;
-  return (lens) => evidence.get(lens) ?? counts?.[lens] ?? null;
+  return (lens) => evidence.get(lens) ?? (payload?.report_selection?.schema === '3d-report-selection-v1' ? 0 : counts?.[lens] ?? null);
 }
 /** Live responses a built report does not include yet, per perspective: the live count over the report's own evidence n, else 0
  *  (no evidence count to compare, or no live count). Presentation only: never a level, never a coverage tier. */
@@ -133,7 +134,7 @@ export function lensCards(raw, counts, { prefer = "report", sent } = {}) {
     if (l.absent) return l;
     const n = responses(l.lens);
     return {
-      lens: l.lens, label: lensLabel(l.lens), n, newer: newer(l.lens), level: levelOf(l.score, n),
+      lens: l.lens, label: lensLabel(l.lens), n, snapshotN: lensRespondents(payload).get(l.lens) ?? null, newer: newer(l.lens), level: levelOf(l.score, n),
       rows: (Array.isArray(l.sub_dimensions) ? l.sub_dimensions : []).filter(Boolean).map((s) => {
         const level = levelOf(s.score, n);
         return { name: s.sub_dimension, score: level === "more" ? null : s.score ?? null, level, items: s.items ?? s.n_items_included, note: s.note };
@@ -168,9 +169,9 @@ const byName = (all, names) => list(names).map((name) => all.find((a) => a.name 
 export function bandRow(report, counts, name) {
   const row = areas(report).find((r) => r.name === name);
   if (!row) throw new TypeError(`results: no cross-perspective area "${name}" in the report`);
-  return band(row, responsesFor(report?.payload, counts));
+  return band(row, responsesFor(report?.payload, counts), report);
 }
-function band(row, responses) {
+function band(row, responses, report) {
   const { name, question } = row;
   const asked = LENS_ORDER.filter((lens) => row.lenses.some((s) => s.lens === lens));
   const levelled = asked.map((lens) => {
@@ -180,7 +181,10 @@ function band(row, responses) {
   const dots = levelled.filter((d) => BANDS.includes(d.level));
   const scores = dots.map((d) => d.score);
   const spread = scores.length < 2 ? null : dots.length === row.lenses.length ? row.spread : Math.max(...scores) - Math.min(...scores);
-  const more = levelled.filter((d) => !BANDS.includes(d.level)).map((d) => d.label);
+  // Only a selected perspective with no recorded responses is waiting for input. A responded perspective can still be unasked about this area.
+  const snapshotResponses = lens => report?.payload?.report_selection?.schema === '3d-report-selection-v1' ? lensRespondents(canonicalPayload(report.payload)).get(lens) ?? 0 : responses(lens);
+  const zeroSelected = LENS_ORDER.filter(lens => list(report?.sent).includes(lens) && !asked.includes(lens) && !(snapshotResponses(lens) > 0));
+  const more = [...levelled.filter((d) => !BANDS.includes(d.level)).map((d) => d.label), ...zeroSelected.map(lensLabel)];
   for (const band of BANDS) {
     const here = dots.filter((d) => d.level === band);
     here.forEach((d, i) => { d.x = bandCentre(band) + 5 * (i - (here.length - 1) / 2); });
@@ -189,15 +193,20 @@ function band(row, responses) {
   const apart = idx.length ? Math.max(...idx) - Math.min(...idx) : 0;
   const span = apart >= 2 ? { from: 12.5 + 25 * Math.min(...idx), to: 12.5 + 25 * Math.max(...idx) } : null;
   const verdict = dots.length < 2 ? "too few perspectives to compare" : apart >= 2 ? `${apart} bands apart — talk about this` : apart === 1 ? "1 band apart" : "same band";
-  const notAsked = LENS_ORDER.filter((lens) => !asked.includes(lens)).map(lensLabel);
-  const notes = [...more.map((l) => `${l} more input needed`), ...notAsked.map((l) => `${l} not asked`)];
+  const notAsked = LENS_ORDER.filter((lens) => !asked.includes(lens) && !zeroSelected.includes(lens)).map(lensLabel);
+  const notes = [...more.map((l) => `${l} more input needed`), ...LENS_ORDER.filter(lens=>!asked.includes(lens)&&!zeroSelected.includes(lens)).map(lens=>`${lensLabel(lens)} ${absentPerspectiveNote(report,lens)}`)];
   return { name, question, dots, more, apart, span, verdict, notAsked, notes, spread, perspectives: asked.length };
+}
+function absentPerspectiveNote(report,lens){
+  if(report?.selectionKnown===false)return 'no recorded score';
+  if(report?.payload?.report_selection?.schema==='3d-report-selection-v1'&&!list(report?.sent).includes(lens)&&!((lensRespondents(canonicalPayload(report.payload)).get(lens)??0)>0))return 'not selected at report capture';
+  return 'not asked';
 }
 
 /** bandRow for each name the report has as a cross-perspective area; a name the payload lacks is skipped, never thrown (R3-3). */
 export function bandRows(report, counts, names) {
   const responses = responsesFor(report?.payload, counts);
-  return byName(areas(report), names).map((a) => band(a, responses));
+  return byName(areas(report), names).map((a) => band(a, responses, report));
 }
 
 /** design-system.md section 4 report copy by the level minimum in force (Codex P1 4382475714): the footer's privacy clause (after
@@ -258,8 +267,8 @@ export const AGREE_NONE = "No compared area has every placed perspective in the 
  *  lensSpreadRows' full-spread order. */
 export function scoreRows(report, counts, names) {
   const all = areas(report), responses = responsesFor(report?.payload, counts);
-  if (names) return byName(all, names).map((a) => scoreRow(a, responses));
-  return all.map((a) => ({ a, row: scoreRow(a, responses) }))
+  if (names) return byName(all, names).map((a) => scoreRow(a, responses, report));
+  return all.map((a) => ({ a, row: scoreRow(a, responses, report) }))
     .sort(({ a: x, row: p }, { a: y, row: q }) => (p.spread === null) - (q.spread === null) || (q.spread ?? 0) - (p.spread ?? 0) || x.order - y.order)
     .map(({ row }) => row);
 }
@@ -274,10 +283,10 @@ export function gapRows(report, counts) {
  *  blank or odd names kept as constructName reads them (R4-3). */
 export function comparedRows(report, counts) {
   const responses = responsesFor(report?.payload, counts);
-  return areas(report).filter((a) => a.multi).map((a) => scoreRow(a, responses));
+  return areas(report).filter((a) => a.multi).map((a) => scoreRow(a, responses, report));
 }
-function scoreRow(area, responses) {
-  const b = band(area, responses), scores = b.dots.map((d) => d.score);
+function scoreRow(area, responses, report) {
+  const b = band(area, responses, report), scores = b.dots.map((d) => d.score);
   return { name: area.name, spread: b.spread, from: scores.length ? Math.min(...scores) : 0, to: scores.length ? Math.max(...scores) : 0, alarm: b.apart >= 2, notes: b.notes,
     dots: [...b.dots].sort((x, y) => x.score - y.score).map((d) => ({ lens: d.lens, label: d.label, score: d.score })) };
 }
@@ -297,7 +306,13 @@ export function radar(report, names, counts) {
   if (!model) return null;
   const drawn = LENS_ORDER.filter((lens) => model.lenses.some((l) => l.lens === lens));
   const asked = LENS_ORDER.filter((lens) => named.some((a) => scored(a).some((s) => s.lens === lens)));
-  const notes = LENS_ORDER.filter((lens) => !drawn.includes(lens)).map((lens) => `${lensLabel(lens)} ${asked.includes(lens) ? "more input needed" : "not asked"}`);
+  const snapshotResponses = lens => report?.payload?.report_selection?.schema === '3d-report-selection-v1' ? lensRespondents(payload).get(lens) ?? 0 : responses(lens);
+  const notes = LENS_ORDER.filter((lens) => !drawn.includes(lens)).map((lens) => `${lensLabel(lens)} ${asked.includes(lens) || (list(report?.sent).includes(lens) && !(snapshotResponses(lens) > 0)) ? "more input needed" : absentPerspectiveNote(report,lens)}`);
+  return radarGeometry(model, drawn, notes);
+}
+
+/** Shared drawing geometry; measure selection remains with each named model. */
+function radarGeometry(model, drawn = model.lenses.map(l => l.lens), notes = []) {
   const C = [210, 185], R = 118, L = 141.6, k = model.spokes.length;
   const at = (i, r) => { const a = -Math.PI / 2 + (2 * Math.PI * i) / k; return [C[0] + r * Math.cos(a), C[1] + r * Math.sin(a)]; };
   const pts = (r) => model.spokes.map((_, i) => at(i, r).map((v) => v.toFixed(1)).join(",")).join(" ");
@@ -331,10 +346,11 @@ export function radar(report, names, counts) {
 
 /** A small count in words for copy that names it ("The two perspectives as one shape"); past six, the digits. */
 export const countWord = (n) => ["no", "one", "two", "three", "four", "five", "six"][n] ?? String(n);
-/** Detailed report sheets: 1 head + radar + tensions, 2 all areas, then the evidence two perspectives a sheet; no sheet is
- *  empty, so a report with two perspectives has three pages, not an empty "(continued)" one (R4-5). */
+/** Detailed sheets: shared comparison and reading guide, one own-subdimension radar per qualifying perspective,
+ * then evidence two perspectives a sheet. Empty/held perspectives add no radar or empty evidence sheet. */
 export const evidenceSheets = (cards) => list(cards).filter((c) => list(c.rows).length).flatMap((c, i, a) => (i % 2 ? [] : [a.slice(i, i + 2)])); // a perspective with no areas (none at build time) has no evidence table
-export const detailedPages = (cards) => 2 + evidenceSheets(cards).length;
+export const perspectiveRadars = cards => subdimensionRadarModels(cards, currentLevelMin()).map(model => ({...model, shape:radarGeometry(model)}));
+export const detailedPages = (cards) => 2 + perspectiveRadars(cards).length + evidenceSheets(cards).length;
 
 /** Held state: who is below the minimum, in the board's words ("Church 1 — needs 2 more"). */
 export function heldLines(counts) {

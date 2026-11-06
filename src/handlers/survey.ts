@@ -1,3 +1,4 @@
+import {translationBriefSource} from '../translation-brief-amendment';
 // Survey access uses assessment/workspace roles; direct project grants alone do not apply.
 import type { Ctx, Handler, Role } from "./types";
 import { CapError, notVisible } from "./errors";
@@ -96,7 +97,7 @@ export const print:Handler=async(ctx,params)=>{
   const printItems=items.map((i:any)=>({id:i.id,type:i.type,text:i.text,required:i.required,
     ...(Array.isArray(i.options)?{options:i.options.map((o:any)=>({code:o.code,text:o.text,...(o.exclusive?{exclusive:true}:{})}))}:{}),
     ...(i.scale?{scale:i.scale}:{}),...(i.max_select?{max_select:i.max_select}:{})}));
-  return {result:{html,items:printItems,content_type:"text/html; charset=utf-8",template_id:t.id,template_version:t.version,blank:true},scope:{type:"assessment",id:aid}};
+  return {result:{html,items:printItems,content_type:"text/html; charset=utf-8",template_id:t.id,template_version:t.version,...(translationBriefSource(parseItems(t),t.source_ref)?{instrument_amendment:translationBriefSource(parseItems(t),t.source_ref)}:{}),blank:true},scope:{type:"assessment",id:aid}};
 };
 // One link per survey (0.24.1 persona A: taking the link again through the API minted a second live link; Collect keeps
 // one link per survey, #395). A link token is the HMAC of its own id under a key derived from SESSION_SECRET, so the

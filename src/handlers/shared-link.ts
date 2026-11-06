@@ -84,7 +84,7 @@ function replay(row: Claim, key: string, payload: string) {
   if (row.payload_digest !== payload) throw new CapError("INVALID_PARAMS", "idempotency key has different answers");
   return { response_id: row.response_id, submitted_at: row.submitted_at, duplicate: true, undo: null };
 }
-export async function submitShared(ctx: Ctx, session: SharedSession, key: string, answers: Record<string, unknown>, template: { template_id: string; template_version: number }, context: Record<string, unknown> = {}) {
+export async function submitShared(ctx: Ctx, session: SharedSession, key: string, answers: Record<string, unknown>, template: { template_id: string; template_version: number; instrument_amendment?: string|null }, context: Record<string, unknown> = {}) {
   // B09: optional respondent context stays out of the payload digest (it is not saved with the device draft), so an
   // uncertain submit + reload + retry with the same key returns the original receipt whatever About you then holds.
   const hasContext = Object.keys(context).length > 0;
@@ -104,7 +104,7 @@ export async function submitShared(ctx: Ctx, session: SharedSession, key: string
         AND i.assessment_survey_id = s.id AND i.scope_type = 'survey'
         AND s.state = 'selected' AND s.collection_status = 'open' AND s.archived_at IS NULL AND a.archived_at IS NULL AND a.stage = 'collect'
         AND s.template_id = ? AND s.template_version = ?`)
-        .bind(responseId, `shared:${session.respondent_id}:${kd}`, JSON.stringify(answers), JSON.stringify({ presented_template_id: template.template_id, presented_template_version: template.template_version, link_id: session.invitation_id, trace_id: ctx.traceId }),
+        .bind(responseId, `shared:${session.respondent_id}:${kd}`, JSON.stringify(answers), JSON.stringify({ presented_template_id: template.template_id, presented_template_version: template.template_version, ...(template.instrument_amendment?{instrument_amendment:template.instrument_amendment}:{}), link_id: session.invitation_id, trace_id: ctx.traceId }),
           at, ...(hasContext ? [JSON.stringify(context)] : []), session.id, session.invitation_id, at, at, template.template_id, template.template_version),
       ctx.db.prepare(`INSERT INTO shared_response_claim (assessment_survey_id, respondent_id, client_key_digest, payload_digest, response_id)
         SELECT assessment_survey_id, respondent_id, ?, ?, id FROM response WHERE id = ?`).bind(kd, pd, responseId),

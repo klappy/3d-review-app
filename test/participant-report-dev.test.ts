@@ -1,3 +1,9 @@
+import {reportResultErrors,participantFormErrors} from './report-contract-check';
+import {get as getReport} from '../src/handlers/report';
+import {form,submit} from '../src/handlers/response';
+import {print as printSurvey} from '../src/handlers/survey';
+import {list as listTemplates,get as getTemplate,render as renderTemplate} from '../src/handlers/template';
+import {parseItems} from '../src/handlers/common';
 import {participantReportsAllowed} from '../src/report-admission';
 import {readFileSync} from 'node:fs';
 import {beforeAll,afterAll,describe,it,expect} from 'vitest';
@@ -77,3 +83,64 @@ describe('participant-source reports (DEV only)',()=>{
   expect(await attestCapture(src,rows,participantReportsAllowed({ENVIRONMENT:'production',PARTICIPANT_REPORTS:'enabled'}))).toEqual({eligible:false,reason:'BELOW_MINIMUM'});
  });
 });
+
+ it('Decision 25 is shared by existing survey form, print, template render and submission without changing old rows',async()=>{
+   const before=(await db.prepare('SELECT * FROM response WHERE assessment_survey_id IN (SELECT id FROM assessment_survey WHERE assessment_id=?) ORDER BY id').bind(aid).all()).results;
+   const storedTemplates=(await db.prepare('SELECT * FROM survey_template ORDER BY id,version').all()).results;
+   for(const [tid,itemId,text] of [['tpl_validation','TR-Q2','We do not have a translation brief'],['tpl_mid_level','ML-Q2','The team does not have a translation brief']]){
+     const existing=await db.prepare('SELECT id FROM assessment_survey WHERE assessment_id=? AND template_id=? AND template_version=2').bind(aid,tid).first<{id:string}>();
+     const sid=existing?.id??'amendment_'+tid;
+     if(existing)await run("UPDATE assessment_survey SET state='selected',collection_status='open' WHERE id=?",sid);
+     else await run("INSERT INTO assessment_survey (id,assessment_id,template_id,template_version,state,collection_status,created_at) VALUES (?,?,?,2,'selected','open','2026-11-05')",sid,aid,tid);
+     const c={...ctx('dev'),env:{...ctx('dev').env,DB:db},traceId:'tr_decision25',log:()=>{},principal:{kind:'participant',id:'decision25_'+tid,respondentId:'decision25_'+tid,participantSurveyId:sid}} as unknown as Ctx;
+     const presented=await form(c,{});
+     const serialized=JSON.parse(JSON.stringify(presented.result));
+     expect(participantFormErrors(serialized)).toEqual([]);
+     expect(participantFormErrors({...serialized,template:{...serialized.template,instrument_amendment:'unknown'}}).length).toBeGreaterThan(0);
+     expect(participantFormErrors({...serialized,template:{...serialized.template,unexpected:true}}).length).toBeGreaterThan(0);
+     const historical=structuredClone(serialized);delete historical.template.instrument_amendment;expect(participantFormErrors(historical)).toEqual([]);
+     const items=presented.result.items as any[];
+     expect(items.find(i=>i.id===itemId).options).toEqual(expect.arrayContaining([expect.objectContaining({code:'no-brief',text})]));
+     const member={...c,principal:{kind:'user',id:'person_mara'}} as Ctx;
+     const printed=await printSurvey(member,{aid,sid});expect(printed.result.html).toContain(text);
+     const catalogue=await listTemplates(member,{});const details=await getTemplate(member,{id:tid,ver:2});
+     const entry=(catalogue.result.templates as any[]).find(t=>t.id===tid&&t.version===2);
+     expect(entry.instrument_amendment).toBe('605edb47d2280568f0f5860f7b1921c12a814222');
+     expect(entry.instrument_amendment).toBe((details.result.template as any).instrument_amendment);
+     expect(entry).not.toHaveProperty('items_json');
+     const template=await renderTemplate(member,{id:tid,ver:2});expect((template.result.template as any).instrument_amendment).toBe(entry.instrument_amendment);expect((template.result.items as any[]).find(i=>i.id===itemId).options).toEqual(expect.arrayContaining([expect.objectContaining({code:'no-brief',text})]));
+     const raw=await db.prepare('SELECT * FROM survey_template WHERE id=? AND version=2').bind(tid).first<any>();
+     const full=parseItems(raw),answers=Object.fromEntries(full.map(i=>[i.id,i.type==='text'?'fixture':i.type==='multi'?[i.options![0].code]:i.options![0].code]));answers[itemId]='no-brief';
+     const submitted=await submit(c,{idempotency_key:'decision25_'+tid,answers});
+     const response=await db.prepare('SELECT * FROM response WHERE id=?').bind(submitted.result.response_id).first<any>();
+     expect(JSON.parse(response.answers_json)[itemId]).toBe('no-brief');expect(response.template_version).toBe(2);expect(JSON.parse(response.provenance_json).instrument_amendment).toBe('605edb47d2280568f0f5860f7b1921c12a814222');
+     expect((await submit(c,{idempotency_key:'decision25_'+tid,answers})).result.duplicate).toBe(true);
+   }
+   expect((await db.prepare('SELECT * FROM survey_template ORDER BY id,version').all()).results).toEqual(storedTemplates);
+   for(const row of before)expect(await db.prepare('SELECT * FROM response WHERE id=?').bind(row.id).first()).toEqual(row);
+ },60000);
+
+ it.each(['no-brief','other'])('production report transport protects a hidden church status with visible team %s',async(teamAnswer)=>{
+   const target='assess_decision25_privacy_'+teamAnswer;
+   const source=await captureForBuild(ctx(),src);if(!source.eligible)throw new Error('fixture capture unavailable');
+   await run('INSERT INTO assessment (id,project_id,language_id,name,purpose,period,format,stage,created_at,created_by) SELECT ?,project_id,language_id,name,purpose,period,format,stage,created_at,created_by FROM assessment WHERE id=?',target,src);
+   await run('INSERT INTO "grant" (id,principal_id,scope_type,scope_id,role,created_at) VALUES (?, ?, ?, ?, ?, ?)',target+'_grant','person_mara','assessment',target,'owner','2026-11-05');
+   let index=0;
+   for(const [templateId,n] of [['tpl_validation',3],['tpl_involved_pastor',1],['tpl_written',1]] as const){
+     const example=source.capture.rows.find(r=>r.selectedTemplateId===templateId);if(!example)throw new Error('missing fixture template '+templateId);
+     const sid=target+'_'+templateId;
+     await run("INSERT INTO assessment_survey (id,assessment_id,template_id,template_version,state,collection_status,created_at) VALUES (?,?,?,?, 'selected','open','2026-11-05')",sid,target,templateId,example.selectedTemplateVersion);
+     const answers=JSON.parse(example.answersRaw);if(templateId==='tpl_validation')answers['TR-Q2']=teamAnswer;if(templateId==='tpl_involved_pastor')answers['CHIP-Q1']='not-aware';
+     for(let i=0;i<n;i++)await run("INSERT INTO response (id,assessment_survey_id,respondent_id,idempotency_key,answers_json,template_id,template_version,source,submitted_at) VALUES (?,?,?,?,?,?,?,'participant','2026-11-05')",target+'_r'+index,sid,target+'_respondent'+index,'key'+index++,JSON.stringify(answers),templateId,example.selectedTemplateVersion);
+   }
+   const c={...ctx('production'),env:{ENVIRONMENT:'production',PARTICIPANT_REPORTS:'enabled'},traceId:'tr_decision25_privacy',log:()=>{}} as unknown as Ctx;
+   const built=await store.buildMaterialized(c,target);if(!built.ok)throw new Error('fixture build held');
+   expect((built.value.payload as any).translation_type_agreement.church_statuses).toEqual(['not-aware']);
+   const disclosed=await getReport(c,{id:built.value.id});expect(reportResultErrors('cap.report.get',disclosed.result)).toEqual([]);
+   const visible=(disclosed.result.report as any).payload.translation_type_agreement;
+   expect(disclosed.result.level_minimum_responses).toBe(3);
+   if(teamAnswer==='other')expect(visible).toBe(null);else {expect(visible.team_statuses).toEqual(['no-brief']);expect(visible.church_statuses).toEqual([]);expect(visible.church_values).toEqual([]);expect(visible.agree).toBe(null);}
+   expect(JSON.stringify(disclosed.result)).not.toContain('not-aware');
+   // Disclosure never mutates the immutable stored payload or capture.
+   const stored=await store.readMaterialized(c,built.value.id);expect(stored.ok&&stored.value.payload).toEqual(built.value.payload);
+ },60000);

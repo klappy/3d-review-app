@@ -35,12 +35,12 @@ it("retains narrative, indicators, agreement, evidence and escaped provenance fr
   const view = render(Context, { report: { reportId: "older", created_at: "2026-10-01", payload: {
     synthetic: true, source_commit: "source-sha", versions: { scorer: "scorer", narrative: "narrator", policy: "policy" },
     narrative: ["<img src=x onerror=alert(1)>"], standalone_indicators: [{ question_text: "Is it clear?", lens: "community", sub_dimension: "clarity", score: 82.5, n_responses: 9 }],
-    translation_type_agreement: { team_values: ["meaning-based"], church_values: ["literal"], agree: false }, evidence: [{ label: "Team form", n: 4 }],
+    translation_type_agreement: { team_values: ["meaning-based"], church_values: ["literal"], agree: false }, evidence: [{ label: "Translation Team — Translators", n: 4 }, {label:"Church — Involved Pastor",n:4}],
   } } });
   expect(view.container.textContent).toContain("Score (out of 100): 82.5");
   expect(view.container.textContent).toContain("Responses: 9");
   expect(view.container.textContent).toContain("Agreed: Meaning-based · Seen as: Literal · Differs");
-  expect(view.container.textContent).toContain("Team form · Submissions: 4");
+  expect(view.container.textContent).toContain("Translation Team — Translators · Submissions: 4");
   expect(view.container.textContent).toContain("Report: older");
   expect(view.container.textContent).toContain("<img src=x onerror=alert(1)>");
   expect(view.container.querySelector("img")).toBeNull();

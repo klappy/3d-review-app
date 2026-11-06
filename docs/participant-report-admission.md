@@ -12,6 +12,14 @@ DEV only (`ENVIRONMENT=dev`): the server-owned floor is one participant response
 
 Raw response lists, demographic breakdowns and row-level exports remain held. No new scoring formula or global quality average is introduced.
 
+## Temporary Summit override (local candidate)
+
+The Summit decision authorizes numeric reports from one participant response. The server-only variable `SUMMIT_ONE_RESPONSE_REPORTS=enabled` lowers assessment admission from 5 to 1 and per-perspective numeric levels from 3 to 1 in known DEV/production environments. This candidate enables it in production configuration; it is not a deployment receipt. Missing, malformed, or disabled values restore the existing production floors. DEV remains at its existing 1/1 defaults. Participant admission, grants, immutable snapshots, scoring, zero-response holds, and missing/unasked axes are unchanged.
+
+Rollback: remove `SUMMIT_ONE_RESPONSE_REPORTS` from production vars and release through normal gates. Revisit after Summit. Previously viewed/downloaded aggregates cannot be retracted. One-response numeric aggregates represent that person's answers; retain true counts and limited-coverage cues. Raw responses, demographic/small-cell answer splits and question disclosure remain held under existing rules. Translation-type categorical agreement retains the prior per-environment 3-response production minimum rather than inheriting the temporary numeric override.
+
+Radar presentation: Next Detailed and full-report PDF exports add separate radars of each perspective's own stored subdimensions, matching the measure in Steve's previews. The existing shared-construct comparison and current/legacy report screen are preserved. A perspective needs at least three genuine scored subdimensions and a known snapshot response count meeting the numeric level floor. Missing scores leave gaps; no axis is zero-filled. Detailed adds one page per qualifying perspective and all page counters follow that count. A one-response chart is labeled with its true count and limited-data wording.
+
 ## Verification boundaries and documentation debt
 
 On October 15 the production OAuth connector built, read and listed two source-pinned synthetic reports from existing imported assessments, with identical immutable readbacks. That verifies those synthetic API/MCP journeys. It does not establish participant-only production reporting, an authenticated browser journey, or embedded-host UI rendering. See the cookbook's [scoped production report receipt](https://github.com/klappy/3d-review-cookbook/blob/main/work/active/2026-10-14-reporting-delivery/PRODUCTION-STEVE-REPORTS-2026-10-15.md).
@@ -21,3 +29,9 @@ The projected `cap.report.build/get/list` capability descriptions still say synt
 ## Historical candidate state
 
 Before explicit activation, the 0.30.0 candidate left production disabled and changed no Worker variable or deployment configuration. It required disclosure-policy approval, independent review and normal release gates before activation. That earlier default-off state is superseded by the recorded activation above; its tests and approval chronology remain in the cookbook.
+
+## Prepared PDF provenance integration
+
+Named Overview and the Detailed reading-guide page show saved report identity, build time, source and scorer/narrative/policy versions outside closed disclosures. Explicitly supplied selection evidence labels a selected perspective with no responses as More input needed across cards and comparisons. The PDF endpoint and Next saved-report adapter do not substitute current survey selection for an old report: existing captures do not persist selected zero-response perspectives, so other perspectives' participation remains explicitly unknown. Changing today's zero-response selections must not change an existing named PDF or Next saved-report presentation. The current Results collection hub continues to show current selection separately.
+
+New builds now use the migration-free versioned selection envelope and v2 report identity described in [Saved active selection](report-selection-snapshot.md). Saved positive selected-zero facts are captured atomically; legacy missing facts remain unknown. No migration, backfill or scoring change is included. Local implementation and tests are not hosted acceptance or publication.

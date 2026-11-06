@@ -1800,6 +1800,9 @@
                   "string",
                   "null"
                 ]
+              },
+              "instrument_amendment": {
+                "const": "605edb47d2280568f0f5860f7b1921c12a814222"
               }
             },
             "required": [
@@ -1829,6 +1832,21 @@
             "items": {
               "type": "string"
             }
+          },
+          "languages": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          },
+          "passages": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          },
+          "demographics_enabled": {
+            "type": "boolean"
           }
         },
         "required": [
@@ -2190,7 +2208,8 @@
             "required": [
               "assessment_id",
               "suppressed",
-              "report"
+              "report",
+              "level_minimum_responses"
             ],
             "properties": {
               "assessment_id": {
@@ -2224,6 +2243,10 @@
                     "$ref": "openapi.yaml#/components/schemas/SyntheticReportPayload"
                   }
                 }
+              },
+              "level_minimum_responses": {
+                "type": "integer",
+                "minimum": 1
               }
             }
           },
@@ -2254,7 +2277,8 @@
                 "const": "held"
               },
               "reason": {
-                "const": "Report unavailable under the current synthetic reporting policy."
+                "type": "string",
+                "maxLength": 512
               },
               "report": {
                 "type": "null"
@@ -2267,6 +2291,14 @@
               },
               "policy_version": {
                 "const": "synthetic-current-assessment-asof-query-v1"
+              },
+              "responses_in": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "responses_needed": {
+                "type": "integer",
+                "minimum": 0
               }
             }
           },
@@ -2361,7 +2393,8 @@
                 "const": "held"
               },
               "reason": {
-                "const": "Report unavailable under the current synthetic reporting policy."
+                "type": "string",
+                "maxLength": 512
               },
               "report": {
                 "type": "null"
@@ -2405,6 +2438,14 @@
               },
               "expires_in": {
                 "type": "integer"
+              },
+              "responses_in": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "responses_needed": {
+                "type": "integer",
+                "minimum": 0
               }
             }
           }
@@ -2453,7 +2494,8 @@
             "required": [
               "assessment_id",
               "suppressed",
-              "report"
+              "report",
+              "level_minimum_responses"
             ],
             "properties": {
               "assessment_id": {
@@ -2487,6 +2529,10 @@
                     "$ref": "openapi.yaml#/components/schemas/SyntheticReportPayload"
                   }
                 }
+              },
+              "level_minimum_responses": {
+                "type": "integer",
+                "minimum": 1
               }
             }
           },
@@ -2517,7 +2563,8 @@
                 "const": "held"
               },
               "reason": {
-                "const": "Report unavailable under the current synthetic reporting policy."
+                "type": "string",
+                "maxLength": 512
               },
               "report": {
                 "type": "null"
@@ -2530,6 +2577,14 @@
               },
               "policy_version": {
                 "const": "synthetic-current-assessment-asof-query-v1"
+              },
+              "responses_in": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "responses_needed": {
+                "type": "integer",
+                "minimum": 0
               }
             }
           }

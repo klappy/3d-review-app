@@ -4,11 +4,15 @@ import {nextReportMarkup,nextReportCss} from './next-layout.generated.js';
 const trustedModels=new WeakSet();
 const esc=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 function freeze(x){if(x&&typeof x==='object'){Object.values(x).forEach(freeze);Object.freeze(x);}return x;}
-export function namedReportModel(stored,{minimum=3,identity={}}={}){
+// Only the fields sentLenses reads are kept from the survey list; nothing else from a survey reaches the paper.
+const surveyFlags=surveys=>(Array.isArray(surveys)?surveys:[]).filter(s=>s&&typeof s==='object').map(s=>({perspective:String(s.perspective??''),state:typeof s.state==='string'?s.state:'selected',archived_at:s.archived_at?true:null}));
+export function namedReportModel(stored,{minimum=3,identity={},surveys}={}){
  if(!Number.isInteger(minimum)||minimum<1)throw Error('PDF_REPORT_HELD');
  // Keep the existing full-detail disclosure guard, including all snapshot counts and standalone cells.
  reportPdfDocument(stored,{minimum});
- const model=freeze(JSON.parse(JSON.stringify({stored,identity:{title:identity.title,project:identity.project,language:identity.language},minimum})));
+ const saved=stored?.report?.payload?.report_selection;
+ if(saved?.schema==='3d-report-selection-v1'&&Array.isArray(saved.selected_perspectives))surveys=saved.selected_perspectives.map(perspective=>({perspective,state:'selected'}));
+ const model=freeze(JSON.parse(JSON.stringify({stored,identity:{title:identity.title,project:identity.project,language:identity.language},minimum,selectionKnown:Array.isArray(surveys),surveys:surveyFlags(surveys)})));
  trustedModels.add(model);return model;
 }
 function papers(markup){
@@ -23,7 +27,7 @@ export function namedReportDocument(model,format,{paper='a4'}={}){
  if(!['overview','detailed'].includes(format))throw Error('INVALID_PDF_FORMAT');
  if(!trustedModels.has(model))throw Error('PDF_REPORT_HELD');
  if(!['a4','letter'].includes(paper))throw Error('INVALID_PDF_PAPER');
- const pages=papers(nextReportMarkup(model.stored,model.identity,model.minimum,format));
+ const pages=papers(nextReportMarkup(model.stored,model.identity,model.minimum,format,model.surveys,model.selectionKnown));
  if(format==='overview'&&pages.length!==1)throw Error('PDF_LAYOUT_INVALID');
  const size=paper==='a4'?'210mm 297mm':'8.5in 11in',width=paper==='a4'?'210mm':'8.5in',height=paper==='a4'?'297mm':'11in';
  // Only physical-page framing differs: report content, typography, diagrams and tables come from Next unchanged.
@@ -31,7 +35,7 @@ export function namedReportDocument(model,format,{paper='a4'}={}){
  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src 'none';style-src 'unsafe-inline';img-src data:;font-src data:;base-uri 'none';form-action 'none'"><title>${esc(format==='overview'?'Overview report':'Detailed report')}</title><style>${nextReportCss}\n${framing}</style></head><body><div class="app" data-theme="light" data-imagery="bars">${pages.join('')}</div></body></html>`;
 }
 /** Full keeps its existing renderer and Letter default; route callers select the server-owned paper value. */
-export function storedReportDocument(stored,{format='full',minimum=3,identity={},paper='letter'}={}){
+export function storedReportDocument(stored,{format='full',minimum=3,identity={},paper='letter',surveys}={}){
  if(format==='full')return reportPdfDocument(stored,{minimum,paper});
- return namedReportDocument(namedReportModel(stored,{minimum,identity}),format,{paper});
+ return namedReportDocument(namedReportModel(stored,{minimum,identity,surveys}),format,{paper});
 }

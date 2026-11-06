@@ -1,3 +1,5 @@
+import {canonicalPinnedQuestion,translationBriefSource} from './translation-brief-amendment.js';
+
 /**
  * Exact arithmetic shape of pinned f042cde survey-pipeline/pipeline/04_aggregate.py.
  * This is an internal reference projection, not a D7-safe disclosure or a new
@@ -31,7 +33,12 @@ export interface CrossLensResult {
   triangulated_mean: number; agreement_range: number | null;
   n_lenses_included: number; per_lens: { lens: string; score: number }[];
 }
-export interface TranslationTypeResponse { assessment_id: string; item_id: string; option_codes: string[] | null }
+export interface TranslationTypeResponse {
+  assessment_id: string; item_id: string; option_codes: string[] | null;
+  /** Effective captured question and source, required to qualify Decision 25 no-brief. */
+  question?: Parameters<typeof translationBriefSource>[0][number];
+  source_ref?: string;
+}
 export interface TranslationTypeResult {
   assessment_id: string; team_values: string[]; church_values: string[]; agree: boolean | null;
 }
@@ -121,7 +128,7 @@ export function crossLensReference(rows: ScoredRow[], constructs: Record<string,
 }
 
 /** Pinned 04_aggregate.py categorical exception; never coerce missing to disagreement. */
-export function translationTypeReference(rows: TranslationTypeResponse[]): TranslationTypeResult[] {
+export function legacyTranslationTypeReference(rows: TranslationTypeResponse[]): TranslationTypeResult[] {
   const teamItems = new Set(["TR-Q2", "ML-Q2"]);
   const churchItems = new Set(["CHIP-Q1", "CHCP-Q1", "CHDL-Q1"]);
   const comparable = new Set(["corresponding", "resembling", "clarifying", "simplifying"]);
@@ -141,4 +148,29 @@ export function translationTypeReference(rows: TranslationTypeResponse[]): Trans
       team_values.some(code => group.church.has(code));
     return { assessment_id, team_values, church_values, agree };
   }), r => r.assessment_id);
+}
+
+/** Decision 25 / source 605edb4: statuses are findings, never comparable types.
+ * Other is excluded entirely, including when both sides selected it. */
+export function translationTypeReference(rows: TranslationTypeResponse[]): (TranslationTypeResult & {team_statuses:string[];church_statuses:string[]})[] {
+  const values = new Map(legacyTranslationTypeReference(rows).map(r=>[r.assessment_id,r]));
+  const statuses = new Map<string,{team:Set<string>;church:Set<string>}>();
+  const allowed = new Set(['no-brief','no-agreement','not-aware']);
+  for (const row of rows) {
+    const side = ['TR-Q2','ML-Q2'].includes(row.item_id) ? 'team' : ['CHIP-Q1','CHCP-Q1','CHDL-Q1'].includes(row.item_id) ? 'church' : null;
+    if (!side) continue;
+    for (const code of row.option_codes ?? []) {
+      if (!allowed.has(code)) continue;
+      // IDs/codes are reusable in custom versions. Only the exact canonical
+      // question may confer these findings: no-brief requires the amended
+      // instrument; no-agreement/not-aware require unamended pinned item bytes.
+      if (!row.question || row.question.id!==row.item_id) continue;
+      if (code==='no-brief' && !translationBriefSource([row.question],row.source_ref)) continue;
+      if ((code==='no-agreement' || code==='not-aware') && !canonicalPinnedQuestion(row.question,row.source_ref)) continue;
+      const group = statuses.get(row.assessment_id) ?? {team:new Set<string>(),church:new Set<string>()};
+      group[side].add(code); statuses.set(row.assessment_id,group);
+    }
+  }
+  for (const id of statuses.keys()) if (!values.has(id)) values.set(id,{assessment_id:id,team_values:[],church_values:[],agree:null});
+  return sorted([...values].map(([id,value])=>({...value,team_statuses:[...(statuses.get(id)?.team??[])].sort(),church_statuses:[...(statuses.get(id)?.church??[])].sort()})),r=>r.assessment_id);
 }

@@ -27,17 +27,18 @@
   let { phone = false, theme = "light", state, data = fixture } = $props();
   const m = $derived(collectModel(data));
   const total = $derived(m.surveys.length);
+  const single = $derived(phone && state !== "all");
   const at = $derived(pickSurvey(state, total, data.qrRoomPhone?.survey));
   const s = $derived(at < 0 ? undefined : m.surveys[at]);
 </script>
 
-{#snippet top()}{#if phone}<PhoneHeader state="nested" title="Show a QR code" parent="Collect" back={href("collect")} initials={m.user.initials} menuHref={href("menu")} home={href("home")} />{:else}<RoomTop {m} />{/if}{/snippet}
+{#snippet top()}{#if phone}<PhoneHeader state="nested" title={single ? "Show a QR code" : "All survey QR codes"} parent="Collect" back={href("collect")} initials={m.user.initials} menuHref={href("menu")} home={href("home")} />{:else}<RoomTop {m} />{/if}{/snippet}
 {#snippet back()}<Glyph name="back" />{/snippet}
 {#snippet arrow()}<Glyph name="arrow" />{/snippet}
-{#snippet bar()}{#if phone && s}<div class="glass phone-bar" role="group" aria-label="Page actions"><Button label="Previous" variant="quiet" href={href("qr-room", { state: String(((at + total - 1) % total) + 1) })} lead={back} /><Button label="Next survey" variant="primary" lg href={href("qr-room", { state: String(((at + 1) % total) + 1) })} trail={arrow} /></div>{/if}{/snippet}
+{#snippet bar()}{#if single && s}<div class="glass phone-bar" role="group" aria-label="Page actions"><Button label="Previous" variant="quiet" href={href("qr-room", { state: String(((at + total - 1) % total) + 1) })} lead={back} /><Button label="Next survey" variant="primary" lg href={href("qr-room", { state: String(((at + 1) % total) + 1) })} trail={arrow} /></div>{/if}{/snippet}
 
 <AppShell {phone} {theme} screen rhythm={phone ? undefined : "center"} {top} {bar}>
-  {#if phone}
+  {#if single}
     <Row split gap={3}><span class="micro">{#if s}Survey {at + 1} of {total}{/if}</span><a class="link small" href={`${href("collect")}#offline`}>Meeting offline? Print and paper</a></Row>
     <div class="glass-hi l-card qr-tile-phone" data-pad="hero">
       {#if s}

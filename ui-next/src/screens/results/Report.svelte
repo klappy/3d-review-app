@@ -10,6 +10,9 @@
      (validator R3-3): cards and rows are iterated, unresolved areas are left out, never thrown. The detailed report's page count
      is its sheets for this report (data.js detailedPages, R4-5). -->
 <script>
+  import { agreementSentence } from "../../../../ui/report-view.js";
+  import { translationAgreementFor } from "../../../../ui/report-agreement.js";
+  import { currentLevelMin } from "./data.js";
   import { reportPdfFormatUrl } from '../../../../ui/pdf/download.js';
   import AppShell from "../../AppShell.svelte";
   import LevelLegend from "./LevelLegend.svelte";
@@ -25,6 +28,7 @@
   import Glyph from "./Glyph.svelte";
   import DocBar from "./DocBar.svelte";
   import PdfActions from '../actions/PdfActions.svelte';
+  import ReportProvenance from "./ReportProvenance.svelte";
   import PaperHead from "./PaperHead.svelte";
   import PaperLegend from "./PaperLegend.svelte";
   import BandBar from "./BandBar.svelte";
@@ -38,6 +42,7 @@
   const reading = $derived(phone && view === "overview");
   const namedPdfUrl = $derived(pdfUrl ? reportPdfFormatUrl(pdfUrl,'overview') : null);
   const D = $derived(report ?? (phone && !reading ? REPORT.phone : REPORT.desktop)); // the reading view draws the overview sheet
+  const agreement = $derived(translationAgreementFor(D.payload, currentLevelMin()));
   const cards = $derived(lensCards(D.payload, D.counts, { sent: D.sent }));
   const pages = $derived(detailedPages(cards));
   // The gaps (two placed perspectives a band or more apart) then at most the first area where the placed perspectives share a band,
@@ -103,6 +108,9 @@
             <span class="bb-verdict">{row.verdict}{#if row.notes.length}<span class="small bb-na">{` · ${row.notes.join(" · ")}`}</span>{/if}</span>
           </div>
         {/each}
+        {#if agreement}
+          <div aria-label="Translation type agreement"><div class="sheet-head" role="heading" aria-level="2">Translation type agreement</div><p class="sheet-text">{agreementSentence(agreement)}</p></div>
+        {/if}
         <PaperLegend />
       </div>
       <div>
@@ -110,6 +118,7 @@
         {#if next.length}<ol class="sheet-list">{#each next as n}<li>{lensLabel(n.lens)} · {n.area} — {LEVEL_WORD[n.level]}</li>{/each}</ol>
         {:else}<p class="sheet-text" data-v="14">No area reads Needs support or Needs urgent attention.</p>{/if}
       </div>
+      <ReportProvenance report={D} />
       <div class="pfoot"><span class="pf-text">Built from {snapshotTotal(cards)} responses on {D.review.builtOn} · levels are bands, not scores · {footPrivacy()}</span><span class="pn">1 of 1</span></div>
     </div>
 {/snippet}

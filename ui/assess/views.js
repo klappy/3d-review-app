@@ -231,7 +231,7 @@ const understand = {
         if ((ctx.isCurrent && !ctx.isCurrent()) || root.isConnected === false || readGeneration !== m.reportReadGeneration) return;
         if (r.suppressed) { m.openReport = { status: 'held' }; showFailure(V3_REPORT_HELD); }
         else {
-          const ok = renderReport({ doc: root.ownerDocument || globalThis.document, root: view, report: r.report });
+          const ok = renderReport({ doc: root.ownerDocument || globalThis.document, root: view, report: r.report, minimum: r.level_minimum_responses });
           if (ok) { m.openReport = { status: 'shown', id }; if (view) readableNumbers(view); if (status) status.textContent = ''; if (full) { full.hidden = false; if (full.scrollIntoView) full.scrollIntoView({ block: 'start' }); } }
           else { m.openReport = { status: 'error', text: 'This report could not be displayed.' }; showFailure(m.openReport.text); }
         }

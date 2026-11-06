@@ -1,0 +1,544 @@
+{
+  "source": "klappy/3d-quality-review",
+  "commit": "605edb47d2280568f0f5860f7b1921c12a814222",
+  "decision": 25,
+  "options_csv_sha256": "79f224cc7e5ea40a806c69dccb6509deb07b9a089c7d4304be0939da06c26c02",
+  "options": {
+    "TR-Q2": {
+      "code": "no-brief",
+      "text": "We do not have a translation brief",
+      "source_order": 5,
+      "source_score": null,
+      "weight": null,
+      "flag": "descriptive",
+      "source_notes": "Not a translation type — excluded from the type comparison; reported as its own finding."
+    },
+    "ML-Q2": {
+      "code": "no-brief",
+      "text": "The team does not have a translation brief",
+      "source_order": 5,
+      "source_score": null,
+      "weight": null,
+      "flag": "descriptive",
+      "source_notes": "Not a translation type — excluded from the type comparison; reported as its own finding."
+    },
+    "TR-Q1": {
+      "code": "no-brief",
+      "text": "We do not have a translation brief",
+      "source_order": 4,
+      "source_score": null,
+      "weight": null,
+      "flag": "descriptive",
+      "source_notes": "Not a translation type — excluded from the type comparison; reported as its own finding."
+    },
+    "ML-Q1": {
+      "code": "no-brief",
+      "text": "The team does not have a translation brief",
+      "source_order": 4,
+      "source_score": null,
+      "weight": null,
+      "flag": "descriptive",
+      "source_notes": "Not a translation type — excluded from the type comparison; reported as its own finding."
+    }
+  },
+  "canonical_questions": {
+    "TR-Q2": {
+      "source_ref": "klappy/3d-quality-review@f042cde553761a6a7f24132cef7802f956378ee0:rubric_csv/Items.csv+Options.csv",
+      "item": {
+        "id": "TR-Q2",
+        "group": "Translation Process & Brief",
+        "text": "If your team has a brief, what type of translation does it describe?",
+        "type": "single",
+        "required": true,
+        "requiredness": "working-required",
+        "answer_semantics": null,
+        "source_type": "descriptive",
+        "source_q_num": 2,
+        "source_score_max": null,
+        "source_weight_in_subdim": 1.0,
+        "source_notes": "Descriptive — captures translation type (filter, not score). Triangulates with CHIP/CHCP/CHDL-Q1.",
+        "source_cross_lens_construct": "translation-brief-alignment",
+        "standalone_indicator": false,
+        "options": [
+          {
+            "code": "corresponding",
+            "text": "Corresponding — very close to the original Greek or Hebrew",
+            "source_order": 1,
+            "source_score": null,
+            "weight": null,
+            "flag": "descriptive",
+            "source_notes": null
+          },
+          {
+            "code": "resembling",
+            "text": "Resembling — close to the original with some adjustments for clarity",
+            "source_order": 2,
+            "source_score": null,
+            "weight": null,
+            "flag": "descriptive",
+            "source_notes": null
+          },
+          {
+            "code": "clarifying",
+            "text": "Clarifying — focused on understandability in natural language",
+            "source_order": 3,
+            "source_score": null,
+            "weight": null,
+            "flag": "descriptive",
+            "source_notes": null
+          },
+          {
+            "code": "simplifying",
+            "text": "Simplifying — easy to understand, using contemporary everyday language",
+            "source_order": 4,
+            "source_score": null,
+            "weight": null,
+            "flag": "descriptive",
+            "source_notes": null
+          },
+          {
+            "code": "other",
+            "text": "Other (please describe)",
+            "source_order": 5,
+            "source_score": null,
+            "weight": null,
+            "flag": "descriptive",
+            "source_notes": null
+          }
+        ]
+      }
+    },
+    "ML-Q2": {
+      "source_ref": "klappy/3d-quality-review@f042cde553761a6a7f24132cef7802f956378ee0:rubric_csv/Items.csv+Options.csv",
+      "item": {
+        "id": "ML-Q2",
+        "group": "Translation Process & Brief",
+        "text": "If the team has a brief, what type of translation does it describe?",
+        "type": "single",
+        "required": true,
+        "requiredness": "working-required",
+        "answer_semantics": null,
+        "source_type": "descriptive",
+        "source_q_num": 2,
+        "source_score_max": null,
+        "source_weight_in_subdim": 1.0,
+        "source_notes": "Descriptive — captures translation type (filter, not score). Triangulates with CHIP/CHCP/CHDL-Q1.",
+        "source_cross_lens_construct": "translation-brief-alignment",
+        "standalone_indicator": false,
+        "options": [
+          {
+            "code": "corresponding",
+            "text": "Corresponding — very close to the original Greek or Hebrew",
+            "source_order": 1,
+            "source_score": null,
+            "weight": null,
+            "flag": "descriptive",
+            "source_notes": null
+          },
+          {
+            "code": "resembling",
+            "text": "Resembling — close to the original with some adjustments for clarity",
+            "source_order": 2,
+            "source_score": null,
+            "weight": null,
+            "flag": "descriptive",
+            "source_notes": null
+          },
+          {
+            "code": "clarifying",
+            "text": "Clarifying — focused on understandability in natural language",
+            "source_order": 3,
+            "source_score": null,
+            "weight": null,
+            "flag": "descriptive",
+            "source_notes": null
+          },
+          {
+            "code": "simplifying",
+            "text": "Simplifying — easy to understand, using contemporary everyday language",
+            "source_order": 4,
+            "source_score": null,
+            "weight": null,
+            "flag": "descriptive",
+            "source_notes": null
+          },
+          {
+            "code": "other",
+            "text": "Other (please describe)",
+            "source_order": 5,
+            "source_score": null,
+            "weight": null,
+            "flag": "descriptive",
+            "source_notes": null
+          }
+        ]
+      }
+    },
+    "TR-Q1": {
+      "source_ref": "klappy/3d-quality-review@f042cde553761a6a7f24132cef7802f956378ee0:rubric_csv/Items.csv+Options.csv",
+      "item": {
+        "id": "TR-Q1",
+        "group": "Translation Process & Brief",
+        "text": "Does your team have a translation brief or plan that defines what kind of translation you are aiming for?",
+        "type": "single",
+        "required": true,
+        "requiredness": "working-required",
+        "answer_semantics": null,
+        "source_type": "ordinal-scored",
+        "source_q_num": 1,
+        "source_score_max": 100.0,
+        "source_weight_in_subdim": 1.0,
+        "source_notes": "Brief sub-dim merged into Process per 2026-05-11 decision.",
+        "source_cross_lens_construct": "translation-brief-alignment",
+        "standalone_indicator": false,
+        "options": [
+          {
+            "code": "documented",
+            "text": "Yes, we have a documented brief that defines our translation type and goals",
+            "source_order": 1,
+            "source_score": 100.0,
+            "weight": null,
+            "flag": null,
+            "source_notes": null
+          },
+          {
+            "code": "shared-undocumented",
+            "text": "Yes, we have a shared understanding as a team of what we are aiming for, but it is not documented",
+            "source_order": 2,
+            "source_score": 67.0,
+            "weight": null,
+            "flag": null,
+            "source_notes": null
+          },
+          {
+            "code": "working-on",
+            "text": "We are still working on defining our translation type and goals",
+            "source_order": 3,
+            "source_score": 33.0,
+            "weight": null,
+            "flag": null,
+            "source_notes": null
+          },
+          {
+            "code": "other",
+            "text": "Other (please describe)",
+            "source_order": 4,
+            "source_score": null,
+            "weight": null,
+            "flag": "missing",
+            "source_notes": "Treat as missing unless inferable."
+          }
+        ]
+      }
+    },
+    "ML-Q1": {
+      "source_ref": "klappy/3d-quality-review@f042cde553761a6a7f24132cef7802f956378ee0:rubric_csv/Items.csv+Options.csv",
+      "item": {
+        "id": "ML-Q1",
+        "group": "Translation Process & Brief",
+        "text": "Does the team have a translation brief or plan that defines what kind of translation they are aiming for?",
+        "type": "single",
+        "required": true,
+        "requiredness": "working-required",
+        "answer_semantics": null,
+        "source_type": "ordinal-scored",
+        "source_q_num": 1,
+        "source_score_max": 100.0,
+        "source_weight_in_subdim": 1.0,
+        "source_notes": null,
+        "source_cross_lens_construct": "translation-brief-alignment",
+        "standalone_indicator": false,
+        "options": [
+          {
+            "code": "documented",
+            "text": "Yes, they have a documented brief that defines their translation type and goals",
+            "source_order": 1,
+            "source_score": 100.0,
+            "weight": null,
+            "flag": null,
+            "source_notes": null
+          },
+          {
+            "code": "shared-undocumented",
+            "text": "Yes, they have a shared understanding as a team of what they are aiming for, but it is not documented",
+            "source_order": 2,
+            "source_score": 67.0,
+            "weight": null,
+            "flag": null,
+            "source_notes": null
+          },
+          {
+            "code": "working-on",
+            "text": "They are still working on defining their translation type and goals",
+            "source_order": 3,
+            "source_score": 33.0,
+            "weight": null,
+            "flag": null,
+            "source_notes": null
+          },
+          {
+            "code": "other",
+            "text": "Other (please describe)",
+            "source_order": 4,
+            "source_score": null,
+            "weight": null,
+            "flag": "missing",
+            "source_notes": "Treat as missing unless inferable."
+          }
+        ]
+      }
+    },
+    "CHIP-Q1": {
+      "source_ref": "klappy/3d-quality-review@f042cde553761a6a7f24132cef7802f956378ee0:rubric_csv/Items.csv+Options.csv",
+      "item": {
+        "id": "CHIP-Q1",
+        "group": "Translation Brief",
+        "text": "What type of translation did your community agree upon or expect?",
+        "type": "single",
+        "required": true,
+        "requiredness": "working-required",
+        "answer_semantics": null,
+        "source_type": "descriptive",
+        "source_q_num": 1,
+        "source_score_max": null,
+        "source_weight_in_subdim": 1.0,
+        "source_notes": "Descriptive. Triangulates with TR-Q2.",
+        "source_cross_lens_construct": "translation-brief-alignment",
+        "standalone_indicator": false,
+        "options": [
+          {
+            "code": "corresponding",
+            "text": "Corresponding — very close to the original Greek or Hebrew",
+            "source_order": 1,
+            "source_score": null,
+            "weight": null,
+            "flag": "descriptive",
+            "source_notes": "Triangulation only — compare with TR-Q2."
+          },
+          {
+            "code": "resembling",
+            "text": "Resembling — close to the original with some adjustments for clarity",
+            "source_order": 2,
+            "source_score": null,
+            "weight": null,
+            "flag": "descriptive",
+            "source_notes": "Triangulation only — compare with TR-Q2."
+          },
+          {
+            "code": "clarifying",
+            "text": "Clarifying — focused on understandability in natural language",
+            "source_order": 3,
+            "source_score": null,
+            "weight": null,
+            "flag": "descriptive",
+            "source_notes": "Triangulation only — compare with TR-Q2."
+          },
+          {
+            "code": "simplifying",
+            "text": "Simplifying — easy to understand, using contemporary everyday language",
+            "source_order": 4,
+            "source_score": null,
+            "weight": null,
+            "flag": "descriptive",
+            "source_notes": "Triangulation only — compare with TR-Q2."
+          },
+          {
+            "code": "no-agreement",
+            "text": "We did not have a prior agreement on translation type",
+            "source_order": 5,
+            "source_score": null,
+            "weight": null,
+            "flag": "descriptive",
+            "source_notes": "Triangulation only — compare with TR-Q2."
+          },
+          {
+            "code": "not-aware",
+            "text": "I am not aware of what type of translation the translators agreed upon",
+            "source_order": 6,
+            "source_score": null,
+            "weight": null,
+            "flag": "descriptive",
+            "source_notes": "Triangulation only — compare with TR-Q2."
+          },
+          {
+            "code": "other",
+            "text": "Other (please describe)",
+            "source_order": 7,
+            "source_score": null,
+            "weight": null,
+            "flag": "descriptive",
+            "source_notes": "Triangulation only — compare with TR-Q2."
+          }
+        ]
+      }
+    },
+    "CHCP-Q1": {
+      "source_ref": "klappy/3d-quality-review@f042cde553761a6a7f24132cef7802f956378ee0:rubric_csv/Items.csv+Options.csv",
+      "item": {
+        "id": "CHCP-Q1",
+        "group": "Translation Brief",
+        "text": "What type of translation did your community agree upon or expect?",
+        "type": "single",
+        "required": true,
+        "requiredness": "working-required",
+        "answer_semantics": null,
+        "source_type": "descriptive",
+        "source_q_num": 1,
+        "source_score_max": null,
+        "source_weight_in_subdim": 1.0,
+        "source_notes": "Descriptive. Triangulates with TR-Q2.",
+        "source_cross_lens_construct": "translation-brief-alignment",
+        "standalone_indicator": false,
+        "options": [
+          {
+            "code": "corresponding",
+            "text": "Corresponding — very close to the original Greek or Hebrew",
+            "source_order": 1,
+            "source_score": null,
+            "weight": null,
+            "flag": "descriptive",
+            "source_notes": "Triangulation only — compare with TR-Q2."
+          },
+          {
+            "code": "resembling",
+            "text": "Resembling — close to the original with some adjustments for clarity",
+            "source_order": 2,
+            "source_score": null,
+            "weight": null,
+            "flag": "descriptive",
+            "source_notes": "Triangulation only — compare with TR-Q2."
+          },
+          {
+            "code": "clarifying",
+            "text": "Clarifying — focused on understandability in natural language",
+            "source_order": 3,
+            "source_score": null,
+            "weight": null,
+            "flag": "descriptive",
+            "source_notes": "Triangulation only — compare with TR-Q2."
+          },
+          {
+            "code": "simplifying",
+            "text": "Simplifying — easy to understand, using contemporary everyday language",
+            "source_order": 4,
+            "source_score": null,
+            "weight": null,
+            "flag": "descriptive",
+            "source_notes": "Triangulation only — compare with TR-Q2."
+          },
+          {
+            "code": "no-agreement",
+            "text": "We did not have a prior agreement on translation type",
+            "source_order": 5,
+            "source_score": null,
+            "weight": null,
+            "flag": "descriptive",
+            "source_notes": "Triangulation only — compare with TR-Q2."
+          },
+          {
+            "code": "not-aware",
+            "text": "I am not aware of what type of translation the translators agreed upon",
+            "source_order": 6,
+            "source_score": null,
+            "weight": null,
+            "flag": "descriptive",
+            "source_notes": "Triangulation only — compare with TR-Q2."
+          },
+          {
+            "code": "other",
+            "text": "Other (please describe)",
+            "source_order": 7,
+            "source_score": null,
+            "weight": null,
+            "flag": "descriptive",
+            "source_notes": "Triangulation only — compare with TR-Q2."
+          }
+        ]
+      }
+    },
+    "CHDL-Q1": {
+      "source_ref": "klappy/3d-quality-review@f042cde553761a6a7f24132cef7802f956378ee0:rubric_csv/Items.csv+Options.csv",
+      "item": {
+        "id": "CHDL-Q1",
+        "group": "Translation Brief",
+        "text": "What type of translation did your community agree upon or expect?",
+        "type": "single",
+        "required": true,
+        "requiredness": "working-required",
+        "answer_semantics": null,
+        "source_type": "descriptive",
+        "source_q_num": 1,
+        "source_score_max": null,
+        "source_weight_in_subdim": 1.0,
+        "source_notes": "Descriptive. Triangulates with TR-Q2.",
+        "source_cross_lens_construct": "translation-brief-alignment",
+        "standalone_indicator": false,
+        "options": [
+          {
+            "code": "corresponding",
+            "text": "Corresponding — very close to the original Greek or Hebrew",
+            "source_order": 1,
+            "source_score": null,
+            "weight": null,
+            "flag": "descriptive",
+            "source_notes": "Triangulation only — compare with TR-Q2."
+          },
+          {
+            "code": "resembling",
+            "text": "Resembling — close to the original with some adjustments for clarity",
+            "source_order": 2,
+            "source_score": null,
+            "weight": null,
+            "flag": "descriptive",
+            "source_notes": "Triangulation only — compare with TR-Q2."
+          },
+          {
+            "code": "clarifying",
+            "text": "Clarifying — focused on understandability in natural language",
+            "source_order": 3,
+            "source_score": null,
+            "weight": null,
+            "flag": "descriptive",
+            "source_notes": "Triangulation only — compare with TR-Q2."
+          },
+          {
+            "code": "simplifying",
+            "text": "Simplifying — easy to understand, using contemporary everyday language",
+            "source_order": 4,
+            "source_score": null,
+            "weight": null,
+            "flag": "descriptive",
+            "source_notes": "Triangulation only — compare with TR-Q2."
+          },
+          {
+            "code": "no-agreement",
+            "text": "We did not have a prior agreement on translation type",
+            "source_order": 5,
+            "source_score": null,
+            "weight": null,
+            "flag": "descriptive",
+            "source_notes": "Triangulation only — compare with TR-Q2."
+          },
+          {
+            "code": "not-aware",
+            "text": "I am not aware of what type of translation the translators agreed upon",
+            "source_order": 6,
+            "source_score": null,
+            "weight": null,
+            "flag": "descriptive",
+            "source_notes": "Triangulation only — compare with TR-Q2."
+          },
+          {
+            "code": "other",
+            "text": "Other (please describe)",
+            "source_order": 7,
+            "source_score": null,
+            "weight": null,
+            "flag": "descriptive",
+            "source_notes": "Triangulation only — compare with TR-Q2."
+          }
+        ]
+      }
+    }
+  }
+}
