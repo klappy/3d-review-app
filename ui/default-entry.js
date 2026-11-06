@@ -26,7 +26,8 @@ export async function bootDefaultEntry({ location = globalThis.location,
   loadCurrent = () => import('./assess/assess.js') } = {}) {
   const target = nextDefaultTarget(location);
   if (target) {
-    // A partial/missing Next asset deployment must not strand the root page.
+    // This checks entry HTML availability, not application/bundle health. The
+    // activation receipt must verify Next boot and its referenced assets.
     try {
       if (await probeNext()) {
         location.replace(target); // no extra root history entry or Back/Forward loop
