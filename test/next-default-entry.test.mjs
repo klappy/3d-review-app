@@ -75,12 +75,14 @@ test('a hash or query navigation while the entry probe is pending cannot be over
   for (const change of [{ hash: '#survey=existing_token' }, { hash: '#session=EXISTING' },
     { search: '?ui=legacy' }, { search: '?return_to=%2F%23project%2Fp' }]) {
     let finishProbe, loads = 0;
+    const replacements = [];
     const probe = new Promise(resolve => { finishProbe = resolve; });
-    const location = { pathname: '/', search: '', hash: '', replace: () => { throw Error('stale navigation'); } };
+    const location = { pathname: '/', search: '', hash: '', replace: target => replacements.push(target) };
     const pending = bootDefaultEntry({ location, probeNext: () => probe, loadCurrent: async () => { loads++; } });
     Object.assign(location, change);
     finishProbe(true);
     assert.deepEqual(await pending, { ui: 'current' });
+    assert.deepEqual(replacements, []);
     assert.equal(loads, 1);
     for (const [key, value] of Object.entries(change)) assert.equal(location[key], value);
   }
