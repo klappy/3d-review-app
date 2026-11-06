@@ -4,11 +4,13 @@
 const PRESENTATION_QUERY = new Set(['ui', 'ui_next', 'theme', 'w']);
 
 // Change the ordinary entry point, not the contracts of existing links. Hashes
-// include survey/session/invitation credentials and legacy report/project routes.
+// include survey/invitation credentials and legacy report/project routes. Valid
+// auth session callbacks are transferred to Next using the existing tab storage.
 // Unknown query parameters also stay with the current handler, including returns.
 export function nextDefaultTarget(location) {
   if (!location || !['/', '/index.html'].includes(location.pathname)) return null;
-  if (location.hash) return null;
+  // Real email/Access callbacks return here; keep their bearer out of the Next URL.
+  if (location.hash && !/^#session=([A-Za-z0-9_]+)$/.test(location.hash)) return null;
   const search = location.search || '';
   const params = new URLSearchParams(search);
   if ([...params.keys()].some(key => !PRESENTATION_QUERY.has(key))) return null;
@@ -22,18 +24,27 @@ export function nextDefaultTarget(location) {
 // Replace the one legacy bootstrap with this call at activation. Import legacy
 // only on its chosen branch; do not start both applications while redirecting.
 export async function bootDefaultEntry({ location = globalThis.location,
-  probeNext = async () => (await fetch('/next/', { method: 'HEAD', cache: 'no-store', credentials: 'same-origin', redirect: 'error' })).ok,
+  probeNext = async signal => (await fetch('/next/', { method: 'HEAD', cache: 'no-store', credentials: 'same-origin', redirect: 'error', signal })).ok,
+  probeTimeoutMs = 2000, storage,
   loadCurrent = () => import('./assess/assess.js') } = {}) {
   const target = nextDefaultTarget(location);
+  const initialHash = location?.hash;
   if (target) {
     // This checks entry HTML availability, not application/bundle health. The
     // activation receipt must verify Next boot and its referenced assets.
+    const controller = new AbortController();
+    let timer;
     try {
-      if (await probeNext() && nextDefaultTarget(location) === target) {
+      const available = await Promise.race([Promise.resolve().then(() => probeNext(controller.signal)),
+        new Promise(resolve => { timer = setTimeout(() => { controller.abort(); resolve(false); }, probeTimeoutMs); })]);
+      if (available && location.hash === initialHash && nextDefaultTarget(location) === target) {
+        const callback = /^#session=([A-Za-z0-9_]+)$/.exec(location.hash || '');
+        if (callback) (storage ?? globalThis.sessionStorage).setItem('facilitatorToken', callback[1]);
         location.replace(target); // no extra root history entry or Back/Forward loop
         return { ui: 'next', target };
       }
-    } catch { /* unavailable assets or refused navigation: retain current UI */ }
+    } catch { /* unavailable entry, storage or navigation: retain current handler */ }
+    finally { clearTimeout(timer); }
   }
   await loadCurrent();
   return { ui: 'current' };

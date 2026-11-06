@@ -37,7 +37,7 @@ test('all seven existing invitation tokens and language query remain byte-for-by
 });
 
 test('existing session, invitation, report and return URLs retain their original handler and bytes', () => {
-  for (const href of ['/#session=EXISTING', '/#invite=EXISTING', '/#invite/list', '/#assessment/a/understand',
+  for (const href of ['/?ui=legacy#session=EXISTING', '/#invite=EXISTING', '/#invite/list', '/#assessment/a/understand',
     '/#project/p', '/#workspace/w', '/#new/a', '/#reports-card', '/?return_to=%2F%23project%2Fp',
     '/?next=%2Fnext%2F%23%2Freview%2Fa', '/?unknown=keep%2Bexact']) {
     const location = locationFor(href), original = location.href;
@@ -95,4 +95,32 @@ test('root wires one default bootstrap; legacy remains a conditional fallback', 
   assert.equal((html.match(/bootDefaultEntry\(\)/g) || []).length, 1);
   const server = readFileSync(new URL('../ui/server.mjs', import.meta.url), 'utf8');
   assert.match(server, /'\/default-entry\.js': \['default-entry\.js', 'text\/javascript'\]/);
+});
+
+
+test('real email and Access session callback transfers the exact bearer to Next without URL credentials', async () => {
+  for (const token of ['EXISTING_email_token_1', 'EXISTING_access_token_2']) {
+    const calls = [], moves = [];
+    const location = { pathname: '/', search: '', hash: '#session=' + token, replace: target => moves.push(target) };
+    await bootDefaultEntry({ location, probeNext: async () => true, storage: { setItem: (k,v) => calls.push([k,v]) }, loadCurrent: () => { throw Error('must stay Next'); } });
+    assert.deepEqual(calls, [['facilitatorToken',token]]);
+    assert.deepEqual(moves, ['/next/?ui_next=on']);
+    assert.ok(!moves[0].includes(token));
+  }
+});
+
+test('stalled probe times out, aborts and loads current once', async () => {
+  let loads = 0, signal;
+  const result = await bootDefaultEntry({ location: { pathname:'/', search:'', hash:'', replace:()=>{throw Error('no redirect');} }, probeTimeoutMs: 10,
+    probeNext: s => { signal=s; return new Promise(()=>{}); }, loadCurrent:()=>{loads++;} });
+  assert.equal(result.ui,'current'); assert.equal(loads,1); assert.equal(signal.aborted,true);
+});
+
+test('callback storage failure and explicit legacy remain on the current handler', async () => {
+  for(const query of ['', '?ui=legacy']) {
+    let loads=0;
+    const location={pathname:'/',search:query,hash:'#session=EXISTING',replace:()=>{throw Error('must not navigate');}};
+    await bootDefaultEntry({location,probeNext:async()=>true,storage:{setItem:()=>{throw Error('unavailable');}},loadCurrent:()=>{loads++;}});
+    assert.equal(loads,1);assert.equal(location.hash,'#session=EXISTING');
+  }
 });

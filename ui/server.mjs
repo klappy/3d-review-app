@@ -1,7 +1,7 @@
 import { createServer } from 'node:http';
 import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
-import { dirname, join } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 
 const root = dirname(fileURLToPath(import.meta.url));
 const upstream = process.env.UI_API_ORIGIN || 'http://127.0.0.1:8787';
@@ -26,6 +26,16 @@ createServer(async (req, res) => {
         for(;;){const {done,value}=await reader.read();if(done)break;res.write(value);}res.end();
       }else res.end(Buffer.from(await response.arrayBuffer()));
     } catch { res.writeHead(502, { 'content-type': 'application/json' }); res.end(JSON.stringify({ ok: false, error: { code: 'UPSTREAM_UNAVAILABLE', message: 'Local Worker is not reachable' } })); }
+    return;
+  }
+  if (path.startsWith('/next/')) {
+    try {
+      const target = resolve(root, '.' + decodeURIComponent(path.endsWith('/') ? path + 'index.html' : path));
+      if (!target.startsWith(resolve(root, 'next') + '/')) throw new Error('outside Next assets');
+      const body = await readFile(target);
+      const type = target.endsWith('.html') ? 'text/html' : target.endsWith('.js') ? 'text/javascript' : target.endsWith('.css') ? 'text/css' : 'application/octet-stream';
+      res.writeHead(200, { 'content-type': type, 'cache-control': 'no-store' }); res.end(body);
+    } catch { res.writeHead(404); res.end(); }
     return;
   }
   const file = files[path];
