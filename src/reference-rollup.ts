@@ -1,4 +1,4 @@
-import {translationBriefSource} from './translation-brief-amendment.js';
+import {canonicalPinnedQuestion,translationBriefSource} from './translation-brief-amendment.js';
 
 /**
  * Exact arithmetic shape of pinned f042cde survey-pipeline/pipeline/04_aggregate.py.
@@ -162,9 +162,11 @@ export function translationTypeReference(rows: TranslationTypeResponse[]): (Tran
     for (const code of row.option_codes ?? []) {
       if (!allowed.has(code)) continue;
       // IDs/codes are reusable in custom versions. Only the exact canonical
-      // amended question may confer Decision 25's new no-brief meaning.
-      if (code==='no-brief' && (!row.question || row.question.id!==row.item_id ||
-        !translationBriefSource([row.question],row.source_ref))) continue;
+      // question may confer these findings: no-brief requires the amended
+      // instrument; no-agreement/not-aware require unamended pinned item bytes.
+      if (!row.question || row.question.id!==row.item_id) continue;
+      if (code==='no-brief' && !translationBriefSource([row.question],row.source_ref)) continue;
+      if ((code==='no-agreement' || code==='not-aware') && !canonicalPinnedQuestion(row.question,row.source_ref)) continue;
       const group = statuses.get(row.assessment_id) ?? {team:new Set<string>(),church:new Set<string>()};
       group[side].add(code); statuses.set(row.assessment_id,group);
     }
