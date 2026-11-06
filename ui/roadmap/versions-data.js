@@ -8,7 +8,8 @@ export const VERSIONS = {
    "changed": [
     "PATCH:existing tokens, participant destinations, bindings, permissions and expiry remain unchanged; no replacement link is issued by this correction.",
     "Local synthetic qualification:seven distinct forms;16A4/Letter PDFs/168pages;28of28rendered QR codes decoded exactly. Full app2303pass/3skip, Next1121pass, legacy962pass, MJS101pass/6skip; overlapping suites. Human satisfaction/confusion/frustration NOT MEASURED. Hosted actual-seven and physical-device acceptance unverified.",
-    "Independent bulk-print increment only; no no-brief/report-selection/radar/one-response/footer or UI-default timing change. Candidate release packaging and DEV/production gates remain."
+    "Independent bulk-print increment only; no no-brief/report-selection/radar/one-response/footer or UI-default timing change. Candidate release packaging and DEV/production gates remain.",
+    "Production review before shipment found a malformed backslash authority edge case; correction b853161673a81ac16e718d7bf347d381f7f5ace5 explicitly refuses it. S31 10pass and seven-survey integration 2pass; corrected main/DEV and fresh production review/checks remain required. Valid existing URLs and QR payloads unchanged."
    ],
    "fixed": [
     "Bulk paper-survey printing retains each existing Next survey URL and QR instead of showing a false missing-link fallback. Individual/current root-link printing remains supported.",
