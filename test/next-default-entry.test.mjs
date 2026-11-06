@@ -60,7 +60,7 @@ test('replace avoids a new root history entry; existing Back/Forward legacy dest
   assert.equal(nextDefaultTarget(locationFor('/?ui=legacy#project/p')), null);
 });
 
-test('missing Next assets, failed probe or refused navigation falls back to the existing UI', async () => {
+test('missing Next entry HTML, failed probe or refused navigation falls back to the existing UI', async () => {
   for (const failure of ['missing', 'network', 'navigation']) {
     let loads = 0, moves = 0;
     const location = { pathname: '/', search: '', hash: '', replace: () => { moves++; if (failure === 'navigation') throw Error('refused'); } };

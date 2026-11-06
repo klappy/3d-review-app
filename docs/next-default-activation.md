@@ -22,7 +22,11 @@ tokens, invitations, surveys, reports, access rules or the existing UI internals
   bytes when forwarded. Explicit `/next/` and participant/PDF/API paths are not
   intercepted. This is a default-entry switch, not a migration of old deep links.
 - `location.replace` avoids adding a root entry to Back/Forward history. A failed
-  Next probe or refused navigation falls back to the existing UI. No persistent
+  Next **entry HTML** probe or refused navigation falls back to the existing UI.
+  A successful HEAD response does not verify JavaScript, bundles or app health;
+  failures after navigation do not automatically return to the current UI.
+  The promotion and wired browser acceptance must verify those assets and boot.
+  No persistent
   default preference is introduced. The explicit Next query avoids an old DEV
   gallery opt-out taking over the new entry.
 
@@ -47,9 +51,11 @@ tokens, invitations, surveys, reports, access rules or the existing UI internals
    local `ui/server.mjs` harness is used, add its corresponding static JS mapping;
    Cloudflare's existing `./ui` asset directory already contains the module.
 4. Recheck the actual wired build on desktop and mobile: signed-out root;
-   already signed-in root; Next sign-in/sign-out and unchanged Access callbacks;
+   already signed-in root; Next HTML and all referenced bundles loading; actual
+   Next sign-in/sign-out and unchanged Access callbacks;
    explicit current/Next entries; all seven existing survey destinations; stored
-   report and invitation links; return URLs; Back/Forward; offline/missing assets.
+   report and invitation links; return URLs; Back/Forward; offline/missing entry
+   HTML, and the documented non-fallback on later JavaScript failure.
    Keep the seven existing tokens byte-for-byte. Do not mint, revoke or submit.
    Update the preparation-only inactive-wiring assertion to test the reviewed
    activated bootstrap. Unit history simulation is not browser acceptance.
@@ -68,7 +74,8 @@ Restore the original root bootstrap:
 
 Use the same protected corrective path and observe the resulting runtime.
 No token, cookie, preference or data reset is necessary. Explicit `/next/` stays
-available and existing root deep links keep their original handler.
+available and existing root deep links keep their original handler. `/?ui=legacy`
+also remains an escape route if Next JavaScript fails after a successful probe.
 
 ## Evidence limits
 
