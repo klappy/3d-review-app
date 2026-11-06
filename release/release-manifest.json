@@ -1,33 +1,32 @@
 {
-  "version": "0.39.0",
+  "version": "0.39.2",
   "cookbook_repo": "klappy/3d-review-cookbook",
-  "cookbook_commit": "e6ccdc660afd2ffbb2a28e7317b25dda11c86b6c",
+  "cookbook_commit": "a666f8cf7046c0ed41bd2198f91209a09a1dcea1",
   "records": [
     {
-      "path": "planning/2026-09-16-parity-build/releases/0.39.0.md",
-      "blob_sha": "ee15f96e59efb5f3938987414de54a9994f93313",
-      "sha256": "3ba36d1f3fe256f03f6faaf0ec402f8cf913168a22fba09071bac361b9427b92"
+      "path": "planning/2026-09-16-parity-build/releases/0.39.2.md",
+      "blob_sha": "8a2141b499092eea13919cb0d6b05c7841110aa8",
+      "sha256": "adb1ddf5dcc343b1f2231a095bdce717dced54649896c38dbdfca21d6a5b9f73"
     },
     {
       "path": "planning/2026-09-16-parity-build/releases/releases.json",
-      "blob_sha": "0f403c8eb838fd937e746d10c202639b3624cb5f",
-      "sha256": "0f849b45e5399cdd7c880e7b66c5a2ecea8e1bd85707d99bede526e4a4434f6a"
+      "blob_sha": "c5b64fd0e80f87e89d942f27fd09bcd20406303e",
+      "sha256": "40f1d2850b6d3dfcaa0d97bf281e4c007b7b91f99d2e89efc526ce6ac335c3ab"
     }
   ],
   "changelog": {
     "sections": {
-      "added": [
-        "The existing stored-report PDF endpoint accepts explicit overview and detailed formats, rendered through the actual Next report components and styles. Full remains the default and an explicit fallback."
-      ],
       "fixed": [
-        "Overview and Detailed downloads select their named document instead of both returning the full legacy report. The file names distinguish the named formats; repeated preparation and format/session changes retain stale-file protection."
+        "Bulk paper-survey printing retains each existing Next survey URL and QR instead of showing a false missing-link fallback. Individual/current root-link printing remains supported.",
+        "The print dialog no longer promises an access code on each paper."
       ],
       "changed": [
-        "MINOR under the major-zero policy for the additive accepted HTTP format selector. Candidate against accepted main 7390415197aad5c7fb3dec618b1572a4f8333071; no released-status, formal approval or deployment claim.",
-        "Existing authorized stored reads, current suppression, server-owned perspective floors and full-report fallback remain authoritative. No scoring, new report creation, migration, public question-results cells/capability, excerpt disclosure, credential, subscription or runtime-configuration change.",
-        "Local genuine PDF evidence covers two distinct synthetic snapshots: one-page overview and four-page detailed documents, matching same-model Next labels and counters. A three-page single-perspective report is a different model. Hosted new-format and physical installed-PWA acceptance remain pending.",
-        "Qualified source 064aefdda1eb4f3f1dcf42fd623ac85c9a83c200, tree 2ef5348765d603f646205d91af3103c5e60fc0f4. All 44 accepted PR594 files remain byte-identical. PDF delta remains 19 files. Local affected tests 42 passed with actual PDF/Workers evidence; eight download helpers passed; type/build and generated freshness passed. Denominators overlap and are not human persona-completion totals. Packaged local qualification head e3762c687c141b84c5bb83de8b1edc00c53dd42a passed 58 tests with one skip; eight helpers passed; Node tests 101 passed/six skipped. Final-head identity/layout checks 18 passed/one skip overlap those checks.",
-        "Independent native bounded review at e3762c687c141b84c5bb83de8b1edc00c53dd42a PASS: 22 tests passed with one existing skip; accepted PR594 product/PDF source, SSR body, prior release history and record hashes preserved. Roadmap regeneration and immutable published-pin metadata are finalized separately, requiring fresh exact-head checks and bounded metadata review. Built local; Reviewed product source; DEV new formats pending; Production new formats pending."
+        "PATCH:existing tokens, participant destinations, bindings, permissions and expiry remain unchanged; no replacement link is issued by this correction.",
+        "Local synthetic qualification:seven distinct forms;16A4/Letter PDFs/168pages;28of28rendered QR codes decoded exactly. Full app2303pass/3skip, Next1121pass, legacy962pass, MJS101pass/6skip; overlapping suites. Human satisfaction/confusion/frustration NOT MEASURED. Hosted actual-seven and physical-device acceptance unverified.",
+        "Independent bulk-print increment only; no no-brief/report-selection/radar/one-response/footer or UI-default timing change. Candidate release packaging and DEV/production gates remain.",
+        "Production review before shipment found a malformed backslash authority edge case; correction b853161673a81ac16e718d7bf347d381f7f5ace5 explicitly refuses it. Automated local synthetic evidence on macOS/Node in the isolated task6 worktree: S31 10pass and seven-survey integration 2pass. Corrected CI, hosted DEV and production qualification remain pending; corrected main/DEV and fresh production review/checks remain required. Valid existing URLs and QR payloads unchanged. Corrected product source b853161673a81ac16e718d7bf347d381f7f5ace5 current persona denominator3: automated local synthetic macOS/Node HTML layer attempted1/passed1/failed0/untested2; S1 seven-form HTML PASS, S2 rendered-paper scan UNTESTED, S3 individual PDF/browser UNTESTED. Corrected CI, hosted DEV, production and physical-device layers each attempted0/passed0/failed0/untested3. Historical8890a707b6a8ff3da2a5af763b12bd273631eb79 PDF/QR evidence remains provenance only; human metrics NOT MEASURED/sample0.",
+        "Superseding technical qualification snapshot: automated GitHub Actions ubuntu-latest/Node22 CI at exact reviewed source 30d5bc603b3c6b4cf343c45ced4306160b332c03 passed2303tests/3skips. Tree-identical merge b6be7042838d6b971f5d43625813f8a016fd4fde deployed via successful connected DEV push-event build248cb042-505b-4974-8d6a-b673f44240b9; health0.39.2+b6be704 matched commit/buildUUID/canonicalf1e082f3e5e4b37fc62001cd16f7cdaf51f3a8ee, D1ok. Read-only hosted synthetic helper smoke passed7exactNextURLs/root/invalid/missing/backslash checks. This supersedes earlier pending technical CI/DEV statements; complete hosted persona/physical scenarios remain untested, distinct from helper checks. Scoped exclusion keeps historical unshipped0.39.1 out of current0.39.2 public surfaces. This metadata follow-up still requires final packaging review/checks/DEV qualification then production615; no production or physical pass is claimed.",
+        "Persistent historical exclusion correction: unshipped0.39.1 has included_in_product:false as well as the historical0.39.2 exclusion. A version bump alone cannot admit unmerged candidate claims; only a reviewed product inclusion may change that flag. Same current0.39.2 output and product source; no feature, dependency, version or permissions change. Metadata follow-up qualification remains separate from prior exact-source technical snapshots."
       ]
     }
   }

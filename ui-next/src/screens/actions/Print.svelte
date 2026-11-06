@@ -125,7 +125,7 @@
         <Grid cols={2} gap={6}>
           <Stack gap={4}>
             <!-- R14 Focus on open: long content focuses the title (tabindex -1; ./modal.js focuses [data-autofocus]). -->
-            <div><h2 class="h2 t-24" id="pt" tabindex="-1" data-autofocus>Print paper surveys</h2><p class="small t-15">Each paper survey carries its QR code and an access code, so answers can be entered later and still land in the right survey.</p></div>
+            <div><h2 class="h2 t-24" id="pt" tabindex="-1" data-autofocus>Print paper surveys</h2><p class="small t-15">Each paper survey carries its existing shared link and QR code, when available, plus its project, review and survey identity. Access codes are printed separately.</p></div>
             <div role="group" aria-labelledby="pt-which">
               <span class="lbl" id="pt-which">Which surveys</span>
               <Stack gap={2}>
