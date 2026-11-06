@@ -1,3 +1,5 @@
+import {translationBriefSource} from './translation-brief-amendment.js';
+
 /**
  * Exact arithmetic shape of pinned f042cde survey-pipeline/pipeline/04_aggregate.py.
  * This is an internal reference projection, not a D7-safe disclosure or a new
@@ -31,7 +33,12 @@ export interface CrossLensResult {
   triangulated_mean: number; agreement_range: number | null;
   n_lenses_included: number; per_lens: { lens: string; score: number }[];
 }
-export interface TranslationTypeResponse { assessment_id: string; item_id: string; option_codes: string[] | null }
+export interface TranslationTypeResponse {
+  assessment_id: string; item_id: string; option_codes: string[] | null;
+  /** Effective captured question and source, required to qualify Decision 25 no-brief. */
+  question?: Parameters<typeof translationBriefSource>[0][number];
+  source_ref?: string;
+}
 export interface TranslationTypeResult {
   assessment_id: string; team_values: string[]; church_values: string[]; agree: boolean | null;
 }
@@ -154,6 +161,10 @@ export function translationTypeReference(rows: TranslationTypeResponse[]): (Tran
     if (!side) continue;
     for (const code of row.option_codes ?? []) {
       if (!allowed.has(code)) continue;
+      // IDs/codes are reusable in custom versions. Only the exact canonical
+      // amended question may confer Decision 25's new no-brief meaning.
+      if (code==='no-brief' && (!row.question || row.question.id!==row.item_id ||
+        !translationBriefSource([row.question],row.source_ref))) continue;
       const group = statuses.get(row.assessment_id) ?? {team:new Set<string>(),church:new Set<string>()};
       group[side].add(code); statuses.set(row.assessment_id,group);
     }

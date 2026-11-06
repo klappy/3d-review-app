@@ -85,7 +85,7 @@ function assemble(aid:string,rows:readonly CaptureRow[],legacy=false) {
       sourceInputFlags(item,answer); // preserve/validate source cleaning semantics; never add raw flags to payload
       const r=scoreSourceItem(item,answer);if(r.status==='held')refuse();
       scored.push({assessment_id:aid,item_id:item.id,lens:t.perspective,sub_dimension:item.group,score:r.score,standalone_indicator:r.standalone_indicator});
-      if(['TR-Q2','ML-Q2','CHIP-Q1','CHCP-Q1','CHDL-Q1'].includes(item.id))categorical.push({assessment_id:aid,item_id:item.id,option_codes:typeof answer==='string'?[answer]:Array.isArray(answer)?answer as string[]:null});
+      if(['TR-Q2','ML-Q2','CHIP-Q1','CHCP-Q1','CHDL-Q1'].includes(item.id))categorical.push({assessment_id:aid,item_id:item.id,question:item,source_ref:t.sourceRef,option_codes:typeof answer==='string'?[answer]:Array.isArray(answer)?answer as string[]:null});
     }
   }
   const included=new Set(model.subdimensions.filter(x=>x.included_in_lens_score).map(x=>JSON.stringify([x.lens,x.sub_dimension])));

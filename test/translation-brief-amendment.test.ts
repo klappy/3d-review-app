@@ -8,7 +8,11 @@ import {renderSyntheticReport,renderLegacySyntheticReport} from '../src/syntheti
 import type {CaptureRow} from '../src/report-attestation';
 let templates:any[],captures:CaptureRow[];
 beforeAll(async()=>{const input=await readPinnedSources();templates=input.templates;captures=(await buildIndex(input.records,input.templates)).captures;},20000);
-const row=(item_id:string,code:string)=>({assessment_id:'fixture',item_id,option_codes:[code]});
+const row=(item_id:string,code:string)=>{
+  const template=templates.find(t=>JSON.parse(t.items_json).some((i:any)=>i.id===item_id));
+  const question=translationBriefItems(JSON.parse(template.items_json),template.source_ref).find((i:any)=>i.id===item_id);
+  return {assessment_id:'fixture',item_id,option_codes:[code],question,source_ref:template.source_ref};
+};
 describe('canonical Decision 25 amendment, all uses of the shared instrument',()=>{
   it('extends both canonical role questions, preserves stored bytes/codes and is idempotent',()=>{
     for(const [id,itemId,text] of [['tpl_validation','TR-Q2','We do not have a translation brief'],['tpl_mid_level','ML-Q2','The team does not have a translation brief']]){
@@ -67,6 +71,26 @@ describe('canonical Decision 25 amendment, all uses of the shared instrument',()
     expect(result.agree).toBe(null);expect(result.team_values).toEqual([]);
     expect(translationTypeReference([row('TR-Q2','clarifying'),row('CHIP-Q1','clarifying')])[0].agree).toBe(true);
     expect(translationTypeReference([row('TR-Q2','clarifying'),row('CHIP-Q1','simplifying')])[0].agree).toBe(false);
+  });
+  it.each(['tpl_validation','tpl_mid_level'])('does not reinterpret legitimate custom no-brief answers on %s',async(templateId)=>{
+    const template=templates.find(t=>t.id===templateId),aid=captures[0].assessmentId;
+    const items=translationBriefItems(JSON.parse(template.items_json),template.source_ref) as any[];
+    const question=items.find(i=>['TR-Q2','ML-Q2'].includes(i.id));
+    question.text='Custom local briefing question';
+    expect(translationBriefSource(items,template.source_ref)).toBe(null);
+    expect(translationBriefItems(items,template.source_ref)).toEqual(items);
+    const answers=Object.fromEntries(items.map(i=>[i.id,i.type==='text'?'fixture':i.type==='multi'?[i.options[0].code]:i.options[0].code]));
+    answers[question.id]='no-brief';
+    const changed=captures.filter(r=>r.assessmentId===aid).slice(0,5).map(r=>({...r,
+      responseId:'custom_'+r.responseId,responseTemplateId:templateId,selectedTemplateId:templateId,
+      selectedTemplateVersion:2,responseTemplateVersion:2,answersRaw:JSON.stringify(answers),
+      templateRaw:JSON.stringify({templateId,templateVersion:2,sourceRef:template.source_ref,perspective:template.perspective,items})}));
+    const result=await renderSyntheticReport(aid,changed,true);
+    expect(result.eligible).toBe(true);if(!result.eligible)throw new Error('custom answer rejected');
+    expect(result.payload.translation_type_agreement?.team_statuses??[]).not.toContain('no-brief');
+    // Historical rendering retains the custom question's original semantics.
+    const historical=await renderLegacySyntheticReport(aid,changed,true);
+    expect(historical.eligible).toBe(true);
   });
   it('new participant reports accept no-brief on the unchanged stored template/version',async()=>{
     const aid=captures[0].assessmentId;
