@@ -43,6 +43,23 @@ describe('canonical Decision 25 amendment, all uses of the shared instrument',()
       expect(translationBriefSource(amended,template.source_ref)).toBe(TRANSLATION_BRIEF_SOURCE);
     }
   });
+  it('does not attest altered metadata or structure on an already-amended question',()=>{
+    for(const id of ['tpl_validation','tpl_mid_level']){
+      const template=templates.find(t=>t.id===id),items=translationBriefItems(JSON.parse(template.items_json),template.source_ref) as any[];
+      const question=items.find(i=>['TR-Q2','ML-Q2'].includes(i.id));
+      const mutations=[{source_score:999},{weight:999},{flag:'scored'},{source_notes:'custom'},{source_order:999},{text:'Custom no brief'},{extra:true}];
+      for(const delta of mutations){
+        const changed={...question,options:question.options.map((o:any)=>o.code==='no-brief'?{...o,...delta}:o)};
+        expect(translationBriefSource([changed],template.source_ref),JSON.stringify(delta)).toBe(null);
+        expect(translationBriefItems([changed],template.source_ref)).toEqual([changed]);
+      }
+      const duplicate={...question,options:[...question.options,question.options.find((o:any)=>o.code==='no-brief')]};
+      expect(translationBriefSource([duplicate],template.source_ref)).toBe(null);
+      const reordered={...question,options:[...question.options].reverse()};expect(translationBriefSource([reordered],template.source_ref)).toBe(null);
+      const other={...question,options:question.options.map((o:any)=>o.code==='other'?{...o,source_order:999}:o)};expect(translationBriefSource([other],template.source_ref)).toBe(null);
+      expect(translationBriefSource(items,template.source_ref)).toBe(TRANSLATION_BRIEF_SOURCE);
+    }
+  });
   it('keeps absence/awareness as findings, never agreement or disagreement; Other disappears',()=>{
     expect(translationTypeReference([row('TR-Q2','other'),row('CHIP-Q1','other')])).toEqual([]);
     expect(translationTypeReference([row('TR-Q2','no-brief'),row('ML-Q2','no-brief'),row('CHIP-Q1','no-agreement'),row('CHCP-Q1','not-aware')])).toEqual([{assessment_id:'fixture',team_values:[],church_values:[],agree:null,team_statuses:['no-brief'],church_statuses:['no-agreement','not-aware']}]);

@@ -15,10 +15,12 @@ function sourceQuestion(item:Item,sourceRef:unknown,amended=false):boolean {
   const pin=amendment.canonical_questions[item.id as keyof typeof amendment.canonical_questions];
   if(!pin||sourceRef!==pin.source_ref)return false;
   if(!amended)return canonical(item)===canonical(pin.item);
-  // The only accepted projected difference is the exact pinned new option and
-  // Other's source order. A lookalike question never earns canonical provenance.
-  const normalized={...item,options:item.options?.filter(o=>o.code!=='no-brief').map(o=>o.code==='other'?{...o,source_order:pin.item.options.find(x=>x.code==='other')!.source_order}:o)};
-  return canonical(normalized)===canonical(pin.item);
+  // Compare the complete projected item, including all inserted option metadata,
+  // ordering and Other's adjusted order; stripping the new option would let
+  // altered score/weight/flag/notes masquerade as the canonical amendment.
+  const option=amendment.options[item.id as keyof typeof amendment.options];
+  const expected={...pin.item,options:pin.item.options.flatMap(o=>o.code==='other'?[option,{...o,source_order:option.source_order+1}]:[o])};
+  return canonical(item)===canonical(expected);
 }
 export function translationBriefItems<T extends Item>(items:T[],sourceRef?:unknown):T[] {
   return items.map(item => {
