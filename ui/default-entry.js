@@ -29,7 +29,7 @@ export async function bootDefaultEntry({ location = globalThis.location,
     // This checks entry HTML availability, not application/bundle health. The
     // activation receipt must verify Next boot and its referenced assets.
     try {
-      if (await probeNext()) {
+      if (await probeNext() && nextDefaultTarget(location) === target) {
         location.replace(target); // no extra root history entry or Back/Forward loop
         return { ui: 'next', target };
       }
