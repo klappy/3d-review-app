@@ -11,6 +11,7 @@
   import ThemeControl from "../../ThemeControl.svelte"; // design-system.md Theme control placement: right after "Public website home"
   import AppShell from "../../AppShell.svelte";
   import Card from "../../Card.svelte";
+  import Tag from "../../Tag.svelte";
   import Row from "../../Row.svelte";
   import PhoneHeader from "../../PhoneHeader.svelte";
   import PhoneBar from "../../PhoneBar.svelte";
@@ -57,7 +58,7 @@
   {#if D.invitation}<Card href={href("invitations", at)} gap={2}><Row gap={3}><span class="icn icn-lens" data-lens="church"><Ico d={A.mail} /></span><span class="small"><b>1 invitation</b> · {D.invitation}</span></Row></Card>{/if}
   {#each D.projectCards ?? [] as c}
     <Card href={c.href ?? projectHref} gap={2}>
-      <span class="h2">{c.title}</span>
+      <Row wrap gap={2}><span class="h2">{c.title}</span>{#if c.limited}<Tag label="Assessment only" />{/if}</Row>
       {#if c.meta}<span class="small">{c.meta}</span>{/if}
       <span class="link">Open project</span>
     </Card>

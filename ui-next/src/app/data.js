@@ -96,55 +96,152 @@ const fmt = (a) => (a.format ? a.format[0].toUpperCase() + a.format.slice(1) : "
 export const addProject = (wid, pid) => api(`/v2/workspaces/${enc(wid)}/projects/${enc(pid)}`, { method: "POST" });
 
 // Home: fixtures/home.json's shape from the account's real projects, so the approved screens/Home.svelte composition draws it. Owner
-// rule: nobody sees a review or assessment outside an opened project, so Home reads and lists projects only (never a project's reviews,
-// never the account's direct review grants); a review is reached by opening its project (projectModel). No invitation store is read
-// tonight (invitations: null draws no invitation card; parity-loop row).
+// rule: nobody sees a review or assessment outside an opened project. Home lists project cards (full grants from /v2/projects, plus
+// limited parent-project cards for assessment-only grants from /v2/me). A review is reached only after opening its project
+// (projectModel); Home never lists, searches or filters reviews themselves. No invitation store is read tonight
+// (invitations: null draws no invitation card; parity-loop row).
 const countText = (n, unit) => (Number.isSafeInteger(n) && n >= 0 ? `${n} ${unit}${n === 1 ? "" : "s"}` : "");
+const LIMITED_GUIDANCE = "Assessment only · ask the owner for a project invite for broader access";
+/** Parent projects the account reaches only through assessment grants (not in /v2/projects). Uses me.grants + assessment.get; no sibling reviews, no project-wide grant. */
+async function limitedProjectEntries(me, knownProjectIds) {
+  const aids = [...new Set((me?.grants ?? []).filter((g) => g.scope_type === "assessment").map((g) => g.scope_id).filter(Boolean))];
+  const byProject = new Map();
+  await Promise.all(aids.map(async (aid) => {
+    try {
+      const { assessment: a } = await assessment(aid);
+      if (!a?.project_id || knownProjectIds.has(a.project_id)) return;
+      const row = byProject.get(a.project_id) ?? { id: a.project_id, reviews: [], created_at: a.created_at ?? "" };
+      row.reviews.push(a);
+      if (String(a.created_at ?? "") > String(row.created_at ?? "")) row.created_at = a.created_at;
+      byProject.set(a.project_id, row);
+    } catch { /* stale grant or invisible assessment: skip */ }
+  }));
+  return [...byProject.values()].map((row) => {
+    const n = row.reviews.length;
+    const names = row.reviews.map((a) => a.name).filter(Boolean).slice(0, 3).join(", ");
+    return {
+      id: row.id,
+      title: "Limited access",
+      meta: [LIMITED_GUIDANCE, countText(n, "review") + (names ? ` · ${names}` : "")].filter(Boolean).join(" · "),
+      href: to("project", { pid: row.id }),
+      limited: true,
+      created_at: row.created_at,
+    };
+  });
+}
 export async function homeModel(me) {
   const [ps, ws] = await Promise.all([projects(), workspaces().catch(() => [])]);
+  const known = new Set(ps.map((p) => p.id));
   const live = ps.filter((p) => !p.archived_at).sort((x, y) => String(y.created_at ?? "").localeCompare(String(x.created_at ?? "")));
   // Aggregate counts the project list already carries (no review is read or named); an unknown count is left out, never invented.
-  const projectCards = live.map((p) => ({ id: p.id, title: p.name, meta: [p.organization, countText(p.assessment_count, "review"), countText(p.response_count, "response")].filter(Boolean).join(" · "), href: to("project", { pid: p.id }) }));
+  const grantedCards = live.map((p) => ({ id: p.id, title: p.name, meta: [p.organization, countText(p.assessment_count, "review"), countText(p.response_count, "response")].filter(Boolean).join(" · "), href: to("project", { pid: p.id }), limited: false, created_at: p.created_at }));
+  const limitedCards = await limitedProjectEntries(me, known);
+  const projectCards = [...grantedCards, ...limitedCards].sort((a, b) => String(b.created_at ?? "").localeCompare(String(a.created_at ?? "")));
   const first = String(me?.principal?.display_name || "").trim().split(/\s+/)[0] || "You";
   const initials = (String(me?.principal?.display_name || "").trim().split(/\s+/).slice(0, 2).map((w) => w[0]?.toUpperCase() ?? "").join("")) || "";
-  return { practiceAvailable: false, user: { first, name: me?.principal?.display_name || "", initials }, workspace: ws[0]?.name ?? "Your workspace", workspaces: ws, projects: ps, invitation: null, projectCards, empty: !live.length, start: to("setup1") };
+  return { practiceAvailable: false, user: { first, name: me?.principal?.display_name || "", initials }, workspace: ws[0]?.name ?? "Your workspace", workspaces: ws, projects: ps, invitation: null, projectCards, empty: !projectCards.length, start: to("setup1") };
 }
 
 // Project: fixtures/setup/project.json's shape for screens/setup/Project.svelte (desktop two tracks, phone list). Levels per review come
 // from each review's newest built report when there is one (results/data.js levelOf on payload.lenses); the trend aside draws the
-// reviews that have levels, newest last.
-export async function projectModel(pid) {
-  const [p, as, ws] = await Promise.all([project(pid), assessmentsOf(pid), workspaces().catch(() => [])]);
-  const live = as.filter((a) => !a.archived_at).sort((x, y) => String(y.created_at).localeCompare(String(x.created_at)));
-  // A project outside any workspace (workspace_id null) is said so, never shown under the first workspace in the list.
-  const w = (p.workspace_id && ws.find((x) => x.id === p.workspace_id)) ?? (p.workspace_id ? { name: "Your workspace" } : { name: "No workspace" });
+// live reviews that have levels, newest last. Archived reviews are returned separately so the opened Project can show an explicit
+// archived view (HOLD from https://github.com/klappy/3d-review-app/pull/606#pullrequestreview-5789010549) without listing them on Home.
+const monthOf = (iso) => { const d = new Date(iso); return isNaN(d) ? "" : d.toLocaleDateString("en-US", { month: "short", year: "numeric" }); };
+async function reviewRowsFor(list) {
   useSessionPolicy();
-  // A review's report list or counts failing to read is the shell's retryable error (never a review silently shown without levels).
-  const lvl = await Promise.all(live.map(async (a) => {
+  const lvl = await Promise.all(list.map(async (a) => {
     if (!["understand", "improve"].includes(a.stage)) return null;
     const r = await reports(a.id); const newest = newestReport(r.reports); if (!newest) return null; const rep = newest.payload ? newest : await report(newest.id);
     const { counts, sent } = await lensSurvey(a.id), levels = levelsOf(rep.payload, counts, sent);
     return levels ? { levels, ns: respondentsOf(rep.payload, counts, sent) } : null;
   }));
-  const month = (iso) => { const d = new Date(iso); return isNaN(d) ? "" : d.toLocaleDateString("en-US", { month: "short", year: "numeric" }); };
-  const reviews = live.map((a, i) => {
+  return list.map((a, i) => {
     const stage = a.stage === "improve" ? "done" : (STAGE_OF[a.stage] ?? "setup");
     const toKey = stage === "done" ? "nextStep" : stage === "results" ? "results" : "collect";
-    return { id: a.id, when: month(a.created_at), title: a.name, stage, to: toKey, href: to(stage === "done" || stage === "results" ? "results" : stage === "collecting" ? "collect" : "review", { aid: a.id }), note: stage === "setup" ? "Setup not finished" : "No results yet", levels: lvl[i] ? Object.entries(lvl[i].levels).filter(([, l]) => l).map(([k, l]) => [k, l, lvl[i].ns[k] ?? null]) : undefined, overall: lvl[i]?.levels?.overall }; // [lens, level, respondents]: the count travels with the level (Coverage beside it)
+    return {
+      id: a.id, when: monthOf(a.created_at), title: a.name, stage, to: toKey, archived: !!a.archived_at,
+      href: to(stage === "done" || stage === "results" ? "results" : stage === "collecting" ? "collect" : "review", { aid: a.id }),
+      note: stage === "setup" ? "Setup not finished" : "No results yet",
+      levels: lvl[i] ? Object.entries(lvl[i].levels).filter(([, l]) => l).map(([k, l]) => [k, l, lvl[i].ns[k] ?? null]) : undefined,
+      overall: lvl[i]?.levels?.overall,
+    };
   });
-  const withLevels = reviews.filter((r) => r.levels).reverse().slice(-4); // the board's trend is four points wide (Project.svelte X(i) = 70 + 110 i in a 420 box): the newest four
+}
+function projectTrend(reviews) {
+  const withLevels = reviews.filter((r) => r.levels).reverse().slice(-4);
   const lines = {};
-  // A review that never surveyed a perspective leaves a gap (null) in that line, never a "More input needed" point it did not earn.
-  for (const lens of ["team", "community", "church"]) { const col = withLevels.map((r) => Object.fromEntries(r.levels)[lens]).filter(Boolean); if (col.length) lines[lens] = withLevels.map((r) => Object.fromEntries(r.levels)[lens] ?? null); }
-  const count = live.length;
-  const since = live.length ? month(live[live.length - 1].created_at) : "";
-  const meta = [p.organization ? `lead organisation ${p.organization}` : "", `${count} review${count === 1 ? "" : "s"}${since ? ` since ${since}` : ""}`].filter(Boolean).join(" · ");
+  for (const lens of ["team", "community", "church"]) {
+    const col = withLevels.map((r) => Object.fromEntries(r.levels)[lens]).filter(Boolean);
+    if (col.length) lines[lens] = withLevels.map((r) => Object.fromEntries(r.levels)[lens] ?? null);
+  }
   return {
-    workspace: { name: w.name, short: w.name },
-    project: { id: p.id, name: p.name, meta, phoneMeta: meta, stage: reviews[0]?.stage ?? "setup" },
-    reviews,
-    trend: { heading: "Over time", help: "Each perspective's overall level, review by review. The direction is what matters, not the exact point.", months: withLevels.map((r) => r.when.split(" ")[0]), rows: ["Strong", "Growing", "Support", "Urgent", "—"], lines, read: withLevels.length ? `${withLevels.length} review${withLevels.length === 1 ? "" : "s"} with results so far.` : "No review has results yet; the lines appear once a report is built." },
+    heading: "Over time",
+    help: "Each perspective's overall level, review by review. The direction is what matters, not the exact point.",
+    months: withLevels.map((r) => r.when.split(" ")[0]),
+    rows: ["Strong", "Growing", "Support", "Urgent", "—"],
+    lines,
+    read: withLevels.length ? `${withLevels.length} review${withLevels.length === 1 ? "" : "s"} with results so far.` : "No review has results yet; the lines appear once a report is built.",
   };
+}
+function shapeProjectModel({ workspace, project, live, archived, limitedAccess = false, since = "" }) {
+  const count = live.length;
+  const metaBits = limitedAccess
+    ? ["Limited access · assessment only", `${count} review${count === 1 ? "" : "s"} you can open`, "Ask the owner for a project invite for broader access"]
+    : [project.organization ? `lead organisation ${project.organization}` : "", `${count} review${count === 1 ? "" : "s"}${since ? ` since ${since}` : ""}`].filter(Boolean);
+  const meta = metaBits.join(" · ");
+  return {
+    limitedAccess,
+    limitedGuidance: limitedAccess ? "You can open the reviews shared with you. Broader project access needs a project invite from the owner." : null,
+    workspace,
+    project: { id: project.id, name: project.name, meta, phoneMeta: meta, stage: live[0]?.stage ?? "setup" },
+    reviews: live,
+    archivedReviews: archived,
+    trend: projectTrend(live),
+  };
+}
+/** Assessment-only path: parent project is not in /v2/projects; build from me.grants + assessment.get for this pid only. */
+async function projectModelLimited(pid, me) {
+  const aids = [...new Set((me?.grants ?? []).filter((g) => g.scope_type === "assessment").map((g) => g.scope_id).filter(Boolean))];
+  const as = [];
+  for (const aid of aids) {
+    try {
+      const { assessment: a } = await assessment(aid);
+      if (a?.project_id === pid) as.push(a);
+    } catch { /* skip */ }
+  }
+  if (!as.length) {
+    const err = new Error("Project not found or not visible");
+    err.code = "NOT_FOUND_OR_NOT_VISIBLE";
+    err.status = 404;
+    throw err;
+  }
+  const sorted = as.sort((x, y) => String(y.created_at).localeCompare(String(x.created_at)));
+  const liveAs = sorted.filter((a) => !a.archived_at);
+  const archivedAs = sorted.filter((a) => a.archived_at);
+  const [live, archived] = await Promise.all([reviewRowsFor(liveAs), reviewRowsFor(archivedAs)]);
+  const oldest = liveAs.length ? liveAs[liveAs.length - 1] : null;
+  return shapeProjectModel({
+    workspace: { name: "Limited access", short: "Limited" },
+    project: { id: pid, name: "Limited access", organization: null },
+    live, archived, limitedAccess: true,
+    since: oldest ? monthOf(oldest.created_at) : "",
+  });
+}
+export async function projectModel(pid, me) {
+  try {
+    const [p, as, ws] = await Promise.all([project(pid), assessmentsOf(pid), workspaces().catch(() => [])]);
+    const sorted = as.sort((x, y) => String(y.created_at).localeCompare(String(x.created_at)));
+    const liveAs = sorted.filter((a) => !a.archived_at);
+    const archivedAs = sorted.filter((a) => a.archived_at);
+    // A project outside any workspace (workspace_id null) is said so, never shown under the first workspace in the list.
+    const w = (p.workspace_id && ws.find((x) => x.id === p.workspace_id)) ?? (p.workspace_id ? { name: "Your workspace" } : { name: "No workspace" });
+    const [live, archived] = await Promise.all([reviewRowsFor(liveAs), reviewRowsFor(archivedAs)]);
+    const oldest = liveAs.length ? liveAs[liveAs.length - 1] : null;
+    return shapeProjectModel({ workspace: { name: w.name, short: w.name }, project: p, live, archived, limitedAccess: false, since: oldest ? monthOf(oldest.created_at) : "" });
+  } catch (e) {
+    if (e?.code !== "NOT_FOUND_OR_NOT_VISIBLE" && Number(e?.status) !== 404) throw e;
+    return projectModelLimited(pid, me);
+  }
 }
 // Lens levels of a built report's payload (results/data.js lensCards does the banding; here the lens word only).
 // Respondents per perspective for a review (the survey counts the Results page bands with): v3ScoreBand (levelCutoffs()) holds a
@@ -506,7 +603,7 @@ export function nextStepModel(m) {
 export function menuModel(me, home, { onSignOut, currentDesign = "/#projects" } = {}) {
   const name = me?.principal?.display_name || "Signed in";
   const who = [name, me?.principal?.email].filter(Boolean).join(" · ");
-  const projectCards = (home.projectCards ?? []).map((c) => ({ title: c.title, meta: c.meta, href: c.href }));
+  const projectCards = (home.projectCards ?? []).map((c) => ({ title: c.title, meta: c.meta, href: c.href, limited: !!c.limited }));
   return {
     who, initials: home.user.initials, invitation: null, chips: [home.workspace, "Mine"], projectCards,
     items: [
