@@ -79,3 +79,6 @@ report-host.test.mjs
 rate-limit.test.mjs
 
 v3/components/access-switch.test.mjs
+
+report-agreement.test.mjs
+report-agreement.d.ts

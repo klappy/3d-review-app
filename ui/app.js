@@ -490,7 +490,7 @@ async function openReport(id) {
   try {
     const result = await api(`/v2/reports/${path(id)}`);
     if (result.suppressed) { clearReportState(); text($('report-status'), result.reason); return; }
-    renderReport({ doc: document, root: $('report-view'), report: result.report });
+    renderReport({ doc: document, root: $('report-view'), report: result.report, minimum: result.level_minimum_responses });
     $('report-view').hidden = false;
     text($('report-status'), '');
   } catch (error) { clearReportState(); throw error; }

@@ -3,7 +3,7 @@ import type { Ctx } from './handlers/types.js';
 import { REPORT_CAPTURE_CTE, attestPackedCapture, type CapturedAssessment } from './report-capture.js';
 import { canonicalJson, parseBoundedJson, sha256Bytes } from './report-canonical-json.js';
 import { ATTESTATION_TRUST } from './synthetic-attestation-trust.js';
-import { renderAttestedCapture, REPORT_SCHEMA, REPORT_VERSIONS } from './synthetic-report-renderer.js';
+import { renderAttestedCapture, renderLegacyAttestedCapture, REPORT_SCHEMA, REPORT_VERSIONS, LEGACY_REPORT_VERSIONS } from './synthetic-report-renderer.js';
 import { participantReportsAllowed, participantReportMinimum } from './report-admission.js';
 
 type StoreContext = Pick<Ctx, 'db' | 'principal' | 'now'> & Partial<Pick<Ctx, 'log'>> & { env?: { ENVIRONMENT?: string; PARTICIPANT_REPORTS?: string } };
@@ -35,16 +35,16 @@ type RendererDescriptor = Readonly<{
   render:(capture:CapturedAssessment)=>unknown|Promise<unknown>;
   validate:(payload:unknown,capture:CapturedAssessment)=>boolean|Promise<boolean>;
 }>;
-async function renderCaptured(c:CapturedAssessment):Promise<unknown>{
-  const result=await renderAttestedCapture(c);
+async function renderCaptured(c:CapturedAssessment,legacy=false):Promise<unknown>{
+  const result=await (legacy?renderLegacyAttestedCapture:renderAttestedCapture)(c);
   if(!result.eligible||result.captureDigest!==c.captureDigest)invalid();
   return result.payload;
 }
 /** Exact trusted projection validates the complete real schema and its values.
  * Always over the original attested capture; no tolerance, cache or DB read. */
-async function validateSyntheticReportPayload(payload:unknown,c:CapturedAssessment):Promise<boolean>{
+async function validateSyntheticReportPayload(payload:unknown,c:CapturedAssessment,legacy=false):Promise<boolean>{
   try{
-    const result=await renderAttestedCapture(c);
+    const result=await (legacy?renderLegacyAttestedCapture:renderAttestedCapture)(c);
     return result.eligible&&result.captureDigest===c.captureDigest&&canonicalJson(payload,PAYLOAD_LIMIT)===result.payloadJson;
   }catch{return false;}
 }
@@ -54,6 +54,12 @@ export const REAL_RENDERER: RendererDescriptor = Object.freeze({
     scorerVersion:REPORT_VERSIONS.scorer,narrativeVersion:REPORT_VERSIONS.narrative,
     policyVersion:REPORT_VERSIONS.policy,outputSchemaVersion:REPORT_SCHEMA}),
   render:renderCaptured,validate:validateSyntheticReportPayload,
+});
+/** Exact historical descriptor is allowed for reads only, never new builds. */
+const LEGACY_RENDERER: RendererDescriptor = Object.freeze({
+  tuple:Object.freeze({...REAL_RENDERER.tuple,scorerVersion:LEGACY_REPORT_VERSIONS.scorer}),
+  render:(capture:CapturedAssessment)=>renderCaptured(capture,true),
+  validate:(payload:unknown,capture:CapturedAssessment)=>validateSyntheticReportPayload(payload,capture,true),
 });
 // Sole private compiled integration point. Tests substitute exactly this declaration.
 // No setter, registration function, caller-rendered product or runtime switch exists.
@@ -146,7 +152,13 @@ async function validateStored(row:StoredRow,r:RendererDescriptor,current?:Captur
   const original=await attest(aid,row.stored_capture,pd,min);if(!original.eligible)invalid();
   if(!DIGEST.test(row.capture_digest)||original.capture.captureDigest!==row.capture_digest)invalid();
   const tuple:VersionTuple={sourcePin:row.source_pin,indexRoot:row.index_root,scorerVersion:row.scorer_version,narrativeVersion:row.narrative_version,policyVersion:row.policy_version,outputSchemaVersion:row.output_schema_version};
-  for(const key of versionKeys)if(tuple[key]!==r.tuple[key])invalid();
+  // Stored metadata may select only one exact compiled historical tuple. It
+  // cannot inject a renderer or bypass capture, hash, authorization or payload checks.
+  if(versionKeys.some(key=>tuple[key]!==r.tuple[key])) {
+    if(r!==REAL_RENDERER||versionKeys.some(key=>tuple[key]!==LEGACY_RENDERER.tuple[key]))invalid();
+    r=LEGACY_RENDERER;
+  }
+
   if(!DIGEST.test(row.report_key)||await reportKey(original.capture,r.tuple)!==row.report_key)invalid();
   if(typeof row.payload_json!=='string'||row.payload_json.length>PAYLOAD_LIMIT||encoder.encode(row.payload_json).length>PAYLOAD_LIMIT||!DIGEST.test(row.payload_sha256))invalid();
   if(await sha256Bytes(encoder.encode(row.payload_json))!==row.payload_sha256)invalid();

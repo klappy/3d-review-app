@@ -398,3 +398,17 @@ test('Codex P2 4384990149: the served level minimum gates Build and the bands; a
   assert.equal(buildResultsCta({ role: 'owner', bandScores: null, reports: none }, oneResp, esc), '');
   assert.match(buildResultsCta({ role: 'owner', bandScores: null, reports: none }, oneResp, esc, 1), /data-results-build/);
 });
+
+test('Decision 25 v3 report opening respects the served DEV minimum and the production floor',async()=>{
+  for(const minimum of [1,3]){
+    const doc=new JSDOM('<main></main>').window.document,root=doc.querySelector('main');
+    const report={id:'rep_1',payload:{source_commit:'fixture',versions:{scorer:'fixture'},lenses:[],evidence:[{label:'Translation Team — Translators',n:1},{label:'Church — Involved Pastor',n:1}],translation_type_agreement:{team_values:[],church_values:[],agree:null,team_statuses:['no-brief'],church_statuses:['not-aware']}}};
+    const {api}=fakeApi({...understandTable,'GET /v2/reports/rep_1':{report,level_minimum_responses:minimum}});
+    const ctx=ctxFor(api),model=await views.understand.load(ctx,{aid:'a1'});
+    root.innerHTML=views.understand.render(ctx,model);views.understand.bind(ctx,root,model);
+    await root.querySelector('[data-open-report="rep_1"]').onclick();
+    const text=root.querySelector('[data-report-view]').textContent;
+    if(minimum===1){assert.match(text,/Translation team: No translation brief/);assert.match(text,/Church: Not aware/);}
+    else {assert.doesNotMatch(text,/No translation brief|Church: Not aware/);}
+  }
+});

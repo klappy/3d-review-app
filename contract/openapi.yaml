@@ -64,7 +64,10 @@ components:
             ],
             "properties": {
               "scorer": {
-                "const": "steve-f042cde-single-assessment-v1"
+                "enum": [
+                  "steve-f042cde-single-assessment-v1",
+                  "steve-605edb4-translation-brief-v1"
+                ]
               },
               "narrative": {
                 "const": "steve-f042cde-rule-narrative-v1"
@@ -357,6 +360,30 @@ components:
                       "boolean",
                       "null"
                     ]
+                  },
+                  "team_statuses": {
+                    "type": "array",
+                    "items": {
+                      "enum": [
+                        "no-brief",
+                        "no-agreement",
+                        "not-aware"
+                      ]
+                    },
+                    "maxItems": 3,
+                    "uniqueItems": true
+                  },
+                  "church_statuses": {
+                    "type": "array",
+                    "items": {
+                      "enum": [
+                        "no-brief",
+                        "no-agreement",
+                        "not-aware"
+                      ]
+                    },
+                    "maxItems": 3,
+                    "uniqueItems": true
                   }
                 }
               }
@@ -397,6 +424,9 @@ components:
               "maxLength": 4096
             },
             "maxItems": 32
+          },
+          "instrument_amendment": {
+            "const": "605edb47d2280568f0f5860f7b1921c12a814222"
           }
         },
         "description": "Exact source-backed synthetic schema; canonical payload limit524288 UTF-8 bytes. Runtime also verifies exact canonical output from its original attested capture."
@@ -3345,7 +3375,7 @@ paths:
               schema:
                 allOf:
                 - $ref: '#/components/schemas/Envelope'
-                - {"type":"object","properties":{"result":{"type":"object","properties":{"survey_id":{"type":"string"},"assessment":{"type":"string"},"language":{"type":"string"},"period":{"type":["string","null"]},"project":{"type":"string"},"purpose":{"type":["string","null"]},"format":{"type":["string","null"]},"template":{"type":"object","properties":{"id":{"type":"string"},"version":{"type":"integer"},"perspective":{"type":"string"},"source_ref":{"type":["string","null"]}},"required":["id","version","perspective","source_ref"],"additionalProperties":false},"items":{"type":"array","items":{"type":"object","description":"Pinned source renderItems output, stable source item IDs, required/option/exclusion semantics unchanged."}},"participant_labels":{"type":"array","items":{"type":"string"}},"context_fields":{"type":"array","items":{"type":"object"}}},"required":["survey_id","assessment","language","period","project","purpose","format","template","items","participant_labels"],"additionalProperties":false}},"required":["result"],"additionalProperties":true}
+                - {"type":"object","properties":{"result":{"type":"object","properties":{"survey_id":{"type":"string"},"assessment":{"type":"string"},"language":{"type":"string"},"period":{"type":["string","null"]},"project":{"type":"string"},"purpose":{"type":["string","null"]},"format":{"type":["string","null"]},"template":{"type":"object","properties":{"id":{"type":"string"},"version":{"type":"integer"},"perspective":{"type":"string"},"source_ref":{"type":["string","null"]},"instrument_amendment":{"const":"605edb47d2280568f0f5860f7b1921c12a814222"}},"required":["id","version","perspective","source_ref"],"additionalProperties":false},"items":{"type":"array","items":{"type":"object","description":"Pinned source renderItems output, stable source item IDs, required/option/exclusion semantics unchanged."}},"participant_labels":{"type":"array","items":{"type":"string"}},"context_fields":{"type":"array","items":{"type":"object"}},"languages":{"type":"array","items":{"type":"object"}},"passages":{"type":"array","items":{"type":"object"}},"demographics_enabled":{"type":"boolean"}},"required":["survey_id","assessment","language","period","project","purpose","format","template","items","participant_labels"],"additionalProperties":false}},"required":["result"],"additionalProperties":true}
         4XX:
           description: error envelope
           content:
@@ -3642,7 +3672,8 @@ paths:
                           "required": [
                             "assessment_id",
                             "suppressed",
-                            "report"
+                            "report",
+                            "level_minimum_responses"
                           ],
                           "properties": {
                             "assessment_id": {
@@ -3676,6 +3707,10 @@ paths:
                                   "$ref": "#/components/schemas/SyntheticReportPayload"
                                 }
                               }
+                            },
+                            "level_minimum_responses": {
+                              "type": "integer",
+                              "minimum": 1
                             }
                           }
                         },
@@ -3706,7 +3741,8 @@ paths:
                               "const": "held"
                             },
                             "reason": {
-                              "const": "Report unavailable under the current synthetic reporting policy."
+                              "type": "string",
+                              "maxLength": 512
                             },
                             "report": {
                               "type": "null"
@@ -3719,6 +3755,14 @@ paths:
                             },
                             "policy_version": {
                               "const": "synthetic-current-assessment-asof-query-v1"
+                            },
+                            "responses_in": {
+                              "type": "integer",
+                              "minimum": 0
+                            },
+                            "responses_needed": {
+                              "type": "integer",
+                              "minimum": 0
                             }
                           }
                         },
@@ -3813,7 +3857,8 @@ paths:
                               "const": "held"
                             },
                             "reason": {
-                              "const": "Report unavailable under the current synthetic reporting policy."
+                              "type": "string",
+                              "maxLength": 512
                             },
                             "report": {
                               "type": "null"
@@ -3857,6 +3902,14 @@ paths:
                             },
                             "expires_in": {
                               "type": "integer"
+                            },
+                            "responses_in": {
+                              "type": "integer",
+                              "minimum": 0
+                            },
+                            "responses_needed": {
+                              "type": "integer",
+                              "minimum": 0
                             }
                           }
                         }
@@ -4250,7 +4303,8 @@ paths:
                           "required": [
                             "assessment_id",
                             "suppressed",
-                            "report"
+                            "report",
+                            "level_minimum_responses"
                           ],
                           "properties": {
                             "assessment_id": {
@@ -4284,6 +4338,10 @@ paths:
                                   "$ref": "#/components/schemas/SyntheticReportPayload"
                                 }
                               }
+                            },
+                            "level_minimum_responses": {
+                              "type": "integer",
+                              "minimum": 1
                             }
                           }
                         },
@@ -4314,7 +4372,8 @@ paths:
                               "const": "held"
                             },
                             "reason": {
-                              "const": "Report unavailable under the current synthetic reporting policy."
+                              "type": "string",
+                              "maxLength": 512
                             },
                             "report": {
                               "type": "null"
@@ -4327,6 +4386,14 @@ paths:
                             },
                             "policy_version": {
                               "const": "synthetic-current-assessment-asof-query-v1"
+                            },
+                            "responses_in": {
+                              "type": "integer",
+                              "minimum": 0
+                            },
+                            "responses_needed": {
+                              "type": "integer",
+                              "minimum": 0
                             }
                           }
                         }

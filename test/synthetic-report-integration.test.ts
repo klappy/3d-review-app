@@ -7,11 +7,12 @@ vi.mock('../src/report-capture',async(importOriginal)=>{const m:any=await import
 import {Miniflare,convertV4MiniflareOptions} from 'miniflare';
 import * as store from '../src/synthetic-report-store';
 import {captureForBuild} from '../src/report-capture';
-import {renderSyntheticReport,REPORT_VERSIONS,REPORT_SCHEMA} from '../src/synthetic-report-renderer';
+import {renderSyntheticReport,renderLegacySyntheticReport,LEGACY_REPORT_VERSIONS,REPORT_VERSIONS,REPORT_SCHEMA} from '../src/synthetic-report-renderer';
 import {canonicalJson} from '../src/report-canonical-json';
 import type {Ctx} from '../src/handlers/types';
 import {SerialOperation} from './helpers/serial-operation';
 import sourceFixture from './fixtures/synthetic-report-renderer-v1.json';
+import {ATTESTATION_TRUST} from '../src/synthetic-attestation-trust';
 const mf=new Miniflare(convertV4MiniflareOptions({workers:[{name:'c2a-real-integration',modules:true,script:"export default {fetch(){return new Response('local synthetic fixture')}}",d1Databases:{DB:'c2a-fixture'}}]}));
 let db:D1Database;
 const aid='assess_syn_earning-trust-2026-01';
@@ -47,6 +48,26 @@ beforeEach(() => corpusOperation.drain(),15000);
 afterEach(() => corpusOperation.drain(),15000);
 afterAll(async () => { try { await corpusOperation.drain(); } finally { await mf.dispose(); } },30000);
 describe('real compiled renderer with local D1',()=>{
+ it('reads exact historical reports and lists them beside new reports without rewriting old rows',async()=>{
+   const c=await capture(),legacy=await renderLegacySyntheticReport(aid,c.rows);
+   if(!legacy.eligible)throw new Error('legacy fixture refused');
+   const tuple={sourcePin:ATTESTATION_TRUST.sourcePin,indexRoot:ATTESTATION_TRUST.indexRoot,scorerVersion:LEGACY_REPORT_VERSIONS.scorer,narrativeVersion:LEGACY_REPORT_VERSIONS.narrative,policyVersion:LEGACY_REPORT_VERSIONS.policy,outputSchemaVersion:REPORT_SCHEMA};
+   const key=hash('3d-materialized-report-v1\0'+canonicalJson({schema:'3d-materialized-report-key-v1',assessmentId:aid,captureDigest:c.captureDigest,...tuple}));
+   const id='sreport_legacy_decision25';
+   await exec('INSERT INTO synthetic_report (id,assessment_id,report_key,capture_digest,index_root,source_pin,scorer_version,narrative_version,policy_version,output_schema_version,capture_json,payload_json,payload_sha256,created_at,created_by) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',id,aid,key,c.captureDigest,tuple.indexRoot,tuple.sourcePin,tuple.scorerVersion,tuple.narrativeVersion,tuple.policyVersion,tuple.outputSchemaVersion,c.packedCapture,legacy.payloadJson,hash(legacy.payloadJson),'2026-11-04T00:00:00.000Z','person_mara');
+   const before=await db.prepare('SELECT * FROM synthetic_report WHERE id=?').bind(id).first();
+   const read=await store.readMaterialized(context(),id);
+   expect(read.ok&&read.value.payload).toEqual(legacy.payload);
+   const current=await report();expect(current.reportKey).not.toBe(key);
+   const listed=await store.listMaterialized(context(),aid,null,5);
+   expect(listed.ok&&listed.value.reports.map(r=>r.id)).toEqual(expect.arrayContaining([id,current.id]));
+   expect(await db.prepare('SELECT * FROM synthetic_report WHERE id=?').bind(id).first()).toEqual(before);
+   // A near-match is not an approved historical renderer.
+   await alter(id,{scorer_version:LEGACY_REPORT_VERSIONS.scorer+'-unapproved'});
+   expect(await store.readMaterialized(context(),id)).toEqual(held());
+   await alter(id,{scorer_version:LEGACY_REPORT_VERSIONS.scorer});
+ });
+
  describe('all34/425 corpus with shared coexistence', () => {
   const measurements:any[]=[]; let total=0,max=0,corpusStarted=0;
   beforeAll(async () => { await clearReports(); corpusStarted=performance.now(); });
@@ -81,7 +102,7 @@ describe('real compiled renderer with local D1',()=>{
    phaseEnd('raw-row');
    expect(row.payload_json).toBe(expected.payloadJson);expect(row.payload_sha256).toBe(hash(expected.payloadJson));
    expect([row.source_pin,row.index_root,row.scorer_version,row.narrative_version,row.policy_version,row.output_schema_version]).toEqual([sourceFixture.source_commit,'d964f81639e0929ce5f53156b28e3902732b98d2394c6d8dc31c9d14a22fb7dd',REPORT_VERSIONS.scorer,REPORT_VERSIONS.narrative,REPORT_VERSIONS.policy,REPORT_SCHEMA]);
-   if(id===aid)expect(row.report_key).toBe('68b602d11a77162f72320c43827d30d33ed9f95fca9dfe5cb07f18905176a52d');
+   if(id===aid)expect(row.report_key).not.toBe('68b602d11a77162f72320c43827d30d33ed9f95fca9dfe5cb07f18905176a52d');
    measurements.push({assessmentId:id,responses:c.rows.length,captureBytes:Buffer.byteLength(c.packedCapture),payloadBytes:Buffer.byteLength(expected.payloadJson),buildMs,getMs,listMs});
    }));
   });

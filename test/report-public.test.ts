@@ -1,3 +1,4 @@
+import {reportResultErrors,schemaErrors,reportPayloadSchema} from './report-contract-check';
 import {readFileSync,writeFileSync} from 'node:fs';
 import {beforeAll,beforeEach,afterAll,describe,it,expect} from 'vitest';
 import {Miniflare,convertV4MiniflareOptions} from 'miniflare';
@@ -17,10 +18,10 @@ const ctx=(database=db,kind:Ctx['principal']['kind']='user',id='person_mara'):Ct
 const schemaSamples:any[]=[];
 const ec=()=>({waitUntil(){},passThroughOnException(){},props:undefined}) as any;
 async function http(path:string,body?:unknown,credential:string|undefined=token){
- const r=await worker.fetch(new Request('https://report.test'+path,{method:body===undefined?'GET':'POST',headers:{...(credential?{authorization:'Bearer '+credential,cookie:'review_access=global'}:{}),'content-type':'application/json'},...(body===undefined?{}:{body:JSON.stringify(body)})}),env,ec());const bodyResult=await r.json() as any;schemaSamples.push({path:path.split('?')[0],method:body===undefined?'get':'post',status:r.status,body:bodyResult});return {status:r.status,body:bodyResult};
+ const r=await worker.fetch(new Request('https://report.test'+path,{method:body===undefined?'GET':'POST',headers:{...(credential?{authorization:'Bearer '+credential,cookie:'review_access=global'}:{}),'content-type':'application/json'},...(body===undefined?{}:{body:JSON.stringify(body)})}),env,ec());const bodyResult=await r.json() as any;if(bodyResult.ok&&['cap.report.build','cap.report.get'].includes(bodyResult.capability))expect(reportResultErrors(bodyResult.capability,bodyResult.result)).toEqual([]);schemaSamples.push({path:path.split('?')[0],method:body===undefined?'get':'post',status:r.status,body:bodyResult});return {status:r.status,body:bodyResult};
 }
 async function mcp(capability:string,params:any,opts:any={},credential=token){
- const r=await worker.fetch(new Request('https://report.test/mcp',{method:'POST',headers:{authorization:'Bearer '+credential,cookie:'review_access=global','content-type':'application/json'},body:JSON.stringify({jsonrpc:'2.0',id:1,method:'tools/call',params:{name:capability==='cap.report.build'?'danger':'read',arguments:{capability,params,...opts}}})}),env,ec());const b:any=await r.json();return b.result?.structuredContent??b;
+ const r=await worker.fetch(new Request('https://report.test/mcp',{method:'POST',headers:{authorization:'Bearer '+credential,cookie:'review_access=global','content-type':'application/json'},body:JSON.stringify({jsonrpc:'2.0',id:1,method:'tools/call',params:{name:capability==='cap.report.build'?'danger':'read',arguments:{capability,params,...opts}}})}),env,ec());const b:any=await r.json();const result=b.result?.structuredContent??b;if(result.ok&&['cap.report.build','cap.report.get'].includes(capability))expect(reportResultErrors(capability,result.result)).toEqual([]);return result;
 }
 const normalized=(b:any)=>{const c=JSON.parse(JSON.stringify(b));delete c.trace_id;if(c.receipt){delete c.receipt.id;delete c.receipt.trace_id;}return c;};
 async function build(a=aid,database=db){const c=ctx(database);const preview:any=await execute(c,'cap.report.build',{aid:a},{tool:'danger',mode:'dry_run'});expect(preview.ok).toBe(true);return execute({...c,traceId:'tr_'+crypto.randomUUID()},'cap.report.build',{aid:a},{tool:'danger',mode:'execute',confirm_token:preview.result.confirm_token}) as Promise<any>;}
@@ -47,6 +48,15 @@ describe('real authenticated report transport and receipt',()=>{
   expect((await db.prepare('SELECT count(*) n FROM receipt').first<any>()).n).toBe(0);expect((await db.prepare('SELECT count(*) n FROM synthetic_report').first<any>()).n).toBe(0);
   const built=await http(path,{mode:'execute',confirm_token:preview.body.result.confirm_token});expect(built.status).toBe(200);const id=built.body.result.report.id;expect(Object.keys(built.body.result.report).sort()).toEqual(['created_at','id','payload']);
   const got=await http('/v2/reports/'+id);expect(normalized(await mcp('cap.report.get',{id}))).toEqual(normalized(got.body));
+  const payload=got.body.result.report.payload;
+  expect(payload.instrument_amendment).toBe('605edb47d2280568f0f5860f7b1921c12a814222');
+  expect(schemaErrors(reportPayloadSchema,{...payload,versions:{...payload.versions,scorer:'unknown'}}).length).toBeGreaterThan(0);
+  expect(schemaErrors(reportPayloadSchema,{...payload,instrument_amendment:'unknown'}).length).toBeGreaterThan(0);
+  expect(schemaErrors(reportPayloadSchema,{...payload,unexpected:true}).length).toBeGreaterThan(0);
+  const agreement={construct_name:'Translation type',team_values:[],church_values:[],agree:null,team_statuses:['no-brief'],church_statuses:['not-aware']};
+  expect(schemaErrors(reportPayloadSchema,{...payload,translation_type_agreement:agreement})).toEqual([]);
+  expect(schemaErrors(reportPayloadSchema,{...payload,translation_type_agreement:{...agreement,team_statuses:['unknown']}}).length).toBeGreaterThan(0);
+  const noMinimum={...got.body.result};delete noMinimum.level_minimum_responses;expect(reportResultErrors('cap.report.get',noMinimum).length).toBeGreaterThan(0);
   expect(got.body.result.report.payload.synthetic).toBe(true);expect(got.body.result.report.payload.schema_version).toBe('3d-synthetic-assessment-report-v1');
   const receipts=await db.prepare('SELECT prior_state_json,confirm_token FROM receipt').all<any>();expect(receipts.results).toHaveLength(1);expect(JSON.parse(receipts.results[0].prior_state_json)).toEqual({prior:null,params:{},result_ids:{}});expect(receipts.results[0].confirm_token).toBeNull();
   expect(JSON.stringify((await db.prepare('SELECT * FROM trace').all()).results)).not.toContain(id);
