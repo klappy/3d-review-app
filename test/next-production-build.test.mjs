@@ -42,19 +42,13 @@ test("WORKERS_CI_BRANCH=production: the guarded build emits ui/next/index.html, 
   }
 });
 
-test("the default entry `/` is the current UI: no automatic navigation, cookie or default flip to /next/", () => {
-  const html = read("ui/index.html").replace(/\/\*[\s\S]*?\*\//g, "").replace(/<!--[\s\S]*?-->/g, ""); // code, not comments
+test("the default entry `/` boots Next through default-entry.js", () => {
+  const html = read("ui/index.html").replace(/\/\*[\s\S]*?\*\//g, "").replace(/<!--[\s\S]*?-->/g, "");
+  assert.match(html, /import \{ bootDefaultEntry \} from "\/default-entry\.js"/);
+  assert.match(html, /bootDefaultEntry\(\)/);
   assert.doesNotMatch(html, /http-equiv=["']?refresh/i);
-  assert.doesNotMatch(html, /location\s*\.\s*(assign|replace)\s*\(|location(\.href)?\s*=[^=]/);
   assert.doesNotMatch(html, /document\.cookie/);
-  // The only reference to /next/ is the opt-in menu link (plus the HEAD probe that hides it when /next/ is not served).
-  const refs = [...html.matchAll(/\/next\//g)].length;
-  assert.equal(refs, 2);
   assert.match(html, /<a href="\/next\/\?ui_next=on" data-ui-next>Try the new design<\/a>/);
-  assert.match(html, /fetch\('\/next\/',\{method:'HEAD'[^)]*\)\.then\(r=>\{if\(!r\.ok\)l\.hidden=true;\}/);
-  // The Worker never routes `/` to /next/: no source file names the /next/ path.
-  const src = spawnSync("grep", ["-rln", "/next", "src"], { cwd: root, encoding: "utf8" });
-  assert.equal(src.stdout.trim(), "");
-  // The assets binding serves ./ui at `/` as before.
+  assert.match(read("ui/default-entry.js"), /AbortSignal\.timeout\(2500\)/);
   assert.match(read("wrangler.toml"), /\[assets\]\ndirectory = "\.\/ui"/);
 });

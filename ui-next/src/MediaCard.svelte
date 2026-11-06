@@ -5,7 +5,7 @@
 <script>
   import Icon from "./Icon.svelte";
   import { I } from "./icons.js";
-  let { title, duration, caption, src, poster } = $props();
+  let { title, duration, caption, src, poster, captionsSrc } = $props();
   if (!(typeof title === "string" && title.trim())) throw new TypeError("MediaCard: title is required");
   if (src != null && !/^https:\/\//.test(src)) throw new TypeError("MediaCard: src must be an https Transcode proxy URL");
   const line = $derived(duration ? `${title} · ${duration}` : title);
@@ -13,7 +13,7 @@
 
 <div class="glass-hi l-media" role="group" aria-label={line}>
   <div class="l-media-frame">
-    {#if src}<video {src} {poster} controls preload="none" aria-label={line}></video>{:else}<span class="icn l-media-play" aria-hidden="true"><Icon d={I.play} size={32} /></span>{/if}
+    {#if src}<video {src} {poster} controls preload="metadata" playsinline aria-label={line}>{#if captionsSrc}<track kind="captions" srclang="en" label="English" src={captionsSrc} />{/if}</video>{:else}<span class="icn l-media-play" aria-hidden="true"><Icon d={I.play} size={32} /></span>{/if}
     <span class="micro l-media-title">{line}</span>
   </div>
   {#if caption}<p class="small">{caption}</p>{/if}

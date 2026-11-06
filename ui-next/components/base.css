@@ -171,7 +171,7 @@ details.dd>summary.dd-row{display:flex;justify-content:space-between;align-items
 /* §2 Media card (captain 2026-10-20 22:29 ET, provisional): 16:10 dark frame, play affordance, title · duration line, caption */
 .l-media{border-radius:var(--radius-xl);padding:20px;display:flex;flex-direction:column;gap:14px}
 .l-media-frame{aspect-ratio:16/10;border-radius:var(--radius-l);background:var(--ink);display:grid;place-items:center;color:var(--ground);position:relative;overflow:hidden}
-.l-media-frame>video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.l-media-frame>video{position:absolute;inset:0;width:100%;height:100%;object-fit:contain}
 .l-media-play{width:72px;height:72px;border-radius:50%;background:rgba(255,255,255,.14);color:var(--field)}
 .l-media-title{position:absolute;left:16px;bottom:14px;color:rgba(255,255,255,.8)}
 /* Explore-lane gaps (auggie-fanout-explore-1133, playbook rules 11 + 16, provisional): Explore, Help and Feedback board inlines closed as rows; values as the boards drew them */

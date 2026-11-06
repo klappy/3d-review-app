@@ -22,7 +22,7 @@ export function nextDefaultTarget(location) {
 // Replace the one legacy bootstrap with this call at activation. Import legacy
 // only on its chosen branch; do not start both applications while redirecting.
 export async function bootDefaultEntry({ location = globalThis.location,
-  probeNext = async () => (await fetch('/next/', { method: 'HEAD', cache: 'no-store', credentials: 'same-origin', redirect: 'error' })).ok,
+  probeNext = async () => (await fetch('/next/', { method: 'HEAD', cache: 'no-store', credentials: 'same-origin', redirect: 'error', signal: AbortSignal.timeout(2500) })).ok,
   loadCurrent = () => import('./assess/assess.js') } = {}) {
   const target = nextDefaultTarget(location);
   if (target) {

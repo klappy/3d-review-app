@@ -24,9 +24,12 @@
   import Disclosure from "../Disclosure.svelte";
   import { C01, C02 } from "../copy/rachel.js";
 
-  // videoSrc: the intro video through the Transcode proxy (generate_transcode_url) once it exists; absent = placeholder frame (Media card contract).
+  // videoSrc: CDN overview from cookbook CDN-HANDOFF-2026-11-06 (exact 8fea7f793783 assets).
   // home (live, signed in): the logo goes to the signed-in home, not back to this page (cookbook work/active/2026-10-26-3d-logged-in-home).
-  let { phone = false, theme = "light", w, videoSrc, home, pending = false } = $props();
+  const OVERVIEW_VIDEO = "https://cdn.3dreview.app/overview/8fea7f793783/3d-review-overview-120s-8fea7f793783.mp4";
+  const OVERVIEW_POSTER = "https://cdn.3dreview.app/overview/8fea7f793783/3d-review-overview-poster.jpg";
+  const OVERVIEW_CAPTIONS = "/overview/3d-review-overview.en.vtt";
+  let { phone = false, theme = "light", w, videoSrc = OVERVIEW_VIDEO, videoPoster = OVERVIEW_POSTER, videoCaptions = OVERVIEW_CAPTIONS, home, pending = false } = $props();
   let SELF = $derived(screenHref("landing", { phone, theme, w }));
   const LOGO = $derived(home ?? SELF);
   const SAMPLE = "#results", VIDEO = "#video", CODE = "#survey-code", HELP = "#help";
@@ -85,7 +88,7 @@
             <Row wrap gap={3}><Button label="Try the sample review" variant="primary" lg href={SAMPLE} {trail} /><Button label="Watch how it works · 2 min" lg href={VIDEO} {lead} /></Row>
             <p class="micro">No account needed to explore the sample. Facilitators sign in with an email link.</p>
           </Stack>
-          <MediaCard title="What 3D Review is" duration="2:10" caption="One short video explains the three perspectives and what a review gives you." src={videoSrc} />
+          <MediaCard title="What 3D Review is" duration="2:00" caption="One short video explains the three perspectives and what a review gives you." src={videoSrc} poster={videoPoster} captionsSrc={videoCaptions} />
         </Grid>
       </Section>
       <Section>
