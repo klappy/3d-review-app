@@ -10,19 +10,15 @@ tokens, invitations, surveys, reports, access rules or the existing UI internals
 
 ## Prepared behavior
 
-- Ordinary `/` and `/index.html` visits go to `/next/?ui_next=on` after a successful
-  same-origin HEAD probe. Next's existing identity/session handling decides its
+- Ordinary `/` and `/index.html` visits go to `/next/?ui_next=on` after a successful same-origin HEAD probe, bounded to two seconds with abort and legacy fallback. Next's existing identity/session handling decides its
   signed-out or signed-in page. No legacy boot runs on the redirect branch.
-- `/?ui=legacy` is an explicit current-UI entry. Existing root hash links also
-  retain their current handler, including participant tokens, Access session
-  returns, invitations, projects, assessments/reports and saved setup routes.
+- `/?ui=legacy` is an explicit current-UI entry. Existing root participant, invitation, project, report and setup hashes retain their current handler. Valid email/Access `#session=` callbacks now move their exact bearer into the existing tab session storage and replace the URL with the Next home entry. A one-use tab-scoped UI intent keeps real bare callbacks in the chosen legacy UI; Next sign-in explicitly selects Next. A stored private invitation always retains the legacy invitation consumer and its pending token. Explicit `?ui=legacy` remains available. This is not a persistent default preference. No server callback, cookie, token issuance or validation changes.
 - Unknown query parameters remain with the current handler. This conservatively
   preserves return URLs, demo entry and other existing query contracts rather
   than guessing how to translate them. Presentation-only queries retain their
   bytes when forwarded. Explicit `/next/` and participant/PDF/API paths are not
   intercepted. This is a default-entry switch, not a migration of old deep links.
-- `location.replace` avoids adding a root entry to Back/Forward history. A failed
-  Next **entry HTML** probe or refused navigation falls back to the existing UI.
+- `location.replace` avoids adding a root entry to Back/Forward history. A failed or stalled Next **entry HTML** probe or refused navigation falls back to the existing UI.
   A successful HEAD response does not verify JavaScript, bundles or app health;
   failures after navigation do not automatically return to the current UI.
   The promotion and wired browser acceptance must verify those assets and boot.
@@ -85,3 +81,9 @@ also remains an escape route if Next JavaScript fails after a successful probe.
 The preparation tests cover entry decisions, exact untouched URLs/tokens,
 fallbacks, a simulated history stack and the fact that activation is absent.
 Existing Next router tests remain relevant. No authenticated hosted browser, real-device or post-activation production result is claimed by the unit tests. Deployment evidence must be added after the protected release.
+
+## Successor review findings
+
+Native findings on a6e46ea are confirmed: auth return now stays Next (explicit legacy is preserved), entry probe is bounded, live shell consumes forwarded presentation, local harness serves contained Next assets and the contradictory production-entry assertion is replaced. The release-identity finding remains blocked on the coordinated canonical cookbook record and matching app pin/version/public surfaces; 0.39.2 is not an accepted identity for this default switch. This branch must not merge under that stale identity. The report lane's 0.40.0 record is separately owned and must not be overwritten.
+
+Fresh independent review of fcfa942 found two further callback regressions: pending private-invitation continuation and real legacy sign-in round trips. Both are corrected with invitation precedence and one-use tab UI intent. A callback with no intent follows the default; a different browser/device has no tab intent. New tests use the actual bare callback shape instead of inventing `?ui=legacy` on the server callback.

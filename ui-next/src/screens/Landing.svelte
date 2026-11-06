@@ -22,17 +22,17 @@
   import PhoneBar from "../PhoneBar.svelte";
   import Button from "../Button.svelte";
   import Disclosure from "../Disclosure.svelte";
+  import "../../components/overview-video.css";
+  import { OVERVIEW } from "../overview-video.js";
   import { C01, C02 } from "../copy/rachel.js";
 
-  // videoSrc: CDN overview from cookbook CDN-HANDOFF-2026-11-06 (exact 8fea7f793783 assets).
+  // Approved public overview: no autoplay, full image and optional same-origin captions.
   // home (live, signed in): the logo goes to the signed-in home, not back to this page (cookbook work/active/2026-10-26-3d-logged-in-home).
-  const OVERVIEW_VIDEO = "https://cdn.3dreview.app/overview/8fea7f793783/3d-review-overview-120s-8fea7f793783.mp4";
-  const OVERVIEW_POSTER = "https://cdn.3dreview.app/overview/8fea7f793783/3d-review-overview-poster.jpg";
-  const OVERVIEW_CAPTIONS = "/overview/3d-review-overview.en.vtt";
-  let { phone = false, theme = "light", w, videoSrc = OVERVIEW_VIDEO, videoPoster = OVERVIEW_POSTER, videoCaptions = OVERVIEW_CAPTIONS, home, pending = false } = $props();
+  let { phone = false, theme = "light", w, videoSrc = OVERVIEW.src, home, pending = false } = $props();
+  let media;
   let SELF = $derived(screenHref("landing", { phone, theme, w }));
   const LOGO = $derived(home ?? SELF);
-  const SAMPLE = "#results", VIDEO = "#video", CODE = "#survey-code", HELP = "#help";
+  const SAMPLE = "#results", CODE = "#survey-code", HELP = "#help";
   const PERSPECTIVES = [
     ["team", "Translation team", "How the team prepares, reviews and decides a passage is ready."],
     ["community", "Community", "Whether people understand, trust and use the translation."],
@@ -71,8 +71,9 @@
       <div><Mark size={44} /></div>
       <h1 class="title-phone">{C01}</h1>
       <p class="small t-15">{C02}</p>
-      <a class="link" href={VIDEO}>Watch how it works · 2 min</a>
+      <button type="button" class="btn btn-quiet" disabled={!videoSrc} onclick={() => media?.play()}>Watch how it works · 2:00</button>
     </Card>
+    <MediaCard bind:this={media} title="What 3D Review is" duration={OVERVIEW.duration} src={videoSrc} poster={OVERVIEW.poster} captions={OVERVIEW.captions} />
     <Card pad="list" gap={1} label="Common questions">
       {#each FAQ_PHONE as [q, a]}<Disclosure label={q} solid={false}><p class="small">{a}</p></Disclosure>{/each}
       <a class="link small" href={HELP}>All questions and the facilitator guide</a>
@@ -85,10 +86,10 @@
           <Stack gap={4}>
             <h1 class="display">{C01}</h1>
             <p class="small lead">{C02}</p>
-            <Row wrap gap={3}><Button label="Try the sample review" variant="primary" lg href={SAMPLE} {trail} /><Button label="Watch how it works · 2 min" lg href={VIDEO} {lead} /></Row>
+            <Row wrap gap={3}><Button label="Try the sample review" variant="primary" lg href={SAMPLE} {trail} /><button type="button" class="btn btn-lg" disabled={!videoSrc} onclick={() => media?.play()}><Icon d={I.play} />Watch how it works · 2:00</button></Row>
             <p class="micro">No account needed to explore the sample. Facilitators sign in with an email link.</p>
           </Stack>
-          <MediaCard title="What 3D Review is" duration="2:00" caption="One short video explains the three perspectives and what a review gives you." src={videoSrc} poster={videoPoster} captionsSrc={videoCaptions} />
+          <MediaCard bind:this={media} title="What 3D Review is" duration={OVERVIEW.duration} caption="One short video explains the three perspectives and what a review gives you." src={videoSrc} poster={OVERVIEW.poster} captions={OVERVIEW.captions} />
         </Grid>
       </Section>
       <Section>

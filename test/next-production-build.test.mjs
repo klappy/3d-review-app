@@ -42,13 +42,13 @@ test("WORKERS_CI_BRANCH=production: the guarded build emits ui/next/index.html, 
   }
 });
 
-test("the default entry `/` boots Next through default-entry.js", () => {
-  const html = read("ui/index.html").replace(/\/\*[\s\S]*?\*\//g, "").replace(/<!--[\s\S]*?-->/g, "");
-  assert.match(html, /import \{ bootDefaultEntry \} from "\/default-entry\.js"/);
-  assert.match(html, /bootDefaultEntry\(\)/);
-  assert.doesNotMatch(html, /http-equiv=["']?refresh/i);
-  assert.doesNotMatch(html, /document\.cookie/);
-  assert.match(html, /<a href="\/next\/\?ui_next=on" data-ui-next>Try the new design<\/a>/);
-  assert.match(read("ui/default-entry.js"), /AbortSignal\.timeout\(2500\)/);
+test("production root delegates to the reviewed default bootstrap with an explicit legacy escape", () => {
+  const html = read("ui/index.html");
+  assert.match(html, /import \{ bootDefaultEntry \} from "\/default-entry\.js"; bootDefaultEntry\(\);/);
+  assert.doesNotMatch(html, /<script[^>]+src="\/assess\/assess\.js/);
+  const bootstrap = read("ui/default-entry.js");
+  assert.match(bootstrap, /location\.replace\(target\)/);
+  assert.match(bootstrap, /loadCurrent = \(\) => import\('\.\/assess\/assess\.js'\)/);
+  assert.match(html, /href="\/next\/\?ui_next=on" data-ui-next/);
   assert.match(read("wrangler.toml"), /\[assets\]\ndirectory = "\.\/ui"/);
 });
