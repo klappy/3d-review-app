@@ -25,6 +25,7 @@
   import Coverage from "./Coverage.svelte";
   import DocBar from "./DocBar.svelte";
   import PdfActions from '../actions/PdfActions.svelte';
+  import ReportProvenance from "./ReportProvenance.svelte";
   import PaperHead from "./PaperHead.svelte";
   import PaperLegend from "./PaperLegend.svelte";
   import ScoreBar from "./ScoreBar.svelte";
@@ -34,7 +35,7 @@
   import { G } from "./icons.js";
   import { out } from "./links.js";
   import { href } from "../href.js";
-  import { REPORT, currentLevelMin, snapshotTotal, fmtScore, footPrivacy, readingPrivacy, lensCards, scoreRows, comparedRows, radar, gapLead, countWord, evidenceSheets, detailedPages } from "./data.js";
+  import { REPORT, currentLevelMin, snapshotTotal, fmtScore, footPrivacy, readingPrivacy, lensCards, scoreRows, comparedRows, radar, gapLead, countWord, evidenceSheets, detailedPages, perspectiveRadars } from "./data.js";
 
   let { phone = false, theme = "light", report, pdfUrl = null, pdfToken = null } = $props();
   const namedPdfUrl = $derived(pdfUrl ? reportPdfFormatUrl(pdfUrl,'detailed') : null);
@@ -44,6 +45,7 @@
   const all = $derived(comparedRows(D, D.counts));
   const shape = $derived(radar(D, D.radar, D.counts));
   const sheets = $derived(evidenceSheets(cards));
+  const perspectiveShapes = $derived(perspectiveRadars(cards));
   // "How to read the scores" names the level minimum in force (served, else the safe 3): at 1 the board's words, "no answers".
   const MIN = currentLevelMin(), fewWords = MIN === 1 ? "no answers" : `fewer than ${MIN} answers`;
   const PAGES = $derived(detailedPages(cards));
@@ -53,7 +55,7 @@
 </script>
 
 {#snippet top()}<DocBar title={`Detailed report · ${PAGES} pages · ${D.review.title}`} other="Open the overview · 1 page" otherHref={href("report")} pdfUrl={namedPdfUrl} {pdfToken} /><LevelLegend />{/snippet}
-{#snippet foot(n)}<div class="pfoot"><span class="pf-text">{FOOT}</span><span class="pn">{n} of {PAGES}</span></div>{/snippet}
+{#snippet foot(n)}{#if n === 2}<ReportProvenance report={D} />{/if}<div class="pfoot"><span class="pf-text">{FOOT}</span><span class="pn">{n} of {PAGES}</span></div>{/snippet}
 {#snippet scores(rows)}
   {#each rows as row}
     <div class="barbell-row" data-kind="score"><!-- the numeric paper row (.paper .barbell-row[data-kind=score]); bb-label / bb-verdict -->
@@ -115,12 +117,26 @@
       {@render foot(2)}
     </div>
 {/snippet}
+{#snippet perspectiveSheet(model, i)}
+    <div class="paper" data-sheet="page" data-perspective-radar={model.lens}>
+      <div>
+        <div class="sheet-head" role="heading" aria-level="2">{model.label} subdimensions</div>
+        <p class="sheet-lead"><Coverage n={model.n} /></p>
+        <div class="radar-row"><Radar model={model.shape} measure="subdimensions" /><div class="radar-side">
+          <p class="sheet-text">Each spoke is this perspective’s own subdimension, scored out of 100. Each ring is 25 points. These areas differ from the shared-construct comparison.</p>
+          {#if model.n < 3}<p class="sheet-text">Limited data: these scores reflect only the {model.n === 1 ? "response" : "responses"} counted here.</p>{/if}
+          {#each model.shape.lenses.filter(l => l.skipped.length) as l}<p class="sheet-text">No score for {l.skipped.join(", ")}. Missing scores leave a gap.</p>{/each}
+        </div></div>
+      </div>
+      {@render foot(3 + i)}
+    </div>
+{/snippet}
 {#snippet evidenceSheet(sheet, i)}
     <div class="paper" data-sheet="page">
       <div class="sheet-head" data-v="0" role="heading" aria-level="2">Every area, with evidence{i ? " (continued)" : ""}</div>
       {#each sheet as c (c.lens)}{@render evidence(c)}{/each}
       {#if i === sheets.length - 1}{@render words()}{/if}
-      {@render foot(3 + i)}
+      {@render foot(3 + perspectiveShapes.length + i)}
     </div>
 {/snippet}
 {#snippet ptop()}<PhoneHeader state="nested" title="Detailed report" parent="Overview" back={href("report", { state: "overview" })} menuHref={out("menu")} />{/snippet}
@@ -137,6 +153,7 @@
   <div class="report-sheets">
     <div class="psheet" data-fit="a4">{@render page1()}</div>
     <div class="psheet" data-fit="a4">{@render page2()}</div>
+    {#each perspectiveShapes as model, i}<div class="psheet" data-fit="a4">{@render perspectiveSheet(model, i)}</div>{/each}
     {#each sheets as sheet, i}<div class="psheet" data-fit="a4">{@render evidenceSheet(sheet, i)}</div>{/each}
   </div>
   <a class="link" href={href("report", { state: "overview" })}>Back to the overview <Glyph d={G.arrow} /></a>
@@ -144,6 +161,6 @@
 {:else}
 <AppShell {theme} screen rhythm="report" {top}>
 <!-- §8.3 Report frame: main.l-main[data-rhythm=report] > .paper[data-sheet] sheets as direct children -->
-{@render page1()}{@render page2()}{#each sheets as sheet, i}{@render evidenceSheet(sheet, i)}{/each}
+{@render page1()}{@render page2()}{#each perspectiveShapes as model, i}{@render perspectiveSheet(model, i)}{/each}{#each sheets as sheet, i}{@render evidenceSheet(sheet, i)}{/each}
 </AppShell>
 {/if}

@@ -28,6 +28,7 @@
   import Glyph from "./Glyph.svelte";
   import DocBar from "./DocBar.svelte";
   import PdfActions from '../actions/PdfActions.svelte';
+  import ReportProvenance from "./ReportProvenance.svelte";
   import PaperHead from "./PaperHead.svelte";
   import PaperLegend from "./PaperLegend.svelte";
   import BandBar from "./BandBar.svelte";
@@ -117,6 +118,7 @@
         {#if next.length}<ol class="sheet-list">{#each next as n}<li>{lensLabel(n.lens)} · {n.area} — {LEVEL_WORD[n.level]}</li>{/each}</ol>
         {:else}<p class="sheet-text" data-v="14">No area reads Needs support or Needs urgent attention.</p>{/if}
       </div>
+      <ReportProvenance report={D} />
       <div class="pfoot"><span class="pf-text">Built from {snapshotTotal(cards)} responses on {D.review.builtOn} · levels are bands, not scores · {footPrivacy()}</span><span class="pn">1 of 1</span></div>
     </div>
 {/snippet}

@@ -83,6 +83,32 @@ components:
             "minLength": 1,
             "description": "At most256 UTF-8 bytes."
           },
+          "report_selection": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "schema",
+              "selected_perspectives"
+            ],
+            "description": "Immutable active selection captured atomically when this report was built. Optional for historical reports, whose selection is unknown. An empty set means no active selected perspectives at capture, not that a perspective was never asked. Archived responding perspectives can still have scored evidence.",
+            "properties": {
+              "schema": {
+                "const": "3d-report-selection-v1"
+              },
+              "selected_perspectives": {
+                "type": "array",
+                "maxItems": 3,
+                "uniqueItems": true,
+                "items": {
+                  "enum": [
+                    "Church",
+                    "Community",
+                    "Translation Team"
+                  ]
+                }
+              }
+            }
+          },
           "lenses": {
             "type": "array",
             "items": {

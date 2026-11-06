@@ -294,7 +294,7 @@ describe("each board renders as a screen", () => {
     expect(all(a, ".glass[data-lens] .h2")).toEqual(["Translation team", "Community", "Church"]);
     expect(all(a, ".glass[data-lens=church] .lvl-word")).toEqual(["Growing", "Growing", "Needs support", "Strong", "Strong", "Growing", "More input needed"]);
     expect(text(a)).toContain("Where the perspectives disagree");
-    expect(all(a, "a.btn")).toEqual(expect.arrayContaining(["Overview report · 1 page", "Detailed report · 4 pages", "Share results with someone"]));
+    expect(all(a, "a.btn")).toEqual(expect.arrayContaining(["Overview report · 1 page", "Detailed report · 7 pages", "Share results with someone"]));
     const del = a.querySelector(".menu button.mi.danger")!;
     expect(del.getAttribute("aria-disabled")).toBe("true");
     expect(text(a.querySelector(".mi-why"))).toBe("Reviews with responses can't be deleted. This one has 18.");
@@ -512,7 +512,7 @@ describe("each board renders as a screen", () => {
     expect([...a.querySelectorAll(".paper .bb-na")].map((n) => [n.tagName, n.parentElement!.className, text(n)])).toEqual([["SPAN", "bb-verdict", "· Community not asked"]]);
     expect(text(a)).not.toMatch(/\S· /);
   });
-  it("ReportDetailed: four sheets, radar, numeric barbells, evidence tables", () => {
+  it("ReportDetailed: shared chart plus three own-perspective sheets, numeric barbells, evidence tables", () => {
     { // §8.11 evidence table: .ev-card > .ev-head + table.ev-table; Score and Evidence end-aligned, Score .tab-n, Evidence .ev-muted
       const ev = mount(ReportDetailed).querySelector(".ev-card[data-lens=team]")!;
       expect([...ev.children].map((k) => k.className)).toEqual(["ev-head", "ev-table"]);
@@ -522,8 +522,8 @@ describe("each board renders as a screen", () => {
       expect(mount(ReportDetailed).querySelector(".ev-card .tbl, .ev-card .th, .ev-card .td")).toBeNull();
     }
     const a = mount(ReportDetailed);
-    expect(all(a, ".pfoot span:last-child")).toEqual(["1 of 4", "2 of 4", "3 of 4", "4 of 4"]);
-    expect(a.querySelectorAll(".paper[data-sheet=page]").length).toBe(4);
+    expect(all(a, ".pfoot span:last-child")).toEqual(Array.from({ length: 7 }, (_, i) => `${i + 1} of 7`));
+    expect(a.querySelectorAll(".paper[data-sheet=page]").length).toBe(7);
     expect(a.querySelector("svg[role=img][aria-label^='Radar']")).not.toBeNull();
     expect(a.querySelectorAll(".paper .score-track").length).toBe(3 + 7);
     expect(all(a, "table").length).toBe(3);
@@ -561,15 +561,15 @@ describe("each board renders as a screen", () => {
     expect(r.querySelectorAll(".paper .band-track").length).toBe(3); // the two gaps and the first area in one band (Q13)
     const d = mount(ReportDetailed, { report: D });
     expect(d.querySelectorAll(H1).length).toBe(1);
-    // two perspectives: three sheets, no empty "(continued)" page; their words close page 3 (R4-5)
-    expect(d.querySelectorAll(".paper[data-sheet=page]").length).toBe(3);
-    expect(all(d, ".pfoot span:last-child")).toEqual(["1 of 3", "2 of 3", "3 of 3"]);
-    expect(text(d.querySelector("header[data-variant=document]"))).toContain("Detailed report · 3 pages");
+    // two perspectives: five sheets including two own-perspective radars, no empty "(continued)" page; their words close page 3 (R4-5)
+    expect(d.querySelectorAll(".paper[data-sheet=page]").length).toBe(5);
+    expect(all(d, ".pfoot span:last-child")).toEqual(Array.from({ length: 5 }, (_, i) => `${i + 1} of 5`));
+    expect(text(d.querySelector("header[data-variant=document]"))).toContain("Detailed report · 5 pages");
     expect(text(d)).not.toContain("(continued)");
     expect(all(d, ".paper[data-sheet=page]:last-child [role=heading][aria-level='2']")).toEqual(["Every area, with evidence", "In their words"]);
     expect(all(d, SHEET_H2)[0]).toBe("The two perspectives as one shape");
     expect(emptyHeadings(d)).toEqual([]);
-    expect(text(r.querySelector("header[data-variant=document]"))).toContain("Open the detailed report · 3 pages");
+    expect(text(r.querySelector("header[data-variant=document]"))).toContain("Open the detailed report · 5 pages");
     expect(all(d, ".ev-card[data-lens] > .ev-head strong")).toEqual(["Translation team", "Community"]);
     expect(text(d)).toContain("Church not asked");
     for (const el of [r, d]) {
@@ -648,7 +648,7 @@ describe("each board renders as a screen", () => {
     expect(btn(hub, "Read").getAttribute("href")).toBe("?ui_next=on&screen=report-detailed");
     for (const [C, props, micro, sheets, other, back, dl] of [
       [Report, { phone: true, state: "overview" }, "Overview · 1 page · A4 scaled to the width; pinch to zoom", 1, "Open the detailed report", "Reports", "Download the overview (PDF)"],
-      [ReportDetailed, { phone: true }, "Detailed · 4 pages · A4 scaled to the width; pinch to zoom", 4, "Back to the overview", "Overview", "Download this report (PDF)"],
+      [ReportDetailed, { phone: true }, "Detailed · 7 pages · A4 scaled to the width; pinch to zoom", 7, "Back to the overview", "Overview", "Download this report (PDF)"],
     ] as const) {
       const a = mount(C, props as Props);
       expect(text(a.querySelector("main > span.micro"))).toBe(micro);
@@ -738,7 +738,7 @@ describe("nesting (8.1), no inline style, one .btn-primary, dark theme", () => {
     const score = d.querySelector(".paper .score-track")!;
     expect([...new Set([...score.children].map((e) => e.className))]).toEqual(["score-line", "score-band", "score-val", "pt"]);
     expect(d.querySelectorAll(".paper .bb-verdict > span.nowrap").length).toBe(5);
-    expect([...d.querySelectorAll(".paper .sheet-head")].filter((h) => !h.closest('[aria-label="Saved report details"]')).map((h) => h.getAttribute("data-v"))).toEqual(["4", "2", "2", "8", "0", "0", null]); // the board's 4/2 · 2/8 · 0 · 0 + In their words
+    expect([...d.querySelectorAll(".paper .sheet-head")].filter((h) => !h.closest('[aria-label="Saved report details"]')).map((h) => h.getAttribute("data-v"))).toEqual(["4", "2", "2", "8", null, null, null, "0", "0", null]); // the board's 4/2 · 2/8 · 0 · 0 + In their words
   });
   it("every route has exactly one h1", () => {
     for (const [board, , C, props] of BOARDS) expect(mount(C, props).querySelectorAll(H1).length, board).toBe(1);
@@ -1129,7 +1129,7 @@ describe("document top bar fit (design-system.md Top bar variants · document ba
     expect(text(h3)).toBe(long);
     expect(h3.getAttribute("title")).toBe(long);
     expect(all(bar, ".top-end > span.small")).toEqual(["Two reports, built from the same answers."]);
-    expect(all(bar, ".top-end .btn")).toEqual(["Open the detailed report · 4 pages", "Download this report (PDF)", "Print"]);
+    expect(all(bar, ".top-end .btn")).toEqual(["Open the detailed report · 7 pages", "Download this report (PDF)", "Print"]);
     const base = readFileSync(resolve(__dirname, "../ui-next/components/base.css"), "utf8");
     expect(base).toContain(".top[data-variant=document]>.h3{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}");
     expect(base).toContain(".top[data-variant=document] .top-end>*{flex:none;white-space:nowrap}");
@@ -1138,4 +1138,43 @@ describe("document top bar fit (design-system.md Top bar variants · document ba
     expect(base).toContain("@media (max-width: 1199.98px){.top[data-variant=document]{height:auto;min-height:64px;flex-wrap:wrap;row-gap:8px;padding-top:10px;padding-bottom:10px}.top[data-variant=document] .top-end{margin-left:auto}}");
     expect(base).toMatch(/\.top\{height:64px;/); // the generic top bar and the document bar at 1200px+ keep the fixed 64px
   });
+});
+
+it('Summit one-response Detailed draws the genuine own-perspective radar on desktop and phone, using snapshot counts only', () => {
+  const base = REPORT.desktop;
+  const community = base.payload.lenses.find((l: any) => l.lens === 'community');
+  const payload = {...base.payload,lenses:[community],cross_lens_multi:[],cross_lens_single:[],evidence:[{label:'community — Written',n:1}]};
+  const report = {...base,payload,counts:{community:99}};
+  for (const phone of [false,true]) {
+    const el=mount(ReportDetailed,{report,phone});
+    const sheet=el.querySelector('[data-perspective-radar=community]')!;
+    expect(sheet).not.toBeNull();expect(text(sheet)).toContain('1 response');expect(text(sheet)).toContain('Limited data');
+    const svg=sheet.querySelector('svg[role=img]')!;
+    expect(svg.getAttribute('aria-label')).toContain('subdimensions');
+    expect(svg.querySelectorAll('polygon[data-lens=community]').length).toBe(1);
+    expect(svg.querySelectorAll('circle[data-lens=community]').length).toBe(community.sub_dimensions.length);
+    expect(el.querySelectorAll('.paper[data-sheet=page]').length).toBe(4);
+    expect(all(el,'.pfoot span:last-child')).toEqual(['1 of 4','2 of 4','3 of 4','4 of 4']);
+  }
+  const unknown={...report,payload:{...payload,evidence:[]}};
+  expect(mount(ReportDetailed,{report:unknown}).querySelector('[data-perspective-radar]')).toBeNull();
+  useLevelMinimum(3);
+  expect(mount(ReportDetailed,{report}).querySelector('[data-perspective-radar]')).toBeNull();
+});
+
+it('G02: Next saved-report readers cannot inherit changing live selection; collection hub remains current',()=>{
+ const community=REPORT.desktop.payload.lenses.find((l:any)=>l.lens==='community');
+ const payload={...REPORT.desktop.payload,lenses:[community],cross_lens_multi:[],cross_lens_single:[],evidence:[{label:'community — Written',n:1}]};
+ const base={payload,reportId:'saved-snapshot',created_at:'2026-11-05T12:00:00Z',review:REPORT.desktop.review,counts:{community:99,team:0,church:0},sent:['team','community','church']};
+ const before=JSON.stringify(base);
+ for(const screen of ['report','report-detailed','results-gaps','results-answers'])for(const phone of [false,true]){
+  const a=liveReport(base,{screen,phone}),b=liveReport({...base,sent:['community']},{screen,phone});
+  expect(a.sent).toEqual([]);expect(a.selectionKnown).toBe(false);expect(a).toEqual(b);expect(a.payload).toBe(payload);
+ }
+ const report=liveReport(base,{screen:'report'});
+ for(const C of [Report,ReportDetailed]){
+  const view=mount(C,{report});expect(text(view)).toContain('Other perspectives’ participation is unknown.');
+  expect(view.querySelector('.sheet-tile[data-lens=church]')).toBeNull();expect(text(view)).not.toContain('Church not asked');
+ }
+ expect(liveReport(base,{screen:'results'}).sent).toEqual(base.sent);expect(JSON.stringify(base)).toBe(before);
 });

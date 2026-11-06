@@ -75,6 +75,8 @@ binding = "PDF_BROWSER"
 
 [env.production.vars]
 ENVIRONMENT = "production"
+# Temporary Summit numeric reports/levels from one response. Remove after Summit to restore 5/3 floors.
+SUMMIT_ONE_RESPONSE_REPORTS = "enabled"
 PARTICIPANT_REPORTS = "enabled"
 PUBLIC_ORIGIN = "https://3dreview.app"
 MAIL_FROM = "noreply@3dreview.app"

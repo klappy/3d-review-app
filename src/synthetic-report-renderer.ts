@@ -7,7 +7,7 @@ import { rollupReference, crossLensReference, translationTypeReference, legacyTr
 import { buildReferenceNarrative } from './reference-narrative.js';
 import model from './pinned-report-model.json';
 import labels from './pinned-report-labels.json';
-import {translationBriefItems, TRANSLATION_BRIEF_SOURCE} from './translation-brief-amendment.js';
+import {translationBriefItems, translationBriefSource, TRANSLATION_BRIEF_SOURCE} from './translation-brief-amendment.js';
 
 export const REPORT_SCHEMA = '3d-synthetic-assessment-report-v1';
 export const LEGACY_REPORT_VERSIONS = Object.freeze({ scorer:'steve-f042cde-single-assessment-v1', narrative:'steve-f042cde-rule-narrative-v1', policy:'synthetic-current-assessment-asof-query-v1' });
@@ -100,7 +100,8 @@ function assemble(aid:string,rows:readonly CaptureRow[],legacy=false) {
   const translation_type_agreement=cat?{construct_name:name('translation-type-agreement'),team_values:cat.team_values.sort(sourceOrder),church_values:cat.church_values.sort(sourceOrder),agree:cat.agree,...(modern?{team_statuses:modern.team_statuses,church_statuses:modern.church_statuses}:{})}:null;
   const evidence=[...evidenceCounts].sort((a,b)=>sourceOrder(a[0],b[0])).map(([form_type,n])=>{const entry=labels.forms.find(x=>x.form_type===form_type);if(!entry)refuse();return {form_type,label:entry.label,n};});
   const narrative=buildReferenceNarrative(lenses,cross_lens_multi.map(x=>({construct_name:x.construct_name,agreement:x.agreement_range,lens_scores:x.lens_scores})),evidence);
-  const payload={schema_version:REPORT_SCHEMA,synthetic:true as const,source_commit:model.commit,versions:legacy?LEGACY_REPORT_VERSIONS:REPORT_VERSIONS,...(!legacy?{instrument_amendment:TRANSLATION_BRIEF_SOURCE}:{}),assessment_id:aid,lenses,cross_lens_multi,cross_lens_single,standalone_indicators,translation_type_agreement,evidence,narrative};
+  const instrumentAmendment=!legacy&&[...parsed.values()].some(({t})=>translationBriefSource(t.items,t.sourceRef))?TRANSLATION_BRIEF_SOURCE:null;
+  const payload={schema_version:REPORT_SCHEMA,synthetic:true as const,source_commit:model.commit,versions:legacy?LEGACY_REPORT_VERSIONS:REPORT_VERSIONS,...(instrumentAmendment?{instrument_amendment:instrumentAmendment}:{}),assessment_id:aid,lenses,cross_lens_multi,cross_lens_single,standalone_indicators,translation_type_agreement,evidence,narrative};
   if(lenses.length>3||cross.length>8||standalone_indicators.length>111||evidence.length>9||narrative.length>32)refuse();
   boundedText(aid);for(const l of lenses){boundedText(l.lens);numeric(l.score);count(l.n_subdims_included);if(l.sub_dimensions.length>17)refuse();for(const s of l.sub_dimensions){boundedText(s.sub_dimension);numeric(s.score);count(s.n_items_included);}}
   for(const c of cross){boundedText(c.construct_name);numeric(c.triangulated_mean);count(c.n_lenses_included);if(c.lens_scores.length!==c.n_lenses_included||c.lens_scores.length>3)refuse();if(c.agreement_range===null){if(c.n_lenses_included!==1)refuse();}else numeric(c.agreement_range);for(const l of c.lens_scores){boundedText(l.lens);numeric(l.score);}}

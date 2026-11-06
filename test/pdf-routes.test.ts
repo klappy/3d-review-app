@@ -59,6 +59,12 @@ describe('PDF endpoints preserve existing authorization and report policy',()=>{
     expect((await request(`${survey}?format=overview`)).status).toBe(400);
     expect((await db.prepare('SELECT id,payload_sha256,capture_digest,created_at FROM synthetic_report ORDER BY id').all()).results).toEqual(before);
   });
+  it('detailed named export body carries the saved report id and build time (G02 provenance)',async()=>{
+    const created=(await db.prepare('SELECT created_at FROM synthetic_report WHERE id=?').bind(reportId).first<{created_at:string}>())!.created_at;
+    render.mockClear();expect((await request(`/v2/reports/${reportId}/pdf?format=detailed`)).status).toBe(200);
+    const html=(render.mock.calls as any)[0][1].html as string;expect(html).toContain(`Report: ${reportId}`);expect(html).toContain(`Built: ${created}`);
+    for(const lens of ['team','community','church'])expect(html,lens).toMatch(new RegExp(`class="sheet-tile"[^>]*data-lens="${lens}"`));
+  });
   it('named formats retain privacy, outsider, unavailable and actual session-revocation refusals',async()=>{
     for(const format of ['overview','detailed']){
       const path=`/v2/reports/${reportId}/pdf?format=${format}`;render.mockClear();

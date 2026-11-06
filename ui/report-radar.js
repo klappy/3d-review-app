@@ -81,7 +81,8 @@ function svgEl(doc, tag, attrs = {}, text) {
   return el;
 }
 
-export const radarCss = `.lens-radar figure{margin:8px 0 0;container-type:inline-size}.lens-radar svg{display:block;width:100%;max-width:460px;height:auto;margin:0 auto;overflow:visible}
+export const radarCss = `.lens-radar[data-perspective-radar]{break-inside:avoid}
+.lens-radar figure{margin:8px 0 0;container-type:inline-size}.lens-radar svg{display:block;width:100%;max-width:460px;height:auto;margin:0 auto;overflow:visible}
 .lens-radar .ring{fill:none;stroke:var(--line);stroke-width:1}.lens-radar .spoke{stroke:var(--line);stroke-width:1}
 .lens-radar .ring-label{font-size:13px;fill:var(--secondary)}.lens-radar .spoke-label{font-size:${LABEL_FS}px;fill:var(--ink)}
 .lens-radar [data-radar-lens] polygon{fill-opacity:.12;stroke-width:2;fill:var(--secondary);stroke:var(--secondary)}.lens-radar [data-radar-lens] polyline{fill:none;stroke-width:2;stroke:var(--secondary)}
@@ -143,12 +144,12 @@ function narrowLayout(spokes) {
   const fs = SPOKE_PX * BASE.w / NARROW_MIN, labels = layoutLabels(spokes, fs, 0, fs * RING_PX / SPOKE_PX, BASE.w / 2);
   return { labels, box: radarViewBox(labels, fs) };
 }
-function radarSvg(doc, model, variant) {
+function radarSvg(doc, model, variant, copy = radarCopy) {
   const count = model.spokes.length;
   // Wide: main 8646a5b's fixed box exactly (review #546 HOLD k0005: growing it shrank the desktop chart).
   const { labels, box: vb } = variant === 'narrow' ? narrowLayout(model.spokes) : { labels: layoutLabels(model.spokes, LABEL_FS, WRAP), box: BASE };
   const svg = svgEl(doc, 'svg', { class: `radar-${variant}`, viewBox: [vb.x, vb.y, vb.w, vb.h].map(fmt).join(' '), role: 'img', style: `--vbw:${fmt(vb.w)}` });
-  svg.append(svgEl(doc, 'title', {}, radarCopy.title));
+  svg.append(svgEl(doc, 'title', {}, copy.title));
   for (const ring of RINGS) {
     svg.append(svgEl(doc, 'polygon', { class: 'ring', points: model.spokes.map((_, i) => point(i, count, ring).map(fmt).join(',')).join(' ') }));
     if (variant === 'narrow' && !NARROW_RINGS.includes(ring)) continue;
@@ -191,12 +192,16 @@ function radarSvg(doc, model, variant) {
 
 /** Full report: detached DOM section, or null when fewer than three areas were scored by two or more perspectives. */
 export function renderLensRadar({ doc, report }) {
-  const model = radarModel(report);
+  return renderRadarSection({ doc, model: radarModel(report) });
+}
+
+/** Shared SVG presentation; callers supply an already disclosed numeric model and explicit measure copy. */
+export function renderRadarSection({ doc, model, copy = radarCopy, kind = "lensRadar" }) {
   if (!model || typeof doc.createElementNS !== 'function') return null;
-  const h = doc.createElement('h4'); h.textContent = radarCopy.heading;
-  const p = doc.createElement('p'); p.className = 'small muted'; p.textContent = radarCopy.intro;
-  const fig = doc.createElement('figure'); fig.append(radarSvg(doc, model, 'wide'), radarSvg(doc, model, 'narrow'));
-  const cap = doc.createElement('figcaption'); cap.className = 'small muted'; cap.textContent = radarCopy.scale; fig.append(cap);
+  const h = doc.createElement('h4'); h.textContent = copy.heading;
+  const p = doc.createElement('p'); p.className = 'small muted'; p.textContent = copy.intro;
+  const fig = doc.createElement('figure'); fig.append(radarSvg(doc, model, 'wide', copy), radarSvg(doc, model, 'narrow', copy));
+  const cap = doc.createElement('figcaption'); cap.className = 'small muted'; cap.textContent = copy.scale; fig.append(cap);
   const legend = doc.createElement('ul'); legend.className = 'lens-radar-legend';
   for (const { lens } of model.lenses) {
     const li = doc.createElement('li'); const dot = doc.createElement('span');
@@ -206,7 +211,7 @@ export function renderLensRadar({ doc, report }) {
   const style = doc.createElement('style'); style.textContent = radarCss;
   const section = doc.createElement('section');
   section.className = 'lens-radar report-detail-section glass panel';
-  section.dataset.lensRadar = '';
+  section.dataset[kind] = '';
   section.append(h, p, fig, legend, style);
   return section;
 }
