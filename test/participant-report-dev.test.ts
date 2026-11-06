@@ -1,7 +1,8 @@
+import {reportResultErrors} from './report-contract-check';
 import {get as getReport} from '../src/handlers/report';
 import {form,submit} from '../src/handlers/response';
 import {print as printSurvey} from '../src/handlers/survey';
-import {render as renderTemplate} from '../src/handlers/template';
+import {list as listTemplates,get as getTemplate,render as renderTemplate} from '../src/handlers/template';
 import {parseItems} from '../src/handlers/common';
 import {participantReportsAllowed} from '../src/report-admission';
 import {readFileSync} from 'node:fs';
@@ -97,7 +98,12 @@ describe('participant-source reports (DEV only)',()=>{
      expect(items.find(i=>i.id===itemId).options).toEqual(expect.arrayContaining([expect.objectContaining({code:'no-brief',text})]));
      const member={...c,principal:{kind:'user',id:'person_mara'}} as Ctx;
      const printed=await printSurvey(member,{aid,sid});expect(printed.result.html).toContain(text);
-     const template=await renderTemplate(member,{id:tid,ver:2});expect((template.result.items as any[]).find(i=>i.id===itemId).options).toEqual(expect.arrayContaining([expect.objectContaining({code:'no-brief',text})]));
+     const catalogue=await listTemplates(member,{});const details=await getTemplate(member,{id:tid,ver:2});
+     const entry=(catalogue.result.templates as any[]).find(t=>t.id===tid&&t.version===2);
+     expect(entry.instrument_amendment).toBe('605edb47d2280568f0f5860f7b1921c12a814222');
+     expect(entry.instrument_amendment).toBe((details.result.template as any).instrument_amendment);
+     expect(entry).not.toHaveProperty('items_json');
+     const template=await renderTemplate(member,{id:tid,ver:2});expect((template.result.template as any).instrument_amendment).toBe(entry.instrument_amendment);expect((template.result.items as any[]).find(i=>i.id===itemId).options).toEqual(expect.arrayContaining([expect.objectContaining({code:'no-brief',text})]));
      const raw=await db.prepare('SELECT * FROM survey_template WHERE id=? AND version=2').bind(tid).first<any>();
      const full=parseItems(raw),answers=Object.fromEntries(full.map(i=>[i.id,i.type==='text'?'fixture':i.type==='multi'?[i.options![0].code]:i.options![0].code]));answers[itemId]='no-brief';
      const submitted=await submit(c,{idempotency_key:'decision25_'+tid,answers});
@@ -125,7 +131,7 @@ describe('participant-source reports (DEV only)',()=>{
    const c={...ctx('production'),env:{ENVIRONMENT:'production',PARTICIPANT_REPORTS:'enabled'},traceId:'tr_decision25_privacy',log:()=>{}} as unknown as Ctx;
    const built=await store.buildMaterialized(c,target);if(!built.ok)throw new Error('fixture build held');
    expect((built.value.payload as any).translation_type_agreement.church_statuses).toEqual(['not-aware']);
-   const disclosed=await getReport(c,{id:built.value.id});
+   const disclosed=await getReport(c,{id:built.value.id});expect(reportResultErrors('cap.report.get',disclosed.result)).toEqual([]);
    const visible=(disclosed.result.report as any).payload.translation_type_agreement;
    expect(disclosed.result.level_minimum_responses).toBe(3);
    expect(visible.team_statuses).toEqual(['no-brief']);expect(visible.church_statuses).toEqual([]);expect(visible.church_values).toEqual([]);expect(visible.agree).toBe(null);

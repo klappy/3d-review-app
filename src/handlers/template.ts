@@ -12,7 +12,7 @@ export const list: Handler = async ctx => {
   requireUser(ctx);
   // B42: the catalogue offers instruments for NEW surveys. Legacy import-only templates (Mid-Level v1 (legacy)) stay out of it so each
   // group type appears once; they remain reachable by id (get/render/select via loadTemplate) and keep showing on the imported surveys.
-  const {results} = await ctx.db.prepare("SELECT id, version, name, perspective, source_ref, published_at FROM survey_template WHERE published_at IS NOT NULL ORDER BY name, version DESC").all<TemplateRow>();
+  const {results} = await ctx.db.prepare("SELECT id, version, name, perspective, source_ref, published_at, items_json FROM survey_template WHERE published_at IS NOT NULL ORDER BY name, version DESC").all<TemplateRow>();
   return {result:{templates:results.filter(t=>!LEGACY_TEMPLATE_IDS.has(t.id)).map(meta)}};
 };
 export const get: Handler = async (ctx,params) => {

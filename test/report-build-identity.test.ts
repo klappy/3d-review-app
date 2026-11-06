@@ -1,3 +1,4 @@
+import {schemaErrors,reportPayloadSchema} from './report-contract-check';
 import {describe,it,expect} from 'vitest';
 import {createHash} from 'node:crypto';
 import {attestPackedCapture} from '../src/report-capture';
@@ -63,4 +64,9 @@ describe('report build identity on a fixed 200-response capture',()=>{
     const same=await attestCapture(fixture.assessmentId,c.capture.rows.map(r=>({...r})),true);
     expect(same.eligible&&same.captureDigest).toBe(PINNED.captureDigest);
   });
+});
+
+it('published payload contract accepts exact historical and amended renderer outputs',async()=>{
+ const capture=await attestPackedCapture(fixture.assessmentId,fixture.packedCapture,true);if(!capture.eligible)throw Error('held');
+ for(const renderer of [renderLegacyAttestedCapture,renderAttestedCapture]){const output=await renderer(capture.capture);expect(schemaErrors(reportPayloadSchema,output.payload)).toEqual([]);}
 });
