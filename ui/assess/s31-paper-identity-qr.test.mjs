@@ -66,6 +66,14 @@ test('Next paper preserves the exact existing URL and participant client; both s
   assert.equal(paperLink(null), null);
 });
 
+test('review #615: backslashes cannot turn the authority into an unsupported browser path', () => {
+  for (const url of [String.raw`https://example.test\other/#survey=abc`, String.raw`https://example.test\other/next/?ui_next=on#survey=abc`, String.raw`https://example.test\/#survey=abc`]) {
+    assert.equal(paperLink({ url }), null, url);
+    assert.equal(printableLink({ url, qr: paperLink({ url: URL1 }).qr }), null, url);
+    assert.match(printDocumentHtml({ ...base, link: { url, qr: paperLink({ url: URL1 }).qr } }), /No shared link/);
+  }
+});
+
 test('activeSurveyLink reads the active link through issue_link and never mints one', async () => {
   const calls = [];
   const api = active => async (url, init) => { calls.push({ url, mode: init.body.mode }); return init.body.mode === 'dry_run' ? { confirm_token: 'ct', ...(active ? { reuses: 'invite_1' } : {}) } : { link_id: 'invite_1', entry_fragment: '#survey=link_AbC123-_x', reused: true }; };
