@@ -71,6 +71,21 @@ test('missing Next entry HTML, failed probe or refused navigation falls back to 
   }
 });
 
+test('a hash or query navigation while the entry probe is pending cannot be overwritten', async () => {
+  for (const change of [{ hash: '#survey=existing_token' }, { hash: '#session=EXISTING' },
+    { search: '?ui=legacy' }, { search: '?return_to=%2F%23project%2Fp' }]) {
+    let finishProbe, loads = 0;
+    const probe = new Promise(resolve => { finishProbe = resolve; });
+    const location = { pathname: '/', search: '', hash: '', replace: () => { throw Error('stale navigation'); } };
+    const pending = bootDefaultEntry({ location, probeNext: () => probe, loadCurrent: async () => { loads++; } });
+    Object.assign(location, change);
+    finishProbe(true);
+    assert.deepEqual(await pending, { ui: 'current' });
+    assert.equal(loads, 1);
+    for (const [key, value] of Object.entries(change)) assert.equal(location[key], value);
+  }
+});
+
 test('preparation is inactive; rollback is restoring the original legacy bootstrap', () => {
   const html = readFileSync(new URL('../ui/index.html', import.meta.url), 'utf8');
   assert.match(html, /<script type="module" src="\/assess\/assess\.js"><\/script>/);

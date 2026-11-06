@@ -29,6 +29,9 @@ tokens, invitations, surveys, reports, access rules or the existing UI internals
   No persistent
   default preference is introduced. The explicit Next query avoids an old DEV
   gallery opt-out taking over the new entry.
+- The URL decision is checked again after the asynchronous probe. A newly
+  selected survey/session hash, legacy opt-in or return query cannot be replaced
+  by a stale default redirect.
 
 ## Activation dependency and controlled wiring
 
