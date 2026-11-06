@@ -30,7 +30,7 @@ var init_sync_only_pdf_context = __esm({
   }
 });
 
-// ../3d-611-rebase/node_modules/svelte/src/constants.js
+// node_modules/svelte/src/constants.js
 var EACH_INDEX_REACTIVE = 1 << 1;
 var EACH_IS_CONTROLLED = 1 << 2;
 var EACH_IS_ANIMATED = 1 << 3;
@@ -53,7 +53,7 @@ var ELEMENT_PRESERVE_ATTRIBUTE_CASE = 1 << 1;
 var ELEMENT_IS_INPUT = 1 << 2;
 var UNINITIALIZED = /* @__PURE__ */ Symbol("uninitialized");
 
-// ../3d-611-rebase/node_modules/svelte/src/escaping.js
+// node_modules/svelte/src/escaping.js
 var ATTR_REGEX = /[&"<]/g;
 var CONTENT_REGEX = /[&<]/g;
 function escape_html(value, is_attr) {
@@ -71,7 +71,7 @@ function escape_html(value, is_attr) {
   return escaped2 + str.substring(last);
 }
 
-// ../3d-611-rebase/node_modules/clsx/dist/clsx.mjs
+// node_modules/clsx/dist/clsx.mjs
 function r(e) {
   var t, f, n = "";
   if ("string" == typeof e || "number" == typeof e) n += e;
@@ -86,7 +86,7 @@ function clsx() {
   return n;
 }
 
-// ../3d-611-rebase/node_modules/svelte/src/internal/shared/utils.js
+// node_modules/svelte/src/internal/shared/utils.js
 var is_array = Array.isArray;
 var index_of = Array.prototype.indexOf;
 var includes = Array.prototype.includes;
@@ -105,7 +105,7 @@ function deferred() {
   return { promise, resolve, reject };
 }
 
-// ../3d-611-rebase/node_modules/svelte/src/internal/shared/attributes.js
+// node_modules/svelte/src/internal/shared/attributes.js
 var replacements = {
   translate: /* @__PURE__ */ new Map([
     [true, "yes"],
@@ -248,14 +248,14 @@ function to_style(value, styles) {
   return value == null ? null : String(value);
 }
 
-// ../3d-611-rebase/node_modules/esm-env/browser-fallback.js
+// node_modules/esm-env/browser-fallback.js
 var browser_fallback_default = typeof window !== "undefined";
 
-// ../3d-611-rebase/node_modules/esm-env/dev-fallback.js
+// node_modules/esm-env/dev-fallback.js
 var node_env = globalThis.process?.env?.NODE_ENV;
 var dev_fallback_default = node_env && !node_env.toLowerCase().startsWith("prod");
 
-// ../3d-611-rebase/node_modules/svelte/src/internal/client/constants.js
+// node_modules/svelte/src/internal/client/constants.js
 var DERIVED = 1 << 1;
 var EFFECT = 1 << 2;
 var RENDER_EFFECT = 1 << 3;
@@ -291,7 +291,7 @@ var IS_XHTML = (
   !!globalThis.document?.contentType && /* @__PURE__ */ globalThis.document.contentType.includes("xml")
 );
 
-// ../3d-611-rebase/node_modules/svelte/src/internal/shared/errors.js
+// node_modules/svelte/src/internal/shared/errors.js
 function lifecycle_outside_component(name) {
   if (dev_fallback_default) {
     const error = new Error(`lifecycle_outside_component
@@ -304,10 +304,10 @@ https://svelte.dev/e/lifecycle_outside_component`);
   }
 }
 
-// ../3d-611-rebase/node_modules/svelte/src/internal/flags/index.js
+// node_modules/svelte/src/internal/flags/index.js
 var async_mode_flag = false;
 
-// ../3d-611-rebase/node_modules/svelte/src/internal/shared/context.js
+// node_modules/svelte/src/internal/shared/context.js
 function get_parent_context(context2) {
   let parent = context2.p;
   while (parent !== null && parent.c === null) {
@@ -322,15 +322,15 @@ function get_or_init_context_map(context2, name) {
   return context2.c ??= new Map(get_parent_context(context2) || void 0);
 }
 
-// ../3d-611-rebase/node_modules/svelte/src/internal/client/reactivity/status.js
+// node_modules/svelte/src/internal/client/reactivity/status.js
 var STATUS_MASK = ~(DIRTY | MAYBE_DIRTY | CLEAN);
 
-// ../3d-611-rebase/node_modules/svelte/src/internal/server/hydration.js
+// node_modules/svelte/src/internal/server/hydration.js
 var BLOCK_OPEN = `<!--${HYDRATION_START}-->`;
 var BLOCK_OPEN_ELSE = `<!--${HYDRATION_START_ELSE}-->`;
 var BLOCK_CLOSE = `<!--${HYDRATION_END}-->`;
 
-// ../3d-611-rebase/node_modules/svelte/src/utils.js
+// node_modules/svelte/src/utils.js
 var DOM_BOOLEAN_ATTRIBUTES = [
   "allowfullscreen",
   "async",
@@ -411,7 +411,7 @@ var RUNES = (
   ]
 );
 
-// ../3d-611-rebase/node_modules/svelte/src/internal/server/errors.js
+// node_modules/svelte/src/internal/server/errors.js
 function async_local_storage_unavailable() {
   const error = new Error(`async_local_storage_unavailable
 The node API \`AsyncLocalStorage\` is not available, but is required to use async server rendering.
@@ -455,7 +455,7 @@ https://svelte.dev/e/server_context_required`);
   throw error;
 }
 
-// ../3d-611-rebase/node_modules/svelte/src/internal/server/context.js
+// node_modules/svelte/src/internal/server/context.js
 var ssr_context = null;
 function set_ssr_context(v) {
   ssr_context = v;
@@ -480,7 +480,7 @@ function pop() {
   ssr_context.p;
 }
 
-// ../3d-611-rebase/node_modules/svelte/src/internal/server/warnings.js
+// node_modules/svelte/src/internal/server/warnings.js
 var bold = "font-weight: bold";
 var normal = "font-weight: normal";
 function unresolved_hydratable(key, stack) {
@@ -500,7 +500,7 @@ https://svelte.dev/e/unresolved_hydratable`,
   }
 }
 
-// ../3d-611-rebase/node_modules/svelte/src/internal/server/render-context.js
+// node_modules/svelte/src/internal/server/render-context.js
 var current_render = null;
 var context = null;
 function get_render_context() {
@@ -546,7 +546,7 @@ function in_webcontainer() {
   return !!globalThis.process?.versions?.webcontainer;
 }
 
-// ../3d-611-rebase/node_modules/svelte/src/internal/server/crypto.js
+// node_modules/svelte/src/internal/server/crypto.js
 var text_encoder;
 var crypto;
 var obfuscated_import = (module_name) => import(
@@ -574,11 +574,11 @@ function base64_encode(bytes) {
   return btoa(binary);
 }
 
-// ../3d-611-rebase/node_modules/devalue/src/constants.js
+// node_modules/devalue/src/constants.js
 var MAX_ARRAY_LEN = 2 ** 32 - 1;
 var MAX_ARRAY_INDEX = MAX_ARRAY_LEN - 1;
 
-// ../3d-611-rebase/node_modules/devalue/src/utils.js
+// node_modules/devalue/src/utils.js
 var escaped = {
   "<": "\\u003C",
   "\\": "\\\\",
@@ -697,7 +697,7 @@ function valid_array_indices(array) {
   return keys;
 }
 
-// ../3d-611-rebase/node_modules/devalue/src/uneval.js
+// node_modules/devalue/src/uneval.js
 var chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_$";
 var MIN_STRING_LENGTH = 128;
 var unsafe_chars = /[<\b\f\n\r\t\0\u2028\u2029]/g;
@@ -1138,7 +1138,7 @@ function stringify_primitive(thing) {
   return str;
 }
 
-// ../3d-611-rebase/node_modules/svelte/src/internal/server/renderer.js
+// node_modules/svelte/src/internal/server/renderer.js
 var RenderResult = class {
   /** @type {() => AccumulatedContent} */
   #render;
@@ -2015,7 +2015,7 @@ var SSRState = class {
   }
 };
 
-// ../3d-611-rebase/node_modules/svelte/src/html-tree-validation.js
+// node_modules/svelte/src/html-tree-validation.js
 var autoclosing_children = {
   // based on http://developers.whatwg.org/syntax.html#syntax-tag-omission
   li: { direct: ["li"] },
@@ -2116,7 +2116,7 @@ var disallowed_children = {
   "#document": { only: ["html"] }
 };
 
-// ../3d-611-rebase/node_modules/svelte/src/internal/server/index.js
+// node_modules/svelte/src/internal/server/index.js
 var INVALID_ATTR_NAME_CHAR_REGEX = /[\s'">/=\u{FDD0}-\u{FDEF}\u{FFFE}\u{FFFF}\u{1FFFE}\u{1FFFF}\u{2FFFE}\u{2FFFF}\u{3FFFE}\u{3FFFF}\u{4FFFE}\u{4FFFF}\u{5FFFE}\u{5FFFF}\u{6FFFE}\u{6FFFF}\u{7FFFE}\u{7FFFF}\u{8FFFE}\u{8FFFF}\u{9FFFE}\u{9FFFF}\u{AFFFE}\u{AFFFF}\u{BFFFE}\u{BFFFF}\u{CFFFE}\u{CFFFF}\u{DFFFE}\u{DFFFF}\u{EFFFE}\u{EFFFF}\u{FFFFE}\u{FFFFF}\u{10FFFE}\u{10FFFF}]/u;
 function render(component, options = {}) {
   if (options.csp?.hash && options.csp.nonce) {
@@ -3136,7 +3136,7 @@ function pdfLoader(load = fetchPdf) {
   } };
 }
 
-// ../3d-611-rebase/node_modules/svelte/src/index-server.js
+// node_modules/svelte/src/index-server.js
 function onDestroy(fn) {
   /** @type {SSRContext} */
   ssr_context.r.on_destroy(fn);
