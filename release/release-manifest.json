@@ -1,32 +1,33 @@
 {
-  "version": "0.39.2",
+  "version": "0.40.0",
   "cookbook_repo": "klappy/3d-review-cookbook",
-  "cookbook_commit": "a666f8cf7046c0ed41bd2198f91209a09a1dcea1",
+  "cookbook_commit": "c43878e2fdd5fe5322723c260aa9341b0d35a143",
   "records": [
     {
-      "path": "planning/2026-09-16-parity-build/releases/0.39.2.md",
-      "blob_sha": "8a2141b499092eea13919cb0d6b05c7841110aa8",
-      "sha256": "adb1ddf5dcc343b1f2231a095bdce717dced54649896c38dbdfca21d6a5b9f73"
+      "path": "planning/2026-09-16-parity-build/releases/0.40.0.md",
+      "blob_sha": "0fafaa8200c13ab5a095ae98d79010b12e2d66f5",
+      "sha256": "dbaaed0e060f77d59a85eb251f91a5ebf7425502352c3b13f06c252c32522e0d"
     },
     {
       "path": "planning/2026-09-16-parity-build/releases/releases.json",
-      "blob_sha": "c5b64fd0e80f87e89d942f27fd09bcd20406303e",
-      "sha256": "40f1d2850b6d3dfcaa0d97bf281e4c007b7b91f99d2e89efc526ce6ac335c3ab"
+      "blob_sha": "7c09fc51508a23f906051f9ae27c493018ebf71c",
+      "sha256": "4ac72a38000fa886101794990c9bae3a94fc9962d7a092c7a03e4ae7d53e0ae5"
     }
   ],
   "changelog": {
     "sections": {
+      "added": [
+        "Summit numeric reports and exports render from one response through the explicit reversible SUMMIT_ONE_RESPONSE_REPORTS flag across current and Next interfaces. Next Detailed and full PDF add each perspective\u2019s genuine subdimension radar without zero-filling missing axes.",
+        "Future reports atomically capture active selected perspectives; saved selection determines selected-but-unanswered labels. Unsupported historical selection stays unknown; no backfill or migration."
+      ],
       "fixed": [
-        "Bulk paper-survey printing retains each existing Next survey URL and QR instead of showing a false missing-link fallback. Individual/current root-link printing remains supported.",
-        "The print dialog no longer promises an access code on each paper."
+        "Canonical no-translation-brief amendment and status qualification require exact question/source identity. Custom or unqualified no-brief cannot acquire canonical meaning; historical answers and renderer behavior remain preserved.",
+        "Categorical findings retain the production floor of three independently of numeric floor one. Empty/suppressed categorical presence, public contract declarations, immutable report identity, PDF provenance and pagination are covered by local regressions."
       ],
       "changed": [
-        "PATCH:existing tokens, participant destinations, bindings, permissions and expiry remain unchanged; no replacement link is issued by this correction.",
-        "Local synthetic qualification:seven distinct forms;16A4/Letter PDFs/168pages;28of28rendered QR codes decoded exactly. Full app2303pass/3skip, Next1121pass, legacy962pass, MJS101pass/6skip; overlapping suites. Human satisfaction/confusion/frustration NOT MEASURED. Hosted actual-seven and physical-device acceptance unverified.",
-        "Independent bulk-print increment only; no no-brief/report-selection/radar/one-response/footer or UI-default timing change. Candidate release packaging and DEV/production gates remain.",
-        "Production review before shipment found a malformed backslash authority edge case; correction b853161673a81ac16e718d7bf347d381f7f5ace5 explicitly refuses it. Automated local synthetic evidence on macOS/Node in the isolated task6 worktree: S31 10pass and seven-survey integration 2pass. Corrected CI, hosted DEV and production qualification remain pending; corrected main/DEV and fresh production review/checks remain required. Valid existing URLs and QR payloads unchanged. Corrected product source b853161673a81ac16e718d7bf347d381f7f5ace5 current persona denominator3: automated local synthetic macOS/Node HTML layer attempted1/passed1/failed0/untested2; S1 seven-form HTML PASS, S2 rendered-paper scan UNTESTED, S3 individual PDF/browser UNTESTED. Corrected CI, hosted DEV, production and physical-device layers each attempted0/passed0/failed0/untested3. Historical8890a707b6a8ff3da2a5af763b12bd273631eb79 PDF/QR evidence remains provenance only; human metrics NOT MEASURED/sample0.",
-        "Superseding technical qualification snapshot: automated GitHub Actions ubuntu-latest/Node22 CI at exact reviewed source 30d5bc603b3c6b4cf343c45ced4306160b332c03 passed2303tests/3skips. Tree-identical merge b6be7042838d6b971f5d43625813f8a016fd4fde deployed via successful connected DEV push-event build248cb042-505b-4974-8d6a-b673f44240b9; health0.39.2+b6be704 matched commit/buildUUID/canonicalf1e082f3e5e4b37fc62001cd16f7cdaf51f3a8ee, D1ok. Read-only hosted synthetic helper smoke passed7exactNextURLs/root/invalid/missing/backslash checks. This supersedes earlier pending technical CI/DEV statements; complete hosted persona/physical scenarios remain untested, distinct from helper checks. Scoped exclusion keeps historical unshipped0.39.1 out of current0.39.2 public surfaces. This metadata follow-up still requires final packaging review/checks/DEV qualification then production615; no production or physical pass is claimed.",
-        "Persistent historical exclusion correction: unshipped0.39.1 has included_in_product:false as well as the historical0.39.2 exclusion. A version bump alone cannot admit unmerged candidate claims; only a reviewed product inclusion may change that flag. Same current0.39.2 output and product source; no feature, dependency, version or permissions change. Metadata follow-up qualification remains separate from prior exact-source technical snapshots."
+        "Candidate 0.40.0 is a MINOR classification for changed schema/accepted behavior. This is the existing 0.40.0 slot, now qualified for combined #611/#614 source. It does not rename the corrected 0.39.2 QR release or admit the unshipped 0.39.1 entry.",
+        "Source checkpoint 611be728bd7b49fea7769e7cefeb711bd515c714 merges current main 1c86bd4ef9d58ff67740856338b17f414af8515b and published canonical-status correction 9a449e87abf0e96373ee195588f67cf29c950621. No shipped/DEV/production acceptance is claimed for this combined candidate.",
+        "Persona/scenario scorecard at combined source 611be728bd7b49fea7769e7cefeb711bd515c714 (runtime evidence at byte-equivalent 3b0191fb924415abcccc735a9f7abb37d3516e93): S1 translator/facilitator canonical no-brief and custom negatives; S2 facilitator/authorized report reader one-response flow and PDFs; S3 authorized report reader categorical privacy and immutable history; S4 authorized report reader normal 12-response named PDFs/pagination. Fixed denominator 4 local automated synthetic scenarios: attempted 4, passed 4, failed 0, untested 0. Hosted DEV, production, physical-phone and print layers each: attempted 0, passed 0, failed 0, untested 4. Human satisfaction/confusion/frustration NOT MEASURED, sample size 0; no comparable human baseline. Component suites overlap and are not extra persona totals."
       ]
     }
   }

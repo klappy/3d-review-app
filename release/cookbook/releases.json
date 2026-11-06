@@ -1,7 +1,27 @@
 {
   "schema": "3dr-releases/1",
-  "current": "0.39.2",
+  "current": "0.40.0",
   "versions": [
+    {
+      "version": "0.40.0",
+      "status": "candidate",
+      "notes_path": "releases/0.40.0.md",
+      "sections": {
+        "added": [
+          "Summit numeric reports and exports render from one response through the explicit reversible SUMMIT_ONE_RESPONSE_REPORTS flag across current and Next interfaces. Next Detailed and full PDF add each perspective’s genuine subdimension radar without zero-filling missing axes.",
+          "Future reports atomically capture active selected perspectives; saved selection determines selected-but-unanswered labels. Unsupported historical selection stays unknown; no backfill or migration."
+        ],
+        "fixed": [
+          "Canonical no-translation-brief amendment and status qualification require exact question/source identity. Custom or unqualified no-brief cannot acquire canonical meaning; historical answers and renderer behavior remain preserved.",
+          "Categorical findings retain the production floor of three independently of numeric floor one. Empty/suppressed categorical presence, public contract declarations, immutable report identity, PDF provenance and pagination are covered by local regressions."
+        ],
+        "changed": [
+          "Candidate 0.40.0 is a MINOR classification for changed schema/accepted behavior. This is the existing 0.40.0 slot, now qualified for combined #611/#614 source. It does not rename the corrected 0.39.2 QR release or admit the unshipped 0.39.1 entry.",
+          "Source checkpoint 611be728bd7b49fea7769e7cefeb711bd515c714 merges current main 1c86bd4ef9d58ff67740856338b17f414af8515b and published canonical-status correction 9a449e87abf0e96373ee195588f67cf29c950621. No shipped/DEV/production acceptance is claimed for this combined candidate.",
+          "Persona/scenario scorecard at combined source 611be728bd7b49fea7769e7cefeb711bd515c714 (runtime evidence at byte-equivalent 3b0191fb924415abcccc735a9f7abb37d3516e93): S1 translator/facilitator canonical no-brief and custom negatives; S2 facilitator/authorized report reader one-response flow and PDFs; S3 authorized report reader categorical privacy and immutable history; S4 authorized report reader normal 12-response named PDFs/pagination. Fixed denominator 4 local automated synthetic scenarios: attempted 4, passed 4, failed 0, untested 0. Hosted DEV, production, physical-phone and print layers each: attempted 0, passed 0, failed 0, untested 4. Human satisfaction/confusion/frustration NOT MEASURED, sample size 0; no comparable human baseline. Component suites overlap and are not extra persona totals."
+        ]
+      }
+    },
     {
       "version": "0.39.2",
       "status": "candidate",
