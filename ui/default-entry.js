@@ -1,4 +1,4 @@
-import { authReturnUI, rememberAuthReturn, clearAuthReturn } from './auth-return.js';
+import { authReturnUI, rememberAuthReturn, clearAuthReturn, installLegacyAuthReturn } from './auth-return.js';
 // Summit item 13: ordinary root entry selects Next after the prerequisite
 // production promotion was verified. Explicit legacy and existing deep links keep
 // their original handlers. This module stores no preference.
@@ -31,6 +31,7 @@ export async function bootDefaultEntry({ location = globalThis.location,
   const callback = /^#session=([A-Za-z0-9_]+)$/.exec(location?.hash || '');
   if (callback && authReturnUI(storage) === 'legacy') {
     clearAuthReturn(storage);
+    installLegacyAuthReturn(globalThis.document, storage);
     await loadCurrent();
     return { ui: 'current' };
   }
@@ -55,6 +56,7 @@ export async function bootDefaultEntry({ location = globalThis.location,
   }
   if (callback) clearAuthReturn(storage);
   else rememberAuthReturn('legacy', storage);
+  installLegacyAuthReturn(globalThis.document, storage);
   await loadCurrent();
   return { ui: 'current' };
 }

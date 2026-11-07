@@ -2,8 +2,68 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { nextDefaultTarget, bootDefaultEntry } from '../ui/default-entry.js';
+import { installLegacyAuthReturn, rememberAuthReturn } from '../ui/auth-return.js';
 
 const locationFor = value => new URL(value, 'https://example.invalid');
+
+test('every legacy sign-in action re-arms the one-use callback intent after account switching', async () => {
+  for (const action of ['access', 'email-link', 'email-form']) {
+    const values = new Map();
+    const storage = { getItem: key => values.get(key) ?? null, setItem: (key, value) => values.set(key, value), removeItem: key => values.delete(key) };
+    const listeners = new Map();
+    const document = { addEventListener: (type, handler, capture) => {
+      assert.equal(capture, true, 'intent must precede the legacy email-link interceptor and submit handler');
+      assert.equal(listeners.has(type), false, 'install once per document');
+      listeners.set(type, handler);
+    } };
+    installLegacyAuthReturn(document, storage);
+    installLegacyAuthReturn(document, storage);
+    assert.equal(storage.getItem('3dr-auth-return-ui'), null, 'installing is not a persistent UI preference');
+    rememberAuthReturn('legacy', storage);
+    let loads = 0;
+    const callback = () => bootDefaultEntry({ storage,
+      location: { pathname: '/', search: '', hash: '#session=REPEAT_TOKEN', replace: () => { throw Error('legacy sign-in must not return Next'); } },
+      probeNext: () => { throw Error('legacy callback must not probe Next'); }, loadCurrent: () => { loads++; } });
+    await callback();
+    assert.equal(storage.getItem('3dr-auth-return-ui'), null);
+    // The same document survives sign-out/account switching. Its next action,
+    // not an entry-module reload, must restore the marker before authentication.
+    if (action === 'email-form') listeners.get('submit')({ target: { matches: selector => selector === 'form[action="/v2/auth/email"]' } });
+    else listeners.get('click')({ button: 0, target: { closest: selector => {
+      assert.ok(selector.includes(action === 'access' ? '/v2/auth/access' : '/v2/auth/email'));
+      return {};
+    } } });
+    assert.equal(storage.getItem('3dr-auth-return-ui'), 'legacy', action);
+    await callback();
+    assert.equal(loads, 2);
+    assert.equal(storage.getItem('3dr-auth-return-ui'), null);
+    rememberAuthReturn('next', storage);
+    const moves = [];
+    await bootDefaultEntry({ storage, location: { pathname: '/', search: '', hash: '#session=NEXT_TOKEN', replace: target => moves.push(target) },
+      probeNext: async () => true, loadCurrent: () => { throw Error('explicit Next choice wins'); } });
+    assert.deepEqual(moves, ['/next/?ui_next=on']);
+  }
+});
+
+test('legacy auth intent does not alter unrelated actions or navigation and tolerates unavailable storage', () => {
+  const listeners = new Map(), writes = [];
+  const document = { addEventListener: (type, handler) => listeners.set(type, handler) };
+  installLegacyAuthReturn(document, { setItem: (...args) => writes.push(args) });
+  listeners.get('click')({ button: 0, target: { closest: () => null } });
+  listeners.get('click')({ button: 1, target: { closest: () => ({}) } });
+  listeners.get('click')({ button: 0, defaultPrevented: true, target: { closest: () => ({}) } });
+  listeners.get('submit')({ target: { matches: () => false } });
+  listeners.get('submit')({ defaultPrevented: true, target: { matches: () => true } });
+  assert.deepEqual(writes, []);
+  installLegacyAuthReturn({ addEventListener: (type, handler) => listeners.set(type, handler) }, { setItem: () => { throw Error('blocked'); } });
+  assert.doesNotThrow(() => listeners.get('click')({ button: 0, target: { closest: () => ({}) } }));
+  assert.doesNotThrow(() => listeners.get('submit')({ target: { matches: () => true } }));
+  for (const entry of ['default-entry.js', 'legacy-auth-entry.js']) {
+    const source = readFileSync(new URL(`../ui/${entry}`, import.meta.url), 'utf8');
+    assert.match(source, /import \{[^}]*installLegacyAuthReturn[^}]*\} from ['"]\.\/auth-return\.js['"]/);
+    assert.match(source, /installLegacyAuthReturn\(globalThis\.document(?:, storage)?\)/);
+  }
+});
 
 test('ordinary root entry selects live Next before loading the legacy identity handler', async () => {
     let currentLoads = 0;
