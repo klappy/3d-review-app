@@ -17,7 +17,8 @@ test("Landing pins approved v5 with separately identified poster and same-origin
   assert.match(landing, /duration: '2:00'/);
   assert.match(landing, /captions: '\/overview\/3d-review-overview\.en\.vtt'/);
   const card = read("ui-next/src/MediaCard.svelte");
-  assert.match(card, /preload="none"/);
+  assert.match(card, /preload="metadata"/);
+  assert.match(card, /<source \{src\} type="video\/mp4"/);
   assert.doesNotMatch(card, /\bautoplay\b/);
   assert.doesNotMatch(card, /<track[^>]*\sdefault\b/);
   assert.match(card, /captions/);
