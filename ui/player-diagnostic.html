@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>3D Review native video diagnostic</title>
+  <style>
+    body { max-width: 48rem; margin: 1rem auto; padding: 0 1rem; font: 1rem/1.5 system-ui, sans-serif; }
+    video { display: block; width: 100%; max-height: 50vh; background: #111; }
+    output { display: block; margin: .5rem 0 1.5rem; overflow-wrap: anywhere; }
+  </style>
+</head>
+<body>
+  <h1>Native video comparison</h1>
+  <p>This DEV-only test uses the same approved film in two plain HTML players. There is no app framework, poster, caption track or custom play button. Tap each player's own play control, one at a time.</p>
+  <h2>A: video src attribute</h2>
+  <video id="direct-player" controls playsinline preload="metadata" src="/v2/media/overview-8bd9e6de2dcf.mp4" aria-label="Player A: video src attribute"></video>
+  <output id="direct-state" aria-live="polite">Waiting for media state.</output>
+  <h2>B: child source element</h2>
+  <video id="source-player" controls playsinline preload="metadata" aria-label="Player B: child source element"><source src="/v2/media/overview-8bd9e6de2dcf.mp4" type="video/mp4"></video>
+  <output id="source-state" aria-live="polite">Waiting for media state.</output>
+  <h2>First-byte response check</h2>
+  <p>This separate request checks the server response. It is not a native playback result and sends no login credentials or diagnostic report.</p>
+  <button id="range-check" type="button">Check first two bytes</button>
+  <output id="range-state" aria-live="polite">Not requested.</output>
+  <p><a href="/v2/media/overview-8bd9e6de2dcf.mp4">Open this same-origin film directly</a></p>
+  <p><a href="/next/?ui_next=on">Return to the homepage</a></p>
+  <script>
+    // Observation only: never initialize, reload, play, pause or replace a source.
+    const networkNames = ['NETWORK_EMPTY', 'NETWORK_IDLE', 'NETWORK_LOADING', 'NETWORK_NO_SOURCE'];
+    const readyNames = ['HAVE_NOTHING', 'HAVE_METADATA', 'HAVE_CURRENT_DATA', 'HAVE_FUTURE_DATA', 'HAVE_ENOUGH_DATA'];
+    for (const [playerId, outputId] of [['direct-player', 'direct-state'], ['source-player', 'source-state']]) {
+      const video = document.getElementById(playerId);
+      const output = document.getElementById(outputId);
+      const show = (event) => {
+        const duration = Number.isFinite(video.duration) ? video.duration.toFixed(1) : 'unknown';
+        output.textContent = `${event}: ${networkNames[video.networkState]}; ${readyNames[video.readyState]}; native media error ${video.error?.code ?? 'none'}; ${video.currentTime.toFixed(1)} / ${duration} seconds; paused ${video.paused}. Network state is a label, not an error count.`;
+      };
+      for (const event of ['loadstart', 'loadedmetadata', 'loadeddata', 'canplay', 'playing', 'pause', 'timeupdate', 'waiting', 'stalled', 'error', 'emptied', 'ended']) {
+        video.addEventListener(event, () => show(event));
+      }
+      video.querySelector('source')?.addEventListener('error', () => show('source error'));
+      show('initial');
+    }
+    document.getElementById('range-check').addEventListener('click', async (event) => {
+      const button = event.currentTarget;
+      const output = document.getElementById('range-state');
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 10000);
+      button.disabled = true;
+      output.textContent = 'Requesting bytes 0–1 from this site…';
+      try {
+        const response = await fetch('/v2/media/overview-8bd9e6de2dcf.mp4', {
+          method: 'GET', headers: { Range: 'bytes=0-1' }, credentials: 'omit',
+          cache: 'no-store', redirect: 'error', signal: controller.signal
+        });
+        // A server ignoring Range must not make this diagnostic buffer the film.
+        let bytes = 0;
+        let capped = false;
+        const reader = response.body?.getReader();
+        if (reader) {
+          try {
+            while (true) {
+              const chunk = await reader.read();
+              if (chunk.done) break;
+              bytes += chunk.value.byteLength;
+              if (bytes > 16) { capped = true; await reader.cancel(); break; }
+            }
+          } finally { reader.releaseLock(); }
+        }
+        output.textContent = `HTTP ${response.status}; Content-Type ${response.headers.get('content-type') ?? 'absent'}; Content-Range ${response.headers.get('content-range') ?? 'absent'}; Content-Length ${response.headers.get('content-length') ?? 'absent'}; body ${capped ? 'more than 16 (stopped)' : bytes} bytes.`;
+      } catch {
+        output.textContent = controller.signal.aborted ? 'Request timed out after 10 seconds.' : 'Request failed. No report was sent.';
+      } finally { clearTimeout(timeout); button.disabled = false; }
+    });
+  </script>
+</body>
+</html>

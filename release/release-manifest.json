@@ -1,32 +1,31 @@
 {
-  "version": "0.41.2",
+  "version": "0.41.3",
   "cookbook_repo": "klappy/3d-review-cookbook",
-  "cookbook_commit": "90c2145efaf07c3522892bae213e2348c57f8b20",
+  "cookbook_commit": "66b55815b7c13b84b54a447ce9bc49a452310587",
   "records": [
     {
-      "path": "planning/2026-09-16-parity-build/releases/0.41.2.md",
-      "blob_sha": "cf52fad31c787dbee93ca9f9ad8d15424c3355b3",
-      "sha256": "4edc724b440fa0122801b1619c574b9d36c67301a4afbeca3a3411fab02d48de"
+      "path": "planning/2026-09-16-parity-build/releases/0.41.3.md",
+      "blob_sha": "55d353a16aeee2765d55c04cda1cacd1dbe76d77",
+      "sha256": "d36681ed3a72fcc0df2b46cd28dbe596edc4ef200eeabac407e3f979afaea6a4"
     },
     {
       "path": "planning/2026-09-16-parity-build/releases/releases.json",
-      "blob_sha": "419004c37d912fef45c49d0bd2c0b20a70d0e3f6",
-      "sha256": "1b1dbb93e66913cfc890dc9cca9df27760a38c3640be2345a61f18bb5c8ae6e6"
+      "blob_sha": "aad9d1b48061010e8981a92ca43bbba1d2659466",
+      "sha256": "e0af66558967f5ca2608f05c6b2eda0f376bf08e4152b2848f27379253ea300f"
     }
   ],
   "changelog": {
     "sections": {
       "changed": [
-        "The homepage embeds the unchanged approved v5 film through one fixed same-origin streaming route, /v2/media/overview-8bd9e6de2dcf.mp4. GET and HEAD preserve upstream byte-range status, range and length headers, validators and streamed bytes. The original immutable CDN URL remains the separate direct-open fallback. Native controls, synchronous user-initiated play, poster and optional captions remain.",
-        "Compatible PATCH 0.41.2 is a bounded delivery-path compatibility candidate following main 326a66b6f8faa1ae1f021fa56e5ddb53850a8ed2 (0.41.1). The user tested that prior DEV release twice on iPhone Safari: the embedded player still failed while the same raw file played. A pause icon or loaded poster with 00:00 duration was not counted as playback. Exact native failure cause remains unconfirmed; this candidate does not claim the issue is resolved.",
-        "Failure text adds fixed source/video/play labels and native numeric media-error, ready-state and network-state values, without exception messages or URLs. Same-origin source validation rejects protocol-relative URLs and backslashes; separate fallback links retain the known-working HTTPS media URL.",
-        "Local affected automated checks passed 64 tests across four route/player/component files, plus one source-wiring test, the normal Next build and typecheck. Route fixtures cover the real Worker wrapper, full 200, ranged 206, open/suffix ranges, 416, HEAD, validators, invalid methods, HTML/redirect/encoded-response refusal, fetch failure and streaming without whole-file buffering. Upstream responses are mocked; actual Cloudflare response bytes/headers and native Safari behavior remain unverified at this record.",
-        "Fixed affected persona/scenario denominator 3: anonymous visitor starts the homepage overview; phone-layout visitor starts it; visitor retries or opens the direct fallback after a media failure. Local automated layer attempted 3, passed 3, failed 0, untested 0, without real authentication. Current candidate DEV-browser, production-browser and physical-iPhone layers each attempted 0, passed 0, failed 0, untested 3. Prior 0.41.1 iPhone failures are historical defect evidence, not current candidate passes. Human satisfaction, confusion and frustration are NOT MEASURED; sample 0.",
-        "The existing connected main-to-DEV workflow must publish and verify this candidate before the user tests native iPhone Safari again. Production stays held until that test succeeds. All 131 older release entries and accepted notes remain unchanged; unrelated frozen work is excluded."
+        "PATCH 0.41.3 adds a separate native-video diagnostic page at /player-diagnostic.html, without changing the homepage, media delivery route or approved media bytes. Player A uses a literal video src attribute; Player B uses a literal child source element. Neither uses an app framework, poster, caption track or custom playback handler.",
+        "The page observes native playback states with named constants so NETWORK_NO_SOURCE is not mistaken for a count of errors. A user-triggered, credential-free same-origin request for bytes 0–1 displays HTTP status, media type, range, length and received byte count. It times out after ten seconds and cancels an unexpectedly large response after a small bounded read. This fetch is a separate diagnostic, not evidence that the browser media stack succeeded.",
+        "The preceding 0.41.2 DEV release at main 1c50e010bf4eb6057a1c59090a25dc0a3e47d3e0 passed source review and Chrome playback, but the real iPhone Safari embed still reported source failure, no metadata and NETWORK_NO_SOURCE. The same iPhone played both the original CDN URL and the new same-origin URL directly. These observations narrow the problem but do not identify its cause or clear the embedded first-byte request path.",
+        "Local diagnostic fixtures passed four tests: literal native player patterns and no custom initialization; named failure-state observation; user-triggered fixed two-byte request with no credentials; bounded cancellation when the server returns too much data. Existing source-suite evidence belongs to 0.41.2 and is not relabeled as the final diagnostic release checks.",
+        "Fixed diagnostic scenario denominator 3: iPhone visitor plays A; iPhone visitor plays B; visitor runs the separate first-byte response check. Local synthetic layer attempted 1, passed 1, failed 0, untested 2: only the separate request/result behavior is simulated, not native video playback. Candidate DEV-browser and physical-iPhone layers each attempted 0, passed 0, failed 0, untested 3. Production is not targeted. Human satisfaction, confusion and frustration are NOT MEASURED; sample 0.",
+        "This is DEV-only diagnostic publication, not a claimed playback fix. User native testing must inform the next change; production stays unchanged. All 132 older release entries and accepted notes remain intact. No unrelated frozen work is included."
       ],
       "security": [
-        "The new public read-only endpoint fetches only the hard-coded approved film URL. It forwards only Range and If-Range, never client Cookie, Authorization, Referer, Origin or query-selected targets; redirects are rejected. Unexpected non-video or encoded media responses return a generic 502. Range errors preserve 416 and the validated total length while discarding upstream error bodies and content types. Responses are streamed with no-store caching and nosniff. This is not an arbitrary proxy.",
-        "No authentication/session/invitation/report behavior, schema, bindings, persistent credentials, deployment triggers, DNS, WAF, cache rules or CORS settings change. No autoplay or crossorigin attribute is added. Approved video bytes, poster and caption assets are unchanged. Required independent external-call security review, final exact-head checks and live verification remain separate gates."
+        "The diagnostic sends no telemetry or report, collects no user data, reads no app credentials or storage, and never changes playback programmatically. Its sole explicit fetch has a hard-coded same-origin public media path and credentials omitted. Response text is rendered with textContent; response bodies are not displayed. No authentication, schema, permissions, bindings, security settings, deployment trigger or external media target changes."
       ]
     }
   }
