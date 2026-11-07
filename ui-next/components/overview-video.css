@@ -1,0 +1,2 @@
+/* Preserve the approved full 16:9 image inside the media-card frame. */
+.l-media-frame>video{object-fit:contain}

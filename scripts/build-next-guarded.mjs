@@ -3,7 +3,7 @@
 //
 // ui/next/ is served by wrangler.toml [assets] directory "./ui" (see vite.next.config.mjs) at /next/, on every branch including
 // `production` (owner request PR576 comment 6480605514): UI Next is an opt-in reached from the current UI's account menu
-// ("Try the new design", ui/index.html); `/` stays the current UI and nothing redirects, sets a cookie or flips the default.
+// ("Try the new design", ui/index.html). Root default selection is owned by ui/default-entry.js; this build sets no preference.
 // Workers Builds injects WORKERS_CI_BRANCH = the branch of the triggering push
 // (https://developers.cloudflare.com/workers/ci-cd/builds/configuration/ — default variables).
 // On branch `production` the build still runs, but vite.next.config.mjs compiles the fixture harness out (__UI_NEXT_FIXTURE_HARNESS__
