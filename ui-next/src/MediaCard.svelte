@@ -22,6 +22,30 @@
     ++playAttempt;
     failure = `The video could not play here (${diagnostic(event?.currentTarget?.tagName === 'SOURCE' ? 'source' : 'video')}).`;
   }
+  function initializeMedia(node, initialSource) {
+    let currentSource;
+    const selectSource = (nextSource) => {
+      if (nextSource === currentSource) return;
+      if (!safeMediaUrl(nextSource)) throw new TypeError("MediaCard: src must be an https or same-origin media URL");
+      currentSource = nextSource;
+      ++playAttempt;
+      failure = '';
+      // Actions run on the connected element. Select the resource explicitly,
+      // rather than mutating a child source in an imported, empty video template.
+      node.src = nextSource;
+      node.load();
+    };
+    selectSource(initialSource);
+    return {
+      update: selectSource,
+      destroy() {
+        ++playAttempt;
+        node.pause();
+        node.removeAttribute('src');
+        node.load();
+      }
+    };
+  }
   function playing() {
     ++playAttempt;
     failure = '';
@@ -52,8 +76,7 @@
 
 <div class="glass-hi l-media" role="group" aria-label={line}>
   <div class="l-media-frame">
-    {#if src}<video bind:this={video} {poster} controls playsinline preload="metadata" tabindex="0" aria-label={line} onerror={mediaFailed} onplaying={playing}>
-      <source {src} type="video/mp4" onerror={mediaFailed} />
+    {#if src}<video bind:this={video} use:initializeMedia={src} {poster} controls playsinline preload="metadata" tabindex="0" aria-label={line} onerror={mediaFailed} onplaying={playing}>
       {#if captions}<track kind="captions" src={captions} srclang="en" label="English" />{/if}
       <a href={fallback}>Open the video</a>
     </video>{:else}<span class="icn l-media-play" aria-hidden="true"><Icon d={I.play} size={32} /></span>{/if}

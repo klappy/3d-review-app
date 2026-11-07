@@ -1,31 +1,31 @@
 {
-  "version": "0.41.3",
+  "version": "0.41.4",
   "cookbook_repo": "klappy/3d-review-cookbook",
-  "cookbook_commit": "66b55815b7c13b84b54a447ce9bc49a452310587",
+  "cookbook_commit": "594e3588bfce28b1a4f388ba873ed13643a8fc51",
   "records": [
     {
-      "path": "planning/2026-09-16-parity-build/releases/0.41.3.md",
-      "blob_sha": "55d353a16aeee2765d55c04cda1cacd1dbe76d77",
-      "sha256": "d36681ed3a72fcc0df2b46cd28dbe596edc4ef200eeabac407e3f979afaea6a4"
+      "path": "planning/2026-09-16-parity-build/releases/0.41.4.md",
+      "blob_sha": "b437dec2f34aa3a4c8e47084faac56741e0d8a65",
+      "sha256": "14dea8dc412aa64edb7fd5ae572f01f2f2a084f12bbc5fa3cf445539537af729"
     },
     {
       "path": "planning/2026-09-16-parity-build/releases/releases.json",
-      "blob_sha": "aad9d1b48061010e8981a92ca43bbba1d2659466",
-      "sha256": "e0af66558967f5ca2608f05c6b2eda0f376bf08e4152b2848f27379253ea300f"
+      "blob_sha": "1015a2d3a536e4387e468d4c895903062fc69a89",
+      "sha256": "c280ef86a2d3024444eb4d11dd37635751cb2af4fcb61f29dbcf74e95cb9c472"
     }
   ],
   "changelog": {
     "sections": {
       "changed": [
-        "PATCH 0.41.3 adds a separate native-video diagnostic page at /player-diagnostic.html, without changing the homepage, media delivery route or approved media bytes. Player A uses a literal video src attribute; Player B uses a literal child source element. Neither uses an app framework, poster, caption track or custom playback handler.",
-        "The page observes native playback states with named constants so NETWORK_NO_SOURCE is not mistaken for a count of errors. A user-triggered, credential-free same-origin request for bytes 0–1 displays HTTP status, media type, range, length and received byte count. It times out after ten seconds and cancels an unexpectedly large response after a small bounded read. This fetch is a separate diagnostic, not evidence that the browser media stack succeeded.",
-        "The preceding 0.41.2 DEV release at main 1c50e010bf4eb6057a1c59090a25dc0a3e47d3e0 passed source review and Chrome playback, but the real iPhone Safari embed still reported source failure, no metadata and NETWORK_NO_SOURCE. The same iPhone played both the original CDN URL and the new same-origin URL directly. These observations narrow the problem but do not identify its cause or clear the embedded first-byte request path.",
-        "Local diagnostic fixtures passed four tests: literal native player patterns and no custom initialization; named failure-state observation; user-triggered fixed two-byte request with no credentials; bounded cancellation when the server returns too much data. Existing source-suite evidence belongs to 0.41.2 and is not relabeled as the final diagnostic release checks.",
-        "Fixed diagnostic scenario denominator 3: iPhone visitor plays A; iPhone visitor plays B; visitor runs the separate first-byte response check. Local synthetic layer attempted 1, passed 1, failed 0, untested 2: only the separate request/result behavior is simulated, not native video playback. Candidate DEV-browser and physical-iPhone layers each attempted 0, passed 0, failed 0, untested 3. Production is not targeted. Human satisfaction, confusion and frustration are NOT MEASURED; sample 0.",
-        "This is DEV-only diagnostic publication, not a claimed playback fix. User native testing must inform the next change; production stays unchanged. All 132 older release entries and accepted notes remain intact. No unrelated frozen work is included."
+        "PATCH 0.41.4 changes only the homepage MediaCard resource-selection lifecycle. The approved same-origin film is assigned to the connected native video element and explicitly loaded after mount, rather than selecting a dynamically mutated child source in an imported empty video template. Source updates reselect only when the raw source actually changes.",
+        "Native controls, inline playback, metadata preloading, retained poster, optional English captions, synchronous user-initiated CTA/retry and the original CDN fallback remain. There is no autoplay. Replaced-source and unmount transitions invalidate older play promises; unmount pauses and clears the resource so detached media does not continue playing.",
+        "Historical native evidence at DEV 0.41.3/main 668c40bb7b2d3be354bbc4250ab6f3b3aaa2d514: the user's iPhone Safari decoded both plain diagnostic players and paused around five seconds of the 120-second film, while the homepage still did not play. The user's separate request returned 206, video/mp4, Content-Range bytes 0-1/20195565, Content-Length 2 and two body bytes. That separate fetch is not native-media proof. The diagnostic success narrows the remaining issue to homepage integration or its extras; it does not conclusively identify the failing lifecycle step.",
+        "Local affected checks passed 49 tests across four component/lifecycle suites, plus one source-wiring test, normal Next build and typecheck. New checks assert connected-node selection, no reload for unrelated props/native playing, source-change validation, stale-promise isolation, current native-error reporting and unmount cleanup. Native load/play/pause are mocked in these tests; no native Safari success is inferred. An initial expanded run exposed one stale child-source selector in an existing fixture (48 passed, one failed), corrected before the passing rerun.",
+        "Fixed affected persona/scenario denominator 3: phone visitor starts the overview with native controls; desktop visitor uses the watch CTA; visitor retries or leaves/replaces the player. Local automated layer attempted 3, passed 3, failed 0, untested 0, with mocked media APIs. Current candidate DEV-browser and physical-iPhone layers each attempted 0, passed 0, failed 0, untested 3. Historical plain-player diagnostic success is not current homepage acceptance. Production is not targeted. Human satisfaction, confusion and frustration are NOT MEASURED; sample 0.",
+        "This is a DEV-only compatibility candidate, not a claim that Safari playback is fixed. Actual native homepage testing is still required before production. All 133 older release entries and accepted notes remain intact; unrelated frozen work is excluded."
       ],
       "security": [
-        "The diagnostic sends no telemetry or report, collects no user data, reads no app credentials or storage, and never changes playback programmatically. Its sole explicit fetch has a hard-coded same-origin public media path and credentials omitted. Response text is rendered with textContent; response bodies are not displayed. No authentication, schema, permissions, bindings, security settings, deployment trigger or external media target changes."
+        "Each actual source update retains HTTPS or strict same-origin path validation before native assignment. No arbitrary HTML, telemetry, credential reads, authentication/session changes, backend/media-route changes, approved media changes, schema, bindings, security settings or deployment trigger changes. Existing bounded failure diagnostics never expose exception messages, tokens or request URLs."
       ]
     }
   }
