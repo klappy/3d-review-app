@@ -1,37 +1,36 @@
 {
-  "version": "0.40.0",
+  "version": "0.41.0",
   "cookbook_repo": "klappy/3d-review-cookbook",
-  "cookbook_commit": "bcabd5b4936242a6700415f01a4b34b656234c31",
+  "cookbook_commit": "83fb3ee93e39bcdd71f8a6b4d3574d68ab93020b",
   "records": [
     {
-      "path": "planning/2026-09-16-parity-build/releases/0.40.0.md",
-      "blob_sha": "e5c64bf749ccd278da8aec2ae3425a0114682398",
-      "sha256": "7f310002a7ef29fa079964ef90b7dbb2c54a47d6b27cfd64870b615134de2157"
+      "path": "planning/2026-09-16-parity-build/releases/0.41.0.md",
+      "blob_sha": "3e19535f0dc5631997b367d65c71912500a83613",
+      "sha256": "9641cc9f93a1fe098a1cb470390dbd89c2d92e7917774eca6450b57f1addb971"
     },
     {
       "path": "planning/2026-09-16-parity-build/releases/releases.json",
-      "blob_sha": "74dad88974c241e759f8b3b72a4f5821ea171884",
-      "sha256": "3f05013c22ffb87d108945bf06bd36547795c19ac44d166ccc88ea95f042fab7"
+      "blob_sha": "ce2855deaff812fc0db24834db64b04f9eb75489",
+      "sha256": "a196af2839e9ad163f2c719ff20af366d98151834ef66f8ae82b5cab985f0779"
     }
   ],
   "changelog": {
     "sections": {
       "added": [
-        "Summit numeric reports and exports render from one response through the explicit reversible SUMMIT_ONE_RESPONSE_REPORTS flag across current and Next interfaces. Next Detailed and full PDF add each perspective\u2019s genuine subdimension radar without zero-filling missing axes.",
-        "Future reports atomically capture active selected perspectives; saved selection determines selected-but-unanswered labels. Unsupported historical selection stays unknown; no backfill or migration.",
-        "Ordinary root `/` boots UI Next after a bounded same-origin `/next/` probe (`ui/default-entry.js`); explicit legacy, deep-link, and invitation continuations keep the current handler. Auth `#session=` callbacks transfer into Next unless the tab recorded legacy return intent.",
-        "Signed-out Next Landing embeds the approved CDN overview video pin `8fea7f793783` (120s MP4 + poster at `https://cdn.3dreview.app/overview/8fea7f793783/\u2026`, same-origin `/overview/3d-review-overview.en.vtt`, no autoplay, captions off by default) on desktop and phone MediaCard."
-      ],
-      "fixed": [
-        "Canonical no-translation-brief amendment and status qualification require exact question/source identity. Custom or unqualified no-brief cannot acquire canonical meaning; historical answers and renderer behavior remain preserved.",
-        "Categorical findings retain the production floor of three independently of numeric floor one. Empty/suppressed categorical presence, public contract declarations, immutable report identity, PDF provenance and pagination are covered by local regressions."
+        "The approved v5 two-minute overview plays in the Landing media card with native controls, keyboard start, full-image containment, optional same-origin English captions and direct-video recovery links. No autoplay. The immutable v5 film replaces the earlier 5d92 film; the latter remains the media rollback target."
       ],
       "changed": [
-        "Candidate 0.40.0 is a MINOR classification for changed schema/accepted behavior. This is the existing 0.40.0 slot, now qualified for combined #611/#614 source. It does not rename the corrected 0.39.2 QR release or admit the unshipped 0.39.1 entry.",
-        "Source checkpoint 611be728bd7b49fea7769e7cefeb711bd515c714 merges current main 1c86bd4ef9d58ff67740856338b17f414af8515b and published canonical-status correction 9a449e87abf0e96373ee195588f67cf29c950621. No shipped/DEV/production acceptance is claimed for this combined candidate.",
-        "Persona/scenario scorecard at combined source 611be728bd7b49fea7769e7cefeb711bd515c714 (runtime evidence at byte-equivalent 3b0191fb924415abcccc735a9f7abb37d3516e93): S1 translator/facilitator canonical no-brief and custom negatives; S2 facilitator/authorized report reader one-response flow and PDFs; S3 authorized report reader categorical privacy and immutable history; S4 authorized report reader normal 12-response named PDFs/pagination. Fixed denominator 4 local automated synthetic scenarios: attempted 4, passed 4, failed 0, untested 0. Hosted DEV, production, physical-phone and print layers each: attempted 0, passed 0, failed 0, untested 4. Human satisfaction/confusion/frustration NOT MEASURED, sample size 0; no comparable human baseline. Component suites overlap and are not extra persona totals.",
-        "Superseding source qualification proposal: app e287f37fafb769bf826bfc8cb1208ce3d121cf42 includes rebased QR behavior and fixes legacy missing report selection falsely becoming known-empty; explicit saved-empty remains known. Prior b854 local evidence:16 suites/376pass/2skip/0fail; historical c946 local affected evidence:16 suites/383pass/2skip/0fail; final e287 local affected evidence:16 suites/384pass/2skip/0fail, final typecheck/PDF freshness pass. Latest c26 P2 correction/comment and additional model-selection regression retained; executable app source unchanged from c946. Latest six-file delta adds canonical Q1 wording derived from same-instrument Q2, exact church-status identity and conditional amendment provenance; no direct upstream Q1 option is claimed; old endpoint control2fail/2pass, corrected4pass; typecheck/PDF freshness pass. Original four-scenario evidence remains inherited at3b0191f, not rerun at this source; exact-source complete scenario and hosted/physical layers each0attempted/0passed/0failed/4untested; human metrics NOT MEASURED/sample0. Same0.40.0 candidate; expanded source requires new canonical acceptance and final packaging, not strict611be equivalence or DEV/production delivery.",
-        "UI/homepage increment source qualification proposal: app `2fedaac9f87107728fdc83c03e63fe88fe1c10f5` (#619) on top of the accepted 0.40.0 report train. Product scope now includes Next-as-default and the CDN overview embed. This is the same 0.40.0 candidate slot under H19 same-version supersession \u2014 not a new version reservation. Report-train evidence at e287/c26/611be remains inherited; this line does not re-run those suites. Captain media-cut acceptance and production go are separate gates and are not claimed by this registry edit alone. Hosted DEV/production delivery of the UI increment: attempted 0 / untested pending packaging and promotion."
+        "Ordinary root entry defaults to Next. The existing toggle and explicit legacy access remain. Existing survey, invitation, report, project and return links retain their bytes and handlers. Sign-in callbacks preserve tokens, selected UI and pending invitation continuation. A confirmed P2 at dae20899 lost the legacy return choice on a second sign-in after same-document account switching. Additive fix b4f1bdc9 re-arms one-use intent at each actual legacy Access/email link or form action. Independent source and three real-DOM two-callback scenarios found the fix correct; the exact published tree has zero tracked differences from the reviewed artifact. All four attached hosted checks completed successfully.",
+        "MINOR 0.41.0 is separate from the accepted report 0.40.0 increment. Published product source b4f1bdc90b44b3b45f9c711098ad976335f70ed1, tree 4713845ca9aabfb7a533d29d3812b9d8e04762d7, is an additive successor of v5 source dae20899 on app PR #619. It is a product checkpoint with inherited 0.40 packaging, not a deployable 0.41 identity. The final app must pin the accepted immutable 0.41 record.",
+        "Independent source review found no material issue in the two-file v5 delta at dae20899/tree 285414dd. Its local checks passed 15 entry/embed tests, 36 embedded component tests, 974 UI tests, 116 MJS tests with 6 pre-existing skips, typecheck and Next build. Full local Vitest was interrupted after remaining at its RUN banner; it is not a pass. Hosted run 42403101623 completed four CI jobs successfully, including 2,374 Vitest tests passed and 3 pre-existing skips; review-provenance passed in run 42403495767. All five attached checks completed. These receipts are historical, not final release identity evidence.",
+        "The published repeat-auth correction matches the frozen five-file artifact with local focused/DOM 18 passes, UI 975 passes, MJS 118 passes with 6 pre-existing skips, and Next build success. Independent review found no issue and separately verified Access link, email link and native email-form second callbacks. The initial source-archive typecheck lacked generated identity files and failed; after binding real b4 Git history, the normal stamp/build/typecheck lifecycle passed. Strict PDF generation now passes with a normal dependency installation; the prior symlinked installation differed only in dependency-path comments and did not change product source. Current-head run 42404390318 completed all four attached checks successfully: ci, ui-test, mjs-test and test. Full Vitest passed 2,374 tests with 3 pre-existing skips across 186 passed files and 1 skipped file. No review-provenance check is yet attached to b4, and formal final approval remains pending.",
+        "Exact v5 bytes passed SHA-256, format and full-decode checks. Direct public Chrome playback advanced with no media error; native pause and keyboard resume worked. All 261 normalized narration words match 37 VTT cues. ASR timing is usable, not frame-exact, and does not constitute a full independent human listen. The retained poster is a generic title card, not an extracted v5 frame.",
+        "Current v5 embedded-browser matrix has four product scenarios: desktop/light, desktop/dark, phone-width/light and phone-width/dark. Product-scenario totals: attempted 0, passed 0, failed 0, untested 4. Two preliminary desktop/light navigation attempts could not reach the preview, so no product scenario began and no product behavior was observed. Direct CDN playback is separate evidence and not an embedded-player pass. Actual embedded behavior must be checked on reachable DEV before production acceptance.",
+        "Fixed persona denominator 3: anonymous visitor overview; returning facilitator fixture sign-in/project navigation; private invitee fixture acceptance/legacy access. Historical local source 0f713638bc299b03ef5ebba15f5b41f1cfabb7ef browser-fixture layer attempted 3, passed 3, failed 0, untested 0; two direct-entry regressions passed 2 of 2 and are not extra personas. On current v5 source, each local end-to-end persona, hosted/provider, production and physical-device layer has attempted 0, passed 0, failed 0, untested 3. Historical fixtures do not prove current v5 or repeat-auth behavior. Human satisfaction, confusion and frustration were not measured, sample 0.",
+        "Known non-major cold-root legacy-module and changelog loading remains a follow-up without a measured latency claim. The accepted 0.40 notes and all older feed entries remain byte-for-byte unchanged. Optional Transcode qualification is not a dependency for the approved direct-CDN film."
+      ],
+      "security": [
+        "No backend authentication, cookie, permission, invitation issuance or expiry, report data, CDN CORS or security-setting change. Public MP4 and poster URLs remain immutable. Caption bytes are verified and served same-origin, default-off to avoid automatic duplication of burned-in captions."
       ]
     }
   }
