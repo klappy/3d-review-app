@@ -15,7 +15,7 @@
   import { parse, to, legacyHref, contextForRoute } from "./router.js";
   import { setLiveContext, liveContext } from "../screens/href.js";
   import { setLiveChrome } from "./chrome.js";
-  import { PHONE_QUERY } from "../route.js";
+  import { PHONE_QUERY, wOverride } from "../route.js";
   import * as S from "./session.js";
   import * as D from "./data.js";
   import * as P from "./participant.js";
@@ -61,14 +61,16 @@
 
   capturePrivateInvitation();
   let hash = $state(globalThis.location?.hash ?? "");
-  let phone = $state(typeof matchMedia === "function" ? matchMedia(PHONE_QUERY).matches : false);
+  const entryQuery = new URLSearchParams(globalThis.location?.search ?? "");
+  const entryWidth = wOverride(entryQuery);
+  let phone = $state(entryWidth ? entryWidth === "phone" : typeof matchMedia === "function" ? matchMedia(PHONE_QUERY).matches : false);
   const requestedRoute = $derived(parse(hash));
   let route = $state(parse(hash)); // All rendered links/actions remain bound to the displayed view until the next view commits.
   // The screen theme: the link's ?theme= when it carries one, else the system's (prefers-color-scheme, followed live); the viewer's own
   // Light or Dark choice in the account menu overrides both (AppShell themeOf).
   let systemDark = $state(systemTheme() === "dark");
   $effect(() => { const mq = globalThis.matchMedia?.("(prefers-color-scheme: dark)"); if (!mq?.addEventListener) return; const f = () => { systemDark = mq.matches; }; mq.addEventListener("change", f); return () => mq.removeEventListener("change", f); });
-  const theme = $derived(route.query.get("theme") === "dark" ? "dark" : route.query.get("theme") === "light" ? "light" : systemDark ? "dark" : "light");
+  const theme = $derived((route.query.get("theme") ?? entryQuery.get("theme")) === "dark" ? "dark" : (route.query.get("theme") ?? entryQuery.get("theme")) === "light" ? "light" : systemDark ? "dark" : "light");
   let session = $state(undefined); // undefined = not read yet; null = signed out
   let page = $state({ status: "loading", key: "", data: null, error: null });
   let pstate = $state(P.snapshot()); // participant journey snapshot
@@ -109,7 +111,7 @@
     globalThis.addEventListener("pageshow", onFocus);
     globalThis.addEventListener("hashchange", onHash);
     const mq = typeof matchMedia === "function" ? matchMedia(PHONE_QUERY) : null;
-    const onMq = () => { phone = mq.matches; };
+    const onMq = () => { if (!entryWidth) phone = mq.matches; };
     mq?.addEventListener("change", onMq);
     const off = P.subscribe((s) => { pstate = s; });
     return () => { focusCheck++; globalThis.removeEventListener("focus", onFocus); globalThis.removeEventListener("pageshow", onFocus); globalThis.removeEventListener("hashchange", onHash); mq?.removeEventListener("change", onMq); off(); };

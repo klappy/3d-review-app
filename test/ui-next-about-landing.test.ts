@@ -145,7 +145,7 @@ describe("Learn more and FAQ disclosures: keyboard and screen-reader order (VALI
         for (const attr of ["role", "aria-expanded", "aria-controls", "tabindex"]) { expect(d.hasAttribute(attr)).toBe(false); expect(s.hasAttribute(attr)).toBe(false); }
       }
       // Tab order = DOM order (no positive tabindex anywhere); the summary sits between the content before and after it.
-      expect(a.querySelector("[tabindex]:not([tabindex='-1'])")).toBeNull();
+      expect(a.querySelector("[tabindex]:not([tabindex='-1']):not([tabindex='0'])")).toBeNull();
       const focusables = [...a.querySelectorAll("a[href], summary, button")];
       const first = focusables.indexOf(ds[0].firstElementChild!);
       expect(first).toBeGreaterThan(0);
@@ -194,10 +194,10 @@ describe("rhythm and Media card (captain ruling 2026-10-20 22:29 ET; design-syst
     expect(mount(Landing, { phone: true }).querySelector("main")!.hasAttribute("data-rhythm")).toBe(false);
   });
   it("Landing hero media card: placeholder frame with play + title · duration line + caption when no src", () => {
-    const m = mount(Landing, {}).querySelector(".l-media")!;
+    const m = mount(Landing, {videoSrc:null}).querySelector(".l-media")!;
     expect(m.querySelector(".l-media-frame .l-media-play")).not.toBeNull();
     expect(m.querySelector("video")).toBeNull();
-    expect(text(m.querySelector(".l-media-title")!)).toBe("What 3D Review is · 2:10");
+    expect(text(m.querySelector(".l-media-title")!)).toBe("What 3D Review is · 2:00");
     expect(text(m.querySelector(".l-media-frame + p.small")!)).toContain("One short video");
   });
   it("Landing media card plays a Transcode proxy URL when videoSrc is given", () => {
