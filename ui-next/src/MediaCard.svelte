@@ -1,20 +1,26 @@
 <!-- UI Next (v4) Media card. Status: provisional (captain ruling 2026-10-20 22:29 ET).
      Contract: design-system.md section 2 "Media card": .glass-hi.l-media > .l-media-frame (16:10 dark frame, .l-media-play disc, .l-media-title line) + caption.
-     src: a URL an approved HTTPS media source when the video exists; absent = placeholder frame.
+     src: an approved HTTPS or same-origin media URL when the video exists; absent = placeholder frame.
      Never auto-plays. No <style>, no inline style. -->
 <script>
   import Icon from "./Icon.svelte";
   import { I } from "./icons.js";
-  let { title, duration, caption, src, poster, captions } = $props();
+  let { title, duration, caption, src, directSrc, poster, captions } = $props();
   if (!(typeof title === "string" && title.trim())) throw new TypeError("MediaCard: title is required");
-  if (src != null && !/^https:\/\//.test(src)) throw new TypeError("MediaCard: src must be an https media URL");
+  const safeMediaUrl = (value) => typeof value === 'string' && (/^https:\/\//.test(value) || /^\/(?![\/\\])[^\\\s]*$/.test(value));
+  if (src != null && !safeMediaUrl(src)) throw new TypeError("MediaCard: src must be an https or same-origin media URL");
+  if (directSrc != null && !safeMediaUrl(directSrc)) throw new TypeError("MediaCard: directSrc must be an https or same-origin media URL");
+  const fallback = $derived(directSrc ?? src);
   let video;
   let failure = $state('');
   let playAttempt = 0;
-  function mediaFailed() {
+  function diagnostic(kind) {
+    // Only fixed event labels and native numeric state: never URLs, tokens or exception messages.
+    return `${kind}; media error ${video?.error?.code ?? 0}; ready ${video?.readyState ?? 0}; network ${video?.networkState ?? 0}`;
+  }
+  function mediaFailed(event) {
     ++playAttempt;
-    const code = video?.error?.code;
-    failure = `The video could not play here${code ? ` (media error ${code})` : ''}.`;
+    failure = `The video could not play here (${diagnostic(event?.currentTarget?.tagName === 'SOURCE' ? 'source' : 'video')}).`;
   }
   function playing() {
     ++playAttempt;
@@ -30,7 +36,7 @@
       if (attempt !== playAttempt || !media.paused || error?.name === 'AbortError') return;
       failure = error?.name === 'NotAllowedError'
         ? 'Tap the play control in the video to start playback.'
-        : 'The video could not play here.';
+        : `The video could not play here (${diagnostic(error?.name === 'NotSupportedError' ? 'play NotSupportedError' : 'play rejected')}).`;
     };
     // Initialize/retry and play in the tap itself, before scrolling or focus.
     // Do not await a load event: Safari requires playback to retain activation.
@@ -49,11 +55,11 @@
     {#if src}<video bind:this={video} {poster} controls playsinline preload="metadata" tabindex="0" aria-label={line} onerror={mediaFailed} onplaying={playing}>
       <source {src} type="video/mp4" onerror={mediaFailed} />
       {#if captions}<track kind="captions" src={captions} srclang="en" label="English" />{/if}
-      <a href={src}>Open the video</a>
+      <a href={fallback}>Open the video</a>
     </video>{:else}<span class="icn l-media-play" aria-hidden="true"><Icon d={I.play} size={32} /></span>{/if}
     {#if !src}<span class="micro l-media-title">{line}</span>{/if}
   </div>
-  {#if failure}<p class="small" role="status">{failure} <button type="button" onclick={play}>Try video again</button> or <a href={src}>open the video directly</a>.</p>{/if}
-  {#if src}<p class="small"><a href={src}>Open video separately</a>{#if captions} · English text captions are available in the player.{/if}</p>{/if}
+  {#if failure}<p class="small" role="status">{failure} <button type="button" onclick={play}>Try video again</button> or <a href={fallback}>open the video directly</a>.</p>{/if}
+  {#if src}<p class="small"><a href={fallback}>Open video separately</a>{#if captions} · English text captions are available in the player.{/if}</p>{/if}
   {#if caption}<p class="small">{caption}</p>{/if}
 </div>

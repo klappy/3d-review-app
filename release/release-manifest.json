@@ -1,33 +1,32 @@
 {
-  "version": "0.41.1",
+  "version": "0.41.2",
   "cookbook_repo": "klappy/3d-review-cookbook",
-  "cookbook_commit": "b7efd02322bb9d1bf39de79337ba3a95b88add27",
+  "cookbook_commit": "90c2145efaf07c3522892bae213e2348c57f8b20",
   "records": [
     {
-      "path": "planning/2026-09-16-parity-build/releases/0.41.1.md",
-      "blob_sha": "64402fcc79deeae5c805784cc833224103dd30a5",
-      "sha256": "c462d9b81747d35a1f49e5c33694b0f6951532355f266d8083e25df8b775ea4c"
+      "path": "planning/2026-09-16-parity-build/releases/0.41.2.md",
+      "blob_sha": "cf52fad31c787dbee93ca9f9ad8d15424c3355b3",
+      "sha256": "4edc724b440fa0122801b1619c574b9d36c67301a4afbeca3a3411fab02d48de"
     },
     {
       "path": "planning/2026-09-16-parity-build/releases/releases.json",
-      "blob_sha": "e8c6ea1f28240860f7241120965e691452fa74fe",
-      "sha256": "ee94dd692311877216bd848ffae4265a82876c5e0baebb95362e4aa467cf0608"
+      "blob_sha": "419004c37d912fef45c49d0bd2c0b20a70d0e3f6",
+      "sha256": "1b1dbb93e66913cfc890dc9cca9df27760a38c3640be2345a61f18bb5c8ae6e6"
     }
   ],
   "changelog": {
     "sections": {
-      "fixed": [
-        "The homepage overview initializes an explicit video/mp4 source with metadata preload. Empty or failed media is loaded and played synchronously inside the user click before focus or scrolling; playback is never automatic. The approved v5 MP4, poster and optional same-origin captions are unchanged.",
-        "Player recovery separates an activation denial from a real media failure, ignores interrupted or superseded play requests, offers an explicit retry button and retains the direct-video fallback. Native media error codes are shown when available. These changes correct reproducible recovery-state defects; they do not yet prove the reported iPhone Safari embedded-playback failure is resolved."
-      ],
       "changed": [
-        "Compatible PATCH 0.41.1 is limited to homepage media initialization and recovery. Baseline main 8a5d7d427937216396dd49c2d079eee5fdd2d4d2 and production b3a1a134eed7fdbe0da853fe35cb73cf09be80d8 share product tree 5b34504f75c258bf4ee135c59e9618952a0c3597. All accepted older release records remain unchanged.",
-        "Four new component regression cases failed on baseline and passed after the correction: synchronous first-load/play; interrupted request; stale rejection after later success; activation denial and media-error retry. Final focused component suite passed 40/40, overview source wiring passed 1/1, and the normal Next build plus typecheck passed. These are local automated fixtures, not Safari browser acceptance. Required exact-head hosted checks and final independent review remain separate gates.",
-        "Fixed affected persona/scenario denominator 3: anonymous visitor starts the overview; returning facilitator starts it on the phone-layout fixture; visitor recovers interrupted or failed playback. Local automated component layer attempted 3, passed 3, failed 0, untested 0; it does not exercise real authentication. Candidate DEV browser, production browser and physical-iPhone layers each attempted 0, passed 0, failed 0, untested 3. On the previous 0.41.0 release, the real user reported iPhone Safari embedded playback failed while the same raw MP4 played. That is the defect report, not a candidate pass. Human satisfaction, confusion and frustration are NOT MEASURED; sample 0.",
-        "The user will test a verified DEV deployment on native iPhone Safari before production promotion. Exact embedded failure cause remains unconfirmed: Chrome positive controls and same-device raw-file playback do not establish embedded Safari success. No Cloudflare cache, CORS or security configuration is changed. Remaining unrelated presentation P2s stay outside this fix."
+        "The homepage embeds the unchanged approved v5 film through one fixed same-origin streaming route, /v2/media/overview-8bd9e6de2dcf.mp4. GET and HEAD preserve upstream byte-range status, range and length headers, validators and streamed bytes. The original immutable CDN URL remains the separate direct-open fallback. Native controls, synchronous user-initiated play, poster and optional captions remain.",
+        "Compatible PATCH 0.41.2 is a bounded delivery-path compatibility candidate following main 326a66b6f8faa1ae1f021fa56e5ddb53850a8ed2 (0.41.1). The user tested that prior DEV release twice on iPhone Safari: the embedded player still failed while the same raw file played. A pause icon or loaded poster with 00:00 duration was not counted as playback. Exact native failure cause remains unconfirmed; this candidate does not claim the issue is resolved.",
+        "Failure text adds fixed source/video/play labels and native numeric media-error, ready-state and network-state values, without exception messages or URLs. Same-origin source validation rejects protocol-relative URLs and backslashes; separate fallback links retain the known-working HTTPS media URL.",
+        "Local affected automated checks passed 64 tests across four route/player/component files, plus one source-wiring test, the normal Next build and typecheck. Route fixtures cover the real Worker wrapper, full 200, ranged 206, open/suffix ranges, 416, HEAD, validators, invalid methods, HTML/redirect/encoded-response refusal, fetch failure and streaming without whole-file buffering. Upstream responses are mocked; actual Cloudflare response bytes/headers and native Safari behavior remain unverified at this record.",
+        "Fixed affected persona/scenario denominator 3: anonymous visitor starts the homepage overview; phone-layout visitor starts it; visitor retries or opens the direct fallback after a media failure. Local automated layer attempted 3, passed 3, failed 0, untested 0, without real authentication. Current candidate DEV-browser, production-browser and physical-iPhone layers each attempted 0, passed 0, failed 0, untested 3. Prior 0.41.1 iPhone failures are historical defect evidence, not current candidate passes. Human satisfaction, confusion and frustration are NOT MEASURED; sample 0.",
+        "The existing connected main-to-DEV workflow must publish and verify this candidate before the user tests native iPhone Safari again. Production stays held until that test succeeds. All 131 older release entries and accepted notes remain unchanged; unrelated frozen work is excluded."
       ],
       "security": [
-        "No authentication, session, invitation, report, backend API, schema, permissions, persistent credentials or deployment-trigger changes. Public media URLs and bytes remain pinned; no autoplay, crossorigin addition or personal data transmission is introduced."
+        "The new public read-only endpoint fetches only the hard-coded approved film URL. It forwards only Range and If-Range, never client Cookie, Authorization, Referer, Origin or query-selected targets; redirects are rejected. Unexpected non-video or encoded media responses return a generic 502. Range errors preserve 416 and the validated total length while discarding upstream error bodies and content types. Responses are streamed with no-store caching and nosniff. This is not an arbitrary proxy.",
+        "No authentication/session/invitation/report behavior, schema, bindings, persistent credentials, deployment triggers, DNS, WAF, cache rules or CORS settings change. No autoplay or crossorigin attribute is added. Approved video bytes, poster and caption assets are unchanged. Required independent external-call security review, final exact-head checks and live verification remain separate gates."
       ]
     }
   }
