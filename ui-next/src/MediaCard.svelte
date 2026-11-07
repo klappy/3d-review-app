@@ -9,25 +9,51 @@
   if (!(typeof title === "string" && title.trim())) throw new TypeError("MediaCard: title is required");
   if (src != null && !/^https:\/\//.test(src)) throw new TypeError("MediaCard: src must be an https media URL");
   let video;
-  let failed = $state(false);
+  let failure = $state('');
+  let playAttempt = 0;
+  function mediaFailed() {
+    ++playAttempt;
+    const code = video?.error?.code;
+    failure = `The video could not play here${code ? ` (media error ${code})` : ''}.`;
+  }
+  function playing() {
+    ++playAttempt;
+    failure = '';
+  }
   export function play() {
-    video?.scrollIntoView?.({ block: 'center', behavior: 'smooth' });
-    video?.focus();
-    if (failed) { video?.load(); failed = false; }
-    try { video?.play()?.catch(() => { failed = true; }); } catch { failed = true; }
+    if (!video) return;
+    const media = video;
+    const attempt = ++playAttempt;
+    const retry = !!failure || !!media.error || media.networkState === HTMLMediaElement.NETWORK_NO_SOURCE;
+    failure = '';
+    const rejected = (error) => {
+      if (attempt !== playAttempt || !media.paused || error?.name === 'AbortError') return;
+      failure = error?.name === 'NotAllowedError'
+        ? 'Tap the play control in the video to start playback.'
+        : 'The video could not play here.';
+    };
+    // Initialize/retry and play in the tap itself, before scrolling or focus.
+    // Do not await a load event: Safari requires playback to retain activation.
+    try {
+      if (retry || media.networkState === HTMLMediaElement.NETWORK_EMPTY) media.load();
+      media.play()?.catch(rejected);
+    } catch (error) { rejected(error); }
+    media.focus({ preventScroll: true });
+    media.scrollIntoView?.({ block: 'center', behavior: 'smooth' });
   }
   const line = $derived(duration ? `${title} · ${duration}` : title);
 </script>
 
 <div class="glass-hi l-media" role="group" aria-label={line}>
   <div class="l-media-frame">
-    {#if src}<video bind:this={video} {src} {poster} controls playsinline preload="none" tabindex="0" aria-label={line} onerror={() => { failed = true; }} onplaying={() => { failed = false; }}>
+    {#if src}<video bind:this={video} {poster} controls playsinline preload="metadata" tabindex="0" aria-label={line} onerror={mediaFailed} onplaying={playing}>
+      <source {src} type="video/mp4" onerror={mediaFailed} />
       {#if captions}<track kind="captions" src={captions} srclang="en" label="English" />{/if}
       <a href={src}>Open the video</a>
     </video>{:else}<span class="icn l-media-play" aria-hidden="true"><Icon d={I.play} size={32} /></span>{/if}
     {#if !src}<span class="micro l-media-title">{line}</span>{/if}
   </div>
-  {#if failed}<p class="small" role="status">The video could not play here. <a href={src}>Open the video directly</a>, or try the player again.</p>{/if}
+  {#if failure}<p class="small" role="status">{failure} <button type="button" onclick={play}>Try video again</button> or <a href={src}>open the video directly</a>.</p>{/if}
   {#if src}<p class="small"><a href={src}>Open video separately</a>{#if captions} · English text captions are available in the player.{/if}</p>{/if}
   {#if caption}<p class="small">{caption}</p>{/if}
 </div>

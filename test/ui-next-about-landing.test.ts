@@ -202,7 +202,8 @@ describe("rhythm and Media card (captain ruling 2026-10-20 22:29 ET; design-syst
   });
   it("Landing media card plays a Transcode proxy URL when videoSrc is given", () => {
     const m = mount(Landing, { videoSrc: "https://transcode.example/v/intro.mp4" }).querySelector(".l-media")!;
-    expect(m.querySelector("video")!.getAttribute("src")).toBe("https://transcode.example/v/intro.mp4");
+    expect(m.querySelector("video source")!.getAttribute("src")).toBe("https://transcode.example/v/intro.mp4");
+    expect(m.querySelector("video source")!.getAttribute("type")).toBe("video/mp4");
     expect(m.querySelector(".l-media-play")).toBeNull();
   });
   it("phone twins: hero card pad=hero, LandingPhone FAQ card pad=list, the 44px mark inside the LandingPhone hero card (board is the design)", () => {
