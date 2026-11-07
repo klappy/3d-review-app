@@ -1,24 +1,26 @@
 {
   "version": "0.40.0",
   "cookbook_repo": "klappy/3d-review-cookbook",
-  "cookbook_commit": "5814eb089445ec2f1efbd018c319f1fa6a7ac012",
+  "cookbook_commit": "bcabd5b4936242a6700415f01a4b34b656234c31",
   "records": [
     {
       "path": "planning/2026-09-16-parity-build/releases/0.40.0.md",
-      "blob_sha": "3f46ae0080a7688f92ae57c58711055da06c6028",
-      "sha256": "36ba6a8277f877e1d2b6a9b76766846eaecd57a37da29bea54d15c19ad47e00b"
+      "blob_sha": "e5c64bf749ccd278da8aec2ae3425a0114682398",
+      "sha256": "7f310002a7ef29fa079964ef90b7dbb2c54a47d6b27cfd64870b615134de2157"
     },
     {
       "path": "planning/2026-09-16-parity-build/releases/releases.json",
-      "blob_sha": "edb4c9a3243406c85780a235d13f459b4c873d5a",
-      "sha256": "4e21610e879f2d1e6cf0d08bcdd038d54b38d920d7abe76bdfa0c4cc43c26c8b"
+      "blob_sha": "74dad88974c241e759f8b3b72a4f5821ea171884",
+      "sha256": "3f05013c22ffb87d108945bf06bd36547795c19ac44d166ccc88ea95f042fab7"
     }
   ],
   "changelog": {
     "sections": {
       "added": [
         "Summit numeric reports and exports render from one response through the explicit reversible SUMMIT_ONE_RESPONSE_REPORTS flag across current and Next interfaces. Next Detailed and full PDF add each perspective\u2019s genuine subdimension radar without zero-filling missing axes.",
-        "Future reports atomically capture active selected perspectives; saved selection determines selected-but-unanswered labels. Unsupported historical selection stays unknown; no backfill or migration."
+        "Future reports atomically capture active selected perspectives; saved selection determines selected-but-unanswered labels. Unsupported historical selection stays unknown; no backfill or migration.",
+        "Ordinary root `/` boots UI Next after a bounded same-origin `/next/` probe (`ui/default-entry.js`); explicit legacy, deep-link, and invitation continuations keep the current handler. Auth `#session=` callbacks transfer into Next unless the tab recorded legacy return intent.",
+        "Signed-out Next Landing embeds the approved CDN overview video pin `8fea7f793783` (120s MP4 + poster at `https://cdn.3dreview.app/overview/8fea7f793783/\u2026`, same-origin `/overview/3d-review-overview.en.vtt`, no autoplay, captions off by default) on desktop and phone MediaCard."
       ],
       "fixed": [
         "Canonical no-translation-brief amendment and status qualification require exact question/source identity. Custom or unqualified no-brief cannot acquire canonical meaning; historical answers and renderer behavior remain preserved.",
@@ -28,7 +30,8 @@
         "Candidate 0.40.0 is a MINOR classification for changed schema/accepted behavior. This is the existing 0.40.0 slot, now qualified for combined #611/#614 source. It does not rename the corrected 0.39.2 QR release or admit the unshipped 0.39.1 entry.",
         "Source checkpoint 611be728bd7b49fea7769e7cefeb711bd515c714 merges current main 1c86bd4ef9d58ff67740856338b17f414af8515b and published canonical-status correction 9a449e87abf0e96373ee195588f67cf29c950621. No shipped/DEV/production acceptance is claimed for this combined candidate.",
         "Persona/scenario scorecard at combined source 611be728bd7b49fea7769e7cefeb711bd515c714 (runtime evidence at byte-equivalent 3b0191fb924415abcccc735a9f7abb37d3516e93): S1 translator/facilitator canonical no-brief and custom negatives; S2 facilitator/authorized report reader one-response flow and PDFs; S3 authorized report reader categorical privacy and immutable history; S4 authorized report reader normal 12-response named PDFs/pagination. Fixed denominator 4 local automated synthetic scenarios: attempted 4, passed 4, failed 0, untested 0. Hosted DEV, production, physical-phone and print layers each: attempted 0, passed 0, failed 0, untested 4. Human satisfaction/confusion/frustration NOT MEASURED, sample size 0; no comparable human baseline. Component suites overlap and are not extra persona totals.",
-        "Superseding source qualification proposal: app e287f37fafb769bf826bfc8cb1208ce3d121cf42 includes rebased QR behavior and fixes legacy missing report selection falsely becoming known-empty; explicit saved-empty remains known. Prior b854 local evidence:16 suites/376pass/2skip/0fail; historical c946 local affected evidence:16 suites/383pass/2skip/0fail; final e287 local affected evidence:16 suites/384pass/2skip/0fail, final typecheck/PDF freshness pass. Latest c26 P2 correction/comment and additional model-selection regression retained; executable app source unchanged from c946. Latest six-file delta adds canonical Q1 wording derived from same-instrument Q2, exact church-status identity and conditional amendment provenance; no direct upstream Q1 option is claimed; old endpoint control2fail/2pass, corrected4pass; typecheck/PDF freshness pass. Original four-scenario evidence remains inherited at3b0191f, not rerun at this source; exact-source complete scenario and hosted/physical layers each0attempted/0passed/0failed/4untested; human metrics NOT MEASURED/sample0. Same0.40.0 candidate; expanded source requires new canonical acceptance and final packaging, not strict611be equivalence or DEV/production delivery."
+        "Superseding source qualification proposal: app e287f37fafb769bf826bfc8cb1208ce3d121cf42 includes rebased QR behavior and fixes legacy missing report selection falsely becoming known-empty; explicit saved-empty remains known. Prior b854 local evidence:16 suites/376pass/2skip/0fail; historical c946 local affected evidence:16 suites/383pass/2skip/0fail; final e287 local affected evidence:16 suites/384pass/2skip/0fail, final typecheck/PDF freshness pass. Latest c26 P2 correction/comment and additional model-selection regression retained; executable app source unchanged from c946. Latest six-file delta adds canonical Q1 wording derived from same-instrument Q2, exact church-status identity and conditional amendment provenance; no direct upstream Q1 option is claimed; old endpoint control2fail/2pass, corrected4pass; typecheck/PDF freshness pass. Original four-scenario evidence remains inherited at3b0191f, not rerun at this source; exact-source complete scenario and hosted/physical layers each0attempted/0passed/0failed/4untested; human metrics NOT MEASURED/sample0. Same0.40.0 candidate; expanded source requires new canonical acceptance and final packaging, not strict611be equivalence or DEV/production delivery.",
+        "UI/homepage increment source qualification proposal: app `2fedaac9f87107728fdc83c03e63fe88fe1c10f5` (#619) on top of the accepted 0.40.0 report train. Product scope now includes Next-as-default and the CDN overview embed. This is the same 0.40.0 candidate slot under H19 same-version supersession \u2014 not a new version reservation. Report-train evidence at e287/c26/611be remains inherited; this line does not re-run those suites. Captain media-cut acceptance and production go are separate gates and are not claimed by this registry edit alone. Hosted DEV/production delivery of the UI increment: attempted 0 / untested pending packaging and promotion."
       ]
     }
   }
