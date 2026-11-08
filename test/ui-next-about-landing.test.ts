@@ -2,10 +2,10 @@
 // UI Next (v4) About and Landing screens + their /next/ routes (status: provisional).
 // Boards: 3d-review-cookbook design/2026-10-15-glass-redesign/canvas About.dc.html, AboutPhone.dc.html, Landing.dc.html, LandingPhone.dc.html
 // (branch next-copy-about-canvas, PR #186); copy: generator/copy_rachel.py -> ui-next/src/copy/rachel.js; pinned to sources/rachel-copy-2026-10-19/app-copy-edits.txt.
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { render } from "@testing-library/svelte";
+import { render, cleanup } from "@testing-library/svelte";
 import About from "../ui-next/src/screens/About.svelte";
 import Landing from "../ui-next/src/screens/Landing.svelte";
 // @ts-expect-error -- plain .js module, no type declarations
@@ -16,6 +16,12 @@ import { route } from "../ui-next/src/route.js";
 import { accountItems } from "../ui-next/src/icons.js";
 // @ts-expect-error -- plain .mjs script, no type declarations
 import { parse, emit } from "../scripts/sync-rachel-copy.mjs";
+
+beforeEach(() => {
+  vi.spyOn(HTMLMediaElement.prototype, 'load').mockImplementation(() => {});
+  vi.spyOn(HTMLMediaElement.prototype, 'pause').mockImplementation(() => {});
+});
+afterEach(() => { cleanup(); vi.restoreAllMocks(); });
 
 type P = Record<string, unknown>;
 const mount = (C: typeof About, props: P) => render(C, { props }).container.querySelector(".app") as HTMLElement;
@@ -200,10 +206,10 @@ describe("rhythm and Media card (captain ruling 2026-10-20 22:29 ET; design-syst
     expect(text(m.querySelector(".l-media-title")!)).toBe("What 3D Review is · 2:00");
     expect(text(m.querySelector(".l-media-frame + p.small")!)).toContain("One short video");
   });
-  it("Landing media card plays a Transcode proxy URL when videoSrc is given", () => {
+  it("Landing media card initializes the native video URL when videoSrc is given", () => {
     const m = mount(Landing, { videoSrc: "https://transcode.example/v/intro.mp4" }).querySelector(".l-media")!;
-    expect(m.querySelector("video source")!.getAttribute("src")).toBe("https://transcode.example/v/intro.mp4");
-    expect(m.querySelector("video source")!.getAttribute("type")).toBe("video/mp4");
+    expect(m.querySelector("video")!.getAttribute("src")).toBe("https://transcode.example/v/intro.mp4");
+    expect(m.querySelector("video source")).toBeNull();
     expect(m.querySelector(".l-media-play")).toBeNull();
   });
   it("phone twins: hero card pad=hero, LandingPhone FAQ card pad=list, the 44px mark inside the LandingPhone hero card (board is the design)", () => {

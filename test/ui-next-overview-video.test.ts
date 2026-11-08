@@ -1,20 +1,21 @@
 // @vitest-environment jsdom
-import {it,expect,vi,afterEach} from 'vitest';
+import {it,expect,vi,afterEach,beforeEach} from 'vitest';
 import {render,fireEvent,cleanup} from '@testing-library/svelte';
 import {readFileSync} from 'node:fs';import {resolve} from 'node:path';import {createHash} from 'node:crypto';
 import Landing from '../ui-next/src/screens/Landing.svelte';
 import {OVERVIEW} from '../ui-next/src/overview-video.js';
+beforeEach(() => { vi.spyOn(HTMLMediaElement.prototype, 'pause').mockImplementation(() => {}); });
 afterEach(()=>{cleanup();vi.restoreAllMocks();});
 for(const phone of [false,true])it(`approved overview player, captions and failure recovery (${phone?'phone':'desktop'})`,async()=>{
  const load=vi.spyOn(HTMLMediaElement.prototype,'load').mockImplementation(()=>{});
  const play=vi.spyOn(HTMLMediaElement.prototype,'play').mockResolvedValue();
  const v=render(Landing,{props:{phone,home:'#/projects'}});const media=v.getByLabelText('What 3D Review is · 2:00',{selector:'video'}) as HTMLVideoElement;
- const source=media.querySelector('source')!;expect(source.getAttribute('src')).toBe(OVERVIEW.src);expect(source.type).toBe('video/mp4');expect(media.poster).toBe(OVERVIEW.poster);expect(media.controls).toBe(true);expect(media.autoplay).toBe(false);expect(media.preload).toBe('metadata');expect(media.hasAttribute('playsinline')).toBe(true);expect(media.hasAttribute('crossorigin')).toBe(false);
+ expect(media.getAttribute('src')).toBe(OVERVIEW.src);expect(media.querySelector('source')).toBeNull();expect(media.poster).toBe(OVERVIEW.poster);expect(media.controls).toBe(true);expect(media.autoplay).toBe(false);expect(media.preload).toBe('metadata');expect(media.hasAttribute('playsinline')).toBe(true);expect(media.hasAttribute('crossorigin')).toBe(false);
  Object.defineProperty(media,'networkState',{configurable:true,value:HTMLMediaElement.NETWORK_IDLE});
  const track=media.querySelector('track')!;expect(track.getAttribute('src')).toBe('/overview/3d-review-overview.en.vtt');expect(track.hasAttribute('default')).toBe(false);expect(track.getAttribute('srclang')).toBe('en');
  const before=location.href;await fireEvent.click(v.getByRole('button',{name:'Watch how it works · 2:00'}));expect(play).toHaveBeenCalledTimes(1);expect(location.href).toBe(before);expect(document.activeElement).toBe(media);
  await fireEvent.error(media);expect(v.getByRole('status').textContent).toContain('could not play');expect(v.getByRole('link',{name:'open the video directly'}).getAttribute('href')).toBe(OVERVIEW.directSrc);
- await fireEvent.click(v.getByRole('button',{name:'Watch how it works · 2:00'}));expect(load).toHaveBeenCalledTimes(1);
+ await fireEvent.click(v.getByRole('button',{name:'Watch how it works · 2:00'}));expect(load).toHaveBeenCalledTimes(2);
  await fireEvent.playing(media);expect(v.queryByRole('status')).toBeNull();expect(v.getByRole('link',{name:'Open video separately'}).getAttribute('href')).toBe(OVERVIEW.directSrc);
 });
 it('same-origin English captions exactly match approved CDN handoff bytes',()=>{

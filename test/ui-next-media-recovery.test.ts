@@ -1,9 +1,10 @@
 // @vitest-environment jsdom
-import { it, expect, vi, afterEach } from 'vitest';
+import { it, expect, vi, afterEach, beforeEach } from 'vitest';
 import { render, fireEvent, cleanup } from '@testing-library/svelte';
 import Landing from '../ui-next/src/screens/Landing.svelte';
 import MediaCard from '../ui-next/src/MediaCard.svelte';
 
+beforeEach(() => { vi.spyOn(HTMLMediaElement.prototype, 'pause').mockImplementation(() => {}); });
 afterEach(() => { cleanup(); vi.restoreAllMocks(); });
 const label = 'What 3D Review is · 2:00';
 const cta = 'Watch how it works · 2:00';
@@ -23,13 +24,13 @@ it('rejects an unsafe direct fallback even when the embedded source is same-orig
   expect(() => render(MediaCard, { props: { title: 'Video', src: '/v2/media/film.mp4', directSrc: '//evil.example/' } })).toThrow('MediaCard: directSrc must');
 });
 
-it('reports bounded source/video state without exposing URLs or exception text', async () => {
+it('reports bounded video state without exposing URLs or exception text', async () => {
   vi.spyOn(HTMLMediaElement.prototype, 'load').mockImplementation(() => {});
   vi.spyOn(HTMLMediaElement.prototype, 'play').mockRejectedValue(new DOMException('private URL or token', 'NotSupportedError'));
   const { view, media, button } = setup();
   Object.defineProperty(media, 'networkState', { configurable: true, value: 3 });
-  await fireEvent.error(media.querySelector('source')!);
-  expect(view.getByRole('status').textContent).toContain('source; media error 0; ready 0; network 3');
+  await fireEvent.error(media);
+  expect(view.getByRole('status').textContent).toContain('video; media error 0; ready 0; network 3');
   await fireEvent.click(button);
   expect(view.getByRole('status').textContent).toContain('play NotSupportedError');
   expect(view.getByRole('status').textContent).not.toContain('private URL');
@@ -44,6 +45,7 @@ it('starts an uninitialized element synchronously in the user click before prese
   const { media, button } = setup();
   media.scrollIntoView = () => { order.push('scroll'); };
   media.focus = () => { order.push('focus'); };
+  order.length = 0; // The mounted-node initialization has already run.
   button.click();
   expect(order.slice(0, 2)).toEqual(['load', 'play']);
   expect(order.indexOf('play')).toBeLessThan(order.indexOf('scroll'));
@@ -83,7 +85,7 @@ it('distinguishes activation rejection from a media failure and permits a direct
   await fireEvent.error(media);
   expect(view.getByRole('status').textContent).toContain('media error 3');
   await fireEvent.click(view.getByRole('button', { name: 'Try video again' }));
-  expect(load).toHaveBeenCalledTimes(2);
+  expect(load).toHaveBeenCalledTimes(3);
   expect(play).toHaveBeenCalledTimes(2);
   await fireEvent.playing(media);
   expect(view.queryByRole('status')).toBeNull();
