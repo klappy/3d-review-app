@@ -38,6 +38,20 @@ describe('controlled player comparison', () => {
     expect(doc.querySelector('#player')?.classList.contains('app')).toBe(configuration.card);
     dom.window.close();
   });
+  it('contains the product shell shadow without changing the media card styling', () => {
+    const html = renderCase(CASES.find(c => c.id === 'r0'));
+    const dom = new JSDOM(html);
+    const inherited = dom.window.document.createElement('style');
+    inherited.textContent = '.app { box-shadow: 0 0 0 100vmax rgb(11, 21, 32); }';
+    dom.window.document.head.prepend(inherited);
+    const host = dom.window.document.getElementById('player')!;
+    expect(dom.window.getComputedStyle(host).boxShadow).toBe('none');
+    expect(dom.window.document.querySelector('nav')).not.toBeNull();
+    expect(dom.window.document.querySelector('h1')).not.toBeNull();
+    expect(html).toContain('id="player" class="app" data-theme="dark"');
+    expect(html).not.toMatch(/\.l-media[^<]*box-shadow:none/);
+    dom.window.close();
+  });
   it('rejects arbitrary case objects rather than interpolating user content', () => {
     expect(() => renderCase({ id: '<script>', title: 'bad' })).toThrow('Unknown player case');
   });
