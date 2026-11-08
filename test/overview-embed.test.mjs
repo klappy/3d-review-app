@@ -10,13 +10,16 @@ const read = (p) => readFileSync(join(root, p), "utf8");
 const CDN = "https://cdn.3dreview.app/overview/8fea7f793783";
 const VTT_SHA = "cb6a2952a991c33a7fbff0d267a8db56fd2181e807345eff82bf55355f7a7e39";
 
-test("Landing pins approved v5 with separately identified poster and same-origin captions", () => {
+test("Overview pins approved v5 and retained diagnostic captions; Landing omits the failing optional track", () => {
   const landing = read("ui-next/src/overview-video.js");
   assert.match(landing, /src: '\/v2\/media\/overview-8bd9e6de2dcf\.mp4'/);
   assert.match(landing, new RegExp(`https://cdn.3dreview.app/overview/8bd9e6de2dcf/3d-review-overview-120s-8bd9e6de2dcf\\.mp4`));
   assert.match(landing, new RegExp(`${CDN}/3d-review-overview-poster\\.jpg`));
   assert.match(landing, /duration: '2:00'/);
   assert.match(landing, /captions: '\/overview\/3d-review-overview\.en\.vtt'/);
+  const page = read("ui-next/src/screens/Landing.svelte");
+  assert.doesNotMatch(page, /captions=\{OVERVIEW\.captions\}/);
+  assert.equal((page.match(/<MediaCard/g) ?? []).length, 2);
   const card = read("ui-next/src/MediaCard.svelte");
   assert.match(card, /preload="metadata"/);
   assert.match(card, /use:initializeMedia=\{src\}/);

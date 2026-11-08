@@ -1,7 +1,24 @@
 {
   "schema": "3dr-releases/1",
-  "current": "0.41.6",
+  "current": "0.41.7",
   "versions": [
+    {
+      "version": "0.41.7",
+      "status": "candidate",
+      "notes_path": "releases/0.41.7.md",
+      "sections": {
+        "changed": [
+          "PATCH 0.41.7 omits the optional English VTT track from both phone and desktop homepage overview players. This matches the working R1 configuration without changing the approved v5 film, same-origin media relay, poster, controls, connected-source lifecycle, Watch/retry behavior or direct CDN fallback. The film’s baked-in captions remain visible; the homepage no longer offers the separate selectable text-caption track. Baked-in text is not an equivalent replacement for a selectable text-caption track. Generic MediaCard track support and the VTT asset are retained.",
+          "Actual user iPhone results on the twelve-case DEV 0.41.6/52c5a9d65c9286f429cb843d648b1c935e8efa72 matrix were seven playback cases reported working (A0, A1, R1–R5) and five reported failing (A2–A5, R0): attempted 12, passed 7, failed 5, untested 0. A1-to-A2 adds only the optional track; R0-to-R1 removes it. Every failing case has the track and every passing case lacks it. This isolates the feature-level trigger across both literal HTML and Svelte, not the underlying Safari parser, request or VTT mechanism. The real homepage must still be retested after deployment.",
+          "The diagnostic matrix retains its case IDs and behavior so those native observations remain comparable. A5/R0 descriptions now explicitly identify the preserved failing 0.41.6 homepage configuration rather than implying the corrected homepage still attaches the track. Production diagnostic exclusion and generic product failure copy remain unchanged.",
+          "At exact frozen app candidate 4fffdf8ac8bba4be2f346bb28bb8c30e7dc407d4, owner checks passed 43 focused tests across five affected suites, one source-wiring test, typecheck and the strict generated-PDF check. Component media APIs are mocked; these results establish source behavior and regressions, not iPhone playback. The unchanged generic recovery/lifecycle and diagnostic configurations remain covered.",
+          "Current candidate coverage is separate from historical matrix results. Automated phone and desktop homepage DOM scenarios each omit the track while retaining native attributes, CTA, recovery and direct fallback: attempted 2, passed 2, failed 0, untested 0. Deployed operator-browser scenarios are desktop and phone layout, each with native-button and Watch-button start/progress/pause (denominator 4): attempted 0, passed 0, failed 0, untested 4. Actual iPhone homepage native-button and Watch-button playback scenarios (denominator 2): attempted 0, passed 0, failed 0, untested 2. Signed-in/authentication journeys, actual sound output and full-film playback are not qualified by these checks. Satisfaction, confusion and frustration are NOT MEASURED; sample 0. All 136 older entries remain byte-preserved. DEV only; production remains unchanged and held pending actual native homepage acceptance."
+        ],
+        "security": [
+          "No authentication, credentials, telemetry, storage, backend route, proxy setting, dependency, migration, binding, DNS, security setting or deployment-trigger change. The only product change removes the homepage optional track and its associated request/availability copy. Diagnostic descriptions and regression assertions are updated, with normal accepted release identity pins. No Spanish content or audio changes."
+        ]
+      }
+    },
     {
       "version": "0.41.6",
       "status": "candidate",
