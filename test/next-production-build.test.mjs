@@ -65,3 +65,19 @@ test("production root delegates to the reviewed default bootstrap with an explic
   assert.match(html, /href="\/next\/\?ui_next=on" data-ui-next/);
   assert.match(read("wrangler.toml"), /\[assets\]\ndirectory = "\.\/ui"/);
 });
+
+test('diagnostic guard purges sibling assets from a previous DEV build without relying on Vite emptyOutDir', async () => {
+  const { buildPlayerDiagnostics } = await import('../scripts/build-player-diagnostics.mjs');
+  const assets = mkdtempSync(join(tmpdir(), 'player-assets-'));
+  try {
+    mkdirSync(join(assets, 'player-matrix/assets'), { recursive: true });
+    writeFileSync(join(assets, 'player-matrix/assets/stale.js'), 'numeric diagnostics');
+    writeFileSync(join(assets, 'player-matrix/r0.html'), 'test player');
+    writeFileSync(join(assets, 'player-diagnostic.html'), 'old test player');
+    writeFileSync(join(assets, 'index.html'), 'ordinary homepage');
+    assert.deepEqual(await buildPlayerDiagnostics({ branch: 'production', assetsDir: assets }), { emitted: false });
+    assert.ok(!existsSync(join(assets, 'player-matrix')));
+    assert.ok(!existsSync(join(assets, 'player-diagnostic.html')));
+    assert.equal(readFileSync(join(assets, 'index.html'), 'utf8'), 'ordinary homepage');
+  } finally { rmSync(assets, { recursive: true, force: true }); }
+});
