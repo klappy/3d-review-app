@@ -24,16 +24,16 @@ it('rejects an unsafe direct fallback even when the embedded source is same-orig
   expect(() => render(MediaCard, { props: { title: 'Video', src: '/v2/media/film.mp4', directSrc: '//evil.example/' } })).toThrow('MediaCard: directSrc must');
 });
 
-it('reports bounded video state without exposing URLs or exception text', async () => {
+it('uses generic recovery copy without diagnostic state, URLs or exception text', async () => {
   vi.spyOn(HTMLMediaElement.prototype, 'load').mockImplementation(() => {});
   vi.spyOn(HTMLMediaElement.prototype, 'play').mockRejectedValue(new DOMException('private URL or token', 'NotSupportedError'));
   const { view, media, button } = setup();
   Object.defineProperty(media, 'networkState', { configurable: true, value: 3 });
   await fireEvent.error(media);
-  expect(view.getByRole('status').textContent).toContain('video; media error 0; ready 0; network 3');
+  expect(view.getByRole('status').textContent).toContain('The video could not play here.');
   await fireEvent.click(button);
-  expect(view.getByRole('status').textContent).toContain('play NotSupportedError');
-  expect(view.getByRole('status').textContent).not.toContain('private URL');
+  expect(view.getByRole('status').textContent).toContain('The video could not play here.');
+  expect(view.getByRole('status').textContent).not.toMatch(/private URL|media error|network|ready|NotSupportedError/);
   await fireEvent.playing(media);
   expect(view.queryByRole('status')).toBeNull();
 });
@@ -83,7 +83,7 @@ it('distinguishes activation rejection from a media failure and permits a direct
   expect(view.getByRole('status').textContent).not.toContain('could not play');
   Object.defineProperty(media, 'error', { configurable: true, value: { code: 3 } });
   await fireEvent.error(media);
-  expect(view.getByRole('status').textContent).toContain('media error 3');
+  expect(view.getByRole('status').textContent).toContain('The video could not play here.');
   await fireEvent.click(view.getByRole('button', { name: 'Try video again' }));
   expect(load).toHaveBeenCalledTimes(3);
   expect(play).toHaveBeenCalledTimes(2);

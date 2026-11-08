@@ -14,13 +14,9 @@
   let video;
   let failure = $state('');
   let playAttempt = 0;
-  function diagnostic(kind) {
-    // Only fixed event labels and native numeric state: never URLs, tokens or exception messages.
-    return `${kind}; media error ${video?.error?.code ?? 0}; ready ${video?.readyState ?? 0}; network ${video?.networkState ?? 0}`;
-  }
-  function mediaFailed(event) {
+  function mediaFailed() {
     ++playAttempt;
-    failure = `The video could not play here (${diagnostic(event?.currentTarget?.tagName === 'SOURCE' ? 'source' : 'video')}).`;
+    failure = 'The video could not play here.';
   }
   function initializeMedia(node, initialSource) {
     let currentSource;
@@ -60,7 +56,7 @@
       if (attempt !== playAttempt || !media.paused || error?.name === 'AbortError') return;
       failure = error?.name === 'NotAllowedError'
         ? 'Tap the play control in the video to start playback.'
-        : `The video could not play here (${diagnostic(error?.name === 'NotSupportedError' ? 'play NotSupportedError' : 'play rejected')}).`;
+        : 'The video could not play here.';
     };
     // Initialize/retry and play in the tap itself, before scrolling or focus.
     // Do not await a load event: Safari requires playback to retain activation.

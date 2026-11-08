@@ -2,7 +2,7 @@ import { expect, it, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { JSDOM } from 'jsdom';
 
-const html = readFileSync(new URL('../ui/player-diagnostic.html', import.meta.url), 'utf8');
+const html = readFileSync(new URL('../ui-player-matrix/legacy.html', import.meta.url), 'utf8');
 const mediaPath = '/v2/media/overview-8bd9e6de2dcf.mp4';
 
 it('uses two literal native source patterns without app initialization or extra media features', () => {

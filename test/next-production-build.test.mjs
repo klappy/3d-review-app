@@ -3,7 +3,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, mkdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -13,6 +13,12 @@ const read = (p) => readFileSync(join(root, p), "utf8");
 
 function build(branch) {
   const out = mkdtempSync(join(tmpdir(), "next-build-"));
+  // Simulate a previous DEV output in the exact production output directory.
+  if (branch === 'production') {
+    mkdirSync(join(out, 'player-matrix'), { recursive: true });
+    writeFileSync(join(out, 'player-matrix/stale.html'), 'diagnostic');
+    writeFileSync(join(out, 'player-diagnostic.html'), 'diagnostic');
+  }
   const env = { ...process.env };
   if (branch) env.WORKERS_CI_BRANCH = branch; else delete env.WORKERS_CI_BRANCH;
   const r = spawnSync(process.execPath, ["scripts/build-next-guarded.mjs", "--outDir", out, "--emptyOutDir"], { cwd: root, env, encoding: "utf8" });
@@ -33,6 +39,13 @@ test("WORKERS_CI_BRANCH=production: the guarded build emits ui/next/index.html, 
       assert.ok(dev.js.includes(s), `non-production bundle keeps the harness: ${s}`);
       assert.ok(!prod.js.includes(s), `production bundle drops the harness: ${s}`);
     }
+    assert.ok(existsSync(join(dev.out, 'player-matrix/a0.html')));
+    assert.ok(existsSync(join(dev.out, 'player-matrix/r5.html')));
+    assert.ok(existsSync(join(dev.out, 'player-diagnostic.html')));
+    assert.ok(!existsSync(join(prod.out, 'player-matrix')), 'production removes all matrix pages, bundles and stale output');
+    assert.ok(!existsSync(join(prod.out, 'player-diagnostic.html')), 'production removes the legacy diagnostic');
+    assert.ok(!prod.js.includes('media error '), 'numeric player diagnostics do not ship in the product bundle');
+    assert.ok(!prod.js.includes('Player cases'), 'the matrix is not imported by the product');
     assert.ok(prod.js.includes("Sample review"), "the live app's sample data stays labelled");
     assert.ok(!prod.js.includes("Sample data: a made-up review"), "no developer design-preview card copy ships");
     assert.ok(!prod.js.includes("Design preview"), "no Design preview card title ships");
