@@ -1,31 +1,30 @@
 {
-  "version": "0.41.5",
+  "version": "0.41.6",
   "cookbook_repo": "klappy/3d-review-cookbook",
-  "cookbook_commit": "2c687ed7167f9a483d82f789a3243065a810802e",
+  "cookbook_commit": "c56f49e7b03b6c978da3048f21e51c9cf69d3b24",
   "records": [
     {
-      "path": "planning/2026-09-16-parity-build/releases/0.41.5.md",
-      "blob_sha": "2e7389e5cb5efa1ec85ec1a12ddb37c6d2098117",
-      "sha256": "05a48e68f3e7617345330ae8dba3e16ec1e34d36414bcd09f8a67d6819ca22d4"
+      "path": "planning/2026-09-16-parity-build/releases/0.41.6.md",
+      "blob_sha": "bcef2928f928a274decefa93a6ecb5fc3c0029b6",
+      "sha256": "6fd0b9a4486f822686f7eae7981916de07386a9c852faa288a806f65ccad3917"
     },
     {
       "path": "planning/2026-09-16-parity-build/releases/releases.json",
-      "blob_sha": "05284943a2a9f008281277251b4030ced56184ea",
-      "sha256": "40f7afd1dab9b90c994c6bce1be5d9a3c142a8632a385c05012ac6ea417f59db"
+      "blob_sha": "99ad76666c923a4336449651dd062e573304c329",
+      "sha256": "c45112b0cb935c9808bb85be461c0e55c0a16fbcfe0f74ecca6d423f4d45e6dc"
     }
   ],
   "changelog": {
     "sections": {
       "changed": [
-        "PATCH 0.41.5 adds the requested DEV-only two-way homepage-player comparison: A0 and R0 controls plus five cumulative additions and five cumulative removals. Every case is a fresh document with one video, the same immutable same-origin v5 MP4, native controls, inline playback and metadata preloading. It does not replace the homepage player or claim to fix native Safari.",
-        "A1–A3 add the retained poster, optional default-off English VTT and actual card CSS to literal native HTML. A4 adds Svelte construction plus connected-node source initialization, explicitly labeled as a combined change. A5/R0 reuse the real homepage MediaCard and Watch button. R1–R5 remove captions, poster, card CSS, custom playback handlers and explicit source initialization in order. R5 versus A0 compares plain Svelte with parser-created video. The test recreation excludes Live authentication/navigation shell, so a baseline that works while the real homepage fails would leave that surrounding context unresolved.",
-        "The ordinary homepage now uses generic playback-failure/recovery copy instead of numeric media error, ready and network values. Its playback lifecycle and source are unchanged. Dedicated DEV test pages retain local observational state only. Diagnostic source is moved outside the published asset root; the guarded production build deletes both the older diagnostic page and the new matrix, including stale DEV outputs.",
-        "Historical native acceptance at DEV 0.41.4/a72c36fb failed with MEDIA_ERR_SRC_NOT_SUPPORTED, HAVE_NOTHING and NETWORK_NO_SOURCE. The same iPhone previously played both literal diagnostic players at 0.41.3 and its separate two-byte fetch returned 206 with the expected two bytes. These observations support a controlled integration comparison, not a proven transport or component root cause. The intended Transcode service is a separate unresolved delivery track; this matrix continues the existing byte-streaming app relay.",
-        "At exact app source 3bdd25a8dc2f4b900399594b8d142fbfc6959f13, local checks passed 46 tests across six affected suites, three production-build regression tests, typecheck, 975 legacy UI tests and 118 MJS tests with six existing skips. The native media APIs in component tests are mocked. The final exact-head hosted suite, independent review and actual DEV browser verification are release gates, not results claimed by this source-only record.",
-        "Two distinct denominators are tracked. Structural configurations: 12 cases A0–A5 and R0–R5; local automated checks attempted 12, passed 12, failed 0, untested 0, without decoding media. Actual playback scenarios: an iPhone viewer tries native playback on each of those 12 cases, with Watch-button behavior separately noted where present; current candidate deployed-browser and physical-iPhone layers each attempted 0, passed 0, failed 0, untested 12. Structural passes are not playback passes. Human satisfaction, confusion and frustration are NOT MEASURED; sample 0. Production promotion remains held until the actual homepage works on the user’s iPhone and diagnostic surfaces are absent from production output. All 134 older release entries remain byte-preserved."
+        "PATCH 0.41.6 fixes a diagnostic-page layout defect observed on actual DEV 0.41.5/c059cf0371e192b253f4b3ea37dc1b86a379db89: the imported product shell’s 100vmax box-shadow painted over the comparison heading, instructions and case links on styled cases. The diagnostic-only #player.app wrapper now sets box-shadow:none. Actual media-card/video CSS, the twelve case configurations, media source and homepage playback behavior remain unchanged.",
+        "The independent browser check of the preceding build verified actual A0 and R0 playback/pause in cloud Chrome, but found the overlay on R0 and A3. Playback evidence was two of twelve cases, not full matrix acceptance or native iPhone success. The test link was withheld rather than presenting an obscured page as ready.",
+        "At exact app source b41bac24f9352f780d5f8efa1eb5438e9f49d9d6, 25 focused tests across two matrix suites passed, including a regression applying the inherited page-filling shadow and verifying the diagnostic override. All three production-build regressions passed, preserving removal of old/new diagnostic outputs and generic product failure copy. These are structural/mocked checks, not media decoding or a screenshot-based visual pass.",
+        "Current correction denominators remain separate: twelve structural configurations have automated checks (attempted 12, passed 12, failed 0, untested 0); twelve actual playback scenarios on the corrected deployed browser and physical iPhone each remain attempted 0, passed 0, failed 0, untested 12. Actual DEV visual verification must confirm heading, instructions and all links before the user is asked to test. Human satisfaction, confusion and frustration are NOT MEASURED; sample 0. All 135 older release entries remain byte-preserved. Production is unchanged and held; this is not a claim that the homepage Safari failure is fixed.",
+        "Visual visibility scenarios: a tester must see the heading, instructions and all case-navigation links on each of the six affected styled cases A3, A4, A5, R0, R1 and R2. Evidence class is operator-browser screenshot inspection on the corrected DEV build from app source b41bac24f9352f780d5f8efa1eb5438e9f49d9d6; before that build is deployed, attempted 0, passed 0, failed 0, untested 6. Physical-iPhone visual inspection has the same six-case denominator and remains attempted 0, passed 0, failed 0, untested 6. These visual counts are independent of structural and playback coverage."
       ],
       "security": [
-        "No new media target, authentication/session access, backend route, proxy setting, dependency, migration, binding, DNS, security setting or deployment trigger change. The matrix uses fixed case IDs and fixed approved media assets; no arbitrary URL input, telemetry, credential collection, storage or response-header probes. Observers print only event labels and native numeric state with textContent; each navigation leaves the previous video document. No automatic playback or simultaneous multi-player load is introduced."
+        "The correction changes only diagnostic wrapper CSS and a regression test, followed by normal release identity pins. No new media source, proxy, request, telemetry, storage, authentication, dependency, migration, binding, security setting or deployment-trigger change. Existing DEV-only generation and production purge remain enforced."
       ]
     }
   }
