@@ -1,7 +1,24 @@
 {
   "schema": "3dr-releases/1",
-  "current": "0.41.5",
+  "current": "0.41.6",
   "versions": [
+    {
+      "version": "0.41.6",
+      "status": "candidate",
+      "notes_path": "releases/0.41.6.md",
+      "sections": {
+        "changed": [
+          "PATCH 0.41.6 fixes a diagnostic-page layout defect observed on actual DEV 0.41.5/c059cf0371e192b253f4b3ea37dc1b86a379db89: the imported product shell’s 100vmax box-shadow painted over the comparison heading, instructions and case links on styled cases. The diagnostic-only #player.app wrapper now sets box-shadow:none. Actual media-card/video CSS, the twelve case configurations, media source and homepage playback behavior remain unchanged.",
+          "The independent browser check of the preceding build verified actual A0 and R0 playback/pause in cloud Chrome, but found the overlay on R0 and A3. Playback evidence was two of twelve cases, not full matrix acceptance or native iPhone success. The test link was withheld rather than presenting an obscured page as ready.",
+          "At exact app source b41bac24f9352f780d5f8efa1eb5438e9f49d9d6, 25 focused tests across two matrix suites passed, including a regression applying the inherited page-filling shadow and verifying the diagnostic override. All three production-build regressions passed, preserving removal of old/new diagnostic outputs and generic product failure copy. These are structural/mocked checks, not media decoding or a screenshot-based visual pass.",
+          "Current correction denominators remain separate: twelve structural configurations have automated checks (attempted 12, passed 12, failed 0, untested 0); twelve actual playback scenarios on the corrected deployed browser and physical iPhone each remain attempted 0, passed 0, failed 0, untested 12. Actual DEV visual verification must confirm heading, instructions and all links before the user is asked to test. Human satisfaction, confusion and frustration are NOT MEASURED; sample 0. All 135 older release entries remain byte-preserved. Production is unchanged and held; this is not a claim that the homepage Safari failure is fixed.",
+          "Visual visibility scenarios: a tester must see the heading, instructions and all case-navigation links on each of the six affected styled cases A3, A4, A5, R0, R1 and R2. Evidence class is operator-browser screenshot inspection on the corrected DEV build from app source b41bac24f9352f780d5f8efa1eb5438e9f49d9d6; before that build is deployed, attempted 0, passed 0, failed 0, untested 6. Physical-iPhone visual inspection has the same six-case denominator and remains attempted 0, passed 0, failed 0, untested 6. These visual counts are independent of structural and playback coverage."
+        ],
+        "security": [
+          "The correction changes only diagnostic wrapper CSS and a regression test, followed by normal release identity pins. No new media source, proxy, request, telemetry, storage, authentication, dependency, migration, binding, security setting or deployment-trigger change. Existing DEV-only generation and production purge remain enforced."
+        ]
+      }
+    },
     {
       "version": "0.41.5",
       "status": "candidate",
