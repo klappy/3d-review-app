@@ -51,7 +51,7 @@ it('selects a genuinely changed source and ignores a rejection from the old sour
   await Promise.resolve(); await Promise.resolve();
   expect(view.queryByRole('status')).toBeNull();
   await fireEvent.error(video);
-  expect(view.getByRole('status').textContent).toContain('video; media error');
+  expect(view.getByRole('status').textContent).toContain('The video could not play here.');
 });
 
 it('validates a changed source before assigning or loading it', async () => {
