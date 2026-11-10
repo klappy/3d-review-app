@@ -277,6 +277,7 @@
     const my = ++seq; viewRead++; pendingReadRoute = routeKey(r);
     const requestedReadCurrent = () => routeKey(r) === routeKey(requestedRoute) || (!!menuState?.origin && routeKey(r) === routeKey(route));
     const retained = !invalidate && page.status === "ready" && !!session?.principal?.id && credential === sessionCredential && scopeKey(r) === scopeKey(route);
+    const navigationBack = !invalidate && credential === sessionCredential ? page.error?.back ?? (retained && r.name !== route.name ? viewHash : null) : null;
     const prior = session?.principal;
     refreshError = ""; actionBusy = false; refreshing = retained;
     if (workspaceUndo && (workspaceUndo.workspaceId !== r.params.wid || credential !== sessionCredential)) workspaceUndo = null;
@@ -314,12 +315,14 @@
     } catch (e) {
       if (my !== seq || !requestedReadCurrent() || credential !== token()) return;
       const kind = classify(e);
-      if (retained && page.status === "ready" && kind === "failed") {
+      // A failed destination is not a refresh of the displayed screen. Keep refresh/write
+      // uncertainty locked, but give navigation failures their own retry and a way back.
+      if (retained && page.status === "ready" && kind === "failed" && !navigationBack) {
         refreshError = String(e?.message || "This view could not be updated.");
       } else {
         route = r;
         if (kind === "unauthenticated") { menuState = null; menuSeq++; S.forget(); session = null; applyChrome(null); page = { status: "ready", key: r.name, data: { screen: "sign-in", next: hash }, error: null }; return false; }
-        page = { status: "error", key: r.name, data: null, error: { kind, message: String(e?.message || "Request could not be completed.") } };
+        page = { status: "error", key: r.name, data: null, error: { kind, message: String(e?.message || "Request could not be completed."), back: kind === "failed" ? navigationBack : null } };
       }
       return false;
     } finally { if (my === seq) refreshing = false; }
@@ -592,7 +595,7 @@
 {:else if page.status === "loading"}
   <LoadingFrame {phone} {theme} {chrome} kind={page.key} />
 {:else if page.status === "error"}
-  <Status {phone} {theme} kind={page.error.kind} message={page.error.message} onretry={load} back={route.params.aid && route.name !== "review-tools" ? to("results", { aid: route.params.aid }) : to("home")} backLabel={route.params.aid && route.name !== "review-tools" ? "Latest results" : "Home"} />
+  <Status {phone} {theme} kind={page.error.kind} message={page.error.message} onretry={load} back={page.error.back ?? (route.params.aid && route.name !== "review-tools" ? to("results", { aid: route.params.aid }) : to("home"))} backLabel={page.error.back ? "Back to previous view" : route.params.aid && route.name !== "review-tools" ? "Latest results" : "Home"} />
 {:else if page.data.screen === "project-settings" && page.data.sample}
   <ProjectSettings {phone} {theme} project={{ id: "sample", name: "Sample project", organization: "", role: "viewer" }} sample />
 {:else if page.data.fixture}
