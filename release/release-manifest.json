@@ -1,30 +1,34 @@
 {
-  "version": "0.41.7",
+  "version": "0.41.8",
   "cookbook_repo": "klappy/3d-review-cookbook",
-  "cookbook_commit": "ca0a3a55a599d09bb8705671ee2511c624cc85c8",
+  "cookbook_commit": "b0fc0ffa54b229e0fc6c29b53c67befdba6e0e0e",
   "records": [
     {
-      "path": "planning/2026-09-16-parity-build/releases/0.41.7.md",
-      "blob_sha": "da4b3f65af231ff93e59a585015423d3adaa7f3f",
-      "sha256": "ac2f5eeebbbbe63b49833710a7e8e86d77b9783f2ca0319c356d272a0d705606"
+      "path": "planning/2026-09-16-parity-build/releases/0.41.8.md",
+      "blob_sha": "e7d91d62e1e6645762f280de6a3c7e5a64cf8439",
+      "sha256": "fe31f81394e5c25bdb4cdb346799210b381640db172ea54d4ca5c54e434aed95"
     },
     {
       "path": "planning/2026-09-16-parity-build/releases/releases.json",
-      "blob_sha": "ffbec2e2a01b166dd4d42ae48dd7c6daecc71ace",
-      "sha256": "b8a0f05b48451625095bc013f9dd588f14dff37a4543cbd0c93a675dffd767d5"
+      "blob_sha": "c6d63aaf9d672e297e041e48ec6ace2cfcfbbb50",
+      "sha256": "346fb0c8f85ab1fb7751be68b9fa56a4767eedc94e36fe5c626c40d2b873645d"
     }
   ],
   "changelog": {
     "sections": {
+      "fixed": [
+        "PATCH 0.41.8 restores saved-report capture reads rejected by hosted D1 with a nested-subquery limit. Bounded ordered aggregate CTEs preserve authorization, deterministic capture bytes, integrity and size limits, and the single-statement snapshot.",
+        "Failed navigation from Collect to Understand or Improve now shows a retryable destination error with a working Back to previous view path. Actual refresh or write uncertainty remains locked; navigation does not build or update a report."
+      ],
       "changed": [
-        "PATCH 0.41.7 omits the optional English VTT track from both phone and desktop homepage overview players. This matches the working R1 configuration without changing the approved v5 film, same-origin media relay, poster, controls, connected-source lifecycle, Watch/retry behavior or direct CDN fallback. The film’s baked-in captions remain visible; the homepage no longer offers the separate selectable text-caption track. Baked-in text is not an equivalent replacement for a selectable text-caption track. Generic MediaCard track support and the VTT asset are retained.",
-        "Actual user iPhone results on the twelve-case DEV 0.41.6/52c5a9d65c9286f429cb843d648b1c935e8efa72 matrix were seven playback cases reported working (A0, A1, R1–R5) and five reported failing (A2–A5, R0): attempted 12, passed 7, failed 5, untested 0. A1-to-A2 adds only the optional track; R0-to-R1 removes it. Every failing case has the track and every passing case lacks it. This isolates the feature-level trigger across both literal HTML and Svelte, not the underlying Safari parser, request or VTT mechanism. The real homepage must still be retested after deployment.",
-        "The diagnostic matrix retains its case IDs and behavior so those native observations remain comparable. A5/R0 descriptions now explicitly identify the preserved failing 0.41.6 homepage configuration rather than implying the corrected homepage still attaches the track. Production diagnostic exclusion and generic product failure copy remain unchanged.",
-        "At exact frozen app candidate 4fffdf8ac8bba4be2f346bb28bb8c30e7dc407d4, owner checks passed 43 focused tests across five affected suites, one source-wiring test, typecheck and the strict generated-PDF check. Component media APIs are mocked; these results establish source behavior and regressions, not iPhone playback. The unchanged generic recovery/lifecycle and diagnostic configurations remain covered.",
-        "Current candidate coverage is separate from historical matrix results. Automated phone and desktop homepage DOM scenarios each omit the track while retaining native attributes, CTA, recovery and direct fallback: attempted 2, passed 2, failed 0, untested 0. Deployed operator-browser scenarios are desktop and phone layout, each with native-button and Watch-button start/progress/pause (denominator 4): attempted 0, passed 0, failed 0, untested 4. Actual iPhone homepage native-button and Watch-button playback scenarios (denominator 2): attempted 0, passed 0, failed 0, untested 2. Signed-in/authentication journeys, actual sound output and full-film playback are not qualified by these checks. Satisfaction, confusion and frustration are NOT MEASURED; sample 0. All 136 older entries remain byte-preserved. DEV only; production remains unchanged and held pending actual native homepage acceptance."
+        "Frozen product source: app PR633 at 6caa645913dbb2e8d9651a8ee4d68fcb53b53316. The release adds no report auto-update, stage/date rewrite, permission change, schema change or new reporting policy. Empty Edit details/Continue remains a separate investigation. This candidate is not a deployed release.",
+        "Owner-reported exact-source checks: pristine npm ci, typecheck and full npm test passed; 192 files passed and 1 skipped, 2443 tests passed and 3 skipped, including 1164 UI Next tests. Standalone test:ui passed 975 tests; test:mjs passed 119 and skipped 6. The 116 focused backend/access tests overlap the full suite and are not added to its total. Final packaging and attached current-head checks remain required.",
+        "Report-reader hosted SQL scorecard: direct read-only hosted D1 checks of final LIST, GET and OBSERVE statements, denominator 3; attempted 3, passed 3, failed 0, untested 0, all zero writes. This validates hosted query execution, not deployed API/MCP/browser behavior or every saved report.",
+        "Assessment-reviewer UI scorecard: automated/local fixtures at the frozen product source cover phone and desktop layouts for Understand and Improve failures, retry and return to Collect without report creation, denominator 4; attempted 4, passed 4, failed 0, untested 0. Device rendering, live authentication and native phone behavior are not measured by these fixtures.",
+        "Deployed acceptance scorecard for the corrected release: report reader opens a saved report, assessment reviewer opens Understand, and assessment reviewer opens Improve, denominator 3 per environment. DEV: attempted 0, passed 0, failed 0, untested 3. Production: attempted 0, passed 0, failed 0, untested 3. Operator-browser, real-human and broader persona outcomes remain untested. Satisfaction, confusion and frustration are NOT MEASURED, sample 0; no comparable baseline delta is claimed."
       ],
       "security": [
-        "No authentication, credentials, telemetry, storage, backend route, proxy setting, dependency, migration, binding, DNS, security setting or deployment-trigger change. The only product change removes the homepage optional track and its associated request/availability copy. Diagnostic descriptions and regression assertions are updated, with normal accepted release identity pins. No Spanish content or audio changes."
+        "No migration, seed replay, production content mutation, dependency, credential, binding, DNS, deployment-trigger, Spanish text or audio change. Existing grant checks, fail-closed capture bounds and immutable saved reports remain in force. Normal independent review, protected merge and Git-connected DEV then production validation remain required."
       ]
     }
   }
