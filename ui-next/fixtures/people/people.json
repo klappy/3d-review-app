@@ -1,0 +1,68 @@
+{
+  "_source": "3d-review-cookbook design/2026-10-15-glass-redesign/canvas People.dc.html, PeoplePhone.dc.html, PeopleWorkspace.dc.html, PeopleWorkspacePhone.dc.html. Rosters use the /v2/{scope}/{id}/grants response shape (grants, pending_invitations) read by ui/assess/permissions.js; name/email/initials/via are display fields the boards draw.",
+  "user": { "first": "Bincy", "initials": "BK", "workspace": "BCS · India" },
+  "review": {
+    "title": "Mark 1–4 draft",
+    "project": "Hindi New Testament",
+    "stage": "collecting",
+    "meta": "Hindi New Testament · Hindi · Written",
+    "updated": "Updated just now",
+    "deleteRefused": "Reviews with responses can't be deleted. This one has 18.",
+    "heading": "People with access to this review",
+    "phoneTitle": "People with access",
+    "me": "p-bincy",
+    "can": {
+      "owner": "Can change everything, invite people and delete",
+      "member": "Can run the review and read results",
+      "viewer": "Can read results only"
+    },
+    "roster": {
+      "grants": [
+        { "id": "g-bincy", "principal_id": "p-bincy", "role": "owner", "name": "Bincy Kurian", "email": "bincy@example.org", "initials": "BK" },
+        { "id": "g-andy", "principal_id": "p-andy", "role": "member", "name": "Andy V.", "email": "andy@example.org", "initials": "AV", "via": "project" },
+        { "id": "g-steve", "principal_id": "p-steve", "role": "viewer", "name": "Steve W.", "email": "steve@example.org", "initials": "SW" }
+      ],
+      "pending_invitations": [
+        { "id": "i-rina", "role": "viewer", "status": "pending", "email": "rina@example.org", "invited": "2 Oct", "expires": "16 Oct" }
+      ]
+    }
+  },
+  "workspace": {
+    "name": "Bridge Connectivity Solutions · India",
+    "short": "BCS · India",
+    "heading": "People in this workspace",
+    "phoneTitle": "People in this workspace",
+    "me": "p-bincy",
+    "can": {
+      "owner": "Everything in the workspace, including deleting projects",
+      "member": "Can create projects and run reviews in all of them",
+      "viewer": "Can read results across all projects"
+    },
+    "roster": {
+      "grants": [
+        { "id": "g-andy", "principal_id": "p-andy", "role": "owner", "name": "Andy V.", "email": "andy@example.org", "initials": "AV" },
+        { "id": "g-bincy", "principal_id": "p-bincy", "role": "member", "name": "Bincy Kurian", "email": "bincy@example.org", "initials": "BK" },
+        { "id": "g-amanda", "principal_id": "p-amanda", "role": "viewer", "name": "Amanda R.", "email": "amanda@example.org", "initials": "AM" },
+        { "id": "g-lindsay", "principal_id": "p-lindsay", "role": "member", "name": "Lindsay D.", "email": "lindsay@example.org", "initials": "LD" }
+      ],
+      "pending_invitations": []
+    }
+  },
+  "inviteLabels": { "viewer": "Viewer — reads results", "member": "Member — runs reviews", "owner": "Owner — everything" },
+  "phone": {
+    "me": "p-bincy",
+    "inviteLabels": { "member": "Member — can run reviews", "viewer": "Viewer — can read results" },
+    "roster": {
+      "grants": [
+        { "id": "g-bincy", "principal_id": "p-bincy", "role": "owner", "name": "Bincy K", "initials": "BK" },
+        { "id": "g-ravi", "principal_id": "p-ravi", "role": "member", "name": "Ravi S", "initials": "RS" },
+        { "id": "g-amanda", "principal_id": "p-amanda", "role": "viewer", "name": "Amanda M", "initials": "AM" }
+      ],
+      "pending_invitations": [
+        { "id": "i-steve", "role": "member", "status": "pending", "email": "steve@seed.org", "initials": "ST", "invited": "3 days ago", "after": "g-ravi" }
+      ]
+    }
+  },
+  "roles": { "owner": "Owner", "member": "Member", "viewer": "Viewer" },
+  "footnote": "Roles flow down, never up: a workspace member can run every review in it; a review viewer sees only that review. Participants never appear here — they answer through links and codes, without accounts."
+}

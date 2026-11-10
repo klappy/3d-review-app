@@ -13,9 +13,22 @@ test('status mapping is explicit; unknown and missing are never ready', () => { 
 test('tree comes only from loaded authorized data: refused list yields no children, no ancestor discovery, hrefs from routes', () => {
   const nodes = treeNodes(routes, known());
   assert.deepEqual(nodes.map(n => [n.id, n.kind, n.href]), [['w:w1', 'workspace', '#workspace/w1'], ['p:p2', 'project', '#project/p2']]);
-  assert.deepEqual(nodes[0].children.map(c => [c.id, c.href, c.children.map(a => a.href)]), [['p:p1', '#project/p1', ['#assessment/a1']]]);
+  assert.deepEqual(nodes[0].children.map(c => [c.id, c.href, c.children.map(a => a.href)]), [['p:p1', '#project/p1', []]], 'owner rule: no review is listed while no project is open');
   assert.deepEqual(nodes[1].children, []);
   assert.ok(nodes.every(n => n.visible === true));
+});
+test('owner rule: reviews are listed in the tree only under the opened project, never on Home, Projects, Workspaces or another project', () => {
+  const reviewHrefs = ns => ns.flatMap(function walk(n) { return [n.kind === 'assessment' ? n.href : null, ...(n.children || []).flatMap(walk)]; }).filter(Boolean);
+  const k = known(); k.lists.set('p2', { status: 'loaded', list: [{ id: 'a2', name: 'Other', stage: 'collect' }] });
+  for (const kind of ['entry', 'projects', 'workspaces', 'workspace']) assert.deepEqual(reviewHrefs(shellModel({ route: { kind }, routes, principal: { id: 'x' }, known: k }).nodes), [], kind);
+  // an opened project lists its own reviews, and only its own
+  const open = shellModel({ route: { kind: 'project', id: 'p1' }, routes, principal: { id: 'x' }, known: k, page: { kind: 'project', model: { status: 'loaded', project: k.projects[0], assessmentsStatus: 'loaded', assessments: [{ id: 'a1', name: 'Sept', stage: 'collect' }] } } });
+  assert.deepEqual(reviewHrefs(open.nodes), ['#assessment/a1']);
+  // an opened review shows its project's reviews (inside that project), not the other project's
+  const inside = shellModel({ route: { kind: 'assessment', id: 'a1' }, routes, principal: { id: 'x' }, known: k, current: { assessment: { id: 'a1', name: 'Sept', project_id: 'p1', stage: 'collect' } } });
+  assert.deepEqual(reviewHrefs(inside.nodes), ['#assessment/a1']);
+  // a stale current review is ignored once the route moved to a non-review page
+  assert.deepEqual(reviewHrefs(shellModel({ route: { kind: 'projects' }, routes, principal: { id: 'x' }, known: k, current: { assessment: { id: 'a1', project_id: 'p1' } } }).nodes), []);
 });
 test('page models enrich the tree without requests: workspaces list, workspace projects, project assessments', () => {
   const ws = treeNodes(routes, { page: { kind: 'workspaces', model: { status: 'loaded', workspaces: [{ id: 'w7', name: 'Seven' }] } } });

@@ -40,10 +40,10 @@ describe("delete assessment stays protected under workspace inheritance", () => 
     for (const who of ["u_wsown", "u_pown"]) expect((await loadProject(mk(who), "prj_1", "owner")).role).toBe("owner");
     // A workspace owner (inherited project owner) and a direct project owner see nothing: D9, unauthorized == nonexistent.
     for (const who of ["u_wsown", "u_pown"]) {
-      await expect(del(mk(who), { id: "asm_empty" }, { dryRun: true })).rejects.toMatchObject({ code: "NOT_FOUND_OR_NOT_VISIBLE" });
+      await expect(del(mk(who), { id: "asm_empty" }, { dryRun: true })).rejects.toMatchObject({ code: who === "u_wsown" ? "NOT_AUTHORIZED_AT_SCOPE" : "NOT_FOUND_OR_NOT_VISIBLE" });
       const env: any = await execute(mk(who), "cap.assessment.delete", { id: "asm_empty" }, { tool: "danger", mode: "dry_run" });
       expect(env.ok).toBe(false);
-      expect(JSON.stringify(env)).toContain("NOT_FOUND_OR_NOT_VISIBLE");
+      expect(JSON.stringify(env)).toContain(who === "u_wsown" ? "NOT_AUTHORIZED_AT_SCOPE" : "NOT_FOUND_OR_NOT_VISIBLE");
     }
     // An assessment member sees it but cannot delete it.
     await expect(del(mk("u_amem"), { id: "asm_empty" }, { dryRun: true })).rejects.toMatchObject({ code: "NOT_AUTHORIZED_AT_SCOPE" });

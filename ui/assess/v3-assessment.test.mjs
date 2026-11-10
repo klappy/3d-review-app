@@ -1,7 +1,7 @@
 // node --test ui/assess/v3-assessment.test.mjs — lane 3: rulings a/b/c and the state-driven primary.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { v3StagePrimary, v3StageWord, v3CountLine, v3BandsMarkup, V3_SET_STAGE, V3_FLAGS, v3ExpectedFor, V3_EXPECTED_KEY } from './v3-assessment.js';
+import { v3StagePrimary, v3StageWord, v3CountLine, v3BandsMarkup, V3_SET_STAGE, V3_FLAGS, v3ExpectedFor, V3_EXPECTED_KEY, v3SettingsRole } from './v3-assessment.js';
 
 const L = ['Translation Team', 'Church', 'Community'];
 
@@ -109,6 +109,17 @@ test('v3ScoreBand: provisional cut-offs and the minimum response count', async (
   assert.equal(v3ScoreBand(59.9, 3), 'Needs support'); assert.equal(v3ScoreBand(40, 3), 'Needs support'); assert.equal(v3ScoreBand(39.9, 3), 'Needs urgent attention');
   assert.equal(v3ScoreBand(90, 2), 'More input needed'); assert.equal(v3ScoreBand(90, null), 'More input needed'); assert.equal(v3ScoreBand(null, 9), 'More input needed');
 });
+// Codex P2 4384990149: an optional served minimum (DEV 1); the default and the frozen constant stay 3; invalid served → 3.
+test('v3ScoreBand / v3LevelMinimum: a served minimum of 1 bands one response; absent or invalid is 3', async () => {
+  const { v3ScoreBand, v3LevelMinimum, v3SuggestedAreas, V3_BAND_CUTOFFS } = await import('./v3-assessment.js');
+  assert.equal(v3ScoreBand(90, 1, V3_BAND_CUTOFFS, 1), 'Strong'); assert.equal(v3ScoreBand(90, 1), 'More input needed');
+  assert.equal(v3ScoreBand(90, 0, V3_BAND_CUTOFFS, 1), 'More input needed'); assert.equal(v3ScoreBand(90, null, V3_BAND_CUTOFFS, 1), 'More input needed');
+  assert.equal(v3LevelMinimum(1), 1); assert.equal(v3LevelMinimum(3), 3);
+  for (const bad of [undefined, null, 0, -1, 1.5, '1', NaN, {}]) assert.equal(v3LevelMinimum(bad), 3, String(bad));
+  const scores = { Church: { score: 30, subs: [] } }, groups = { Church: { surveys: 1, loaded: 1, responses: 1 } };
+  assert.deepEqual(v3SuggestedAreas(scores, ['Church'], groups), []);
+  assert.deepEqual(v3SuggestedAreas(scores, ['Church'], groups, 1), [{ area: 'Church', band: 'Needs urgent attention' }]);
+});
 test('v3BandsMarkup: report scores band each perspective and sub-dimension, labelled provisional; held without scores', async () => {
   const { v3BandsMarkup, v3ReportScores, v3EvidenceRows } = await import('./v3-assessment.js');
   const report = { payload: { lenses: [{ lens: 'Church', score: 45.8, sub_dimensions: [{ sub_dimension: 'Affirmation', score: 41.7 }, { sub_dimension: 'Translation Brief', score: 80 }] }, { lens: 'Community', score: 47.1, sub_dimensions: [] }] } };
@@ -172,4 +183,14 @@ test('S51 v3HeldText: API numbers when below the floor; the number-free line oth
   const h = v3BandsMarkup({ status: 'held', responses_in: 2, responses_needed: 5, reason: 'D7 x' }, ['Translation Team'], s => String(s));
   assert.match(h, /data-v3-band-held>Results appear after a report is built from enough responses\. 2 responses so far; at least 5 are needed/);
   assert.doesNotMatch(h, /D7 x/);
+});
+
+test('protected assessment settings follow direct authority while content can inherit', () => {
+  assert.equal(v3SettingsRole({role:'owner',direct_role:null}), null);
+  assert.equal(v3SettingsRole({role:'owner',direct_role:'member'}), 'member');
+  assert.equal(v3SettingsRole({role:'member',direct_role:null}), null);
+  assert.equal(v3SettingsRole({role:'owner',direct_role:'owner'}), 'owner');
+  assert.equal(v3SettingsRole({role:'viewer',granted_role:'owner',direct_role:'owner',complete:true}), 'owner');
+  assert.equal(v3SettingsRole({role:'viewer',granted_role:'owner',direct_role:null,complete:true}), 'viewer');
+  assert.equal(v3SettingsRole({role:'owner'}), 'owner'); // older exact-grant servers
 });

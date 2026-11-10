@@ -1,5 +1,5 @@
-import { renderBlankPrint } from '../stage-screens.js';
-import { qrSvg } from './share.js';
+import { renderBlankPrint, isSurveyLinkUrl } from '../stage-screens.js';
+import { qrSvg, oneSheetHtml, printAllHtml } from './share.js';
 import { shareUrl } from '../shared-link.js';
 
 // S25 — the printed survey is its own document, never the app page.
@@ -109,8 +109,13 @@ export async function activeSurveyLink(api, { aid, sid, origin = globalThis.loca
   if (!r?.link_id || typeof r.entry_fragment !== 'string' || !/^#survey=[A-Za-z0-9_-]+$/.test(r.entry_fragment)) return null;
   return { id: r.link_id, url: shareUrl(origin, r.entry_fragment), expires_at: r.expires_at || null };
 }
-// The paper's link: the URL plus its QR (the Share card's own qrSvg) as an inline SVG data URI — no network on the paper.
-export const paperLink = link => (link?.url ? { url: link.url, qr: `data:image/svg+xml,${encodeURIComponent(qrSvg(link.url))}` } : null);
+// Encode the survey's exact existing entry URL, including its intended participant client.
+// The paper validator accepts only the two supported routes; no link is issued or rewritten here.
+export function paperLink(link) {
+  if (!isSurveyLinkUrl(link?.url)) return null;
+  const url = link.url;
+  return { url, qr: `data:image/svg+xml,${encodeURIComponent(qrSvg(url))}` };
+}
 
 // S31 identity, from the facilitator's rows as the API returns them: the assessment read carries language_id only
 // (src/handlers/assessment.ts, SELECT a.*), so the evaluated language's name comes from the project's languages
@@ -122,4 +127,44 @@ export function printIdentityFrom(a, { project = null, languages = [], survey = 
     assessment: { id: a.id, name: a.name, language: langName.get(a.language_id) || a.language_name || '' },
     survey: { id: survey.id, name: survey.template_name, perspective },
   };
+}
+
+// UI Next (/next/) Print QR pages (cookbook wiring done-when 2): the chosen surveys' sheets — the Share card's own oneSheetHtml /
+// printAllHtml (title, line, URL, QR as inline SVG) — as a self-contained print document opened from the click like
+// openPrintDocument above, so the app page never prints (S25). Nothing personal is on a page.
+const QR_CTX = { esc };
+const QR_DOC_CSS = `html,body{background:#fff;color:#111;margin:0;font:16px/1.4 system-ui,sans-serif}main{padding:16mm}
+.doc-tools{display:flex;gap:12px;align-items:center;margin-bottom:12mm}.share-sheet-print{break-after:page;text-align:center}
+.share-sheet-print:last-child{break-after:auto}.share-sheet-qr svg{width:90mm;height:90mm}.share-sheet-url{word-break:break-all}
+.share-all-list{list-style:none;padding:0;display:grid;grid-template-columns:1fr 1fr;gap:12mm}.share-all-item{text-align:center}
+.share-all-qr svg{width:60mm;height:60mm}
+.share-cards .share-all-list{gap:0}.share-cards .share-all-item{border:1px dashed #999;padding:6mm;break-inside:avoid}.share-cards .share-all-qr svg{width:48mm;height:48mm}
+@media print{.doc-tools{display:none}}`;
+
+// surveys: [{ name, fullLink, lens }] (the chosen rows); per: "survey" (one page each) | "sheet" | "one" (all on one page).
+export function qrPrintDocumentHtml({ title, surveys, per = "survey", paper = "Letter", autoPrint = false, cards = 6, returnHref = "" }) {
+  const rows = surveys.filter((s) => s.fullLink);
+  if (!rows.length) return "";
+  const line = title ? `${title}` : "";
+  // "sheet" (hand-out cards): one page per chosen survey carrying `cards` (six) identical cut-cards of that survey — the same
+  // escaped item markup as the all-on-one page, repeated, with cut lines from the print CSS; "one": every chosen code on one page.
+  const body = per === "survey"
+    ? rows.map((s) => oneSheetHtml(QR_CTX, { title: s.name, line, url: s.fullLink })).join("")
+    : per === "sheet"
+      ? rows.map((s) => printAllHtml(QR_CTX, { heading: `${s.name}${title ? ` · ${title}` : ""}`, items: Array.from({ length: cards }, () => ({ title: s.name, line: "Cut along the lines; one card per person.", url: s.fullLink })) }).replace('class="share-sheet-print share-all"', 'class="share-sheet-print share-all share-cards"')).join("")
+      : printAllHtml(QR_CTX, { heading: title || "Surveys", items: rows.map((s) => ({ title: s.name, line: "", url: s.fullLink })) });
+  const size = /a4/i.test(paper) ? "A4" : "letter";
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${esc(title || "QR pages")}</title><style>${QR_DOC_CSS}
+@page{size:${size}}</style></head><body><main><div class="doc-tools"><button type="button" onclick="print()">Print</button>${/^\/next\/#\/review\/[^/?#]+\/(?:collect|print|results)(?:[?#].*)?$/.test(returnHref) ? `<a href="${esc(returnHref)}">Return to review</a>` : ""}<span>${size === "A4" ? "A4" : "Letter"} · nothing personal on the page</span></div>${body}</main>${autoPrint ? '<script>addEventListener("load",function(){setTimeout(function(){print()},300)})</script>' : ""}</body></html>`;
+}
+
+// Open the document in its own tab from the click; false when the browser blocked the tab (the caller says so).
+export function openQrPrintDocument(win, opts) {
+  const html = qrPrintDocumentHtml({ ...opts, autoPrint: true });
+  if (!html) return false;
+  let w = null;
+  try { w = win.open("", "_blank"); } catch { w = null; }
+  if (!w) return false;
+  w.document.open(); w.document.write(html); w.document.close();
+  return true;
 }

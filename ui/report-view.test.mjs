@@ -49,7 +49,7 @@ const REPORT = {
       { item_id: 'i1', lens: 'community', sub_dimension: 'clarity', question_text: 'Is the meaning clear?', score: 82.5, n_responses: 9 },
     ],
     translation_type_agreement: { construct_name: 'Translation type agreement', team_values: ['meaning-based'], church_values: ['literal', 'meaning-based'], agree: false },
-    evidence: [{ form_type: 'team', label: 'Team form', n: 4 }, { form_type: 'church', label: 'Church form', n: 2 }],
+    evidence: [{ form_type: 'team', label: 'Translation Team — Translators', n: 4 }, { form_type: 'church', label: 'Church — Involved Pastor', n: 4 }],
     narrative: ['Team scores are highest on process.', 'One lens has no comparable data.'],
   },
 };
@@ -90,7 +90,7 @@ test('R4 standalone indicators, evidence and narrative rows', () => {
   const root = fakeNode('section');
   renderReport({ doc, root, report: REPORT });
   assert.deepEqual(sectionRows(root, copy.standalone), ['Is the meaning clear?', 'community · clarity', 'Score (out of 100)', '82.5', 'Responses', '9']);
-  assert.deepEqual(sectionRows(root, copy.evidence), ['Team form', 'Submissions', '4', 'Church form', 'Submissions', '2']);
+  assert.deepEqual(sectionRows(root, copy.evidence), ['Translation Team — Translators', 'Submissions', '4', 'Church — Involved Pastor', 'Submissions', '4']);
   assert.deepEqual(sectionRows(root, copy.narrative), ['Team scores are highest on process.', 'One lens has no comparable data.']);
 });
 
@@ -116,7 +116,7 @@ test('R6 agree null prints "not comparable"; translation section absent when the
 test('R7 empty arrays announce no section', () => {
   const root = fakeNode('section');
   renderReport({ doc, root, report: { ...REPORT, payload: { ...REPORT.payload, lenses: [], cross_lens_multi: [], cross_lens_single: [], standalone_indicators: [], evidence: [], narrative: [] } } });
-  assert.deepEqual(root.children.slice(2).map(s => s.children[0].textContent), [copy.translationAgreement]);
+  assert.deepEqual(root.children.slice(2).map(s => s.children[0].textContent), []);
 });
 
 test('R8 held or malformed results render nothing at all', () => {
@@ -185,4 +185,22 @@ test('R12 three or more shared areas: renderReport places the radar right after 
   // One shared area (the R1 payload) is below the three-spoke floor: no radar section.
   const r1 = fakeNode('section'); renderReport({ doc, root: r1, report: REPORT });
   assert.equal(r1.children.some(s => s.children[0]?.textContent === radarCopy.heading), false);
+});
+
+test('Decision 25 status findings are visible and excluded from agreement; Other is not a finding', () => {
+  const root = fakeNode('div');
+  renderReport({doc,root,report:{...REPORT,payload:{...REPORT.payload,translation_type_agreement:{team_values:[],church_values:[],agree:null,team_statuses:['no-brief','other'],church_statuses:['no-agreement','not-aware']}}}});
+  const text = sectionRows(root,copy.translationAgreement).join(' ');
+  assert.match(text,/Not comparable/);
+  assert.match(text,/Translation team: No translation brief/);
+  assert.match(text,/Church: No prior agreement on translation type/);
+  assert.match(text,/Church: Not aware of the agreed translation type/);
+  assert.match(text,/excluded from the agreement comparison/);
+  assert.doesNotMatch(text,/Other|Matches|Differs/);
+});
+test('Other-only visible side does not render a section revealing hidden status presence',()=>{
+ const p={...REPORT.payload,evidence:[{label:'Translation Team — Translators',n:3},{label:'Church — Involved Pastor',n:1}],translation_type_agreement:{construct_name:'Translation type',team_values:[],church_values:[],agree:null,team_statuses:[],church_statuses:['not-aware']}};
+ const a=fakeNode('section'),b=fakeNode('section');
+ renderReport({doc,root:a,report:{...REPORT,payload:p},minimum:3});renderReport({doc,root:b,report:{...REPORT,payload:{...p,translation_type_agreement:null}},minimum:3});
+ assert.equal(flat(a),flat(b));assert.equal(sectionRows(a,copy.translationAgreement),null);
 });

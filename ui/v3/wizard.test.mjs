@@ -135,7 +135,7 @@ const lossyApi = (loseOn) => {
     let r;
     if (method === 'GET' && url === '/v2/projects/p1/assessments') return { assessments: db.assessments };
     if (method === 'GET' && url === '/v2/assessments/a1') return { assessment: { id: 'a1', stage: db.stage }, surveys: db.surveys };
-    if (url.endsWith('/assessments')) { const a = { id: 'a1', name: body.name, language_id: body.language_id, role: 'owner', stage: 'prepare', created_at: new Date().toISOString() }; db.assessments.push(a); r = { assessment: a }; }
+    if (url.endsWith('/assessments')) { const a = { id: 'a1', name: body.name, language_id: body.language_id, role: 'owner', direct_role: 'owner', stage: 'prepare', created_at: new Date().toISOString() }; db.assessments.push(a); r = { assessment: a }; }
     else if (url.endsWith('/surveys')) { const x = { id: 's' + (++n), template_id: body.template_id, template_version: body.version }; db.surveys.push(x); r = { survey: x }; }
     else if (url.endsWith('/stage')) { db.stage = body.stage; r = { assessment: { id: 'a1', stage: body.stage } }; }
     else if (url.endsWith('/links')) r = body.mode === 'dry_run' ? { confirm_token: 'ct' } : { entry_fragment: '#survey=x' };
@@ -185,9 +185,12 @@ test('#188 a clear 4xx refusal leaves nothing pending, so the draft stays editab
 });
 
 test('#188 reconcile never adopts a collaborator\'s same-name assessment', async () => {
-  const theirs = { id: 'x9', name: 'Oct', language_id: 'l1', role: 'member', stage: 'prepare', created_at: new Date().toISOString() };
+  const theirs = { id: 'x9', name: 'Oct', language_id: 'l1', role: 'owner', direct_role: null, stage: 'prepare', created_at: new Date().toISOString() };
   const found = await reconcile({ cap: 'cap.assessment.create' }, { pid: 'p1', lid: 'l1', pending: { at: Date.now() } }, draft(), async () => ({ assessments: [theirs] }));
   assert.equal(found, null);
+  const mine = { ...theirs, id: 'mine', direct_role: 'owner', created_at: new Date(Date.now() - 1000).toISOString() };
+  const recovered = await reconcile({ cap: 'cap.assessment.create' }, { pid: 'p1', lid: 'l1', pending: { at: Date.now() } }, draft(), async () => ({ assessments: [mine, theirs] }));
+  assert.equal(recovered.assessment.id, 'mine', 'newer inherited ownership cannot displace the directly owned creation');
 });
 
 test('#188 resume reads back an existing same-name language instead of repeating a refused create', async () => {

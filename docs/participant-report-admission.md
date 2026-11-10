@@ -6,9 +6,19 @@ Participant-only report captures are admitted in DEV. Production admits them onl
 
 Production activation was explicitly approved on October 14 and made durable in the production configuration on October 15. The released configuration includes `PARTICIPANT_REPORTS=enabled`; do not treat the historical candidate/default-off description below as a new approval request. Activation and preservation evidence is recorded in the cookbook's [activation receipt](https://github.com/klappy/3d-review-cookbook/blob/main/work/active/2026-10-14-reporting-delivery/ACTIVATION-PERSISTENCE-2026-10-15.md). Removing the value holds future participant builds and reads again; it cannot retract reports already seen or copied.
 
-The existing assessment-wide minimum of five responses, refusal of mixed pinned fixtures/participant captures, exact assessment grants, preview/confirmation, immutable snapshots and source-derived scoring remain. The three-response per-perspective minimum controls overview bands only. Full reports can contain smaller-group aggregates; five and three are existing working defaults, not a validated privacy guarantee. The owner accepted this disclosure shape for activation; this document does not change it.
+The existing assessment-wide minimum of five responses, refusal of mixed pinned fixtures/participant captures, effective assessment access (direct assessment or containing workspace grant), preview/confirmation, immutable snapshots and source-derived scoring remain. The three-response per-perspective minimum controls overview bands only. Full reports can contain smaller-group aggregates; five and three are existing working defaults, not a validated privacy guarantee. The owner accepted this disclosure shape for activation; this document does not change it.
+
+DEV only (`ENVIRONMENT=dev`): the server-owned floor is one participant response (`src/report-admission.ts` `participantReportMinimum`), and UI Next bands a perspective from its first response with a coverage jar beside the level (3d-review-cookbook `work/active/2026-10-26-3d-report-threshold-coverage`). Every other environment, production included, keeps the five-response floor above; lowering it there needs its own disclosure decision.
 
 Raw response lists, demographic breakdowns and row-level exports remain held. No new scoring formula or global quality average is introduced.
+
+## Temporary Summit override (local candidate)
+
+The Summit decision authorizes numeric reports from one participant response. The server-only variable `SUMMIT_ONE_RESPONSE_REPORTS=enabled` lowers assessment admission from 5 to 1 and per-perspective numeric levels from 3 to 1 in known DEV/production environments. This candidate enables it in production configuration; it is not a deployment receipt. Missing, malformed, or disabled values restore the existing production floors. DEV remains at its existing 1/1 defaults. Participant admission, grants, immutable snapshots, scoring, zero-response holds, and missing/unasked axes are unchanged.
+
+Rollback: remove `SUMMIT_ONE_RESPONSE_REPORTS` from production vars and release through normal gates. Revisit after Summit. Previously viewed/downloaded aggregates cannot be retracted. One-response numeric aggregates represent that person's answers; retain true counts and limited-coverage cues. Raw responses, demographic/small-cell answer splits and question disclosure remain held under existing rules. Translation-type categorical agreement retains the prior per-environment 3-response production minimum rather than inheriting the temporary numeric override.
+
+Radar presentation: Next Detailed and full-report PDF exports add separate radars of each perspective's own stored subdimensions, matching the measure in Steve's previews. The existing shared-construct comparison and current/legacy report screen are preserved. A perspective needs at least three genuine scored subdimensions and a known snapshot response count meeting the numeric level floor. Missing scores leave gaps; no axis is zero-filled. Detailed adds one page per qualifying perspective and all page counters follow that count. A one-response chart is labeled with its true count and limited-data wording.
 
 ## Verification boundaries and documentation debt
 
@@ -19,3 +29,9 @@ The projected `cap.report.build/get/list` capability descriptions still say synt
 ## Historical candidate state
 
 Before explicit activation, the 0.30.0 candidate left production disabled and changed no Worker variable or deployment configuration. It required disclosure-policy approval, independent review and normal release gates before activation. That earlier default-off state is superseded by the recorded activation above; its tests and approval chronology remain in the cookbook.
+
+## Prepared PDF provenance integration
+
+Named Overview and the Detailed reading-guide page show saved report identity, build time, source and scorer/narrative/policy versions outside closed disclosures. Explicitly supplied selection evidence labels a selected perspective with no responses as More input needed across cards and comparisons. The PDF endpoint and Next saved-report adapter do not substitute current survey selection for an old report: existing captures do not persist selected zero-response perspectives, so other perspectives' participation remains explicitly unknown. Changing today's zero-response selections must not change an existing named PDF or Next saved-report presentation. The current Results collection hub continues to show current selection separately.
+
+New builds now use the migration-free versioned selection envelope and v2 report identity described in [Saved active selection](report-selection-snapshot.md). Saved positive selected-zero facts are captured atomically; legacy missing facts remain unknown. No migration, backfill or scoring change is included. Local implementation and tests are not hosted acceptance or publication.

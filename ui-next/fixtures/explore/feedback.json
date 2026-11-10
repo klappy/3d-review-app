@@ -1,0 +1,10 @@
+{
+  "user": { "first": "Bincy", "initials": "BK" },
+  "workspace": "BCS · India",
+  "from": { "page": "Collect", "review": "Mark 1–4 draft" },
+  "kinds": ["Something is wrong", "Something is confusing", "An idea"],
+  "kind": "Something is wrong",
+  "feels": ["Frustrating", "Confusing", "Fine", "Helpful"],
+  "feel": "Confusing",
+  "about": ["This screen", "Results", "Sharing and paper", "Something else"]
+}

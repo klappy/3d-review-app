@@ -1,0 +1,27 @@
+{
+  "_note": "UI Next Home mock data (provisional). Home lists projects only (owner rule: reviews appear only inside an opened project). No real people or projects.",
+  "user": {
+    "first": "Bincy",
+    "name": "Bincy Kurian",
+    "initials": "BK"
+  },
+  "workspace": "BCS · India",
+  "invitation": {
+    "from": "Andy",
+    "project": "Odia New Testament",
+    "role": "As a member — you can run reviews in it.",
+    "phone": "Seed Company · partners"
+  },
+  "projectCards": [
+    {
+      "title": "Hindi New Testament",
+      "meta": "BCS · 4 reviews · 86 responses",
+      "href": "#project"
+    },
+    {
+      "title": "Lao Old Testament",
+      "meta": "BCS · 1 review · 0 responses",
+      "href": "#project"
+    }
+  ]
+}

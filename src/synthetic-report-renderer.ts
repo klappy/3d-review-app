@@ -3,13 +3,15 @@ import { attestCapture, type CaptureRow } from './report-attestation.js';
 import { isAttestedCapture, type CapturedAssessment } from './report-capture.js';
 import { parseBoundedJson, canonicalJson } from './report-canonical-json.js';
 import { scoreSourceItem, type SourceItem } from './source-item-score.js';
-import { rollupReference, crossLensReference, translationTypeReference, type ScoredRow, type IndicatorResult, type TranslationTypeResponse } from './reference-rollup.js';
+import { rollupReference, crossLensReference, translationTypeReference, legacyTranslationTypeReference, type ScoredRow, type IndicatorResult, type TranslationTypeResponse } from './reference-rollup.js';
 import { buildReferenceNarrative } from './reference-narrative.js';
 import model from './pinned-report-model.json';
 import labels from './pinned-report-labels.json';
+import {translationBriefItems, translationBriefSource, TRANSLATION_BRIEF_SOURCE} from './translation-brief-amendment.js';
 
 export const REPORT_SCHEMA = '3d-synthetic-assessment-report-v1';
-export const REPORT_VERSIONS = Object.freeze({ scorer:'steve-f042cde-single-assessment-v1', narrative:'steve-f042cde-rule-narrative-v1', policy:'synthetic-current-assessment-asof-query-v1' });
+export const LEGACY_REPORT_VERSIONS = Object.freeze({ scorer:'steve-f042cde-single-assessment-v1', narrative:'steve-f042cde-rule-narrative-v1', policy:'synthetic-current-assessment-asof-query-v1' });
+export const REPORT_VERSIONS = Object.freeze({...LEGACY_REPORT_VERSIONS, scorer:'steve-605edb4-translation-brief-v1'});
 export const REPORT_MAX_BYTES = 524288;
 const fields = ['responseId','assessmentId','assessmentSurveyId','responseTemplateId','responseTemplateVersion','selectedTemplateId','selectedTemplateVersion','submittedAt','answersRaw','templateRaw'] as const;
 function refuse():never { throw new Error('RENDER_REFUSED'); }
@@ -63,15 +65,15 @@ export function projectStandaloneIndicators(indicators:readonly IndicatorResult[
     return {item_id:ind.item_id,lens:found.lens,sub_dimension:found.item.group,question_text:found.item.text,score:ind.score,n_responses:ind.n_responses};
   });
 }
-function assemble(aid:string,rows:readonly CaptureRow[]) {
+function assemble(aid:string,rows:readonly CaptureRow[],legacy=false) {
   const scored:ScoredRow[]=[],categorical:TranslationTypeResponse[]=[];
   const itemMap=new Map<string,{item:SourceItem;lens:string;key:string}>(),evidenceCounts=new Map<string,number>();
   // Parse each distinct template string once and compute each item's equality key once.
   // Keyed by exact bytes: a template differing by any byte is parsed and keyed on its own.
-  const parsed=new Map<string,{t:{items:SourceItem[];perspective:string};keys:string[]}>();
+  const parsed=new Map<string,{t:{items:SourceItem[];perspective:string;sourceRef:string};keys:string[]}>();
   for(const row of rows){
     let tk=parsed.get(row.templateRaw);
-    if(!tk){const t=parseBoundedJson(row.templateRaw,65536) as unknown as {items:SourceItem[];perspective:string};tk={t,keys:t.items.map(item=>canonicalJson(item))};parsed.set(row.templateRaw,tk);}
+    if(!tk){const raw=parseBoundedJson(row.templateRaw,65536) as unknown as {items:SourceItem[];perspective:string;sourceRef:string};const t=legacy?raw:{...raw,items:translationBriefItems(raw.items,raw.sourceRef)};tk={t,keys:t.items.map(item=>canonicalJson(item))};parsed.set(row.templateRaw,tk);}
     const {t,keys}=tk;
     const answers=parseBoundedJson(row.answersRaw,8192) as Record<string,unknown>;
     const form=formTypes.get(row.selectedTemplateId);if(!form)refuse();evidenceCounts.set(form,(evidenceCounts.get(form)??0)+1);
@@ -83,7 +85,7 @@ function assemble(aid:string,rows:readonly CaptureRow[]) {
       sourceInputFlags(item,answer); // preserve/validate source cleaning semantics; never add raw flags to payload
       const r=scoreSourceItem(item,answer);if(r.status==='held')refuse();
       scored.push({assessment_id:aid,item_id:item.id,lens:t.perspective,sub_dimension:item.group,score:r.score,standalone_indicator:r.standalone_indicator});
-      if(['TR-Q2','ML-Q2','CHIP-Q1','CHCP-Q1','CHDL-Q1'].includes(item.id))categorical.push({assessment_id:aid,item_id:item.id,option_codes:typeof answer==='string'?[answer]:Array.isArray(answer)?answer as string[]:null});
+      if(['TR-Q2','ML-Q2','CHIP-Q1','CHCP-Q1','CHDL-Q1'].includes(item.id))categorical.push({assessment_id:aid,item_id:item.id,question:item,source_ref:t.sourceRef,option_codes:typeof answer==='string'?[answer]:Array.isArray(answer)?answer as string[]:null});
     }
   }
   const included=new Set(model.subdimensions.filter(x=>x.included_in_lens_score).map(x=>JSON.stringify([x.lens,x.sub_dimension])));
@@ -93,11 +95,13 @@ function assemble(aid:string,rows:readonly CaptureRow[]) {
   const cross_lens_multi=cross.filter(x=>x.lens_scores.length>=2).sort((a,b)=>(b.agreement_range!-a.agreement_range!)||sourceOrder(a.construct_code,b.construct_code));
   const cross_lens_single=cross.filter(x=>x.lens_scores.length===1).sort((a,b)=>sourceOrder(a.construct_code,b.construct_code));
   const standalone_indicators=projectStandaloneIndicators(rolled.indicators,itemMap);
-  const cat=translationTypeReference(categorical)[0];
-  const translation_type_agreement=cat?{construct_name:name('translation-type-agreement'),team_values:cat.team_values.sort(sourceOrder),church_values:cat.church_values.sort(sourceOrder),agree:cat.agree}:null;
+  const modern=legacy?null:translationTypeReference(categorical)[0];
+  const cat=legacy?legacyTranslationTypeReference(categorical)[0]:modern;
+  const translation_type_agreement=cat?{construct_name:name('translation-type-agreement'),team_values:cat.team_values.sort(sourceOrder),church_values:cat.church_values.sort(sourceOrder),agree:cat.agree,...(modern?{team_statuses:modern.team_statuses,church_statuses:modern.church_statuses}:{})}:null;
   const evidence=[...evidenceCounts].sort((a,b)=>sourceOrder(a[0],b[0])).map(([form_type,n])=>{const entry=labels.forms.find(x=>x.form_type===form_type);if(!entry)refuse();return {form_type,label:entry.label,n};});
   const narrative=buildReferenceNarrative(lenses,cross_lens_multi.map(x=>({construct_name:x.construct_name,agreement:x.agreement_range,lens_scores:x.lens_scores})),evidence);
-  const payload={schema_version:REPORT_SCHEMA,synthetic:true as const,source_commit:model.commit,versions:REPORT_VERSIONS,assessment_id:aid,lenses,cross_lens_multi,cross_lens_single,standalone_indicators,translation_type_agreement,evidence,narrative};
+  const instrumentAmendment=!legacy&&[...parsed.values()].some(({t})=>translationBriefSource(t.items,t.sourceRef))?TRANSLATION_BRIEF_SOURCE:null;
+  const payload={schema_version:REPORT_SCHEMA,synthetic:true as const,source_commit:model.commit,versions:legacy?LEGACY_REPORT_VERSIONS:REPORT_VERSIONS,...(instrumentAmendment?{instrument_amendment:instrumentAmendment}:{}),assessment_id:aid,lenses,cross_lens_multi,cross_lens_single,standalone_indicators,translation_type_agreement,evidence,narrative};
   if(lenses.length>3||cross.length>8||standalone_indicators.length>111||evidence.length>9||narrative.length>32)refuse();
   boundedText(aid);for(const l of lenses){boundedText(l.lens);numeric(l.score);count(l.n_subdims_included);if(l.sub_dimensions.length>17)refuse();for(const s of l.sub_dimensions){boundedText(s.sub_dimension);numeric(s.score);count(s.n_items_included);}}
   for(const c of cross){boundedText(c.construct_name);numeric(c.triangulated_mean);count(c.n_lenses_included);if(c.lens_scores.length!==c.n_lenses_included||c.lens_scores.length>3)refuse();if(c.agreement_range===null){if(c.n_lenses_included!==1)refuse();}else numeric(c.agreement_range);for(const l of c.lens_scores){boundedText(l.lens);numeric(l.score);}}
@@ -110,20 +114,27 @@ export type RenderResult={eligible:false;reason:'HELD'}|{eligible:true;payload:S
 /** Own immutable primitive snapshot before await prevents caller mutation after
  * A's snapshot from changing rendered inputs. This still does not authorize or
  * prove DB membership: callers must use the separately reviewed B boundary. */
-export async function renderSyntheticReport(expectedAssessmentId:string,rows:readonly CaptureRow[],participant=false):Promise<RenderResult> {
+async function renderVersion(expectedAssessmentId:string,rows:readonly CaptureRow[],participant=false,legacy=false):Promise<RenderResult> {
   try {
     const captured=snapshot(rows);
     const attested=await attestCapture(expectedAssessmentId,captured,participant===true);if(!attested.eligible)return {eligible:false,reason:'HELD'};
-    return {eligible:true,...assemble(expectedAssessmentId,[...captured].sort((a,b)=>sourceOrder(a.responseId,b.responseId))),captureDigest:attested.captureDigest};
+    return {eligible:true,...assemble(expectedAssessmentId,[...captured].sort((a,b)=>sourceOrder(a.responseId,b.responseId)),legacy),captureDigest:attested.captureDigest};
   }catch{return {eligible:false,reason:'HELD'};}
 }
 /** Same render for a capture minted by attestPackedCapture in this isolate (see isAttestedCapture):
  * its frozen rows already passed attestCapture, so the attestation is reused, not repeated. Any
  * other object takes the full renderSyntheticReport path, attestation included. */
-export async function renderAttestedCapture(c:CapturedAssessment):Promise<RenderResult> {
-  if(!isAttestedCapture(c))return renderSyntheticReport(c.assessmentId,c.rows,c.participant===true);
+async function renderAttestedVersion(c:CapturedAssessment,legacy=false):Promise<RenderResult> {
+  if(!isAttestedCapture(c))return renderVersion(c.assessmentId,c.rows,c.participant===true,legacy);
   try {
     const captured=snapshot(c.rows);
-    return {eligible:true,...assemble(c.assessmentId,[...captured].sort((a,b)=>sourceOrder(a.responseId,b.responseId))),captureDigest:c.captureDigest};
+    return {eligible:true,...assemble(c.assessmentId,[...captured].sort((a,b)=>sourceOrder(a.responseId,b.responseId)),legacy),captureDigest:c.captureDigest};
   }catch{return {eligible:false,reason:'HELD'};}
 }
+
+/** Historical renderer is compiled and read-only: old reports retain their exact
+ * payload/tuple validation. New builds always use the Decision 25 renderer. */
+export const renderSyntheticReport = (aid:string,rows:readonly CaptureRow[],participant=false)=>renderVersion(aid,rows,participant,false);
+export const renderLegacySyntheticReport = (aid:string,rows:readonly CaptureRow[],participant=false)=>renderVersion(aid,rows,participant,true);
+export const renderAttestedCapture = (c:CapturedAssessment)=>renderAttestedVersion(c,false);
+export const renderLegacyAttestedCapture = (c:CapturedAssessment)=>renderAttestedVersion(c,true);

@@ -7,7 +7,7 @@ import { build } from 'esbuild';
 import { beforeAll, beforeEach, afterAll, describe, it, expect } from 'vitest';
 import { Miniflare, convertV4MiniflareOptions } from 'miniflare';
 import * as production from '../src/synthetic-report-store';
-import { B1_CAPTURE_SQL, REPORT_CAPTURE_CTE, captureForBuild } from '../src/report-capture';
+import { B1_CAPTURE_SQL, REPORT_CAPTURE_CTE, attestSelectionCapture } from '../src/report-capture';
 import type { Ctx } from '../src/handlers/types';
 const mf=new Miniflare(convertV4MiniflareOptions({workers:[{name:'report-materialization-b2',modules:true,script:"export default {fetch(){return new Response('synthetic fixture only')}}",d1Databases:{DB:'report-b2-fixture'}}]}));
 let db:D1Database,marker:typeof production,variant:typeof production;
@@ -51,6 +51,8 @@ beforeAll(async()=>{
     const sql=readFileSync(new URL('../'+file,import.meta.url),'utf8').split('\n').filter(l=>!l.trimStart().startsWith('--')).join('\n');
     const statements=sql.split(';\n').map(s=>s.trim()).filter(Boolean);for(let i=0;i<statements.length;i+=50)await db.batch(statements.slice(i,i+50).map(s=>db.prepare(s)));
   }
+ // Keep existing direct-grant race fixtures exact; inherited revocation is covered by workspace-assessment-access.
+ await db.prepare('DELETE FROM "grant" WHERE principal_id=\'person_mara\' AND scope_type=\'workspace\'').run();
   marker=await testBundle();variant=await testBundle('test-marker-scorer-v2');
 },60000);
 beforeEach(async()=>{
@@ -59,7 +61,7 @@ beforeEach(async()=>{
 });
 afterAll(async()=>{await mf.dispose();rmSync(temporary,{recursive:true,force:true});});
 async function report(){const r=await marker.buildMaterialized(context(),aid);expect(r.ok).toBe(true);if(!r.ok)throw new Error('fixture build refused');return r.value;}
-async function captured(){const r=await captureForBuild(context(),aid);expect(r.eligible).toBe(true);if(!r.eligible)throw new Error('fixture capture refused');return r.capture;}
+async function captured(){const row=await db.prepare(marker.REPORT_OBSERVE_SQL).bind('user',null,aid,'person_mara','member').first<any>();const r=await attestSelectionCapture(aid,row.current_capture);expect(r.eligible).toBe(true);if(!r.eligible)throw new Error('fixture capture refused');return r.capture;}
 async function alterReport(id:string,values:Record<string,unknown>){
   await exec('DROP TRIGGER synthetic_report_no_update');
   try{await exec('UPDATE synthetic_report SET '+Object.keys(values).map(k=>k+'=?').join(',')+' WHERE id=?',...Object.values(values),id);}finally{await exec(noUpdate);}
@@ -85,7 +87,13 @@ describe('private marker isolation and exact D1 commands',()=>{
     const row=await db.prepare('SELECT * FROM synthetic_report').first<any>();expect(row.id).toBe(created.value.id);
     // Independently frozen Python hashlib vector over explicit accepted preimage.
     expect(created.value.captureDigest).toBe('e8d986173aae61cf158e57d4d881a3f35ecc9d885769953f455f728993bce933');
-    expect(created.value.reportKey).toBe('6da8672ed391975ded7fcdf82ed609a18158059f3af7214a32aa347480fa8858');
+    const hash=(s:string)=>createHash('sha256').update(s).digest('hex');
+    const legacyIdentity={schema:'3d-materialized-report-key-v1',assessmentId:aid,captureDigest:created.value.captureDigest,...tuple};
+    const canonical=(x:unknown):string=>JSON.stringify(x, Object.keys(x as object).sort());
+    expect(hash('3d-materialized-report-v1\0'+canonical(legacyIdentity))).toBe('6da8672ed391975ded7fcdf82ed609a18158059f3af7214a32aa347480fa8858');
+    const selection=JSON.parse(row.capture_json)[3];
+    const selectionDigest=hash(JSON.stringify(selection));
+    expect(created.value.reportKey).toBe(hash('3d-materialized-report-v2\0'+canonical({...legacyIdentity,schema:'3d-materialized-report-key-v2',selectionDigest})));
     expect(createHash('sha256').update(row.payload_json).digest('hex')).toBe(row.payload_sha256);
     console.log('B2_BIND_PROOF '+JSON.stringify(calls.map(c=>({binds:c.args.length,method:c.method,sqlBytes:Buffer.byteLength(c.sql)}))));
   });
@@ -96,9 +104,9 @@ describe('private marker isolation and exact D1 commands',()=>{
     expect(await refusing.buildMaterialized(context(),aid)).toEqual({ok:false,reason:'UNAVAILABLE'});
     expect((await db.prepare('SELECT count(*) n FROM synthetic_report').first<any>()).n).toBe(1);
   });
-  it('pins the global viewer-read CTE and leaves the original B1 build capture unchanged',()=>{
+  it('pins the effective workspace-aware viewer-read CTE and leaves the original B1 capture unchanged',()=>{
     const normalized=REPORT_CAPTURE_CTE.split('\n').filter(l=>!l.trimStart().startsWith('--')).join('\n').trim();
-    expect(createHash('sha256').update(normalized).digest('hex')).toBe('645681a3ede9eb28749bec3d398e2fb366b15de0fb704a7a2025e0befefaa56e');
+    expect(createHash('sha256').update(normalized).digest('hex')).toBe('e8d073f4644391e9f373b75a028521717ebd33403a74c662ec734aba3d276976');
     expect(createHash('sha256').update(B1_CAPTURE_SQL).digest('hex')).toBe('8e3f51e2f5cb7350c2a7824e5a78c91c64fb17a1966d79b9fe3f064c711598c6');
   });
   it('keeps reports immutable under actual D1 triggers and surfaces a forced constraint failure',async()=>{

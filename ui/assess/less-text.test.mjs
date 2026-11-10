@@ -162,8 +162,37 @@ test('B30 About: one heading, one short line, one primary; the explanation and t
   const body = lessText(h, 'about', /<h[12]\b/g);
   assert.equal(count(upFront(h), /<p class="muted lead">/g), 1);
   const line = upFront(h).match(/<p class="muted lead">([^<]*)<\/p>/)[1]; assert.equal(sentences(line), 1, 'one sentence');
-  for (const moved of ['A facilitator sets up a review.', 'Who it is for', 'When to use it', 'How often']) assert.ok(body.includes(moved), `moved, not removed: ${moved}`);
+  for (const moved of ['How it works', 'A facilitator (usually a project manager or partner) creates the review', 'Who it is for', 'When to use it', 'How often']) assert.ok(body.includes(moved), `moved, not removed: ${moved}`);
   assert.equal(count(h, /<h[1-6]\b/g), 1, 'one heading in the whole page, disclosures included');
+});
+
+// Rachel 2026-10-19 copy (cookbook sources/rachel-copy-2026-10-19/COPY-MAP.md C01–C12): exact source sentences and C03 captions on About
+// and the public home. C03 labels keep the app-wide "Translation team" casing (declared conflict), so they are not pinned here.
+test('Rachel copy C01–C12: exact sentences and captions on About and home (C03 labels kept app-wide, not pinned); each sentence under its label behind Learn more', async () => {
+  const cards = await import('./cards.js');
+  const about = pages.entry.render({ esc, cards, state: {} }, { mode: 'about' });
+  const home = pages.entry.render({ esc, cards, state: {} }, { mode: 'welcome' });
+  const exact = ['3D Review visualizes how a Bible translation project is performing so you can decide what to do next.',
+    'How the work is done', 'How it’s understood', 'How it’s used', 'How it works',
+    'A facilitator (usually a project manager or partner) creates the review and chooses the surveys that fit your project, whether it’s written, oral, or sign language.',
+    'Each group answers a short survey, by link, QR code, or on paper.',
+    'You get a report that shows strengths and areas to grow, side by side, so you know where to focus next.',
+    'Translation teams and their leaders, the communities they serve and the churches they partner with',
+    'When your project would benefit from a pause to reflect and learn from feedback (consider using between books or publishing iterations)',
+    'Repeat when a new assessment would be useful, or over increments of time to create a trajectory'];
+  for (const [name, h] of [['about', about], ['home', home]]) {
+    const body = lessText(h, name, /<h[12]\b/g);
+    for (const t of exact) assert.ok(h.includes(esc(t)), `${name}: ${t}`);
+    // C12 ships in full, trajectory clause included (cookbook work/active/2026-10-19-current-ui-copy/RULING.md option 2).
+    assert.ok(body.includes('<strong>How it works</strong>'), `${name}: How it works behind Learn more`);
+    // Each sentence pinned to its own label (review 6276186955 F3): a swap between labels fails.
+    const pairs = [['Set up.', exact[5]], ['Share.', exact[6]], ['Learn.', exact[7]]].map(([l, t]) => `<strong>${esc(l)}</strong> ${esc(t)}</p>`);
+    pairs.push(...[['Who it is for', exact[8]], ['When to use it', exact[9]], ['How often', exact[10]]].map(([l, t]) => `<p><strong>${esc(l)}</strong></p><p class="muted">${esc(t)}</p>`));
+    for (const pr of pairs) assert.ok(body.includes(pr), `${name}: label + sentence pair behind Learn more: ${pr}`);
+    assert.match(upFront(h), /<p class="muted lead">3D Review visualizes how a Bible translation project is performing so you can decide what to do next\.<\/p>/);
+  }
+  assert.match(about, /<h1>Three perspectives\. One useful next step\.<\/h1>/);
+  assert.match(home, /<h1>Three perspectives\.<br>One useful next step\.<\/h1>/);
 });
 
 // Validator FAIL on #292 @2b81817 (lanes-1611): Permissions kept two lines + three headings; notices showed ids and ISO stamps;

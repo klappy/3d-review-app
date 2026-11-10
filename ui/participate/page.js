@@ -3,7 +3,7 @@ import { createParticipantJourney } from './controller.js';
 import { mountParticipantView, itemError, drawAbout, aboutValues, setAboutValues, aboutFields, welcomeCopy } from '../participant-view.js';
 import { UI_EN, SURVEYOR_EN, formStrings, translateForm, makeT, fetchTranslationsProgressive, initialLanguage, rememberLanguage, isEnglish, pickLanguage, passageNames, translatingSub } from './i18n.js';
 import { reviewAnswer, receiptLine, isOtherOption, otherBox, collectOther, syncOtherBoxes, OTHER_TEXT_KEY } from '../present.js';
-import { receiptNotice, copy as linkCopy } from '../shared-link.js';
+import { receiptNotice, copy as linkCopy, deviceStorage } from '../shared-link.js';
 import { holdRetry, underHold, setControlLabel, rateLimitNotice, isRateLimitedError, rateLimitedTranslate } from '../rate-limit.js';
 
 const $ = id => document.getElementById(id);
@@ -296,7 +296,8 @@ async function loadTranslations(form = journey?.state?.form || null) {
 }
 langSelect.addEventListener('change', () => { lang = langSelect.value || 'en'; rememberLanguage(localStore(), lang); loadTranslations(); });
 var journey;
-journey = createParticipantJourney({ ...(demo ? sample : { window, storage: sessionStorage }), onChange: paint });
+// Receipt per device (captain ruling 2026-10-21): any tab on this phone that reopens the link shows the same receipt.
+journey = createParticipantJourney({ ...(demo ? sample : { window, storage: deviceStorage({ device: localStore(), tab: sessionStorage }) }), onChange: paint });
 $('answers').addEventListener('input', () => journey.save(values()));
 $('answers').addEventListener('change', syncOther);
 $('answers').addEventListener('submit', event => { event.preventDefault(); try { journey.review(values(true)); } catch (error) { $('notice').textContent = error.message; } });

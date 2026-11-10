@@ -1,3 +1,5 @@
+import {discloseTranslationAgreement} from '../../ui/report-agreement.js';
+import {perspectiveLevelMinimum,translationAgreementMinimum} from '../report-admission';
 /** Report transport projection; all grant/current/stored authority belongs to the store observation. */
 import type { Handler, HandlerResult, Impact } from './types';
 import { CapError, notVisible } from './errors';
@@ -44,12 +46,12 @@ export const build:Handler=async(ctx,p,opts)=>{
   }
   const r=await buildMaterialized(ctx,aid);
   if(!r.ok){if(r.reason==='HELD')return held(r.marker.assessment_id,false,await heldReason(ctx,aid));return failure(r.reason,true);}
-  return {result:{assessment_id:aid,suppressed:false,report:{id:r.value.id,created_at:r.value.createdAt,payload:r.value.payload}},scope:{type:'assessment',id:aid}};
+  return {result:{assessment_id:aid,suppressed:false,level_minimum_responses:perspectiveLevelMinimum(ctx.env),report:{id:r.value.id,created_at:r.value.createdAt,payload:discloseTranslationAgreement(r.value.payload,translationAgreementMinimum(ctx.env))}},scope:{type:'assessment',id:aid}};
 };
 export const get:Handler=async(ctx,p)=>{
   const id=params(p,'id');const r=await readMaterialized(ctx,id);
   if(!r.ok){if(r.reason==='HELD')return held(r.marker.assessment_id,false,await heldReason(ctx,r.marker.assessment_id));return failure(r.reason);}
-  return {result:{assessment_id:r.value.assessmentId,suppressed:false,report:{id:r.value.id,created_at:r.value.createdAt,payload:r.value.payload}},scope:{type:'assessment',id:r.value.assessmentId}};
+  return {result:{assessment_id:r.value.assessmentId,suppressed:false,level_minimum_responses:perspectiveLevelMinimum(ctx.env),report:{id:r.value.id,created_at:r.value.createdAt,payload:discloseTranslationAgreement(r.value.payload,translationAgreementMinimum(ctx.env))}},scope:{type:'assessment',id:r.value.assessmentId}};
 };
 export const list:Handler=async(ctx,p)=>{
   const aid=params(p,'aid','cursor');

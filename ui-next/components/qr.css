@@ -1,0 +1,10 @@
+/* UI Next (v4) QR module grids beyond the boards' 21x21 (collect/Qr.svelte data-n): real survey links are QR versions 2-10. Status: provisional. */
+.qr[data-n="25"]{grid-template-columns:repeat(25,1fr)}
+.qr[data-n="29"]{grid-template-columns:repeat(29,1fr)}
+.qr[data-n="33"]{grid-template-columns:repeat(33,1fr)}
+.qr[data-n="37"]{grid-template-columns:repeat(37,1fr)}
+.qr[data-n="41"]{grid-template-columns:repeat(41,1fr)}
+.qr[data-n="45"]{grid-template-columns:repeat(45,1fr)}
+.qr[data-n="49"]{grid-template-columns:repeat(49,1fr)}
+.qr[data-n="53"]{grid-template-columns:repeat(53,1fr)}
+.qr[data-n="57"]{grid-template-columns:repeat(57,1fr)}

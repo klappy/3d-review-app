@@ -27,7 +27,7 @@
 <header class="gx-bar">
   <strong>UI Next gallery</strong>
   <span class="gx-note">Home's components: Top bar, Menu, Tag, Level, phone header, phone bar. Provisional.</span>
-  <nav class="gx-toggle" aria-label="Gallery pages"><a class="gx-tab" href="?">Components</a><a class="gx-tab" href="?page=layouts">Layouts</a><a class="gx-tab" href="?page=home" aria-current="page">Home parts</a></nav>
+  <nav class="gx-toggle" aria-label="Gallery pages"><a class="gx-tab" href="?page=components">Components</a><a class="gx-tab" href="?page=layouts">Layouts</a><a class="gx-tab" href="?page=home" aria-current="page">Home parts</a></nav>
   <div class="gx-toggle" role="group" aria-label="Theme">
     {#each MODES as m}<button type="button" class="gx-tab" aria-pressed={mode === m ? "true" : "false"} onclick={() => (mode = m)}>{m}</button>{/each}
   </div>
@@ -89,6 +89,10 @@
         <div class="gx-frame gx-phone"><PhoneBar label="Start a 3D Review" lead="plus" href="#setup" /></div>
         <div class="gx-k">primary + quiet Back</div>
         <div class="gx-frame gx-phone"><PhoneBar label="Next" backHref="#back" href="#next" /></div>
+        <div class="gx-k" id={`gx-bar-why-${theme}`}>primary disabled, described by its reason (this line): nothing ticked yet</div>
+        <div class="gx-frame gx-phone"><PhoneBar label="Print surveys" href="#print" disabled ariaDescribedby={`gx-bar-why-${theme}`} /></div>
+        <div class="gx-k">demoted: a dialog or sheet holds the one primary</div>
+        <div class="gx-frame gx-phone"><PhoneBar label="New project" lead="plus" href="#setup" demoted /></div>
       </div>
     </section>
   {/each}

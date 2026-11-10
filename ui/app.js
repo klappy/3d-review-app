@@ -11,7 +11,7 @@ import { reviewAnswer, templateChoices, receiptLine, isOtherOption, otherBox, co
 import { assessmentGrants, clearIdentityData, codeEntryFailure, hasProjectWork, hasReportWork, hasSharedAssessmentEntry } from './visibility.js';
 import { renderList, renderReport, upsertRow } from './report-view.js';
 import { recoverParticipant, redeemAndOpen, resumeNoticeAfterReceipt, resumeTarget, savedSubmitKey } from './participant-resume.js';
-import { copy as sharedCopy, createSharedLinkClient, fill, receiptNotice, currentNamespace, digestNamespace, entryFailureKind, errorKind, parseEntryFragment, rateLimitedCopy, rememberCurrent, resolveConflict, restoreDraft, saveDraft, scopedStorage, shareUrl, stripFragment, submitFailureKind } from './shared-link.js';
+import { copy as sharedCopy, createSharedLinkClient, deviceStorage, fill, receiptNotice, CURRENT_KEY, currentNamespace, digestNamespace, entryFailureKind, errorKind, parseEntryFragment, rateLimitedCopy, rememberCurrent, resolveConflict, restoreDraft, saveDraft, scopedStorage, shareUrl, stripFragment, submitFailureKind } from './shared-link.js';
 // Thrown by shared-link paths that already showed the participant copy: run() marks the action as
 // needing attention without painting raw server text into #error.
 // limit: set when the handled refusal was a rate limit, so run() still holds the control for the wait ({ retryAfter }, and
@@ -20,6 +20,7 @@ class HandledFailure extends Error { constructor(limit) { super('handled'); this
 // In-memory only (per page): whether an earlier submit on this page had an unknown outcome.
 let participantView = null;
 let submitState = 'none'; // 'none' | 'uncertain'
+let sharedStorage = null;
 const $ = id => document.getElementById(id);
 let pendingInvitation = location.hash.startsWith('#invite=') ? parseInvitationFragment(location.hash) : null;
 const invitationEntry = pendingInvitation !== null;
@@ -244,7 +245,7 @@ async function chooseProject() {
   if (!state.project) { const ws = collab.selectedWorkspace(); if (ws) collab.setScope({ type: 'workspace', id: ws.id, role: ws.role }); await languageControls.refresh(); return; } // leaving a project restores the still-selected workspace scope
   const result = await api(`/v2/projects/${path(state.project)}`);
   state.projectView = result.project;
-  collab.setScope({ type: 'project', id: result.project.id, role: result.project.role });
+  collab.setScope({ type: 'project', id: result.project.id, role: result.project.direct_role ?? null });
   await languageControls.refresh();
   await assessments();
 }
@@ -263,15 +264,15 @@ async function chooseAssessment() {
   collab.setScope(null); // R2: downstream collaborator scope resets synchronously before any await
   lensSurveys?.reset();
   text($('assessment-detail'), ''); text($('survey-detail'), ''); text($('results'), 'Select an assessment.');
-  if (!state.assessment) { if (state.projectView) collab.setScope({ type: 'project', id: state.projectView.id, role: state.projectView.role }); return; } // leaving an assessment restores the still-selected project scope (supplier a974903 intent)
+  if (!state.assessment) { if (state.projectView) collab.setScope({ type: 'project', id: state.projectView.id, role: state.projectView.direct_role ?? null }); return; } // leaving an assessment restores the still-selected project scope (supplier a974903 intent)
   const stageRead = stageSnapshot();
   if (!state.templates) await templates(); // the lens catalogue must be loaded before the snapshot (Auditor P2 root cause)
   const result = await api(`/v2/assessments/${path(state.assessment)}`);
   if (!stageCurrent(stageRead)) return;
   state.assessmentRole = result.assessment.role; showReportControls();
   renderAssessmentHeadrow(document, $('assessment-context'), result.assessment);
-  collab.setScope({ type: 'assessment', id: result.assessment.id, role: result.assessment.role });
-  text($('assessment-detail'), `${result.assessment.name} · stage ${result.assessment.stage} · exact role ${result.assessment.role}`);
+  collab.setScope({ type: 'assessment', id: result.assessment.id, role: result.assessment.direct_role ?? null });
+  text($('assessment-detail'), `${result.assessment.name} · stage ${result.assessment.stage} · effective role ${result.assessment.role}`);
   const next = { prepare: 'collect', collect: 'understand', understand: 'improve', improve: 'understand' }[result.assessment.stage];
   if (next) $('stage-target').value = next;
   for (const survey of result.surveys || []) option($('surveys'), survey.id, `${survey.template_name} · ${survey.collection_status}`);
@@ -353,8 +354,8 @@ async function chooseGrantedAssessment() {
   if (!stageCurrent(stageRead)) return;
     state.assessmentRole = result.assessment.role; showReportControls();
     renderAssessmentHeadrow(document, $('assessment-context'), result.assessment);
-    collab.setScope({ type: 'assessment', id: result.assessment.id, role: result.assessment.role });
-    text($('granted-detail'), `${result.assessment.name} · stage ${result.assessment.stage} · exact role ${result.assessment.role}`);
+    collab.setScope({ type: 'assessment', id: result.assessment.id, role: result.assessment.direct_role ?? null });
+    text($('granted-detail'), `${result.assessment.name} · stage ${result.assessment.stage} · effective role ${result.assessment.role}`);
     for (const survey of result.surveys || []) option($('surveys'), survey.id, survey.template_name || survey.id);
     lensSurveys?.set({ aid: result.assessment.id, role: result.assessment.role, stage: result.assessment.stage, surveys: result.surveys || [], templates: state.templates || [], canOpen: !$('survey-card').hidden });
     entityScreen?.render();
@@ -489,7 +490,7 @@ async function openReport(id) {
   try {
     const result = await api(`/v2/reports/${path(id)}`);
     if (result.suppressed) { clearReportState(); text($('report-status'), result.reason); return; }
-    renderReport({ doc: document, root: $('report-view'), report: result.report });
+    renderReport({ doc: document, root: $('report-view'), report: result.report, minimum: result.level_minimum_responses });
     $('report-view').hidden = false;
     text($('report-status'), '');
   } catch (error) { clearReportState(); throw error; }
@@ -663,7 +664,15 @@ function showReceipt(result) {
   text($('participant-resume'), resumeNoticeAfterReceipt(result, $('participant-resume').textContent));
   $('receipt').hidden = false;
   if (result.submitted !== false) { $('review').hidden = true; $('answers').hidden = true; participantView?.showReceipt(); }
-  if (state.shared && result.submitted !== false) text($('participant-resume'), receiptNotice(state.form?.template?.perspective));
+  if (state.shared && result.submitted !== false) {
+    // Same receipt promotion as /participate/: drafts and unsubmitted sessions stay in their tab,
+    // and a legacy tab without a known server expiry cannot acquire a fresh device lifetime.
+    const until = Number(state.sharedStore.get('expiresAt'));
+    if (Number.isFinite(until) && until > Date.now()) {
+      state.sharedStore.remember('bearer', until); state.sharedStore.remember('expiresAt', until); sharedStorage.remember(CURRENT_KEY, until);
+    }
+    text($('participant-resume'), receiptNotice(state.form?.template?.perspective));
+  }
 }
 bindClick('recover', 'Recovering receipt…', async () => {
   let receipt;
@@ -705,8 +714,10 @@ async function sharedLinkEntry(token, namespace) {
   $('facilitator').hidden = true; $('evidence').remove(); document.querySelector('aside').hidden = true; $('participant-arrival').hidden = true; $('participant-code-guidance').hidden = true; // arrival and code guidance are for the legacy code path only (explicit targets: Bugbot 4036816500); evidence is removed, not hidden: no trace/receipt text exists on the shared route
   for (const el of $('redeem').querySelectorAll('label,button')) el.hidden = true; // code entry hidden; the alert slot stays
   namespace = namespace || await digestNamespace(token);
-  state.sharedStore = scopedStorage(sessionStorage, namespace);
-  rememberCurrent(sessionStorage, namespace); // digest only; the raw token is never persisted
+  let device; try { device = window.localStorage; } catch { /* blocked storage retains per-tab behavior */ }
+  sharedStorage = deviceStorage({ device, tab: sessionStorage });
+  state.sharedStore = scopedStorage(sharedStorage, namespace);
+  rememberCurrent(sharedStorage, namespace); // digest only; the raw token is never persisted
   state.shared = createSharedLinkClient({ store: state.sharedStore }); // no onEvent: nothing is ever written to #events in shared mode
   try {
     // With a fragment: open (resume_token when this namespace holds a bearer). Without one (reload):

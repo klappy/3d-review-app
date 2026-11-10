@@ -148,16 +148,24 @@ async function askUpstream(env: Env, deps: Deps, lang: LwcLanguage, context: str
   if (secret) { headers.authorization = `Bearer ${secret}`; headers.apikey = secret; }
   const ctl = new AbortController();
   const timer = setTimeout(() => ctl.abort(), TRANSLATE_LIMITS.timeoutMs);
+  // Diagnostic pointer for a 502 (root RESULTS 2026-10-22: twelve real 502s, cause undecidable from the retained logs): booleans,
+  // the upstream status or exception name, parse/accept counts and duration only — never the key, headers, texts or body.
+  const t0 = Date.now(), asked = keyOf.size;
+  const diag = (why: string, extra: Record<string, unknown> = {}) =>
+    console.warn(JSON.stringify({ at: "translate.upstream", why, keyPresent: !!secret, asked, ms: Date.now() - t0, ...extra }));
   // S33 E1: the limit covers the body read too, so the timer is cleared only after res.json() settles (every path).
   try {
     let res: Response;
     try { res = await (deps.fetch ?? fetch)(url, { method: "POST", headers, signal: ctl.signal, body: JSON.stringify({ targetLang: lang.name, context, sourceTexts }) }); }
-    catch { return { texts: new Map(), status: 502 }; }
-    if (!res.ok) return { texts: new Map(), status: res.status === 429 ? 429 : 502 };
+    catch (e) { diag("fetch_failed", { exception: (e as { name?: string })?.name ?? "Error", aborted: ctl.signal.aborted }); return { texts: new Map(), status: 502 }; }
+    if (!res.ok) { diag("upstream_status", { status: res.status, requestId: res.headers.get("x-request-id") ?? res.headers.get("cf-ray") ?? undefined }); return { texts: new Map(), status: res.status === 429 ? 429 : 502 }; }
     const data = await res.json().catch(() => null) as { translated?: Record<string, unknown> } | null;
-    if (ctl.signal.aborted) return { texts: new Map(), status: 502 };
+    if (ctl.signal.aborted) { diag("body_aborted"); return { texts: new Map(), status: 502 }; }
+    const parsed = !!data && typeof data === "object" && !!data.translated && typeof data.translated === "object";
     const texts = new Map<string, string>();
-    for (const [k, hash] of keyOf) { const v = data?.translated?.[k]; if (acceptable(lang, missing.get(hash)!, v)) texts.set(hash, (v as string).trim()); }
+    let rejected = 0;
+    for (const [k, hash] of keyOf) { const v = data?.translated?.[k]; if (acceptable(lang, missing.get(hash)!, v)) texts.set(hash, (v as string).trim()); else rejected++; }
+    if (!parsed || !texts.size) diag(parsed ? "none_acceptable" : "parse_failed", { parsed, accepted: texts.size, rejected });
     return { texts, status: 200 };
   } finally { clearTimeout(timer); }
 }

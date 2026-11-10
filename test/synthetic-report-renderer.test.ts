@@ -1,6 +1,6 @@
 import {beforeAll,describe,it,expect,vi} from 'vitest';
 import {buildIndex,readPinnedSources} from '../tools/build-synthetic-attestation';
-import {renderSyntheticReport,sourceInputFlags,sourceOrder,projectStandaloneIndicators,REPORT_SCHEMA,REPORT_VERSIONS} from '../src/synthetic-report-renderer';
+import {renderSyntheticReport,renderLegacySyntheticReport,LEGACY_REPORT_VERSIONS,sourceInputFlags,sourceOrder,projectStandaloneIndicators,REPORT_SCHEMA,REPORT_VERSIONS} from '../src/synthetic-report-renderer';
 import {buildReferenceNarrative} from '../src/reference-narrative';
 import {rollupReference} from '../src/reference-rollup';
 import {canonicalJson} from '../src/report-canonical-json';
@@ -24,13 +24,17 @@ function equivalent(actual:any,expected:any,path='root'){
 describe('C1 source assembly, distinct from reporting authorization',()=>{
  it('all34 complete attested captures match original source07 assembly',async()=>{
   expect(groups.size).toBe(34);expect(captures.length).toBe(425);let max=0,strings=0;
-  for(const [aid,rows]of groups){const result=await renderSyntheticReport(aid,rows);expect(result.eligible,aid).toBe(true);if(!result.eligible)throw new Error('gold refused');
+  for(const [aid,rows]of groups){const result=await renderLegacySyntheticReport(aid,rows);expect(result.eligible,aid).toBe(true);if(!result.eligible)throw new Error('gold refused');
    const {schema_version,synthetic,source_commit,versions,assessment_id,...body}=result.payload;
-   expect({schema_version,synthetic,source_commit,versions,assessment_id}).toEqual({schema_version:REPORT_SCHEMA,synthetic:true,source_commit:fixture.source_commit,versions:REPORT_VERSIONS,assessment_id:aid});
+   expect({schema_version,synthetic,source_commit,versions,assessment_id}).toEqual({schema_version:REPORT_SCHEMA,synthetic:true,source_commit:fixture.source_commit,versions:LEGACY_REPORT_VERSIONS,assessment_id:aid});
    equivalent(body,fixture.contexts[aid as keyof typeof fixture.contexts],aid);
+   const current=await renderSyntheticReport(aid,rows);expect(current.eligible).toBe(true);if(!current.eligible)throw new Error('amended capture refused');
+   for(const field of ['lenses','cross_lens_multi','cross_lens_single','standalone_indicators','evidence','narrative'] as const)expect(current.payload[field]).toEqual(result.payload[field]);
+   if(result.payload.translation_type_agreement)for(const field of ['team_values','church_values','agree'] as const)expect(current.payload.translation_type_agreement?.[field]).toEqual(result.payload.translation_type_agreement[field]);
+
    expect(result.payloadJson).toBe(canonicalJson(result.payload));max=Math.max(max,Buffer.byteLength(result.payloadJson));strings+=body.narrative.length;
    expect(Object.isFrozen(result.payload)).toBe(true);expect(Object.isFrozen(result.payload.lenses)).toBe(true);
-   const repeated=await renderSyntheticReport(aid,[...rows].reverse());expect(repeated.eligible).toBe(true);if(repeated.eligible)expect(repeated.payloadJson).toBe(result.payloadJson);
+   const repeated=await renderLegacySyntheticReport(aid,[...rows].reverse());expect(repeated.eligible).toBe(true);if(repeated.eligible)expect(repeated.payloadJson).toBe(result.payloadJson);
   }
   console.log('C1_ASSEMBLY '+JSON.stringify({assessments:groups.size,responses:captures.length,narrativeStrings:strings,maxPayloadBytes:max,source:fixture.source_commit}));
  });

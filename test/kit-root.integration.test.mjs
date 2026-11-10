@@ -69,7 +69,7 @@ test('DoD3: Workspaces is in the primary shell nav and opens with zero projects 
   const p = await bootPage('direct', '#projects');
   const link = p.q('[data-header-host] #account-menu #shell-links a[href="#workspaces"]');
   assert.ok(link, 'Workspaces link in the shell nav'); assert.equal(link.textContent.trim(), 'Workspaces');
-  assert.deepEqual(p.qa('#shell-links a').map(a => a.getAttribute('href')), ['#workspaces', '#feedback', '/roadmap/'], 'Workspaces leads the existing nav items');
+  assert.deepEqual(p.qa('#shell-links a').map(a => a.getAttribute('href')), ['#workspaces', '#feedback', '/roadmap/', '/next/?ui_next=on'], 'Workspaces leads the existing nav items; "Try the new design" (UI Next opt-in, data-ui-next) closes the list');
   assert.equal(p.api.state.projects.length, 0, 'zero-project account');
   const toggle = p.q('#account-menu-toggle'), menu = p.q('#account-menu');
   toggle.click(); assert.equal(menu.hidden, false, 'menu opens'); assert.equal(toggle.getAttribute('aria-expanded'), 'true');

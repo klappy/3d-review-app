@@ -116,7 +116,7 @@ async function participantCapture(expectedAssessmentId: string, rows: CaptureRow
   });
   return { eligible: true, responseIds: responses.map(r => r.responseId), captureDigest };
 }
-export async function attestCapture(expectedAssessmentId: string, capture: readonly CaptureRow[], participant = false): Promise<AttestationResult> {
+export async function attestCapture(expectedAssessmentId: string, capture: readonly CaptureRow[], participant = false, minimum = SUPPRESSION_THRESHOLD): Promise<AttestationResult> {
   let rows: CaptureRow[];
   try { rows = snapshot(expectedAssessmentId, capture); } catch { return { eligible: false, reason: 'INVALID_INPUT' }; }
   let entries: ReadonlyMap<string, Entry>;
@@ -124,9 +124,11 @@ export async function attestCapture(expectedAssessmentId: string, capture: reado
   if (participant === true) {
     const known = rows.filter(row => entries.has(row.responseId)).length;
     if (known > 0 && known < rows.length) return { eligible: false, reason: 'MIXED_SOURCE' };
-    // D7 minimum: participant answers never become scores below SUPPRESSION_THRESHOLD, so build, get and list hold
-    // together with Results and the responses list (persona C, 0.24.1 agent track: a report scored n=1).
-    if (known === 0 && rows.length < SUPPRESSION_THRESHOLD) return { eligible: false, reason: 'BELOW_MINIMUM' };
+    // D7 minimum: participant answers never become scores below the server-owned floor (report-admission.ts
+    // participantReportMinimum: SUPPRESSION_THRESHOLD, or 1 on DEV), so build, get and list hold together with Results and the
+    // responses list (persona C, 0.24.1 agent track). The floor is never below one response.
+    const floor = Number.isInteger(minimum) && minimum >= 1 ? minimum : SUPPRESSION_THRESHOLD;
+    if (known === 0 && rows.length < floor) return { eligible: false, reason: 'BELOW_MINIMUM' };
     if (known === 0) { try { return await participantCapture(expectedAssessmentId, rows); } catch { return { eligible: false, reason: 'INVALID_INPUT' }; } }
   }
   try {

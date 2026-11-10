@@ -1,16 +1,366 @@
 {
   "schema": "3dr-releases/1",
-  "current": "0.37.0",
+  "current": "0.41.7",
   "versions": [
     {
-      "version": "0.37.0",
+      "version": "0.41.7",
       "status": "candidate",
+      "notes_path": "releases/0.41.7.md",
+      "sections": {
+        "changed": [
+          "PATCH 0.41.7 omits the optional English VTT track from both phone and desktop homepage overview players. This matches the working R1 configuration without changing the approved v5 film, same-origin media relay, poster, controls, connected-source lifecycle, Watch/retry behavior or direct CDN fallback. The film’s baked-in captions remain visible; the homepage no longer offers the separate selectable text-caption track. Baked-in text is not an equivalent replacement for a selectable text-caption track. Generic MediaCard track support and the VTT asset are retained.",
+          "Actual user iPhone results on the twelve-case DEV 0.41.6/52c5a9d65c9286f429cb843d648b1c935e8efa72 matrix were seven playback cases reported working (A0, A1, R1–R5) and five reported failing (A2–A5, R0): attempted 12, passed 7, failed 5, untested 0. A1-to-A2 adds only the optional track; R0-to-R1 removes it. Every failing case has the track and every passing case lacks it. This isolates the feature-level trigger across both literal HTML and Svelte, not the underlying Safari parser, request or VTT mechanism. The real homepage must still be retested after deployment.",
+          "The diagnostic matrix retains its case IDs and behavior so those native observations remain comparable. A5/R0 descriptions now explicitly identify the preserved failing 0.41.6 homepage configuration rather than implying the corrected homepage still attaches the track. Production diagnostic exclusion and generic product failure copy remain unchanged.",
+          "At exact frozen app candidate 4fffdf8ac8bba4be2f346bb28bb8c30e7dc407d4, owner checks passed 43 focused tests across five affected suites, one source-wiring test, typecheck and the strict generated-PDF check. Component media APIs are mocked; these results establish source behavior and regressions, not iPhone playback. The unchanged generic recovery/lifecycle and diagnostic configurations remain covered.",
+          "Current candidate coverage is separate from historical matrix results. Automated phone and desktop homepage DOM scenarios each omit the track while retaining native attributes, CTA, recovery and direct fallback: attempted 2, passed 2, failed 0, untested 0. Deployed operator-browser scenarios are desktop and phone layout, each with native-button and Watch-button start/progress/pause (denominator 4): attempted 0, passed 0, failed 0, untested 4. Actual iPhone homepage native-button and Watch-button playback scenarios (denominator 2): attempted 0, passed 0, failed 0, untested 2. Signed-in/authentication journeys, actual sound output and full-film playback are not qualified by these checks. Satisfaction, confusion and frustration are NOT MEASURED; sample 0. All 136 older entries remain byte-preserved. DEV only; production remains unchanged and held pending actual native homepage acceptance."
+        ],
+        "security": [
+          "No authentication, credentials, telemetry, storage, backend route, proxy setting, dependency, migration, binding, DNS, security setting or deployment-trigger change. The only product change removes the homepage optional track and its associated request/availability copy. Diagnostic descriptions and regression assertions are updated, with normal accepted release identity pins. No Spanish content or audio changes."
+        ]
+      }
+    },
+    {
+      "version": "0.41.6",
+      "status": "candidate",
+      "notes_path": "releases/0.41.6.md",
+      "sections": {
+        "changed": [
+          "PATCH 0.41.6 fixes a diagnostic-page layout defect observed on actual DEV 0.41.5/c059cf0371e192b253f4b3ea37dc1b86a379db89: the imported product shell’s 100vmax box-shadow painted over the comparison heading, instructions and case links on styled cases. The diagnostic-only #player.app wrapper now sets box-shadow:none. Actual media-card/video CSS, the twelve case configurations, media source and homepage playback behavior remain unchanged.",
+          "The independent browser check of the preceding build verified actual A0 and R0 playback/pause in cloud Chrome, but found the overlay on R0 and A3. Playback evidence was two of twelve cases, not full matrix acceptance or native iPhone success. The test link was withheld rather than presenting an obscured page as ready.",
+          "At exact app source b41bac24f9352f780d5f8efa1eb5438e9f49d9d6, 25 focused tests across two matrix suites passed, including a regression applying the inherited page-filling shadow and verifying the diagnostic override. All three production-build regressions passed, preserving removal of old/new diagnostic outputs and generic product failure copy. These are structural/mocked checks, not media decoding or a screenshot-based visual pass.",
+          "Current correction denominators remain separate: twelve structural configurations have automated checks (attempted 12, passed 12, failed 0, untested 0); twelve actual playback scenarios on the corrected deployed browser and physical iPhone each remain attempted 0, passed 0, failed 0, untested 12. Actual DEV visual verification must confirm heading, instructions and all links before the user is asked to test. Human satisfaction, confusion and frustration are NOT MEASURED; sample 0. All 135 older release entries remain byte-preserved. Production is unchanged and held; this is not a claim that the homepage Safari failure is fixed.",
+          "Visual visibility scenarios: a tester must see the heading, instructions and all case-navigation links on each of the six affected styled cases A3, A4, A5, R0, R1 and R2. Evidence class is operator-browser screenshot inspection on the corrected DEV build from app source b41bac24f9352f780d5f8efa1eb5438e9f49d9d6; before that build is deployed, attempted 0, passed 0, failed 0, untested 6. Physical-iPhone visual inspection has the same six-case denominator and remains attempted 0, passed 0, failed 0, untested 6. These visual counts are independent of structural and playback coverage."
+        ],
+        "security": [
+          "The correction changes only diagnostic wrapper CSS and a regression test, followed by normal release identity pins. No new media source, proxy, request, telemetry, storage, authentication, dependency, migration, binding, security setting or deployment-trigger change. Existing DEV-only generation and production purge remain enforced."
+        ]
+      }
+    },
+    {
+      "version": "0.41.5",
+      "status": "candidate",
+      "notes_path": "releases/0.41.5.md",
+      "sections": {
+        "changed": [
+          "PATCH 0.41.5 adds the requested DEV-only two-way homepage-player comparison: A0 and R0 controls plus five cumulative additions and five cumulative removals. Every case is a fresh document with one video, the same immutable same-origin v5 MP4, native controls, inline playback and metadata preloading. It does not replace the homepage player or claim to fix native Safari.",
+          "A1–A3 add the retained poster, optional default-off English VTT and actual card CSS to literal native HTML. A4 adds Svelte construction plus connected-node source initialization, explicitly labeled as a combined change. A5/R0 reuse the real homepage MediaCard and Watch button. R1–R5 remove captions, poster, card CSS, custom playback handlers and explicit source initialization in order. R5 versus A0 compares plain Svelte with parser-created video. The test recreation excludes Live authentication/navigation shell, so a baseline that works while the real homepage fails would leave that surrounding context unresolved.",
+          "The ordinary homepage now uses generic playback-failure/recovery copy instead of numeric media error, ready and network values. Its playback lifecycle and source are unchanged. Dedicated DEV test pages retain local observational state only. Diagnostic source is moved outside the published asset root; the guarded production build deletes both the older diagnostic page and the new matrix, including stale DEV outputs.",
+          "Historical native acceptance at DEV 0.41.4/a72c36fb failed with MEDIA_ERR_SRC_NOT_SUPPORTED, HAVE_NOTHING and NETWORK_NO_SOURCE. The same iPhone previously played both literal diagnostic players at 0.41.3 and its separate two-byte fetch returned 206 with the expected two bytes. These observations support a controlled integration comparison, not a proven transport or component root cause. The intended Transcode service is a separate unresolved delivery track; this matrix continues the existing byte-streaming app relay.",
+          "At exact app source 3bdd25a8dc2f4b900399594b8d142fbfc6959f13, local checks passed 46 tests across six affected suites, three production-build regression tests, typecheck, 975 legacy UI tests and 118 MJS tests with six existing skips. The native media APIs in component tests are mocked. The final exact-head hosted suite, independent review and actual DEV browser verification are release gates, not results claimed by this source-only record.",
+          "Two distinct denominators are tracked. Structural configurations: 12 cases A0–A5 and R0–R5; local automated checks attempted 12, passed 12, failed 0, untested 0, without decoding media. Actual playback scenarios: an iPhone viewer tries native playback on each of those 12 cases, with Watch-button behavior separately noted where present; current candidate deployed-browser and physical-iPhone layers each attempted 0, passed 0, failed 0, untested 12. Structural passes are not playback passes. Human satisfaction, confusion and frustration are NOT MEASURED; sample 0. Production promotion remains held until the actual homepage works on the user’s iPhone and diagnostic surfaces are absent from production output. All 134 older release entries remain byte-preserved."
+        ],
+        "security": [
+          "No new media target, authentication/session access, backend route, proxy setting, dependency, migration, binding, DNS, security setting or deployment trigger change. The matrix uses fixed case IDs and fixed approved media assets; no arbitrary URL input, telemetry, credential collection, storage or response-header probes. Observers print only event labels and native numeric state with textContent; each navigation leaves the previous video document. No automatic playback or simultaneous multi-player load is introduced."
+        ]
+      }
+    },
+    {
+      "version": "0.41.4",
+      "status": "candidate",
+      "notes_path": "releases/0.41.4.md",
+      "sections": {
+        "changed": [
+          "PATCH 0.41.4 changes only the homepage MediaCard resource-selection lifecycle. The approved same-origin film is assigned to the connected native video element and explicitly loaded after mount, rather than selecting a dynamically mutated child source in an imported empty video template. Source updates reselect only when the raw source actually changes.",
+          "Native controls, inline playback, metadata preloading, retained poster, optional English captions, synchronous user-initiated CTA/retry and the original CDN fallback remain. There is no autoplay. Replaced-source and unmount transitions invalidate older play promises; unmount pauses and clears the resource so detached media does not continue playing.",
+          "Historical native evidence at DEV 0.41.3/main 668c40bb7b2d3be354bbc4250ab6f3b3aaa2d514: the user's iPhone Safari decoded both plain diagnostic players and paused around five seconds of the 120-second film, while the homepage still did not play. The user's separate request returned 206, video/mp4, Content-Range bytes 0-1/20195565, Content-Length 2 and two body bytes. That separate fetch is not native-media proof. The diagnostic success narrows the remaining issue to homepage integration or its extras; it does not conclusively identify the failing lifecycle step.",
+          "Local affected checks passed 49 tests across four component/lifecycle suites, plus one source-wiring test, normal Next build and typecheck. New checks assert connected-node selection, no reload for unrelated props/native playing, source-change validation, stale-promise isolation, current native-error reporting and unmount cleanup. Native load/play/pause are mocked in these tests; no native Safari success is inferred. An initial expanded run exposed one stale child-source selector in an existing fixture (48 passed, one failed), corrected before the passing rerun.",
+          "Fixed affected persona/scenario denominator 3: phone visitor starts the overview with native controls; desktop visitor uses the watch CTA; visitor retries or leaves/replaces the player. Local automated layer attempted 3, passed 3, failed 0, untested 0, with mocked media APIs. Current candidate DEV-browser and physical-iPhone layers each attempted 0, passed 0, failed 0, untested 3. Historical plain-player diagnostic success is not current homepage acceptance. Production is not targeted. Human satisfaction, confusion and frustration are NOT MEASURED; sample 0.",
+          "This is a DEV-only compatibility candidate, not a claim that Safari playback is fixed. Actual native homepage testing is still required before production. All 133 older release entries and accepted notes remain intact; unrelated frozen work is excluded."
+        ],
+        "security": [
+          "Each actual source update retains HTTPS or strict same-origin path validation before native assignment. No arbitrary HTML, telemetry, credential reads, authentication/session changes, backend/media-route changes, approved media changes, schema, bindings, security settings or deployment trigger changes. Existing bounded failure diagnostics never expose exception messages, tokens or request URLs."
+        ]
+      }
+    },
+    {
+      "version": "0.41.3",
+      "status": "candidate",
+      "notes_path": "releases/0.41.3.md",
+      "sections": {
+        "changed": [
+          "PATCH 0.41.3 adds a separate native-video diagnostic page at /player-diagnostic.html, without changing the homepage, media delivery route or approved media bytes. Player A uses a literal video src attribute; Player B uses a literal child source element. Neither uses an app framework, poster, caption track or custom playback handler.",
+          "The page observes native playback states with named constants so NETWORK_NO_SOURCE is not mistaken for a count of errors. A user-triggered, credential-free same-origin request for bytes 0–1 displays HTTP status, media type, range, length and received byte count. It times out after ten seconds and cancels an unexpectedly large response after a small bounded read. This fetch is a separate diagnostic, not evidence that the browser media stack succeeded.",
+          "The preceding 0.41.2 DEV release at main 1c50e010bf4eb6057a1c59090a25dc0a3e47d3e0 passed source review and Chrome playback, but the real iPhone Safari embed still reported source failure, no metadata and NETWORK_NO_SOURCE. The same iPhone played both the original CDN URL and the new same-origin URL directly. These observations narrow the problem but do not identify its cause or clear the embedded first-byte request path.",
+          "Local diagnostic fixtures passed four tests: literal native player patterns and no custom initialization; named failure-state observation; user-triggered fixed two-byte request with no credentials; bounded cancellation when the server returns too much data. Existing source-suite evidence belongs to 0.41.2 and is not relabeled as the final diagnostic release checks.",
+          "Fixed diagnostic scenario denominator 3: iPhone visitor plays A; iPhone visitor plays B; visitor runs the separate first-byte response check. Local synthetic layer attempted 1, passed 1, failed 0, untested 2: only the separate request/result behavior is simulated, not native video playback. Candidate DEV-browser and physical-iPhone layers each attempted 0, passed 0, failed 0, untested 3. Production is not targeted. Human satisfaction, confusion and frustration are NOT MEASURED; sample 0.",
+          "This is DEV-only diagnostic publication, not a claimed playback fix. User native testing must inform the next change; production stays unchanged. All 132 older release entries and accepted notes remain intact. No unrelated frozen work is included."
+        ],
+        "security": [
+          "The diagnostic sends no telemetry or report, collects no user data, reads no app credentials or storage, and never changes playback programmatically. Its sole explicit fetch has a hard-coded same-origin public media path and credentials omitted. Response text is rendered with textContent; response bodies are not displayed. No authentication, schema, permissions, bindings, security settings, deployment trigger or external media target changes."
+        ]
+      }
+    },
+    {
+      "version": "0.41.2",
+      "status": "candidate",
+      "notes_path": "releases/0.41.2.md",
+      "sections": {
+        "changed": [
+          "The homepage embeds the unchanged approved v5 film through one fixed same-origin streaming route, /v2/media/overview-8bd9e6de2dcf.mp4. GET and HEAD preserve upstream byte-range status, range and length headers, validators and streamed bytes. The original immutable CDN URL remains the separate direct-open fallback. Native controls, synchronous user-initiated play, poster and optional captions remain.",
+          "Compatible PATCH 0.41.2 is a bounded delivery-path compatibility candidate following main 326a66b6f8faa1ae1f021fa56e5ddb53850a8ed2 (0.41.1). The user tested that prior DEV release twice on iPhone Safari: the embedded player still failed while the same raw file played. A pause icon or loaded poster with 00:00 duration was not counted as playback. Exact native failure cause remains unconfirmed; this candidate does not claim the issue is resolved.",
+          "Failure text adds fixed source/video/play labels and native numeric media-error, ready-state and network-state values, without exception messages or URLs. Same-origin source validation rejects protocol-relative URLs and backslashes; separate fallback links retain the known-working HTTPS media URL.",
+          "Local affected automated checks passed 64 tests across four route/player/component files, plus one source-wiring test, the normal Next build and typecheck. Route fixtures cover the real Worker wrapper, full 200, ranged 206, open/suffix ranges, 416, HEAD, validators, invalid methods, HTML/redirect/encoded-response refusal, fetch failure and streaming without whole-file buffering. Upstream responses are mocked; actual Cloudflare response bytes/headers and native Safari behavior remain unverified at this record.",
+          "Fixed affected persona/scenario denominator 3: anonymous visitor starts the homepage overview; phone-layout visitor starts it; visitor retries or opens the direct fallback after a media failure. Local automated layer attempted 3, passed 3, failed 0, untested 0, without real authentication. Current candidate DEV-browser, production-browser and physical-iPhone layers each attempted 0, passed 0, failed 0, untested 3. Prior 0.41.1 iPhone failures are historical defect evidence, not current candidate passes. Human satisfaction, confusion and frustration are NOT MEASURED; sample 0.",
+          "The existing connected main-to-DEV workflow must publish and verify this candidate before the user tests native iPhone Safari again. Production stays held until that test succeeds. All 131 older release entries and accepted notes remain unchanged; unrelated frozen work is excluded."
+        ],
+        "security": [
+          "The new public read-only endpoint fetches only the hard-coded approved film URL. It forwards only Range and If-Range, never client Cookie, Authorization, Referer, Origin or query-selected targets; redirects are rejected. Unexpected non-video or encoded media responses return a generic 502. Range errors preserve 416 and the validated total length while discarding upstream error bodies and content types. Responses are streamed with no-store caching and nosniff. This is not an arbitrary proxy.",
+          "No authentication/session/invitation/report behavior, schema, bindings, persistent credentials, deployment triggers, DNS, WAF, cache rules or CORS settings change. No autoplay or crossorigin attribute is added. Approved video bytes, poster and caption assets are unchanged. Required independent external-call security review, final exact-head checks and live verification remain separate gates."
+        ]
+      }
+    },
+    {
+      "version": "0.41.1",
+      "status": "candidate",
+      "notes_path": "releases/0.41.1.md",
+      "sections": {
+        "fixed": [
+          "The homepage overview initializes an explicit video/mp4 source with metadata preload. Empty or failed media is loaded and played synchronously inside the user click before focus or scrolling; playback is never automatic. The approved v5 MP4, poster and optional same-origin captions are unchanged.",
+          "Player recovery separates an activation denial from a real media failure, ignores interrupted or superseded play requests, offers an explicit retry button and retains the direct-video fallback. Native media error codes are shown when available. These changes correct reproducible recovery-state defects; they do not yet prove the reported iPhone Safari embedded-playback failure is resolved."
+        ],
+        "changed": [
+          "Compatible PATCH 0.41.1 is limited to homepage media initialization and recovery. Baseline main 8a5d7d427937216396dd49c2d079eee5fdd2d4d2 and production b3a1a134eed7fdbe0da853fe35cb73cf09be80d8 share product tree 5b34504f75c258bf4ee135c59e9618952a0c3597. All accepted older release records remain unchanged.",
+          "Four new component regression cases failed on baseline and passed after the correction: synchronous first-load/play; interrupted request; stale rejection after later success; activation denial and media-error retry. Final focused component suite passed 40/40, overview source wiring passed 1/1, and the normal Next build plus typecheck passed. These are local automated fixtures, not Safari browser acceptance. Required exact-head hosted checks and final independent review remain separate gates.",
+          "Fixed affected persona/scenario denominator 3: anonymous visitor starts the overview; returning facilitator starts it on the phone-layout fixture; visitor recovers interrupted or failed playback. Local automated component layer attempted 3, passed 3, failed 0, untested 0; it does not exercise real authentication. Candidate DEV browser, production browser and physical-iPhone layers each attempted 0, passed 0, failed 0, untested 3. On the previous 0.41.0 release, the real user reported iPhone Safari embedded playback failed while the same raw MP4 played. That is the defect report, not a candidate pass. Human satisfaction, confusion and frustration are NOT MEASURED; sample 0.",
+          "The user will test a verified DEV deployment on native iPhone Safari before production promotion. Exact embedded failure cause remains unconfirmed: Chrome positive controls and same-device raw-file playback do not establish embedded Safari success. No Cloudflare cache, CORS or security configuration is changed. Remaining unrelated presentation P2s stay outside this fix."
+        ],
+        "security": [
+          "No authentication, session, invitation, report, backend API, schema, permissions, persistent credentials or deployment-trigger changes. Public media URLs and bytes remain pinned; no autoplay, crossorigin addition or personal data transmission is introduced."
+        ]
+      }
+    },
+    {
+      "version": "0.41.0",
+      "status": "candidate",
+      "notes_path": "releases/0.41.0.md",
+      "sections": {
+        "added": [
+          "The approved v5 two-minute overview plays in the Landing media card with native controls, keyboard start, full-image containment, optional same-origin English captions and direct-video recovery links. No autoplay. The immutable v5 film replaces the earlier 5d92 film; the latter remains the media rollback target."
+        ],
+        "changed": [
+          "Ordinary root entry defaults to Next. The existing toggle and explicit legacy access remain. Existing survey, invitation, report, project and return links retain their bytes and handlers. Sign-in callbacks preserve tokens, selected UI and pending invitation continuation. A confirmed P2 at dae20899 lost the legacy return choice on a second sign-in after same-document account switching. Additive fix b4f1bdc9 re-arms one-use intent at each actual legacy Access/email link or form action. Independent source and three real-DOM two-callback scenarios found the fix correct; the exact published tree has zero tracked differences from the reviewed artifact. All four attached hosted checks completed successfully.",
+          "MINOR 0.41.0 is separate from the accepted report 0.40.0 increment. Published product source b4f1bdc90b44b3b45f9c711098ad976335f70ed1, tree 4713845ca9aabfb7a533d29d3812b9d8e04762d7, is an additive successor of v5 source dae20899 on app PR #619. It is a product checkpoint with inherited 0.40 packaging, not a deployable 0.41 identity. The final app must pin the accepted immutable 0.41 record.",
+          "Independent source review found no material issue in the two-file v5 delta at dae20899/tree 285414dd. Its local checks passed 15 entry/embed tests, 36 embedded component tests, 974 UI tests, 116 MJS tests with 6 pre-existing skips, typecheck and Next build. Full local Vitest was interrupted after remaining at its RUN banner; it is not a pass. Hosted run 42403101623 completed four CI jobs successfully, including 2,374 Vitest tests passed and 3 pre-existing skips; review-provenance passed in run 42403495767. All five attached checks completed. These receipts are historical, not final release identity evidence.",
+          "The published repeat-auth correction matches the frozen five-file artifact with local focused/DOM 18 passes, UI 975 passes, MJS 118 passes with 6 pre-existing skips, and Next build success. Independent review found no issue and separately verified Access link, email link and native email-form second callbacks. The initial source-archive typecheck lacked generated identity files and failed; after binding real b4 Git history, the normal stamp/build/typecheck lifecycle passed. Strict PDF generation now passes with a normal dependency installation; the prior symlinked installation differed only in dependency-path comments and did not change product source. Current-head run 42404390318 completed all four attached checks successfully: ci, ui-test, mjs-test and test. Full Vitest passed 2,374 tests with 3 pre-existing skips across 186 passed files and 1 skipped file. No review-provenance check is yet attached to b4, and formal final approval remains pending.",
+          "Exact v5 bytes passed SHA-256, format and full-decode checks. Direct public Chrome playback advanced with no media error; native pause and keyboard resume worked. All 261 normalized narration words match 37 VTT cues. ASR timing is usable, not frame-exact, and does not constitute a full independent human listen. The retained poster is a generic title card, not an extracted v5 frame.",
+          "Current v5 embedded-browser matrix has four product scenarios: desktop/light, desktop/dark, phone-width/light and phone-width/dark. Product-scenario totals: attempted 0, passed 0, failed 0, untested 4. Two preliminary desktop/light navigation attempts could not reach the preview, so no product scenario began and no product behavior was observed. Direct CDN playback is separate evidence and not an embedded-player pass. Actual embedded behavior must be checked on reachable DEV before production acceptance.",
+          "Fixed persona denominator 3: anonymous visitor overview; returning facilitator fixture sign-in/project navigation; private invitee fixture acceptance/legacy access. Historical local source 0f713638bc299b03ef5ebba15f5b41f1cfabb7ef browser-fixture layer attempted 3, passed 3, failed 0, untested 0; two direct-entry regressions passed 2 of 2 and are not extra personas. On current v5 source, each local end-to-end persona, hosted/provider, production and physical-device layer has attempted 0, passed 0, failed 0, untested 3. Historical fixtures do not prove current v5 or repeat-auth behavior. Human satisfaction, confusion and frustration were not measured, sample 0.",
+          "Known non-major cold-root legacy-module and changelog loading remains a follow-up without a measured latency claim. The accepted 0.40 notes and all older feed entries remain byte-for-byte unchanged. Optional Transcode qualification is not a dependency for the approved direct-CDN film."
+        ],
+        "security": [
+          "No backend authentication, cookie, permission, invitation issuance or expiry, report data, CDN CORS or security-setting change. Public MP4 and poster URLs remain immutable. Caption bytes are verified and served same-origin, default-off to avoid automatic duplication of burned-in captions."
+        ]
+      }
+    },
+    {
+      "version": "0.40.0",
+      "status": "candidate",
+      "notes_path": "releases/0.40.0.md",
+      "sections": {
+        "added": [
+          "Summit numeric reports and exports render from one response through the explicit reversible SUMMIT_ONE_RESPONSE_REPORTS flag across current and Next interfaces. Next Detailed and full PDF add each perspective’s genuine subdimension radar without zero-filling missing axes.",
+          "Future reports atomically capture active selected perspectives; saved selection determines selected-but-unanswered labels. Unsupported historical selection stays unknown; no backfill or migration."
+        ],
+        "fixed": [
+          "Canonical no-translation-brief amendment and status qualification require exact question/source identity. Custom or unqualified no-brief cannot acquire canonical meaning; historical answers and renderer behavior remain preserved.",
+          "Categorical findings retain the production floor of three independently of numeric floor one. Empty/suppressed categorical presence, public contract declarations, immutable report identity, PDF provenance and pagination are covered by local regressions."
+        ],
+        "changed": [
+          "Candidate 0.40.0 is a MINOR classification for changed schema/accepted behavior. This is the existing 0.40.0 slot, now qualified for combined #611/#614 source. It does not rename the corrected 0.39.2 QR release or admit the unshipped 0.39.1 entry.",
+          "Source checkpoint 611be728bd7b49fea7769e7cefeb711bd515c714 merges current main 1c86bd4ef9d58ff67740856338b17f414af8515b and published canonical-status correction 9a449e87abf0e96373ee195588f67cf29c950621. No shipped/DEV/production acceptance is claimed for this combined candidate.",
+          "Persona/scenario scorecard at combined source 611be728bd7b49fea7769e7cefeb711bd515c714 (runtime evidence at byte-equivalent 3b0191fb924415abcccc735a9f7abb37d3516e93): S1 translator/facilitator canonical no-brief and custom negatives; S2 facilitator/authorized report reader one-response flow and PDFs; S3 authorized report reader categorical privacy and immutable history; S4 authorized report reader normal 12-response named PDFs/pagination. Fixed denominator 4 local automated synthetic scenarios: attempted 4, passed 4, failed 0, untested 0. Hosted DEV, production, physical-phone and print layers each: attempted 0, passed 0, failed 0, untested 4. Human satisfaction/confusion/frustration NOT MEASURED, sample size 0; no comparable human baseline. Component suites overlap and are not extra persona totals.",
+          "Superseding source qualification proposal: app e287f37fafb769bf826bfc8cb1208ce3d121cf42 includes rebased QR behavior and fixes legacy missing report selection falsely becoming known-empty; explicit saved-empty remains known. Prior b854 local evidence:16 suites/376pass/2skip/0fail; historical c946 local affected evidence:16 suites/383pass/2skip/0fail; final e287 local affected evidence:16 suites/384pass/2skip/0fail, final typecheck/PDF freshness pass. Latest c26 P2 correction/comment and additional model-selection regression retained; executable app source unchanged from c946. Latest six-file delta adds canonical Q1 wording derived from same-instrument Q2, exact church-status identity and conditional amendment provenance; no direct upstream Q1 option is claimed; old endpoint control2fail/2pass, corrected4pass; typecheck/PDF freshness pass. Original four-scenario evidence remains inherited at3b0191f, not rerun at this source; exact-source complete scenario and hosted/physical layers each0attempted/0passed/0failed/4untested; human metrics NOT MEASURED/sample0. Same0.40.0 candidate; expanded source requires new canonical acceptance and final packaging, not strict611be equivalence or DEV/production delivery."
+        ]
+      }
+    },
+    {
+      "version": "0.39.2",
+      "status": "candidate",
+      "notes_path": "releases/0.39.2.md",
+      "sections": {
+        "fixed": [
+          "Bulk paper-survey printing retains each existing Next survey URL and QR instead of showing a false missing-link fallback. Individual/current root-link printing remains supported.",
+          "The print dialog no longer promises an access code on each paper."
+        ],
+        "changed": [
+          "PATCH:existing tokens, participant destinations, bindings, permissions and expiry remain unchanged; no replacement link is issued by this correction.",
+          "Local synthetic qualification:seven distinct forms;16A4/Letter PDFs/168pages;28of28rendered QR codes decoded exactly. Full app2303pass/3skip, Next1121pass, legacy962pass, MJS101pass/6skip; overlapping suites. Human satisfaction/confusion/frustration NOT MEASURED. Hosted actual-seven and physical-device acceptance unverified.",
+          "Independent bulk-print increment only; no no-brief/report-selection/radar/one-response/footer or UI-default timing change. Candidate release packaging and DEV/production gates remain.",
+          "Production review before shipment found a malformed backslash authority edge case; correction b853161673a81ac16e718d7bf347d381f7f5ace5 explicitly refuses it. Automated local synthetic evidence on macOS/Node in the isolated task6 worktree: S31 10pass and seven-survey integration 2pass. Corrected CI, hosted DEV and production qualification remain pending; corrected main/DEV and fresh production review/checks remain required. Valid existing URLs and QR payloads unchanged. Corrected product source b853161673a81ac16e718d7bf347d381f7f5ace5 current persona denominator3: automated local synthetic macOS/Node HTML layer attempted1/passed1/failed0/untested2; S1 seven-form HTML PASS, S2 rendered-paper scan UNTESTED, S3 individual PDF/browser UNTESTED. Corrected CI, hosted DEV, production and physical-device layers each attempted0/passed0/failed0/untested3. Historical8890a707b6a8ff3da2a5af763b12bd273631eb79 PDF/QR evidence remains provenance only; human metrics NOT MEASURED/sample0.",
+          "Superseding technical qualification snapshot: automated GitHub Actions ubuntu-latest/Node22 CI at exact reviewed source 30d5bc603b3c6b4cf343c45ced4306160b332c03 passed2303tests/3skips. Tree-identical merge b6be7042838d6b971f5d43625813f8a016fd4fde deployed via successful connected DEV push-event build248cb042-505b-4974-8d6a-b673f44240b9; health0.39.2+b6be704 matched commit/buildUUID/canonicalf1e082f3e5e4b37fc62001cd16f7cdaf51f3a8ee, D1ok. Read-only hosted synthetic helper smoke passed7exactNextURLs/root/invalid/missing/backslash checks. This supersedes earlier pending technical CI/DEV statements; complete hosted persona/physical scenarios remain untested, distinct from helper checks. Scoped exclusion keeps historical unshipped0.39.1 out of current0.39.2 public surfaces. This metadata follow-up still requires final packaging review/checks/DEV qualification then production615; no production or physical pass is claimed.",
+          "Persistent historical exclusion correction: unshipped0.39.1 has included_in_product:false as well as the historical0.39.2 exclusion. A version bump alone cannot admit unmerged candidate claims; only a reviewed product inclusion may change that flag. Same current0.39.2 output and product source; no feature, dependency, version or permissions change. Metadata follow-up qualification remains separate from prior exact-source technical snapshots."
+        ]
+      }
+    },
+    {
+      "version": "0.39.1",
+      "status": "candidate",
+      "included_in_product": false,
+      "excluded_from": ["0.39.2"],
+      "notes_path": "releases/0.39.1.md",
+      "sections": {
+        "fixed": [
+          "TR-Q2 and ML-Q2 include the canonical no-translation-brief choice for everyone using those shared surveys, including existing survey links, assisted entry and printed forms.",
+          "Newly built reports show no translation brief, no prior agreement and not aware as findings excluded from translation-type comparison. Other remains excluded and historical answers keep their original meaning.",
+          "Translation-type categories, status findings and match verdicts respect immutable report perspective counts and the configured minimum in API/MCP and every report screen; newer live counts cannot lift suppression."
+        ],
+        "changed": [
+          "Source amendment: Decision 25 at 605edb47d2280568f0f5860f7b1921c12a814222. Historical template versions/capture hashes remain unchanged; new submissions and reports record the amendment pin. A new scorer identity separates new reports from the exact historical renderer used to read old reports.",
+          "Automated local synthetic fixtures, environment local source/Miniflare D1; exact tested app head 5cdb3b70f69e7e2d5c05c6e7d4461eb10f91419a. Fixed denominator 3 named scenarios: translator/facilitator answering existing TR-Q2 or ML-Q2; report reader comparing perspectives; authorized reader reopening an old report. Attempted 3, passed 3, failed 0, untested 0 at that local layer. Final exact-head full suite 2313 passed/3 skipped/0 failed; UI966 passed; Node101 passed/6 skipped. Suite totals overlap and are not persona totals. Hosted DEV, production and physical-device surfaces: each 0 attempted/0 passed/0 failed/3 untested. Satisfaction/confusion/frustration NOT MEASURED, sample size0. Independent general code review passed; required security review, cookbook acceptance and hosted release validation remain pending."
+        ]
+      }
+    },
+    {
+      "version": "0.39.0",
+      "status": "released",
+      "notes_path": "releases/0.39.0.md",
+      "date": "2026-11-05",
+      "sections": {
+        "added": [
+          "The existing stored-report PDF endpoint accepts explicit overview and detailed formats, rendered through the actual Next report components and styles. Full remains the default and an explicit fallback.",
+          "Public Roadmap shows the public work feed as Past / Now / Future beside shipped version history, with honest empty and error states.",
+          "Verified super admins get a compact Personal / Support selector beside the account control; ordinary and unknown accounts see no switch."
+        ],
+        "fixed": [
+          "Overview and Detailed downloads select their named document instead of both returning the full legacy report. The file names distinguish the named formats; repeated preparation and format/session changes retain stale-file protection."
+        ],
+        "changed": [
+          "PR606 persona/scenario scorecard backfill: fixed denominator 3 — S1 facilitator discovers workspaces/projects through Next Home, phone menu, Workspace and Projects without cross-project review listings; S2 authorized project member opens a project and reaches its permitted reviews; S3 authorized aggregate reader cannot infer a below-minimum respondent group from a multi-select option complement. Exact released source f83b886c9790bf57847b7cf4c86001cfb740222a. For each of local complete persona journeys, hosted DEV, hosted production and physical phone/PWA: attempted 0, passed 0, failed 0, untested 3. All three scenario outcomes are untested at those layers; inherited source inspection and isolated synthetic regression cases are separate technical evidence, not complete scenario passes. Known assessment-only invitee entry and archived-review discovery limitations remain open; zero measured failures does not mean no defects. Evidence class for this backfill is source/document inspection, not operator browser or real-human study. Satisfaction, confusion and frustration NOT MEASURED; sample size 0; no comparable baseline delta.",
+          "PR606 shipped in production source f83b886c9790bf57847b7cf4c86001cfb740222a: Next Home, phone account menu, Workspace and Projects list projects/workspaces; review listings remain inside an opened project. Global review Explore/search is removed. Corresponding current-UI discovery paths are also project-scoped. Aggregate counts and direct review links remain; assessment-only invitee entry and archived-review discovery were carried as known limitations, not resolved acceptance.",
+          "PR606 also conservatively holds a multi-select question when an option complement (answered minus count) is a small cell below the configured minimum. This corrects internal question-results preparation; public question-result disclosure remains held. No new authorization, schema or data migration is implied.",
+          "Scoped evidence: app PR606 merged as 5f9226ee562b3cb549ca4fdbb7a907708d8ffde6 and was promoted by PR609 as f83b886. Exact production-source inspection confirms project-only Next Home and complementary-cell suppression in src/question-results-projection.ts. PR606 regression evidence includes test/ui-next-assessments-inside-project.test.ts (8 tests) and test/pdf-question-results.test.ts complementary-cell cases; its independent review recorded held small complements and ready balanced/unanimous cases. These are inherited source/local synthetic checks, not new hosted persona/device acceptance. Existing production health identity receipt remains separate.",
+          "Release-status correction 2026-11-05 supersedes the historical candidate statements below: production app PR609 merged f83b886c9790bf57847b7cf4c86001cfb740222a and health at 2026-11-05T18:52:14Z reported 0.39.0+f83b886, D1 ok. This is runtime identity evidence, not signed-in, named-PDF or device acceptance. Earlier qualification and candidate statements remain historical provenance.",
+          "MINOR under the major-zero policy for the additive accepted HTTP format selector. Candidate against accepted main 7390415197aad5c7fb3dec618b1572a4f8333071; no released-status, formal approval or deployment claim.",
+          "Existing authorized stored reads, current suppression, server-owned perspective floors and full-report fallback remain authoritative. No scoring, new report creation, migration, public question-results cells/capability, excerpt disclosure, credential, subscription or runtime-configuration change.",
+          "Local genuine PDF evidence covers two distinct synthetic snapshots: one-page overview and four-page detailed documents, matching same-model Next labels and counters. A three-page single-perspective report is a different model. Hosted new-format and physical installed-PWA acceptance remain pending.",
+          "Qualified source 064aefdda1eb4f3f1dcf42fd623ac85c9a83c200, tree 2ef5348765d603f646205d91af3103c5e60fc0f4. All 44 accepted PR594 files remain byte-identical. PDF delta remains 19 files. Local affected tests 42 passed with actual PDF/Workers evidence; eight download helpers passed; type/build and generated freshness passed. Denominators overlap and are not human persona-completion totals. Packaged local qualification head e3762c687c141b84c5bb83de8b1edc00c53dd42a passed 58 tests with one skip; eight helpers passed; Node tests 101 passed/six skipped. Final-head identity/layout checks 18 passed/one skip overlap those checks.",
+          "Independent native bounded review at e3762c687c141b84c5bb83de8b1edc00c53dd42a PASS: 22 tests passed with one existing skip; accepted PR594 product/PDF source, SSR body, prior release history and record hashes preserved. Roadmap regeneration and immutable published-pin metadata are finalized separately, requiring fresh exact-head checks and bounded metadata review. Built local; Reviewed product source. DEV serves 0.39.0+0d35fdd (health verified 2026-11-04, after the 0.38.2 back-merge); authenticated, named-PDF-format and installed-phone smoke on DEV are not yet verified; production new formats pending.",
+          "Shared Improve resources are filled from the supplied Pathways catalogue (40 links, 38 unique destinations; one unrelated supplied link excluded). Destination fit is mostly unverified.",
+          "Persona/scenario outcomes for added changes (sample size 0, all scenarios untested): Pathways PR593 denominator 4 \u2014 S1 map loads / S2 contextual fit / S3 excluded destination off map / S4 Improve without scoring change \u2014 0/0/0/4; Roadmap PR598 denominator 4 \u2014 S1 Past history / S2 Now empty-or-error / S3 Future real items / S4 375px+1280px usable \u2014 0/0/0/4; Personal/Support PR599 denominator 4 \u2014 S1 super-admin compact control / S2 no switch for ordinary accounts / S3 no Sign-in beside verified mode / S4 phone viewport light+dark \u2014 0/0/0/4. Automated evidence kept separate and is not scenario completion.",
+          "Release runbook leads with the current operating checklist (documentation only).",
+          "Record correction: Global Access browsing (0.36.0 candidate, app PR552) shipped to production inside 0.37.0; the 0.36.0 and 0.37.0 records did not say so."
+        ]
+      }
+    },
+    {
+      "version": "0.38.2",
+      "status": "released",
+      "notes_path": "releases/0.38.2.md",
+      "tag": "v0.38.2",
+      "date": "2026-11-04",
+      "sections": {
+        "fixed": [
+          "Next account navigation opens over the mounted destination using a bounded fresh identity read, and closes without repeating destination aggregate reads. Menu failures and retries remain local.",
+          "Same-context updates retain the displayed route and model with local pending or error state. Closing a menu discards superseded snapshot reads while preserving active mutation busy state, confirmed readback and Undo; late success and failure cannot replace another requested route.",
+          "Public Landing and Projects use their actual destination structure during initial reads. Projects fences old child/create completions and offers reversible All projects or With responses filtering with shown/total, reset and unknown-count visibility; existing human context labels distinguish duplicate names.",
+          "Missing-report presentation distinguishes collected responses from a saved report using the displayed authorized model, without new reads, automatic builds or PDF changes.",
+          "Later bounded corrections separate participant entry from facilitator session/chrome and keep changing preview/build outcomes in a polite atomic live-status region.",
+          "Verified menu identity retains its server-served level minimum. Workspace write rejections are not reported as saved or restored; confirmed writes with failed authoritative view reads are reported as saved but unverified, including completion while the account menu is open.",
+          "Phone project/review management menus carry their explicit entity scope and return to the mounted origin. Menu Close preserves real Back history and displayed anchors; the overlay follows stored viewer theme and live theme-radio changes."
+        ],
+        "changed": [
+          "Compatible PATCH from accepted 0.38.1, app PR597. The original reviewed product source was dc964eeb369711b2209d5e18f1e39358d007b33d, tree b1dbbb5e8ae3e7997058e35d1952bb4d54e53ceb. That source remains historical provenance; it is not the corrected functional-source checkpoint identified below. Authorization, My/Global scope, disclosure and mutation authority remain unchanged; no API, schema, migration, credential or response-data change.",
+          "Historical bounded persona scorecard at the original product checkpoint: anonymous visitor opening public Landing and verified facilitator using account-menu/update lifecycle. Automated local component and synthetic GET-only browser evidence: 2 named scenarios attempted, 2 passed, 0 failed, 0 untested within that fixed two-scenario scope. Facilitator viewport repetitions are not added to the persona total. Member, view-only, project-only and participant workflows were not qualified as complete persona journeys. Hosted persistence and physical installed-PWA acceptance remain unverified.",
+          "Historical dc964eeb checkpoint: 1137 UI tests across 70 files, typecheck/guarded build and lint passed; independent native review passed 19 lifecycle checks. Source CI41209525126 passed all four jobs. These results cover that historical source, not later correction heads.",
+          "Historical packaging checkpoint 7a7808cc6187fb2727af8e1f5764d9980f804961, tree dc5f86007ac8a82f005eecec8c543c6297bca8b2, pinned accepted cookbook snapshot 0e0c2b6d5d55041e45089da735730246b1c893f6. Its six-file metadata-only delta preserved dc964eeb product bytes. Independent canonical and packaging review passed; exact-head version/roadmap-metadata tests passed 37 with one existing skip, roadmap Node tests passed 11, and CI41214046993 passed all four jobs. That pin and those results remain historical and do not pre-accept a future repackaging commit.",
+          "Historical correction checkpoint e81b532d958d6f16b6fd83cc4e728d0b83575f10, tree 60eb51ebbbe1f3dbb86ad41af285a576b0b5b6a0: participant-boundary and announcement corrections passed 89 author-targeted tests. Independent original-finding review passed 62 affected cases and a negative control restoring the earlier files failed eight new cases. CI41218930675 passed all four jobs. Later findings at this checkpoint are preserved as superseded findings, not erased by that scoped acceptance.",
+          "Historical correction checkpoint 388837e50ab5c2d464cccd78610cdb50baf47071, tree 92e32c9bc5ab0630cfc806a8f9be09cbb662b28d: author affected tests passed 98; independent native review passed 59 distinct action/menu/cache-policy cases. Local Chromium at actual 390x844 and 1280x844 separately confirmed served minimum 1 and real Back traversal using synthetic GET-only fixtures. CI41245357113 passed all four jobs. Subsequent write-success/readback-failure, management-origin and overlay-theme findings at this source are corrected at the next checkpoint; its earlier 59-case acceptance remains scoped historical evidence.",
+          "Corrected functional-source checkpoint fc7250be1ec1d3978fd0df9bd913787fb4c922be, tree 147f1075579b45f31da71dee7fe0f28cf9872ae7: frozen author checks passed 103 targeted tests across five files, typecheck/guarded build and lint with zero violations in 228 scanned files. Existing independent native local review passed 58 actual cases and closed the three functional findings. A negative control restoring only the old EntityTools after the actual management heading caused both origin cases to fail. These counts overlap earlier suites and must not be summed into a persona or full-product completion score.",
+          "At the corrected functional-source checkpoint, fc7250be was local-only and had no remote CI or formal GitHub approval. Its six existing packaging files remained byte-identical to the accepted 0e0-based 0.38.2 package. A later canonical backfill commit and app pin/packaging commit have not been predetermined or accepted by this record. Their actual immutable hashes, fresh exact-head CI and independent metadata review must be observed through the normal release chain; no circular final-package SHA is asserted.",
+          "Subsequent functional-source publication checkpoint: fc7250be1ec1d3978fd0df9bd913787fb4c922be was pushed normally to existing app PR597, and CI41246976817 (run537) completed all four jobs successfully: test, mjs-test, ci and ui-test. This verifies that same functional tree147f1075579b45f31da71dee7fe0f28cf9872ae7; it does not pre-accept a later canonical backfill or app metadata/packaging head. No canonical backfill publication, app-copy/pin change, formal approval, merge, tag or deployment occurred at this checkpoint.",
+          "Evidence classes remain automated/local component, controlled synthetic HTTP/browser and independent native review. The new management-origin, view-verification and theme cases are targeted regressions, not fresh hosted persona acceptance. Satisfaction, confusion and frustration NOT MEASURED; human-study sample size 0. No real responses, credentials or grants were created for these checks.",
+          "Built local and independently reviewed bounded corrected functional source; canonical backfill acceptance, publication, new pins and packaged-head checks remain pending at this checkpoint. DEV live 0.38.2+7b45749 and Production live 0.38.2+48c3a1f (2026-11-04; see C2 receipt). The separate compact Personal/Support chrome continuation, white iPhone top-band investigation, roadmap work and unshipped 0.39.0 PDF format candidate remain excluded."
+        ]
+      }
+    },
+    {
+      "version": "0.38.1",
+      "status": "candidate",
+      "notes_path": "releases/0.38.1.md",
+      "sections": {
+        "fixed": [
+          "The Next phone workspace/account menu renders its live navigation rows, reopens after dismissal, and reaches usable account actions even when optional review history is delayed or unavailable. Identity-read failure remains a bounded retryable state.",
+          "Projects displays the server-scoped submitted survey response total alongside its review total. Missing or malformed counts remain unavailable; project membership does not imply access to every review.",
+          "Assessment-only deletion no longer mistakes a now-inaccessible parent for an uncertain delete. Lifecycle controls offer adjacent stages and archive only when the existing direct-assessment and effective-project authority intersection permits it.",
+          "Current and Next workspace grouping choices use caller-scoped eligibility for direct project ownership and direct ownership of every contained assessment. Existing atomic mutation authorization remains authoritative.",
+          "Action-plan and next-step sharing state the recipient sign-in/access requirement. Printed and displayed action-plan QR codes encode the actual review URL instead of fixture bits.",
+          "Browser acceptance rejects actual Loading content and Loading review content frames, blank shells and failed account-menu interactions instead of reporting a completed journey."
+        ],
+        "changed": [
+          "Compatible PATCH correcting eight audited UI gaps plus one acceptance-harness blind spot from production 0.38.0. Current UI remains the default and Next remains explicitly opt-in.",
+          "Local component, isolated D1 and mocked-HTTP browser evidence is recorded separately from hosted authentication/persistence and installed-phone PWA acceptance. No production data, real survey responses, access grants, email or scoring/disclosure policy is changed.",
+          "Facilitator/owner, collaborator/member, view-only, project-only owner and anonymous participant-shell browser fixtures:33 attempted,33 passed,0 failed,0 untested against the fixed affected-scenario denominator. Separate identity failure/retry3/3 and plan-sharing4/4 supplements are not added to33; two plan cases repeat desktop checks. Chrome156, actual routed UI with intercepted synthetic HTTP; not hosted authorization, real-store persistence, full canonical persona completion or physical installed-PWA acceptance. Satisfaction, confusion and frustration NOT MEASURED.",
+          "Product source e7f62610e3927eb20b9de02faf8e67590d2327de, tree3d374cccaf0ce052a798e7391d6fec024ba414b0: local full2262passed/3skipped, current-UI950passed, separate Node101passed/6skipped, build/typecheck and lint passed. Fresh independent114targeted checks found no material defect. Software denominators overlap and are not persona-completion totals. These precede packaging; exact packaged-head CI and protected review remain required. Built local; Reviewed local independent only; DEV live pending; Production live pending."
+        ]
+      }
+    },
+    {
+      "version": "0.38.0",
+      "status": "candidate",
+      "notes_path": "releases/0.38.0.md",
+      "sections": {
+        "added": [
+          "Integrated Next project and workspace discovery, scoped saved views, contextual account and People navigation, persisted review plans and durable completion, selected-report history and complete saved report details, confirmed lifecycle and invitation workflows, survey-link management, and explicit print return paths.",
+          "Workspace roles reach contained assessments and permitted reports without per-assessment invitations. Direct project grants alone do not open assessments; direct-owner delegation/deletion, viewer restrictions, report-build policy and production disclosure thresholds remain enforced.",
+          "Next sharing includes existing email drafts, survey-link previews/revocation and one-time access-code issue, copy, export and same-session print with context/principal checks and plaintext-window cleanup. Survey/report PDF downloads use the configured renderer with an honest print fallback."
+        ],
+        "fixed": [
+          "Retained survey selections follow survey IDs across review changes. Async completion stays with its initiating review and principal, rereads current cookie-session identity before mutations and preserves notes saved during stage advancement.",
+          "Access/history controls render inside the themed screen shell; loading uses scoped skeletons. Printed reports include supplied provenance without expanding the on-screen disclosure."
+        ],
+        "changed": [
+          "Compatible additive MINOR candidate from the 0.37.2 DEV baseline. The workspace-inheritance source previously excluded from 0.37.2 is included in this product; the unshipped 0.37.1 version identity remains historical and is not separately published as released.",
+          "The current UI at / remains the default; /next/ retains the existing explicit opt-in. No default rollout, production promotion, schema migration, seed replay or report-scoring policy change is introduced by this packaging correction.",
+          "Facilitator automated/local persistent D1 qualification at app d85c023db50d2d79812a35046f44a824fac1a434: two fixed journeys attempted, two passed, zero failed and zero untested, covering create/edit/readback, repeated completion, runtime reopen and authorization negatives. This bypasses HTTP authentication at the synthetic dispatcher fixture boundary and is not hosted/browser-reload/device acceptance.",
+          "Operator automated/local aggregate at the same product source: 2111 tests passed and three skipped; separate legacy suite 948 passed; additional Node suite 101 passed and six skipped. These overlapping software suites are not combined or counted as persona/UI completion. Twelve bounded mock layout scenes passed their layout checks at 169713228d739e345c5193100ce8aa15fddd4f99; no satisfaction, confusion or frustration study was performed: NOT MEASURED.",
+          "Built: implemented product source with local evidence. Reviewed: independent source/delta findings corrected, formal exact-head approval pending. DEV live: pending; Production live: pending. Hosted persisted-write/readback/reload, installed-phone PWA, external PDF binding and full 262-action qualification remain unverified.",
+          "Remaining boundaries: N05 isolated persistent practice-copy capability; N06 copy-specific simulation/clear/delete and retention contract; N08 reserved recommendation proposal/review service; N09 supplied curated resource rows absent; N17 assisted collector authorization held under D6. Static samples and responsive screenshots do not satisfy real-store or installed-PWA outcomes."
+        ]
+      }
+    },
+    {
+      "version": "0.37.2",
+      "status": "candidate",
+      "notes_path": "releases/0.37.2.md",
+      "sections": {
+        "fixed": [
+          "UI Next screens at `/next/` (Landing, About, Home and lane screens) now use the phone layout on viewports narrower than 720px instead of only when the link carries `?w=phone`, and switch when the window crosses that width; `?w=phone` and `?w=desktop` still force a layout.",
+          "Next UI results and report navigation starts independent reads together, and following an in-page anchor no longer repeats data reads. Existing access checks, required-read errors, explicit report-build confirmation and current UI default are preserved. Automated and local synthetic evidence is distinct from pending DEV and production verification."
+        ],
+        "changed": [
+          "The UI Next preview at `/next/` is built by the standard typecheck and test steps on all branches, including production. Production compiles out fixture galleries and mounts the live app; the current UI at `/` stays the default, with an explicit \u201cTry the new design\u201d menu opt-in.",
+          "Cumulative source includes the existing PR554 build integration, PR574 responsive layout and PR576 production opt-in alongside PR581 navigation performance. Workspace inheritance from the separate unmerged 0.37.1 candidate is excluded. Automated/local evidence and unmeasured physical-device or real-human outcomes remain distinct from pending deployed acceptance.",
+          "Inherited PR576 report behavior is unchanged from the existing production source: DEV uses one-response report/per-perspective floors; production retains its existing disclosure gates and thresholds. Report-build admission, member grants, viewer eligibility, pre-close access and coverage cues remain source- and environment-specific; their six-scenario fresh acceptance denominator is explicitly untested here.",
+          "At app c88df937, Operator automated/local production-build and menu-opt-in checks passed 2/2; Facilitator automated/local responsive-layout checks passed 15/15, with zero failures. The six inherited report scenarios (Facilitator/member: DEV floors, member build admission, pre-close access and coverage cues; Facilitator/viewer: eligibility; Operator: production disclosure and threshold retention) have 0 attempted, 0 passed, 0 failed, 6 untested. Operator/Facilitator hosted standard-build, responsive and opt-in scenarios have 0 attempted, 0 passed, 0 failed, 3 untested. No real-human study; satisfaction, confusion and frustration NOT MEASURED."
+        ]
+      }
+    },
+    {
+      "version": "0.37.1",
+      "status": "candidate",
+      "notes_path": "releases/0.37.1.md",
+      "sections": {
+        "fixed": [
+          "Workspace roles now reach contained assessments and permitted reports without per-assessment invitations. Direct project grants alone do not open assessments; direct-grant delegation and deletion checks, viewer restrictions and report privacy/admission remain. Automated isolated authentication/report scenarios are recorded separately from pending review, DEV and production validation."
+        ]
+      },
+      "excluded_from": [
+        "0.37.2"
+      ],
+      "exclusion_reason": "Historical unshipped 0.37.1 version identity remains excluded from generated release surfaces. Its workspace-inheritance source is included and described in the 0.38.0 candidate instead; the original exclusion from 0.37.2 is preserved.",
+      "included_in_product": false
+    },
+    {
+      "version": "0.37.0",
+      "status": "released",
       "notes_path": "releases/0.37.0.md",
       "sections": {
         "changed": [
           "The app no longer blocks requests because of app-level request-rate limits or missing limiter bindings. This supports workshops where many participants share one connection. The existing per-address sign-in-link and collaborator-invitation product caps remain, along with upstream translation 429 responses and the MCP batch-size limit."
         ]
-      }
+      },
+      "tag": "v0.37.0",
+      "date": "2026-10-20"
     },
     {
       "version": "0.36.0",

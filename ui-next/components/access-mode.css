@@ -1,0 +1,5 @@
+/* A verified account's access preference lives beside its account control, not in page content. */
+.access-mode{display:inline-flex;align-items:center;flex:none}
+.access-mode .in{width:auto;min-height:var(--target);padding-block:var(--sp-1);padding-inline:var(--sp-2);font-size:var(--t-14);font-weight:600;border-color:var(--line-2)}
+.access-mode[data-access-mode=support] .in{background:var(--community-soft);border-color:var(--community);color:var(--ink)}
+.access-mode-error{position:absolute;z-index:30;inset-inline:var(--sp-4);top:100%;padding:var(--sp-3);background:var(--field);border:1px solid var(--line-2);border-radius:var(--radius-m);box-shadow:var(--sh-1)}

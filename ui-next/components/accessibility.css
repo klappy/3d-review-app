@@ -1,0 +1,5 @@
+.app .skip-nav:not(:focus){position:absolute;width:1px;height:1px;padding:0;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
+.app .skip-nav:focus{position:fixed;z-index:100;inset-block-start:var(--sp-2);inset-inline-start:var(--sp-2)}
+
+.app main[data-has-utilities]{gap:var(--sp-4)}
+@media print{.app [data-next-utilities]{display:none}}

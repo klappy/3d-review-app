@@ -15,6 +15,8 @@ import { copy, createSharedLinkClient, currentNamespace, digestNamespace, entryF
 // @ts-expect-error plain JS module without types
 import * as sharedModule from "../ui/shared-link.js"; // namespace import: a missing export reads undefined instead of failing the whole file
 // @ts-expect-error plain JS module without types
+import { createParticipantJourney } from "../ui/participate/controller.js";
+// @ts-expect-error plain JS module without types
 import { FORM, memoryStorage } from "./fixtures/shared-link-contract.dev.mjs";
 
 const mf = new Miniflare(convertV4MiniflareOptions({ workers: [{ name: "shared-browser", modules: true, script: "export default { fetch() { return new Response('ok') } }", d1Databases: { DB: "shared-browser" } }] }));
@@ -278,16 +280,17 @@ async function settled($: (id: string) => any) { // wait for the startup run() t
   throw new Error("startup did not settle: " + $("notice").textContent);
 }
 let bootCount = 0;
-async function boot(storage: any, hash: string, fetcher: typeof fetchImpl = fetchImpl) {
+async function boot(storage: any, hash: string, fetcher: typeof fetchImpl = fetchImpl, { device = memoryStorage(), localStorageThrows = false, pathname = "/" } = {}) {
   const { document, $ } = fakeDocument();
   const g: any = globalThis;
   g.document = document; g.window = g; g.sessionStorage = storage;
+  Object.defineProperty(g, "localStorage", { configurable: true, get() { if (localStorageThrows) throw new Error("storage blocked"); return device; } });
   // Real window event seam: each boot is a new document, so prior listeners do not survive.
   const windowListeners = new Map<string, Function[]>();
   g.MutationObserver = class { observe() {} disconnect() {} }; // presentation observers; mutation scheduling is covered by actual Chromium
   g.addEventListener = (type: string, listener: Function) => { windowListeners.set(type, [...(windowListeners.get(type) || []), listener]); };
   g.dispatchEvent = (event: {type: string}) => { for (const listener of windowListeners.get(event.type) || []) listener(event); return true; };
-  g.location = { hash, pathname: "/", search: "", origin: ORIGIN }; g.history = { replaceState: () => { g.location.hash = ""; } };
+  g.location = { hash, pathname, search: "", origin: ORIGIN }; g.history = { replaceState: () => { g.location.hash = ""; } };
   Object.defineProperty(g, "navigator", { value: { clipboard: { writeText: async () => {} } }, configurable: true }); g.CSS = { escape: (s: string) => s };
   g.fetch = fetcher;
   g.Option = class { constructor(public text: string, public value: string) {} };
@@ -298,6 +301,88 @@ async function boot(storage: any, hash: string, fetcher: typeof fetchImpl = fetc
 }
 
 describe("[fake-DOM] ui/app.js shared mode", () => {
+  async function submitLegacy($: (id: string) => any) {
+    $("answers").values = { Q1: "3" };
+    await $("answers").dispatch("submit"); await settled($);
+    await $("submit").dispatch("click"); await settled($);
+    expect($("receipt").textContent).toMatch(/^Response saved/);
+  }
+  it("remembers a legacy submitted receipt across tabs, bounded by the real server expiry (Codex 4343346815)", async () => {
+    const link = await issue(), device = memoryStorage(), first = memoryStorage();
+    let opened: any;
+    const capture = async (url: string, init: any) => { const r = await fetchImpl(url, init); if (url.endsWith("/link")) opened = ((await r.clone().json()) as any).result; return r; };
+    const $ = await boot(first, link.entry_fragment, capture, { device, pathname: "/legacy/" });
+    await submitLegacy($);
+    const ns = await digestNamespace(link.link_token), bearer = first.getItem(ns + "bearer");
+    expect(JSON.parse(device.getItem(ns + "bearer"))).toEqual({ v: bearer, exp: Date.parse(opened.expires_at) });
+    expect(device.keys().sort()).toEqual(["shared:current", ns + "bearer", ns + "expiresAt"].sort());
+    const second = memoryStorage(), $2 = await boot(second, link.entry_fragment, fetchImpl, { device, pathname: "/legacy/" });
+    expect(second.getItem(ns + "bearer")).toBe(bearer);
+    expect($2("receipt").textContent).toBe($("receipt").textContent);
+    expect($2("answers").hidden).toBe(true);
+    // An expired device bearer is dropped before open(), so a new tab starts a new respondent.
+    device.setItem(ns + "bearer", JSON.stringify({ v: bearer, exp: Date.now() - 1 }));
+    const third = memoryStorage(), $3 = await boot(third, link.entry_fragment, fetchImpl, { device, pathname: "/legacy/" });
+    expect(third.getItem(ns + "bearer")).not.toBe(bearer); expect($3("answers").hidden).toBe(false);
+  });
+  it("keeps legacy drafts and unsubmitted sessions in the tab and leaves code/staff entry alone", async () => {
+    const link = await issue(), device = memoryStorage(), first = memoryStorage();
+    const $ = await boot(first, link.entry_fragment, fetchImpl, { device });
+    const ns = await digestNamespace(link.link_token);
+    const draft = { template: { id: "t", version: 1 }, answers: { Q1: "4" } };
+    first.setItem(ns + "draft", JSON.stringify(draft)); first.setItem(ns + "submitKey", "pending");
+    expect(device.size).toBe(0);
+    const other = memoryStorage(); await boot(other, link.entry_fragment, fetchImpl, { device });
+    expect(other.getItem(ns + "draft")).toBeNull(); expect(other.getItem(ns + "submitKey")).toBeNull();
+    const submitted = memoryStorage(), $submitted = await boot(submitted, link.entry_fragment, fetchImpl, { device });
+    await submitLegacy($submitted);
+    expect(device.getItem(ns + "draft")).toBeNull(); expect(device.getItem(ns + "submitKey")).toBeNull();
+    const before = device.keys().sort().map((key: string) => [key, device.getItem(key)]);
+    const staffTab = memoryStorage(); staffTab.setItem("facilitatorToken", owner);
+    const calls: string[] = [];
+    await boot(staffTab, "#participant", async (url: string, init: any) => { calls.push(url); return fetchImpl(url, init); }, { device });
+    expect(calls).not.toContain("/v2/participate/link"); expect(calls).not.toContain("/v2/participate/receipt");
+    expect(staffTab.getItem("facilitatorToken")).toBe(owner); expect(staffTab.getItem("shared:current")).toBeNull();
+    expect(device.keys().sort().map((key: string) => [key, device.getItem(key)])).toEqual(before);
+  });
+  it("leaves a code participant in its own tab even when the device remembers a shared receipt", async () => {
+    const link = await issue(), device = memoryStorage();
+    const $ = await boot(memoryStorage(), link.entry_fragment, fetchImpl, { device }); await submitLegacy($);
+    const before = device.keys().sort().map((key: string) => [key, device.getItem(key)]);
+    const participant = await mintSession(env, "person_mara", "participant", { participant_survey_id: "survey_tavo", respondent_id: "legacy-code-control" });
+    const code = memoryStorage(); code.setItem("participantToken", participant);
+    const calls: { url: string; bearer: string }[] = [];
+    await boot(code, "#participant", async (url: string, init: any) => { calls.push({ url, bearer: init.headers?.authorization }); return fetchImpl(url, init); }, { device });
+    expect(calls.some(c => c.url === "/v2/participate/link")).toBe(false);
+    expect(calls.find(c => c.url === "/v2/participate/receipt")?.bearer).toBe(`Bearer ${participant}`);
+    expect(code.getItem("participantToken")).toBe(participant); expect(code.getItem("shared:current")).toBeNull();
+    expect(device.keys().sort().map((key: string) => [key, device.getItem(key)])).toEqual(before);
+  });
+  it("keeps old legacy tab receipts without known expiry out of device storage", async () => {
+    const link = await issue(), device = memoryStorage(), first = memoryStorage();
+    const $ = await boot(first, link.entry_fragment, fetchImpl, { device }); await submitLegacy($);
+    const ns = await digestNamespace(link.link_token);
+    first.removeItem(ns + "expiresAt"); for (const key of device.keys()) device.removeItem(key);
+    const $2 = await boot(first, "", fetchImpl, { device });
+    expect($2("receipt").textContent).toMatch(/^Response saved/); expect(device.size).toBe(0);
+  });
+  it("allows Interview another in the dedicated flow to forget a legacy remembered receipt", async () => {
+    const link = await issue(), device = memoryStorage(), first = memoryStorage();
+    const $ = await boot(first, link.entry_fragment, fetchImpl, { device }); await submitLegacy($);
+    const ns = await digestNamespace(link.link_token), previous = first.getItem(ns + "bearer");
+    const session = memoryStorage(), win = { location: { hash: link.entry_fragment, pathname: "/participate/", search: "" }, history: { replaceState() { win.location.hash = ""; } } };
+    const journey = createParticipantJourney({ window: win, storage: sharedModule.deviceStorage({ device, tab: session }), fetchImpl });
+    await journey.start(); expect(journey.state.phase).toBe("receipt");
+    await journey.another(); expect(journey.state.phase).toBe("form"); expect(journey.state.fresh).toBe(true);
+    expect(device.getItem(ns + "bearer")).toBeNull(); expect(session.getItem(ns + "bearer")).not.toBe(previous);
+  });
+  it("keeps a legacy submitted tab usable when device storage is blocked", async () => {
+    const link = await issue(), first = memoryStorage();
+    const $ = await boot(first, link.entry_fragment, fetchImpl, { localStorageThrows: true });
+    await submitLegacy($);
+    const $2 = await boot(first, "", fetchImpl, { localStorageThrows: true });
+    expect($2("receipt").textContent).toBe($("receipt").textContent);
+  });
   it("registers actual hash lifecycle events without breaking the shared participant session", async () => {
     const link = await issue(); const storage = memoryStorage(); const $ = await boot(storage, link.entry_fragment);
     const ns = await digestNamespace(link.link_token); const bearer = storage.getItem(ns + "bearer");

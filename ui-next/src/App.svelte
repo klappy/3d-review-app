@@ -20,7 +20,7 @@
 <header class="gx-bar">
   <strong>UI Next gallery</strong>
   <span class="gx-note">Svelte 5 re-expression of Button, Stage pill and Lens dot. Provisional.</span>
-  <nav class="gx-toggle" aria-label="Gallery pages"><a class="gx-tab" href="?" aria-current="page">Components</a><a class="gx-tab" href="?page=layouts">Layouts</a><a class="gx-tab" href="?page=home">Home parts</a></nav>
+  <nav class="gx-toggle" aria-label="Gallery pages"><a class="gx-tab" href="?page=components" aria-current="page">Components</a><a class="gx-tab" href="?page=layouts">Layouts</a><a class="gx-tab" href="?page=home">Home parts</a></nav>
   <div class="gx-toggle" role="group" aria-label="Theme">
     {#each MODES as m}
       <button type="button" class="gx-tab" aria-pressed={mode === m ? "true" : "false"} onclick={() => (mode = m)}>{m}</button>

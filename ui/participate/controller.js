@@ -1,4 +1,4 @@
-import { copy, createSharedLinkClient, receiptNotice, currentNamespace, digestNamespace, entryFailureKind, errorKind, parseEntryFragment, rememberCurrent, resolveConflict, restoreDraft, saveDraft, scopedStorage, stripFragment, submitFailureKind } from '../shared-link.js';
+import { CURRENT_KEY, copy, createSharedLinkClient, receiptNotice, currentNamespace, digestNamespace, entryFailureKind, errorKind, parseEntryFragment, rememberCurrent, resolveConflict, restoreDraft, saveDraft, scopedStorage, stripFragment, submitFailureKind } from '../shared-link.js';
 import { closedLine } from '../v3/components/active-until.js';
 import { SURVEYOR_EN } from './i18n.js';
 import { retryAfterSeconds } from '../rate-limit.js';
@@ -23,6 +23,14 @@ export function createParticipantJourney({ window: win, storage, fetchImpl, onCh
     store.remove('draft'); store.remove('submitKey'); uncertain = false;
     // thanks: the notice's inputs, so the page can say it in the participant's language (receiptNotice with its translator).
     const thanks = { perspective: form?.template?.perspective, code: store.get('via') === 'code' };
+    // Receipt per device (captain ruling 2026-10-21): only a submitted link session is remembered on the device, until
+    // the server session ends. A code works once, so a code session stays in its tab.
+    // Older tab sessions have no server expiry. They may still show their receipt,
+    // but cannot safely acquire a fresh device lifetime without opening the link.
+    const until = Number(store.get('expiresAt'));
+    if (!thanks.code && Number.isFinite(until) && until > Date.now()) {
+      store.remember('bearer', until); store.remember('expiresAt', until); storage.remember?.(CURRENT_KEY, until);
+    }
     return show('receipt', { receipt: result, notice: receiptNotice(thanks.perspective, { code: thanks.code }), thanks });
   }
   async function loadForm() {
@@ -127,7 +135,7 @@ export function createParticipantJourney({ window: win, storage, fetchImpl, onCh
       if (busy || state.phase !== 'receipt' || !store) return state;
       if (store.get('via') === 'code') { win.location.assign('/#survey'); return state; }
       const previous = store.get('bearer');
-      const drop = () => { store.remove('bearer'); store.remove('draft'); store.remove('submitKey'); answers = undefined; context = {}; uncertain = false; };
+      const drop = () => { store.remove('bearer'); store.remove('expiresAt'); store.remove('draft'); store.remove('submitKey'); answers = undefined; context = {}; uncertain = false; };
       if (!linkToken) { drop(); client = createSharedLinkClient({ store, fetchImpl }); return show('unavailable', { notice: SURVEYOR_EN.openLinkForNext }); }
       return action(() => openNext(previous, drop));
     },

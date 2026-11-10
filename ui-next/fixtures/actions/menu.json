@@ -1,0 +1,53 @@
+{
+ "_source": "Mock data for MenuPhone (cookbook design/2026-10-15-glass-redesign/canvas): HomePhone under the account sheet. Status: provisional.",
+ "who": "Bincy K · bincy@bcs.org.in",
+ "invitation": "Seed Company · partners",
+ "chips": [
+  "BCS · India",
+  "Mine"
+ ],
+ "items": [
+  [
+   "people",
+   "BCS · India — switch workspace"
+  ],
+  [
+   "mail",
+   "Invitations · 1 new"
+  ],
+  [
+   "help",
+   "Help and FAQ"
+  ],
+  [
+   "sparkle",
+   "Why 3D Review exists"
+  ],
+  [
+   "pen",
+   "Send app feedback"
+  ],
+  [
+   "globe",
+   "Public website home"
+  ],
+  [
+   "people",
+   "Use another account"
+  ],
+  [
+   "out",
+   "Sign out"
+  ]
+ ],
+ "projectCards": [
+  {
+   "title": "Hindi New Testament",
+   "meta": "BCS · 4 reviews · 86 responses"
+  },
+  {
+   "title": "Lao Old Testament",
+   "meta": "BCS · 1 review · 0 responses"
+  }
+ ]
+}

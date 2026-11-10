@@ -58,7 +58,10 @@ it('switches a verified super admin between personal grants and all workspace hi
  expect((await projects(global,{})).result.projects.find((x:any)=>x.id===p.id)).toMatchObject({role:'owner',direct_role:'member'});
  for(const a of (await assessments(global,{pid:p.id})).result.assessments){
   await db.prepare('INSERT INTO "grant" (id,principal_id,scope_type,scope_id,role,created_at) VALUES (?,?,?,?,?,?)').bind('g_admin_'+a.id,'global_admin','assessment',a.id,'member',stamp).run();
-  expect((await assessments(global,{pid:p.id})).result.assessments.find((x:any)=>x.id===a.id).role).toBe('member');
+  // Workspace owner wins over the lower direct member grant; preserve the direct marker.
+  expect((await assessments(global,{pid:p.id})).result.assessments.find((x:any)=>x.id===a.id)).toMatchObject({role:'owner',direct_role:'member'});
+  expect((await assessment(global,{id:a.id})).result.assessment).toMatchObject({role:'owner',direct_role:'member'});
+  expect((await assessment(my,{id:a.id})).result.assessment).toMatchObject({role:'owner',direct_role:'member'});
  }
  await db.prepare('DELETE FROM "grant" WHERE principal_id=?').bind('global_admin').run();
  // Switching back restores the ordinary grants without altering the account or grants.

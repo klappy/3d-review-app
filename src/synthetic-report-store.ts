@@ -1,10 +1,10 @@
 /** Internal C2a store–renderer integration. No public handler or authorization shortcut. */
 import type { Ctx } from './handlers/types.js';
-import { REPORT_CAPTURE_CTE, attestPackedCapture, type CapturedAssessment } from './report-capture.js';
+import { REPORT_CAPTURE_CTE, REPORT_SELECTION_CAPTURE_CTE, attestSelectionCapture, type CapturedAssessment } from './report-capture.js';
 import { canonicalJson, parseBoundedJson, sha256Bytes } from './report-canonical-json.js';
 import { ATTESTATION_TRUST } from './synthetic-attestation-trust.js';
-import { renderAttestedCapture, REPORT_SCHEMA, REPORT_VERSIONS } from './synthetic-report-renderer.js';
-import { participantReportsAllowed } from './report-admission.js';
+import { renderAttestedCapture, renderLegacyAttestedCapture, REPORT_SCHEMA, REPORT_VERSIONS, LEGACY_REPORT_VERSIONS } from './synthetic-report-renderer.js';
+import { participantReportsAllowed, participantReportMinimum } from './report-admission.js';
 
 type StoreContext = Pick<Ctx, 'db' | 'principal' | 'now'> & Partial<Pick<Ctx, 'log'>> & { env?: { ENVIRONMENT?: string; PARTICIPANT_REPORTS?: string } };
 /** Observe-only build timing: one `report.stage` span per stage, data {stage, ms} only (no ids, no bytes;
@@ -13,18 +13,19 @@ type StoreContext = Pick<Ctx, 'db' | 'principal' | 'now'> & Partial<Pick<Ctx, 'l
 const clock=():number=>(globalThis as {performance?:{now():number}}).performance?.now()??Date.now();
 function stageSpan(ctx:StoreContext,stage:string,t0:number):number{const t=clock();try{ctx.log?.('report.stage',{stage,ms:Math.round((t-t0)*1000)/1000});}catch{}return t;}
 function participantAdmission(ctx:StoreContext):boolean{return participantReportsAllowed(ctx.env);}
-type Attest=typeof attestPackedCapture;
-/** Memo scoped to ONE build call: keyed by the exact (assessment id, packed bytes, participant flag).
+function participantMinimum(ctx:StoreContext):number{return participantReportMinimum(ctx.env);}
+type Attest=typeof attestSelectionCapture;
+/** Memo scoped to ONE build call: keyed by the exact (assessment id, packed bytes, participant flag, floor).
  * attestPackedCapture is a pure function of those inputs and the compiled trust, so a hit returns the
  * same frozen result a re-run would. Every check that consumes the result (digest, report key,
  * payload hash, validate) still runs; only the repeated attestation of identical bytes is skipped.
  * Any byte difference (a stored or current capture that moved) misses and attests in full. */
 function attestOnce():Attest{
   const memo=new Map<string,ReturnType<Attest>>();
-  return (aid,raw,participant=false)=>{
-    const key=aid+'\0'+(participant===true?'1':'0')+'\0'+raw;
+  return (aid,raw,participant=false,minimum)=>{
+    const key=aid+'\0'+(participant===true?'1':'0')+'\0'+String(minimum)+'\0'+raw;
     let result=memo.get(key);
-    if(!result){result=attestPackedCapture(aid,raw,participant);memo.set(key,result);}
+    if(!result){result=attestSelectionCapture(aid,raw,participant,minimum);memo.set(key,result);}
     return result;
   };
 }
@@ -34,17 +35,23 @@ type RendererDescriptor = Readonly<{
   render:(capture:CapturedAssessment)=>unknown|Promise<unknown>;
   validate:(payload:unknown,capture:CapturedAssessment)=>boolean|Promise<boolean>;
 }>;
-async function renderCaptured(c:CapturedAssessment):Promise<unknown>{
-  const result=await renderAttestedCapture(c);
+async function renderCaptured(c:CapturedAssessment,legacy=false):Promise<unknown>{
+  const result=await (legacy?renderLegacyAttestedCapture:renderAttestedCapture)(c);
   if(!result.eligible||result.captureDigest!==c.captureDigest)invalid();
-  return result.payload;
+  return withSelection(result.payload,c);
+}
+function withSelection(payload:unknown,c:CapturedAssessment):unknown{
+  if(c.selection===undefined)return payload;
+  if(!payload||typeof payload!=='object'||Array.isArray(payload))invalid();
+  const selected=[...new Set(c.selection.map(row=>row[4]))].sort();
+  return {...payload,report_selection:{schema:'3d-report-selection-v1',selected_perspectives:selected}};
 }
 /** Exact trusted projection validates the complete real schema and its values.
  * Always over the original attested capture; no tolerance, cache or DB read. */
-async function validateSyntheticReportPayload(payload:unknown,c:CapturedAssessment):Promise<boolean>{
+async function validateSyntheticReportPayload(payload:unknown,c:CapturedAssessment,legacy=false):Promise<boolean>{
   try{
-    const result=await renderAttestedCapture(c);
-    return result.eligible&&result.captureDigest===c.captureDigest&&canonicalJson(payload,PAYLOAD_LIMIT)===result.payloadJson;
+    const result=await (legacy?renderLegacyAttestedCapture:renderAttestedCapture)(c);
+    return result.eligible&&result.captureDigest===c.captureDigest&&canonicalJson(payload,PAYLOAD_LIMIT)===canonicalJson(withSelection(result.payload,c),PAYLOAD_LIMIT);
   }catch{return false;}
 }
 /** Read-only frozen descriptor; exported for in-process measurement and identity tests only. */
@@ -54,14 +61,27 @@ export const REAL_RENDERER: RendererDescriptor = Object.freeze({
     policyVersion:REPORT_VERSIONS.policy,outputSchemaVersion:REPORT_SCHEMA}),
   render:renderCaptured,validate:validateSyntheticReportPayload,
 });
+/** Exact historical descriptor is allowed for reads only, never new builds. */
+const LEGACY_RENDERER: RendererDescriptor = Object.freeze({
+  tuple:Object.freeze({...REAL_RENDERER.tuple,scorerVersion:LEGACY_REPORT_VERSIONS.scorer}),
+  render:(capture:CapturedAssessment)=>renderCaptured(capture,true),
+  validate:(payload:unknown,capture:CapturedAssessment)=>validateSyntheticReportPayload(payload,capture,true),
+});
 // Sole private compiled integration point. Tests substitute exactly this declaration.
 // No setter, registration function, caller-rendered product or runtime switch exists.
 const APPROVED_RENDERER: RendererDescriptor = REAL_RENDERER;
+const STORE_CAPTURE_CTE = REPORT_SELECTION_CAPTURE_CTE;
 
 export type Report = Readonly<{id:string;assessmentId:string;reportKey:string;captureDigest:string;createdAt:string;payload:unknown}>;
 export type ReportSummary = Omit<Report,'payload'>;
 export type EligibilityMarker = Readonly<{assessment_id:string;eligible:boolean;policy_version:string}>;
+/** Why a visible assessment cannot build (Codex P2 4383751986), decided beside the boolean so the two cannot disagree:
+ * 'environment' = this environment admits no participant report (only a trusted synthetic capture could build, and none did);
+ * 'count' = participant reports are admitted but the capture is under the server floor; 'capture' = admitted and at the floor,
+ * yet the capture does not attest or render (mixed sources, malformed rows); null = eligible. */
+export type HoldReason='environment'|'count'|'capture'|null;
 export type EligibilityResult = {ok:true;marker:EligibilityMarker}|{ok:false;reason:'NOT_VISIBLE'|'UNAVAILABLE'};
+export type BuildDecision = {result:EligibilityResult;hold:HoldReason};
 export type StoreResult<T> = {ok:true;value:T}|{ok:false;reason:'HELD';marker:EligibilityMarker}|{ok:false;reason:'NOT_VISIBLE'|'UNAVAILABLE'|'CONFLICT'|'DETERMINISM'};
 export type ReportPage = {reports:readonly ReportSummary[];afterId:string|null};
 const NOT_VISIBLE = Object.freeze({ok:false as const,reason:'NOT_VISIBLE' as const});
@@ -87,6 +107,10 @@ function identity(c:CapturedAssessment,t:VersionTuple){
   return {schema:'3d-materialized-report-key-v1',assessmentId:c.assessmentId,captureDigest:c.captureDigest,indexRoot:t.indexRoot,sourcePin:t.sourcePin,scorerVersion:t.scorerVersion,narrativeVersion:t.narrativeVersion,policyVersion:t.policyVersion,outputSchemaVersion:t.outputSchemaVersion};
 }
 async function reportKey(c:CapturedAssessment,t:VersionTuple):Promise<string>{
+  if(c.selection!==undefined){
+    const selectionDigest=await sha256Bytes(encoder.encode(canonicalJson(c.selection)));
+    return sha256Bytes(encoder.encode('3d-materialized-report-v2\0'+canonicalJson({...identity(c,t),schema:'3d-materialized-report-key-v2',selectionDigest})));
+  }
   return sha256Bytes(encoder.encode('3d-materialized-report-v1\0'+canonicalJson(identity(c,t))));
 }
 function principal(ctx:StoreContext):[string,string]|null{
@@ -97,7 +121,7 @@ const COLUMNS=`m.id, t.id AS assessment_id, m.report_key, m.capture_digest, m.in
   m.source_pin, m.scorer_version, m.narrative_version, m.policy_version,
   m.output_schema_version, m.capture_json AS stored_capture,
   c.capture_json AS current_capture, m.payload_json, m.payload_sha256, m.created_at`;
-export const REPORT_COMMIT_SQL=REPORT_CAPTURE_CTE+`
+export const REPORT_COMMIT_SQL=STORE_CAPTURE_CTE+`
 INSERT INTO synthetic_report
   (id, assessment_id, report_key, capture_digest, index_root, source_pin,
    scorer_version, narrative_version, policy_version, output_schema_version,
@@ -132,14 +156,20 @@ ORDER BY p.id COLLATE BINARY;`;
 type StoredRow={id:string|null;assessment_id:string;report_key:string;capture_digest:string;index_root:string;source_pin:string;scorer_version:string;narrative_version:string;policy_version:string;output_schema_version:string;stored_capture:string;current_capture:string|null;payload_json:string;payload_sha256:string;created_at:string};
 type Validated={report:Report;payloadBytes:string;payloadHash:string};
 /** No queries here: both captures and metadata came from the same authorized SELECT. */
-async function validateStored(row:StoredRow,r:RendererDescriptor,current?:CapturedAssessment,pd=false,attest:Attest=attestPackedCapture):Promise<Validated>{
+async function validateStored(row:StoredRow,r:RendererDescriptor,current?:CapturedAssessment,pd=false,attest:Attest=attestSelectionCapture,min?:number):Promise<Validated>{
   const aid=text(row.assessment_id);
-  if(!current){const c=await attest(aid,row.current_capture??'',pd);if(!c.eligible)invalid();current=c.capture;}
+  if(!current){const c=await attest(aid,row.current_capture??'',pd,min);if(!c.eligible)invalid();current=c.capture;}
   else if(current.assessmentId!==aid||current.packedCapture!==row.current_capture)invalid();
-  const original=await attest(aid,row.stored_capture,pd);if(!original.eligible)invalid();
+  const original=await attest(aid,row.stored_capture,pd,min);if(!original.eligible)invalid();
   if(!DIGEST.test(row.capture_digest)||original.capture.captureDigest!==row.capture_digest)invalid();
   const tuple:VersionTuple={sourcePin:row.source_pin,indexRoot:row.index_root,scorerVersion:row.scorer_version,narrativeVersion:row.narrative_version,policyVersion:row.policy_version,outputSchemaVersion:row.output_schema_version};
-  for(const key of versionKeys)if(tuple[key]!==r.tuple[key])invalid();
+  // Stored metadata may select only one exact compiled historical tuple. It
+  // cannot inject a renderer or bypass capture, hash, authorization or payload checks.
+  if(versionKeys.some(key=>tuple[key]!==r.tuple[key])) {
+    if(r!==REAL_RENDERER||versionKeys.some(key=>tuple[key]!==LEGACY_RENDERER.tuple[key]))invalid();
+    r=LEGACY_RENDERER;
+  }
+
   if(!DIGEST.test(row.report_key)||await reportKey(original.capture,r.tuple)!==row.report_key)invalid();
   if(typeof row.payload_json!=='string'||row.payload_json.length>PAYLOAD_LIMIT||encoder.encode(row.payload_json).length>PAYLOAD_LIMIT||!DIGEST.test(row.payload_sha256))invalid();
   if(await sha256Bytes(encoder.encode(row.payload_json))!==row.payload_sha256)invalid();
@@ -147,32 +177,48 @@ async function validateStored(row:StoredRow,r:RendererDescriptor,current?:Captur
   if(!await r.validate(payload,original.capture))invalid();
   return {report:Object.freeze({id:text(row.id),assessmentId:aid,reportKey:row.report_key,captureDigest:row.capture_digest,createdAt:text(row.created_at,128),payload}),payloadBytes:row.payload_json,payloadHash:row.payload_sha256};
 }
-export const REPORT_OBSERVE_SQL=REPORT_CAPTURE_CTE+`
+export const REPORT_OBSERVE_SQL=STORE_CAPTURE_CTE+`
 SELECT t.id AS assessment_id,c.capture_json AS current_capture
 FROM target t LEFT JOIN captured c ON c.assessment_id=t.id;`;
 type Observation={assessment_id:string;current_capture:string|null};
-type BuildObservation={ok:true;aid:string;capture:CapturedAssessment|null}|{ok:false;reason:'NOT_VISIBLE'|'UNAVAILABLE'};
-/** One authorized SELECT; subsequent attestation uses only its immutable bytes. */
-async function observeBuild(ctx:StoreContext,assessmentId:string,attest:Attest=attestPackedCapture):Promise<BuildObservation>{
+type BuildObservation={ok:true;aid:string;capture:CapturedAssessment|null;belowMinimum:boolean}|{ok:false;reason:'NOT_VISIBLE'|'UNAVAILABLE'};
+/** One authorized SELECT; subsequent attestation uses only its immutable bytes. role: the grant floor of that SELECT ('member' for
+ * build and preview; 'viewer' only for the read-only eligibility answer on Results, which never builds). */
+async function observeBuild(ctx:StoreContext,assessmentId:string,attest:Attest=attestSelectionCapture,role:'member'|'viewer'='member'):Promise<BuildObservation>{
   const who=principal(ctx);if(!who)return NOT_VISIBLE;
   let aid:string;try{aid=text(assessmentId);approved(descriptor());}catch{return NOT_VISIBLE;}
   let row:Observation|null;
   let t=clock();
-  try{row=await ctx.db.prepare(REPORT_OBSERVE_SQL).bind(who[0],null,aid,who[1],'member').first<Observation>();}catch{return UNAVAILABLE;}
+  try{row=await ctx.db.prepare(REPORT_OBSERVE_SQL).bind(who[0],null,aid,who[1],role).first<Observation>();}catch{return UNAVAILABLE;}
   t=stageSpan(ctx,'observe_sql',t);
   if(!row)return NOT_VISIBLE;
   if(row.assessment_id!==aid)return UNAVAILABLE;
-  const current=await attest(aid,row.current_capture??'',participantAdmission(ctx));
+  const current=await attest(aid,row.current_capture??'',participantAdmission(ctx),participantMinimum(ctx));
   stageSpan(ctx,'attest_observe',t);
-  return {ok:true,aid,capture:current.eligible?current.capture:null};
+  // Only for the hold reason (Codex P2 4406305544): a count to collect is the attestation's own below-minimum refusal, or no capture
+  // at all (zero responses); a mixed-source, mismatched or undecodable capture is a capture problem whatever its row count.
+  const belowMinimum=!current.eligible&&(current.belowMinimum===true||!row.current_capture);
+  return {ok:true,aid,capture:current.eligible?current.capture:null,belowMinimum};
+}
+function holdReason(ctx:StoreContext,eligible:boolean,belowMinimum:boolean):HoldReason{
+  if(eligible)return null;
+  if(!participantAdmission(ctx))return 'environment';
+  return belowMinimum?'count':'capture';
+}
+/** The one build-eligibility decision and its reason (Codex P2s 4383599307, 4383751986). The build dry run (role 'member') reads
+ * only its result, unchanged; Results (role 'viewer', read-only) reads both, so report_build_allowed, report_hold_reason and the
+ * build cannot disagree: participant admission, the floor and trusted synthetic captures are decided here, not re-derived. */
+export async function observeBuildDecision(ctx:StoreContext,assessmentId:string,role:'member'|'viewer'='member'):Promise<BuildDecision>{
+  const observation=await observeBuild(ctx,assessmentId,attestSelectionCapture,role);if(!observation.ok)return {result:observation,hold:null};
+  const decided=(eligible:boolean):BuildDecision=>({result:{ok:true,marker:marker(observation.aid,eligible)},hold:holdReason(ctx,eligible,observation.belowMinimum)});
+  if(!observation.capture)return decided(false);
+  const t=clock();
+  try{await descriptor().render(observation.capture);stageSpan(ctx,'render_preview',t);return decided(true);}
+  catch{stageSpan(ctx,'render_preview',t);return decided(false);}
 }
 /** Preview exposes no captured token, count, digest or report identity. */
-export async function observeBuildEligibility(ctx:StoreContext,assessmentId:string):Promise<EligibilityResult>{
-  const observation=await observeBuild(ctx,assessmentId);if(!observation.ok)return observation;
-  if(!observation.capture)return {ok:true,marker:marker(observation.aid,false)};
-  const t=clock();
-  try{await descriptor().render(observation.capture);stageSpan(ctx,'render_preview',t);return {ok:true,marker:marker(observation.aid,true)};}
-  catch{stageSpan(ctx,'render_preview',t);return {ok:true,marker:marker(observation.aid,false)};}
+export async function observeBuildEligibility(ctx:StoreContext,assessmentId:string,role:'member'|'viewer'='member'):Promise<EligibilityResult>{
+  return (await observeBuildDecision(ctx,assessmentId,role)).result;
 }
 export async function buildMaterialized(ctx:StoreContext,assessmentId:string):Promise<StoreResult<Report>>{
   // One memo for the whole build: observe, commit, current and stored attest the same packed bytes once.
@@ -194,7 +240,7 @@ async function commitWith(ctx:StoreContext,assessmentId:string,captured:Captured
     approved(r);aid=text(assessmentId);
     // Attest the raw token via the per-build memo (a hit only for identical bytes), ignoring any caller assertion of its digest/rows/eligibility.
     let t=clock();
-    const capture=await attest(aid,captured.packedCapture,participantAdmission(ctx));t=stageSpan(ctx,'attest_commit',t);if(!capture.eligible)return UNAVAILABLE;c=capture.capture;
+    const capture=await attest(aid,captured.packedCapture,participantAdmission(ctx),participantMinimum(ctx));t=stageSpan(ctx,'attest_commit',t);if(!capture.eligible)return UNAVAILABLE;c=capture.capture;
     const rendered=await r.render(c);t=stageSpan(ctx,'render',t);payloadBytes=canonicalJson(rendered,PAYLOAD_LIMIT);t=stageSpan(ctx,'canonicalize',t);
     const parsed=parseBoundedJson(payloadBytes,PAYLOAD_LIMIT);const ok=await r.validate(parsed,c);t=stageSpan(ctx,'validate',t);if(!ok)return UNAVAILABLE;
     key=await reportKey(c,r.tuple);payloadHash=await sha256Bytes(encoder.encode(payloadBytes));stageSpan(ctx,'hash',t);
@@ -212,12 +258,12 @@ async function commitWith(ctx:StoreContext,assessmentId:string,captured:Captured
   ts=stageSpan(ctx,'result_sql',ts);
   if(!row)return NOT_VISIBLE;
   if(row.assessment_id!==aid)return UNAVAILABLE;
-  const current=await attest(aid,row.current_capture??'',participantAdmission(ctx));
+  const current=await attest(aid,row.current_capture??'',participantAdmission(ctx),participantMinimum(ctx));
   ts=stageSpan(ctx,'attest_current',ts);
   if(!current.eligible)return held(aid);
   if(row.id===null)return {ok:false,reason:'CONFLICT'};
   try{
-    const valid=await validateStored(row,r,current.capture,participantAdmission(ctx),attest);stageSpan(ctx,'validate_stored',ts);
+    const valid=await validateStored(row,r,current.capture,participantAdmission(ctx),attest,participantMinimum(ctx));stageSpan(ctx,'validate_stored',ts);
     if(valid.report.assessmentId!==aid||valid.report.reportKey!==key||valid.report.captureDigest!==c.captureDigest||valid.payloadHash!==payloadHash||valid.payloadBytes!==payloadBytes)return {ok:false,reason:'DETERMINISM'};
     return {ok:true,value:valid.report};
   }catch{return held(aid);}
@@ -230,7 +276,7 @@ export async function readMaterialized(ctx:StoreContext,reportId:string):Promise
   try{row=await ctx.db.prepare(REPORT_GET_SQL).bind(who[0],rid,null,who[1],'viewer').first<StoredRow>();}catch{return UNAVAILABLE;}
   if(!row)return NOT_VISIBLE;
   let aid:string;try{aid=text(row.assessment_id);}catch{return UNAVAILABLE;}
-  try{return {ok:true,value:(await validateStored(row,r,undefined,participantAdmission(ctx))).report};}catch{return held(aid);}
+  try{return {ok:true,value:(await validateStored(row,r,undefined,participantAdmission(ctx),attestSelectionCapture,participantMinimum(ctx))).report};}catch{return held(aid);}
 }
 export async function listMaterialized(ctx:StoreContext,assessmentId:string,afterId:string|null=null,pageSize=5):Promise<StoreResult<ReportPage>>{
   const r=descriptor();
@@ -241,12 +287,12 @@ export async function listMaterialized(ctx:StoreContext,assessmentId:string,afte
   if(rows.length===0)return NOT_VISIBLE;
   if(rows.length>pageSize+1||rows.some(row=>row.assessment_id!==aid))return UNAVAILABLE;
   try{
-    const current=await attestPackedCapture(aid,rows[0].current_capture??'',participantAdmission(ctx));if(!current.eligible)return held(aid);
+    const current=await attestSelectionCapture(aid,rows[0].current_capture??'',participantAdmission(ctx),participantMinimum(ctx));if(!current.eligible)return held(aid);
     if(rows.some(row=>row.current_capture!==current.capture.packedCapture))return held(aid);
     if(rows.length===1&&rows[0].id===null)return {ok:true,value:{reports:[],afterId:null}};
     const validated:ReportSummary[]=[];let previous=afterId??'';
     for(const row of rows){
-      const result=await validateStored(row,r,current.capture,participantAdmission(ctx));if(result.report.id<=previous)invalid();previous=result.report.id;
+      const result=await validateStored(row,r,current.capture,participantAdmission(ctx),attestSelectionCapture,participantMinimum(ctx));if(result.report.id<=previous)invalid();previous=result.report.id;
       const {payload,...summary}=result.report;validated.push(Object.freeze(summary));
     }
     const reports=Object.freeze(validated.slice(0,pageSize));

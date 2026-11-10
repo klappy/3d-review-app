@@ -63,17 +63,18 @@ describe("renderPill refusals", () => {
 describe("pill.css", () => {
   const css = read("components/pill.css");
   const body = stripComments(css);
+  const skin = stripComments(read("components/base.css")); // .pill lives in the generated helmet (scripts/ui-next-base.mjs)
   it("defines .pill, the dot and one data-stage binding per ported stage", () => {
-    expect(body).toMatch(/\.pill \{/);
-    expect(body).toMatch(/\.pill i \{[^}]*background: var\(--stage\)/);
-    for (const [stage] of EXPECTED) expect(body).toContain(`.pill[data-stage=${stage}] { --stage: var(--stage-${stage}); }`);
+    expect(skin).toMatch(/\.pill\{/);
+    expect(skin).toMatch(/\.pill i\{[^}]*background:var\(--stage\)/);
+    for (const [stage] of EXPECTED) expect(skin).toContain(`.pill[data-stage=${stage}]{--stage:var(--stage-${stage})}`);
   });
   it("has no closed binding (not ported)", () => {
     expect(body).not.toMatch(/closed/);
   });
   it("paints only from tokens: no raw colour literals", () => {
     expect(body).not.toMatch(/#[0-9a-fA-F]{3,8}\b|rgba?\(|hsla?\(/);
-    for (const t of ["--glass-hi", "--line", "--ink", "--t-13", "--radius-xl", "--field"]) expect(body).toContain(`var(${t})`);
+    expect(body).toContain("var(--field)");
   });
   it("uses only tokens that ui-next/tokens.css defines (or the local --stage binding)", () => {
     const tokens = read("tokens.css");

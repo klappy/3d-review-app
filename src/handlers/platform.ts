@@ -1,4 +1,5 @@
 /** entry / auth / ops / docs-file handlers (Lane B). Domain handlers are Lane A's. */
+import { perspectiveLevelMinimum } from "../report-admission";
 import { feedbackExperience, feedbackProvenance, projectFeedbackProvenance } from './feedback-provenance';
 import type { Handler } from "./types";
 import { CapError, id, sha256, notVisible } from "./types";
@@ -99,7 +100,10 @@ export const authMe: Handler = async (ctx) => {
   const account = pr.kind === "user" || pr.kind === "support";
   const grants = account ? (await ctx.db.prepare("SELECT scope_type, scope_id, role FROM grant WHERE principal_id = ?").bind(pr.id).all()).results : [];
   const display_name = account ? await readDisplayName(ctx, pr.id) : null;
-  return { result: { principal: { id: pr.id, kind: pr.kind, super_admin: !!pr.superAdmin || pr.kind === "support", access_mode: pr.accessMode ?? (pr.kind === "support" ? "global" : "my"), provisioned: !!pr.provisioned, delegated_by: pr.delegatedBy ?? null, support_actor: pr.supportActor ?? null, participant_survey_id: pr.participantSurveyId ?? null, display_name }, grants } };
+  return { result: { principal: { id: pr.id, kind: pr.kind, super_admin: !!pr.superAdmin || pr.kind === "support", access_mode: pr.accessMode ?? (pr.kind === "support" ? "global" : "my"), provisioned: !!pr.provisioned, delegated_by: pr.delegatedBy ?? null, support_actor: pr.supportActor ?? null, participant_survey_id: pr.participantSurveyId ?? null, display_name }, grants,
+    // One additive field: the per-perspective level minimum (report-admission.ts; DEV 1, otherwise 3), so pages with no review in
+    // hand (Help) band and word levels as the server does.
+    level_minimum_responses: perspectiveLevelMinimum(ctx.env) } };
 };
 
 /** PATCH /v2/me {display_name}: the signed-in account sets or clears its own display name (participants have no account). */

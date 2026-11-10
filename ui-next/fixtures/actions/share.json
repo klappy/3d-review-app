@@ -1,0 +1,11 @@
+{
+ "_source": "Mock data for Share / SharePhone (cookbook design/2026-10-15-glass-redesign/canvas). Status: provisional.",
+ "copied": 2,
+ "codes": {
+  "code": "K7Q 4F2",
+  "line": "Community · 12 unused",
+  "unused": "12 unused codes"
+ },
+ "lead": "Each perspective — and each role inside it — has its own survey link. People answer without an account. One link can be used by everyone who answers that survey.",
+ "phoneLead": "Each survey has its own link. Send it, show the QR, or hand the phone over."
+}

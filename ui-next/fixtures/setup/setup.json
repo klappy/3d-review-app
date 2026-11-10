@@ -1,0 +1,238 @@
+{
+  "flow": "Start a 3D Review",
+  "steps": [
+    "Details",
+    "The passage",
+    "Who will participate?",
+    "About each group",
+    "Launch"
+  ],
+  "details": {
+    "name": "Mark 1–4 draft",
+    "projects": [
+      "Hindi New Testament",
+      "Lao Old Testament",
+      "Odia New Testament",
+      "— New project —"
+    ],
+    "project": "Odia New Testament",
+    "phoneProject": "Odia New Testament",
+    "languageQuery": "odia",
+    "language": {
+      "name": "Odia",
+      "code": "ory"
+    },
+    "matches": [
+      {
+        "name": "Adivasi Odia",
+        "code": "ort"
+      }
+    ],
+    "location": "Puri, Odisha",
+    "facilitator": "",
+    "formats": [
+      "Written",
+      "Audio",
+      "Video or sign"
+    ],
+    "phoneFormats": [
+      "Written",
+      "Audio",
+      "Video",
+      "Sign"
+    ],
+    "format": "Written",
+    "opens": "2026-09-28",
+    "closes": "2026-10-31"
+  },
+  "passage": {
+    "name": "",
+    "file": {
+      "name": "41-MRK.usfm",
+      "note": "Typeset · 6 pages",
+      "shows": "Participants will see Mark 1–4 as pages they can scroll."
+    },
+    "phoneFile": {
+      "name": "Mark_1-4_draft.pdf",
+      "size": "1.2 MB"
+    },
+    "languages": [
+      [
+        "English",
+        "English"
+      ],
+      [
+        "Hindi · hin",
+        "Hindi"
+      ],
+      [
+        "Odia · ory",
+        "Odia"
+      ]
+    ],
+    "signNote": "Indian Sign Language has no written survey — add an interpreter note in the next step instead."
+  },
+  "groups": [
+    {
+      "lens": "team",
+      "perspective": "Translation Team",
+      "name": "Translation team",
+      "who": "The people doing the translation work.",
+      "checked": true,
+      "phoneNote": "Translators · Team leaders & mentors",
+      "rolesLabel": "Who from the team? · how many of each",
+      "roles": [
+        {
+          "name": "Translators",
+          "note": "own survey",
+          "checked": true,
+          "expected": 5
+        },
+        {
+          "name": "Team leaders & mentors",
+          "note": "facilitators, team leaders, CiTs · own survey",
+          "checked": true,
+          "expected": 3
+        }
+      ]
+    },
+    {
+      "lens": "community",
+      "perspective": "Community",
+      "name": "Community",
+      "who": "People who speak the language.",
+      "checked": true,
+      "phoneNote": "Audio survey",
+      "expected": 15,
+      "format": "Written"
+    },
+    {
+      "lens": "church",
+      "perspective": "Church",
+      "name": "Church",
+      "who": "Pastors and church leaders in the language area.",
+      "checked": true,
+      "phoneChecked": false,
+      "phoneNote": "Choose roles next",
+      "rolesLabel": "Who from the church? · how many of each",
+      "roles": [
+        {
+          "name": "Pastor involved in the work",
+          "checked": true,
+          "expected": 5
+        },
+        {
+          "name": "Pastor in the community",
+          "checked": false
+        },
+        {
+          "name": "Denominational leader",
+          "checked": true,
+          "expected": 2
+        },
+        {
+          "name": "Consultant",
+          "checked": false
+        }
+      ]
+    }
+  ],
+  "context": {
+    "open": "community",
+    "values": {
+      "community": {
+        "facilitator_role": "Facilitator",
+        "total_participants": "14",
+        "participant_selection": "Church members who read Odia",
+        "location_community": "Two villages near Cuttack",
+        "location_region": "Odisha",
+        "location_setting": "rural",
+        "scripture_portions_tested": "Mark 1–4"
+      }
+    },
+    "demographics": true
+  },
+  "summary": [
+    {
+      "label": "Review",
+      "main": "Mark 1–4 draft",
+      "strong": true,
+      "sub": "Hindi New Testament · Hindi (hin) · Written",
+      "step": 1
+    },
+    {
+      "label": "People respond to",
+      "main": "Mark 1–4, printed draft booklet",
+      "sub": "41-MRK.usfm attached · shown as 6 pages",
+      "step": 2
+    },
+    {
+      "label": "Answer languages",
+      "main": "English · Hindi · Odia",
+      "step": 2
+    },
+    {
+      "label": "Location or community",
+      "main": "Puri, Odisha",
+      "step": 1
+    },
+    {
+      "label": "Facilitator",
+      "main": "",
+      "step": 1
+    },
+    {
+      "label": "Survey open",
+      "main": "28 Sep – 31 Oct 2026 · 33 days",
+      "step": 1
+    },
+    {
+      "label": "Who will participate",
+      "step": 3,
+      "derive": "who"
+    },
+    {
+      "label": "About each group",
+      "sub": "Participants asked age range and gender (skippable)",
+      "step": 4,
+      "derive": "about"
+    }
+  ],
+  "phoneSummary": [
+    {
+      "label": "Name",
+      "value": "Mark 1–4 draft",
+      "step": 1
+    },
+    {
+      "label": "Location or community",
+      "value": "Puri, Odisha",
+      "step": 1
+    },
+    {
+      "label": "Facilitator",
+      "value": "",
+      "step": 1
+    },
+    {
+      "label": "Passage",
+      "value": "Mark_1-4_draft.pdf · EN · HI · OR",
+      "step": 2
+    },
+    {
+      "label": "Who",
+      "step": 3,
+      "derive": "who"
+    },
+    {
+      "label": "About each group",
+      "step": 4,
+      "derive": "about"
+    },
+    {
+      "label": "Open until",
+      "value": "31 Oct 2026",
+      "step": 1
+    }
+  ]
+}

@@ -1,0 +1,186 @@
+{
+ "_source": "Mock data for NextStep / NextStepPhone (cookbook design/2026-10-15-glass-redesign/canvas). Status: provisional.",
+ "gaps": [
+  {
+   "area": "Clarity / naturalness",
+   "checked": true,
+   "apart": "3 bands apart",
+   "span": [
+    12.5,
+    87.5
+   ],
+   "wide": true,
+   "pts": [
+    [
+     "team",
+     87.5,
+     "Strong"
+    ],
+    [
+     "community",
+     12.5,
+     "Needs urgent attention"
+    ],
+    [
+     "church",
+     62.5,
+     "Growing"
+    ]
+   ]
+  },
+  {
+   "area": "Impact / use",
+   "checked": true,
+   "apart": "2 bands apart",
+   "span": [
+    12.5,
+    62.5
+   ],
+   "wide": true,
+   "pts": [
+    [
+     "team",
+     60.0,
+     "Growing"
+    ],
+    [
+     "community",
+     12.5,
+     "Needs urgent attention"
+    ],
+    [
+     "church",
+     65.0,
+     "Growing"
+    ]
+   ]
+  },
+  {
+   "area": "Understanding of the source",
+   "checked": false,
+   "apart": "1 band apart",
+   "span": [
+    37.5,
+    62.5
+   ],
+   "wide": false,
+   "pts": [
+    [
+     "team",
+     62.5,
+     "Growing"
+    ],
+    [
+     "church",
+     37.5,
+     "Needs support"
+    ]
+   ]
+  }
+ ],
+ "weak": [
+  {
+   "lens": "community",
+   "label": "Community · Impactful",
+   "level": "urgent",
+   "checked": true
+  },
+  {
+   "lens": "community",
+   "label": "Community · Understandable",
+   "level": "urgent",
+   "checked": true
+  },
+  {
+   "lens": "team",
+   "label": "Translation team · External review",
+   "level": "support",
+   "checked": false
+  },
+  {
+   "lens": "church",
+   "label": "Church · Readiness",
+   "level": "support",
+   "checked": false
+  }
+ ],
+ "noticed": "Community participants found parts of Mark 3 hard to follow when read aloud. Two readers said some words sound like a neighbouring dialect.",
+ "next": "Hold a listening session with Community participants before the next draft.",
+ "followUp": "2026-11-28",
+ "again": [
+  "After the next draft",
+  "In 3 months",
+  "In 6 months",
+  "Not planned"
+ ],
+ "recs": [
+  {
+   "because": "Clarity / naturalness · team Strong, community Urgent — 3 bands apart",
+   "state": "ready",
+   "title": "Hold a community listening session on Mark 3",
+   "text": "The text is clear to the people who made it and not to the people who hear it — a classic sign that checking happened inside the team. A listening session puts readers in the room.",
+   "from": "From the pathway library · Seed Company naturalness guide"
+  },
+  {
+   "because": "Impact / use · team Growing, community Urgent — 2 bands apart",
+   "state": "ready",
+   "title": "Put the draft in people's hands: audio of Mark 1–4 and two home groups",
+   "text": "High confidence with low use usually means distribution, not quality: people don't have it in a form they can use. Audio and small-group settings move use faster than another revision.",
+   "from": "From the pathway library · open-access OBT playbook"
+  },
+  {
+   "because": "External review · Needs support",
+   "state": "ready",
+   "title": "Book a consultant check before the next draft",
+   "text": "No consultant has seen the draft since Mark 1. The brief is strong, so this is a scheduling gap, not a method gap.",
+   "from": "From the pathway library"
+  },
+  {
+   "because": "Church · Readiness · Needs support",
+   "state": "queued",
+   "title": "Suggestion being prepared",
+   "text": "Leaders are present at checking but have not used the text in a service. The suggestion is being written from the pattern and your notes, then reviewed by a person before it shows.",
+   "from": "Generated from the pattern · reviewed before it appears",
+   "wait": "We'll tell you when it's ready."
+  }
+ ],
+ "glance": [
+  [
+   "team",
+   "growing"
+  ],
+  [
+   "community",
+   "support"
+  ],
+  [
+   "church",
+   "growing"
+  ]
+ ],
+ "phone": {
+  "title": "Luke 1–2",
+  "stage": "results",
+  "lead": "Where the perspectives pull apart. Add what you will act on to the plan.",
+  "items": [
+   {
+    "kind": "Tension",
+    "title": "Clarity / naturalness",
+    "text": "The team is confident; a third of the community found parts hard to follow.",
+    "inPlan": true
+   },
+   {
+    "kind": "Tension",
+    "title": "Impact / use",
+    "text": "Church leaders see impact the community has not yet felt.",
+    "inPlan": false
+   },
+   {
+    "kind": "Recommendation",
+    "title": "Hold a listening session",
+    "text": "Queued · ready when 5 more community answers arrive.",
+    "inPlan": false
+   }
+  ]
+ }
+}

@@ -1,8 +1,9 @@
+import {translationBriefSource} from '../translation-brief-amendment';
 import type { Ctx, Handler } from "./types";
 import { participantLanguages } from "../languages";
 import { participantPassages } from "../passages";
 import { CapError, notVisible } from "./errors";
-import { gate, isOtherOption, newId, nowIso, OTHER_TEXT_KEY, OTHER_TEXT_MAX, parseItems, participantLabels, renderItems, reqStr, roleAt, type TemplateItem } from "./common";
+import { gate, isOtherOption, newId, nowIso, OTHER_TEXT_KEY, OTHER_TEXT_MAX, parseItems, participantLabels, renderItems, reqStr, effectiveRoleAt, type TemplateItem } from "./common";
 
 import { collecting, sharedSession, submitShared } from "./shared-link";
 import { minimumHold } from "./results";
@@ -95,7 +96,7 @@ export const form: Handler = async (ctx, params) => {
   const passages = await participantPassages(ctx.env, s.assessment_id);
   return { result: { survey_id: s.id, assessment: s.name, language: s.language_name, period: s.period, languages, passages,
     project: s.project_name, purpose: s.purpose, format: s.format,
-    template: { id: s.template_id, version: s.template_version, perspective: s.perspective, source_ref: s.source_ref },
+    template: { id: s.template_id, version: s.template_version, perspective: s.perspective, source_ref: s.source_ref, ...(translationBriefSource(items,s.source_ref)?{instrument_amendment:translationBriefSource(items,s.source_ref)}:{}) },
     items: renderItems(items, s.language_name), participant_labels: participantLabels(s.template_id),
     // B09: optional "About you" fields shown before Q1, outside the pinned instrument. All optional.
     // S15a: only when the facilitator turned demographics on for this assessment; off by default.
@@ -118,7 +119,7 @@ export const submit: Handler = async (ctx, params) => {
     const items = parseItems(s as any);
     if (!items.length) throw new CapError("STAGE_CONFLICT", "survey instrument is unavailable");
     const answers = validateAnswers(items, params.answers), context = respondentContext(s, params.context);
-    return { result: await submitShared(ctx, shared, idempotencyKey, answers, s, context), scope: { type: "survey", id: s.id } };
+    return { result: await submitShared(ctx, shared, idempotencyKey, answers, {...s,instrument_amendment:translationBriefSource(items,s.source_ref)}, context), scope: { type: "survey", id: s.id } };
   }
   const respondentId = ctx.principal.respondentId!;
   const prior = await ctx.db.prepare("SELECT id, assessment_survey_id, respondent_id, submitted_at FROM response WHERE assessment_survey_id = ? AND idempotency_key = ?")
@@ -141,7 +142,7 @@ export const submit: Handler = async (ctx, params) => {
     (id, assessment_survey_id, respondent_id, idempotency_key, answers_json, template_id, template_version, provenance_json, source, submitted_at${hasContext ? ", context_json" : ""})
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?${hasContext ? ", ?" : ""})`)
     .bind(responseId, s.id, respondentId, idempotencyKey, JSON.stringify(answers), s.template_id, s.template_version,
-      JSON.stringify({ presented_template_id: s.template_id, presented_template_version: s.template_version, trace_id: ctx.traceId }), "participant", submittedAt,
+      JSON.stringify({ presented_template_id: s.template_id, presented_template_version: s.template_version, ...(translationBriefSource(items,s.source_ref)?{instrument_amendment:translationBriefSource(items,s.source_ref)}:{}), trace_id: ctx.traceId }), "participant", submittedAt,
       ...(hasContext ? [JSON.stringify(context)] : [])).run();
   return { result: { response_id: responseId, submitted_at: submittedAt, duplicate: false, undo: null }, scope: { type: "survey", id: s.id } };
 };
@@ -168,7 +169,7 @@ export const assisted_next: Handler = async (ctx) => {
 async function assessmentGrant(ctx: Ctx, aid: string, min: "viewer" | "member" | "owner") {
   const a = await ctx.db.prepare("SELECT id FROM assessment WHERE id = ?").bind(aid).first<{ id: string }>();
   if (!a) throw notVisible("assessment");
-  gate(await roleAt(ctx, "assessment", aid), min, "assessment");
+  gate(await effectiveRoleAt(ctx, "assessment", aid), min, "assessment");
 }
 
 export const list: Handler = async (ctx, params) => {

@@ -1,6 +1,6 @@
 // Client navigation is a projection of /v2/me, never an authorization grant.
 export function hasProjectWork(me) {
-  return !!me?.principal?.provisioned || (me?.grants || []).some(grant => grant.scope_type === 'project');
+  return !!me?.principal?.provisioned || (me?.grants || []).some(grant => ['workspace', 'project'].includes(grant.scope_type));
 }
 
 // The principal's OWN assessment grant rows from /v2/me; nothing is enumerated from a project.

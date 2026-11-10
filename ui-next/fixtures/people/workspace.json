@@ -1,0 +1,24 @@
+{
+  "_source": "3d-review-cookbook design/2026-10-15-glass-redesign/canvas Workspace.dc.html, WorkspacePhone.dc.html, WorkspaceGroup.dc.html, WorkspaceGroupPhone.dc.html. Candidates carry the workspace role, DIRECT project role and server-computed grouping eligibility (direct ownership of every contained review) used by ui/workspace-manager.js mayGroup().",
+  "user": { "first": "Bincy", "initials": "BK" },
+  "name": "Bridge Connectivity Solutions · India",
+  "short": "BCS · India",
+  "lead": "Projects this organisation runs or has been given access to. Partners never see each other's workspaces.",
+  "stats": [["Projects", 5], ["Reviews", 10], ["Responses", 133]],
+  "views": ["Active", "All", "Archived"],
+  "projects": [
+    {"title": "Hindi New Testament", "orgs": [["BCS", true], ["Seed Company", false]], "reviews": 4, "responses": 86, "phone": "4 reviews · 86 responses"},
+    {"title": "Odia New Testament", "orgs": [["BCS", true]], "reviews": 1, "responses": 0, "phone": "1 review · 0 responses"},
+    {"title": "Kurubaru Scripture", "orgs": [["BCS", true], ["SIL", false]], "reviews": 2, "responses": 20, "phone": "2 reviews · 20 responses"},
+    {"title": "ISL Mark", "orgs": [["BCS", true], ["Deaf Bible Society", false]], "reviews": 1, "responses": 15, "phone": "1 review · 15 responses"},
+    {"title": "Lao Old Testament", "orgs": [["Partner · shared", true], ["unfoldingWord", false]], "reviews": 2, "responses": 12, "phone": "2 reviews · 12 responses"}
+  ],
+  "group": {
+    "workspaceRole": "member",
+    "candidates": [
+      { "title": "Psalms reading group", "directRole": "owner", "groupingEligible": true },
+      { "title": "Kurubaru Scripture", "directRole": "owner", "groupingEligible": true },
+      { "title": "Lao Old Testament", "directRole": null, "groupingEligible": false }
+    ]
+  }
+}

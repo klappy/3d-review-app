@@ -6,6 +6,10 @@ main = "src/worker.ts"
 compatibility_date = "2026-09-01"
 workers_dev = true # preserve existing DEV alias when adding the custom domain
 
+# PDF Quick Actions; each environment declares its own non-inheritable binding.
+[browser]
+binding = "PDF_BROWSER"
+
 [[routes]]
 pattern = "dev.3dreview.app"
 custom_domain = true
@@ -64,8 +68,15 @@ run_worker_first = ["/v2/*", "/mcp", "/mcp/*", "/authorize", "/token", "/registe
 [env.production]
 name = "3d-review"
 workers_dev = false # preserve prior custom-domain-only production configuration
+
+# Production PDF Quick Actions, explicitly enabled for the 0.38.0 release.
+[env.production.browser]
+binding = "PDF_BROWSER"
+
 [env.production.vars]
 ENVIRONMENT = "production"
+# Temporary Summit numeric reports/levels from one response. Remove after Summit to restore 5/3 floors.
+SUMMIT_ONE_RESPONSE_REPORTS = "enabled"
 PARTICIPANT_REPORTS = "enabled"
 PUBLIC_ORIGIN = "https://3dreview.app"
 MAIL_FROM = "noreply@3dreview.app"

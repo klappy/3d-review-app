@@ -1,4 +1,5 @@
 import { sandboxToolsEnabled } from './sandbox-tools.js';
+import { mayGroup } from '../workspace-manager.js';
 // Scope pages — entry · workspaces · workspace · projects · project (UI overhaul contract, 2026-09-17).
 // Each page = { load(ctx, params) → model, render(ctx, model) → html, bind(ctx, root, model) }.
 // ctx = { api, esc, enc, go, note(msg, alert), state, routes, cards, setToken? }.
@@ -139,8 +140,10 @@ const storeSession = (key, v) => { try { sessionStorage.setItem(key, v); } catch
 const dropSession = key => { try { sessionStorage.removeItem(key); } catch {} };
 
 // ---------- entry (public) ----------
-// B20: also composed by the v3 setup wizard (step 2 "Who will participate?"), one description per perspective.
-export const PERSPECTIVES = [['team', 'Translation team', 'Experience of the work'], ['community', 'Community', 'Experience of the translation'], ['church', 'Church', 'Experience of its use']];
+// Labels + captions for the perspectives row on the public home and About only. The v3 setup wizard (step 2 "Who will participate?")
+// does not compose this list; it uses PERSPECTIVE_WHO below (ui/v3/wizard.js:28), so a caption change here never reaches the wizard.
+// C03 (Rachel 2026-10-19 copy, cookbook sources/rachel-copy-2026-10-19 app-copy-edits.txt paragraphs 3–5): captions on home + About.
+export const PERSPECTIVES = [['team', 'Translation team', 'How the work is done'], ['community', 'Community', 'How it’s understood'], ['church', 'Church', 'How it’s used']];
 // B08+B20 (Bincy SI 04 "Translation Team, Community, and Church descriptions"): one plain who-line per group, shared by setup step 2,
 // the launched rows and the Collect heading. Headings and data unchanged. Keyed as the wizard's pdot(): team / community / church.
 export const PERSPECTIVE_WHO = Object.freeze({ team: 'The people doing the translation work.', community: 'People who speak the language.', church: 'Pastors and church leaders in the language area.' });
@@ -174,19 +177,23 @@ function hero(ctx, signedIn) {
   const signInHref = ctx.state?.emailLinks === true ? '#signin' : '/v2/auth/access';
   const choices = `<nav class="public-choices actions" aria-label="Choose where to start" style="margin-top:0"><a class="rv-btn" href="#about">Read about it</a><a class="rv-btn" href="/?demo=1#assessment/demo-assessment/collect">Take the tour</a><a class="rv-btn" href="#survey">Take a survey</a>${signedIn ? '' : `<a class="rv-btn primary" href="${signInHref}">Sign in</a>`}</nav>`; // B02: a signed-in home never offers Sign in
   // Captain order 17:05 (lane 9, L9-22) "less text": public home = the four choices, one heading, one short line; everything else behind Learn more.
-  return `<section class="hero panel" id="public-home">${choices}${signedIn ? '' : signupNote(ctx, '8px 0 14px')}<p class="eyebrow" id="public-about">What is 3D Review?</p><h1>Three perspectives.<br>One useful next step.</h1><p class="muted lead">${LEAD}</p>${learnMore(`<p class="muted">3D Review brings translation team, community and church perspectives together to understand a project and choose useful next steps.</p>${perspectivesRow(ctx)}<p class="small muted">Explore the real assessment screens · Go at your own pace · Nothing is sent</p><p class="small"><a href="/?demo=1#assessment/demo-assessment/collect">Browse a sample assessment (synthetic data) →</a> · <a href="#projects">Open your projects and reports</a></p><p class="muted">Use it when your project is ready to pause, reflect and learn from feedback. Repeat when a new assessment would be useful — for example, between books or publishing iterations.</p>`)}</section>${continueCards}`;
+  return `<section class="hero panel" id="public-home">${choices}${signedIn ? '' : signupNote(ctx, '8px 0 14px')}<p class="eyebrow" id="public-about">What is 3D Review?</p><h1>Three perspectives.<br>One useful next step.</h1><p class="muted lead">${LEAD}</p>${learnMore(`${perspectivesRow(ctx)}${learnMoreBody(ctx)}<p class="small muted">Explore the real assessment screens · Go at your own pace · Nothing is sent</p><p class="small"><a href="/?demo=1#assessment/demo-assessment/collect">Browse a sample assessment (synthetic data) →</a> · <a href="#projects">Open your projects and reports</a></p>`)}</section>${continueCards}`;
 }
 function surveyView(ctx) {
   return `<section class="panel narrow"><p class="eyebrow">For participants</p><h1>Your feedback starts with your invitation.</h1><p class="muted">Open the survey link or scan the QR code someone shared with you. If you were given an access code, enter it below.</p><p><a class="button" href="/participate/?demo=1">Try a sample survey — nothing is sent</a></p><form id="code-form"><label class="field">Access code<input name="code" required autocomplete="off" maxlength="64" aria-describedby="code-error"></label><p id="code-error" class="code-error" role="alert" data-code-error></p><div class="actions"><button class="primary" type="submit">Open my survey</button><button type="button" class="quiet" data-act="welcome">Back to welcome</button></div></form><p class="small muted">Missing your survey link? Ask the person who invited you or shared the survey to send you the link. You do not need an account to follow a participant link.</p></section>`;
 }
 // Captain ruling 12:53 (lane 1, L1-16): a real public About page at #about — never a sign-in panel. Cards via ctx.cards.card (shared card component).
 // B30: About and the public home share one short line (composed, not copied).
-const LEAD = 'Hear from the translation team, the community and the church, then choose what to do next.';
-const WHO = [['Who it is for', 'Translation teams, the communities they serve and the churches using the translation — with a facilitator who runs the review.'], ['When to use it', 'When your project is ready to pause, reflect and learn from feedback.'], ['How often', 'Repeat when a new assessment would be useful — for example, between books or publishing iterations.']];
+// Rachel 2026-10-19 copy (cookbook sources/rachel-copy-2026-10-19/app-copy-edits.txt; C02, C05–C12). Source wording and punctuation kept;
+// source headings render as label lines (B30: one heading per screen, disclosures included).
+const LEAD = '3D Review visualizes how a Bible translation project is performing so you can decide what to do next.';
+const HOW = [['Set up.', 'A facilitator (usually a project manager or partner) creates the review and chooses the surveys that fit your project, whether it’s written, oral, or sign language.'], ['Share.', 'Each group answers a short survey, by link, QR code, or on paper.'], ['Learn.', 'You get a report that shows strengths and areas to grow, side by side, so you know where to focus next.']];
+const WHO = [['Who it is for', 'Translation teams and their leaders, the communities they serve and the churches they partner with'], ['When to use it', 'When your project would benefit from a pause to reflect and learn from feedback (consider using between books or publishing iterations)'], ['How often', 'Repeat when a new assessment would be useful, or over increments of time to create a trajectory']];
+// One Learn more body shared by the public home AND About (ruling 12:34: pages compose, never copy): an edit here changes both.
+const learnMoreBody = ctx => `<p data-copy="how-it-works"><strong>How it works</strong></p>${HOW.map(([t, s]) => `<p class="muted"><strong>${ctx.esc(t)}</strong> ${ctx.esc(s)}</p>`).join('')}${WHO.map(([t, s]) => `<p><strong>${ctx.esc(t)}</strong></p><p class="muted">${ctx.esc(s)}</p>`).join('')}`;
 export function aboutView(ctx) {
   // B30: behind Learn more the three facts are plain label + line pairs (no card headings: one heading per screen).
-  const facts = WHO.map(([t, s]) => `<p><strong>${ctx.esc(t)}</strong></p><p class="muted">${ctx.esc(s)}</p>`).join('');
-  return `<section class="glass panel narrow" id="about-page"><a class="back" href="#">← Back to home</a><p class="eyebrow">About 3D Review</p><h1>Three perspectives. One useful next step.</h1><p class="muted lead">${LEAD}</p>${perspectivesRow(ctx)}${learnMore(`<p class="muted">A facilitator sets up a review.</p><p class="muted">Each group answers a short survey.</p><p class="muted">The results show where the project is strong and where it needs support.</p>${facts}`)}<div class="actions"><a class="rv-btn primary" href="#">Back to home</a><a class="rv-btn" href="/?demo=1#assessment/demo-assessment/collect">Take the tour</a><a class="rv-btn" href="#survey">Take a survey</a></div></section>`;
+  return `<section class="glass panel narrow" id="about-page"><a class="back" href="#">← Back to home</a><p class="eyebrow">About 3D Review</p><h1>Three perspectives. One useful next step.</h1><p class="muted lead">${LEAD}</p>${perspectivesRow(ctx)}${learnMore(learnMoreBody(ctx))}<div class="actions"><a class="rv-btn primary" href="#">Back to home</a><a class="rv-btn" href="/?demo=1#assessment/demo-assessment/collect">Take the tour</a><a class="rv-btn" href="#survey">Take a survey</a></div></section>`;
 }
 // BCS demo 2026-09-29 (bee:10809312 u3540382343-350): the Cloudflare code page signs in by itself once a code is pasted, and a
 // second Submit shows an error page; sign-in emails can land in Spam. Plain hints until production moves to email links.
@@ -338,7 +345,7 @@ const workspaces = {
   render(ctx, model) {
     const g = gate(ctx, model); if (g) return g;
     const r = readModel('workspaces', model);
-    return readRegion(`${pageHead(ctx, r)}<p class="muted">${model.globalAccess ? 'Every workspace is available in Global Access. Open a workspace to browse its projects and assessments.' : 'Workspaces group projects shared with you.'} <a href="${ctx.routes.projects}">All projects</a></p>${kitGrid(ctx, r.items, r.empty)}`)
+    return readRegion(`${pageHead(ctx, r)}<p class="muted">${model.globalAccess ? 'Every workspace is available in Global Access. Open a workspace to browse its projects.' : 'Workspaces group projects shared with you.'} <a href="${ctx.routes.projects}">All projects</a></p>${kitGrid(ctx, r.items, r.empty)}`)
       + actionRegion(`<section class="panel" style="margin-top:22px"><h2>Create a workspace</h2><form id="create-workspace"><label class="field">Workspace name<input name="name" maxlength="100" required placeholder="For example, Lake region"></label><div class="actions"><button class="primary" type="submit">Create workspace</button></div></form></section>`);
   },
   bind(ctx, root, model) {
@@ -362,8 +369,8 @@ const workspace = {
     catch (e) { return { ...fail(e, safeMessage), params }; }
     const model = { status: 'loaded', params, workspace: core.workspace || {}, projects: core.projects || [], candidates: [], candidatesStatus: 'skipped' };
     if (CAN_EDIT.has(model.workspace.role)) {
-      // Projects the identity can open that are not already grouped here; the server decides share authority on add.
-      try { const r = await ctx.api('/v2/projects'); const here = new Set(model.projects.map(p => p.id)); model.candidates = (r.projects || []).filter(p => !here.has(p.id) && !p.archived_at); model.candidatesStatus = 'loaded'; }
+      // Keep visible, ungrouped projects with their server-computed share eligibility. The write rechecks authority.
+      try { const r = await ctx.api('/v2/projects'); const here = new Set(model.projects.map(p => p.id)); model.candidates = (r.projects || []).filter(p => !here.has(p.id) && !p.workspace_id && !p.archived_at); model.candidatesStatus = 'loaded'; }
       catch (e) { model.candidatesStatus = classify(e); }
     }
     return model;
@@ -371,9 +378,10 @@ const workspace = {
   render(ctx, model) {
     const g = gate(ctx, model, { href: ctx.routes.workspaces, label: 'All workspaces' }); if (g) return g;
     const w = model.workspace, edit = CAN_EDIT.has(w.role), owner = w.role === 'owner';
+    const eligible = p => mayGroup(w.role, p.direct_role, 'group', p.grouping_eligible);
     // Management lives on the card itself (root visual delta, loc-27): one card per project, its own Remove control beneath it.
     const rows = '';
-    const add = edit ? `<section class="panel" style="margin-top:22px"><h2>Add a project</h2>${model.candidatesStatus === 'loaded' ? (model.candidates.length ? `<form id="add-project"><label class="field">Project<select name="pid" required><option value="">Choose a project…</option>${model.candidates.map(p => `<option value="${ctx.esc(p.id)}">${ctx.esc(p.name)}</option>`).join('')}</select></label><div class="actions"><button class="primary" type="submit">Add to workspace</button></div></form>` : '<p class="muted">Every project you can open is already grouped here, or you have no projects yet.</p>') : '<p class="muted">The project list could not be loaded right now.</p>'}<p class="small muted">Only projects you already hold a role on can be grouped. Grouping never grants access.</p></section>` : '';
+    const add = edit ? `<section class="panel" style="margin-top:22px"><h2>Add a project</h2><p class="small" id="grouping-access-notice">Adding a project gives everyone in this workspace access to the project, its assessments and their available reports at their workspace role. You must directly own the project and every review it contains, including archived reviews. Removing the project ends inherited access; people added to a project directly keep their access.</p>${model.candidatesStatus === 'loaded' ? (model.candidates.length ? `<form id="add-project"><label class="field">Project<select name="pid" required><option value="">Choose a project…</option>${model.candidates.map(p => `<option value="${ctx.esc(p.id)}"${eligible(p) ? '' : ' disabled'}>${ctx.esc(p.name)}${eligible(p) ? '' : p.grouping_eligible === undefined ? ' · Eligibility unavailable; reload' : ' · Direct project and review ownership required'}</option>`).join('')}</select></label><div class="actions"><button class="primary" type="submit"${model.candidates.some(eligible) ? '' : ' disabled'} aria-describedby="grouping-access-notice">Add to workspace</button></div></form>` : '<p class="muted">No ungrouped projects are available. Remove a project from its current workspace before moving it here.</p>') : '<p class="muted">The project list could not be loaded right now. Reload before grouping a project.</p>'}</section>` : '';
     const rename = owner ? `<section class="panel" style="margin-top:22px"><h2>Rename</h2><form id="rename-form"><label class="field">Workspace name<input name="name" maxlength="100" required value="${ctx.esc(w.name)}"></label><div class="actions"><button class="primary" type="submit">Save name</button></div></form></section>` : '';
     const r = readModel('workspace', model);
     // Read region: kit cards for grouped projects. Action region: the existing per-card Remove controls, Add and Rename forms (same selectors).
@@ -390,6 +398,10 @@ const workspace = {
       ev.preventDefault();
       const form = ev.target, pid = val(form, 'pid');
       if (!pid) return;
+      const candidate = model.candidates.find(p => p.id === pid);
+      if (!candidate || !mayGroup(model.workspace.role, candidate.direct_role, 'group', candidate.grouping_eligible)) {
+        ctx.note('Grouping requires direct ownership of the project and every review. Reload to check current eligibility.', true); return;
+      }
       const r = await write(ctx, form.querySelector('button[type=submit]'), 'Add project', () => ctx.api(`/v2/workspaces/${ctx.enc(id)}/projects/${ctx.enc(pid)}`, { method: 'POST' }));
       if (r) { ctx.note('Project added.'); await reload(); }
     });
@@ -427,22 +439,8 @@ const projects = {
     // pendingInvitations); any failure → none, Home unchanged. Started here (after the signed-out return above, so a signed-out
     // visitor makes no request) so it runs alongside the assessment and /v2/me reads instead of after them.
     const mine = ctx.api('/v2/me/invitations').then(pendingInvitations, () => []);
-    // v3 lane 9: each project's assessments, read-only, same endpoint the project page uses; first 20 projects, the rest link out.
-    const lists = {};
-    await Promise.allSettled(list.filter(p => !p.archived_at).slice(0, 20).map(async p => {
-      try { const a = await ctx.api(`/v2/projects/${encodeURIComponent(p.id)}/assessments`); lists[p.id] = { status: 'loaded', list: (a.assessments || []).filter(x => !x.archived_at) }; }
-      catch (e) { lists[p.id] = { status: classify(e) }; }
-    }));
-    // B03 (Bincy F01/F02): an assessment shared directly (assessment grant, no project role) is not in /v2/projects. Home lists it
-    // from the caller's own grants (/v2/me) + the assessment read the grant already allows — no new server surface.
-    let shared = [];
-    try {
-      const me = await ctx.api('/v2/me'), here = new Set(list.map(p => p.id));
-      const ids = [...new Set((me?.grants || []).filter(g => g.scope_type === 'assessment').map(g => g.scope_id))].slice(0, 20);
-      const reads = await Promise.allSettled(ids.map(id => ctx.api(`/v2/assessments/${encodeURIComponent(id)}`)));
-      shared = reads.filter(r => r.status === 'fulfilled').map(r => r.value?.assessment).filter(a => a && !a.archived_at && !here.has(a.project_id));
-    } catch { shared = []; }
-    return { status: 'loaded', params, projects: list, lists, shared, invitations: await mine };
+    // Owner rule: Home never reads or lists any project's reviews; they load only once a project is opened (the project page).
+    return { status: 'loaded', params, projects: list, invitations: await mine };
   },
   render(ctx, model) {
     const g = gate(ctx, model); if (g) return g;
@@ -450,7 +448,7 @@ const projects = {
     // CONTRACT § 4–5: the welcome is the page title, by saved name (same cleaner as the header, rev461 N2), else the email; with
     // neither, the existing "Projects" head stays.
     const greet = (ctx.displayName ? ctx.displayName(ctx.state?.principal?.display_name) : '') || ctx.state?.accountEmail || '';
-    const home = homeView({ projects: model.projects || [], shared: model.shared || [], listFor: id => (model.lists || {})[id], stageLabel: s => ctx.esc(ctxStage(s)), start: START_REVIEW, invitations: (model.invitations || []).length, name: greet });
+    const home = homeView({ projects: model.projects || [], start: START_REVIEW, invitations: (model.invitations || []).length, name: greet });
     return readRegion(`${greet ? '' : pageHead(ctx, r)}${home}<p class="small muted"><a href="${ctx.routes.workspaces}">Organize projects in a workspace</a> · Optional</p>`);
   },
   bind(ctx, root, model) {
