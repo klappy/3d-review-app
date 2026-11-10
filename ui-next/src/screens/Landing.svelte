@@ -26,7 +26,8 @@
   import { OVERVIEW } from "../overview-video.js";
   import { C01, C02 } from "../copy/rachel.js";
 
-  // Approved public overview: no autoplay, full image and optional same-origin captions.
+  // The film has baked-in captions. The optional VTT track is not attached here:
+  // the native iPhone A1/A2 and R0/R1 comparison isolates it as the playback trigger.
   // home (live, signed in): the logo goes to the signed-in home, not back to this page (cookbook work/active/2026-10-26-3d-logged-in-home).
   let { phone = false, theme = "light", w, videoSrc = OVERVIEW.src, home, pending = false } = $props();
   let media;
@@ -73,7 +74,7 @@
       <p class="small t-15">{C02}</p>
       <button type="button" class="btn btn-quiet" disabled={!videoSrc} onclick={() => media?.play()}>Watch how it works · 2:00</button>
     </Card>
-    <MediaCard bind:this={media} title="What 3D Review is" duration={OVERVIEW.duration} src={videoSrc} poster={OVERVIEW.poster} captions={OVERVIEW.captions} />
+    <MediaCard bind:this={media} title="What 3D Review is" duration={OVERVIEW.duration} src={videoSrc} directSrc={videoSrc === OVERVIEW.src ? OVERVIEW.directSrc : videoSrc} poster={OVERVIEW.poster} />
     <Card pad="list" gap={1} label="Common questions">
       {#each FAQ_PHONE as [q, a]}<Disclosure label={q} solid={false}><p class="small">{a}</p></Disclosure>{/each}
       <a class="link small" href={HELP}>All questions and the facilitator guide</a>
@@ -89,7 +90,7 @@
             <Row wrap gap={3}><Button label="Try the sample review" variant="primary" lg href={SAMPLE} {trail} /><button type="button" class="btn btn-lg" disabled={!videoSrc} onclick={() => media?.play()}><Icon d={I.play} />Watch how it works · 2:00</button></Row>
             <p class="micro">No account needed to explore the sample. Facilitators sign in with an email link.</p>
           </Stack>
-          <MediaCard bind:this={media} title="What 3D Review is" duration={OVERVIEW.duration} caption="One short video explains the three perspectives and what a review gives you." src={videoSrc} poster={OVERVIEW.poster} captions={OVERVIEW.captions} />
+          <MediaCard bind:this={media} title="What 3D Review is" duration={OVERVIEW.duration} caption="One short video explains the three perspectives and what a review gives you." src={videoSrc} directSrc={videoSrc === OVERVIEW.src ? OVERVIEW.directSrc : videoSrc} poster={OVERVIEW.poster} />
         </Grid>
       </Section>
       <Section>

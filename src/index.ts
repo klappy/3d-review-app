@@ -21,8 +21,11 @@ import { installRoadmapStream } from "./roadmap/stream";
 import { installTranslate } from "./translate";
 import { installPassages } from "./passages";
 import { installPdf } from "./pdf";
+import { OVERVIEW_MEDIA_PATH, overviewMedia } from "./overview-media";
 
 const app = new Hono<{ Bindings: Env }>();
+// Public immutable overview media; /v2/* already runs Worker-first in both environments.
+app.all(OVERVIEW_MEDIA_PATH, (c) => overviewMedia(c.req.raw));
 const json = (value: unknown, status: number) => new Response(JSON.stringify(value), {
   status, headers: { "content-type": "application/json; charset=utf-8" },
 });

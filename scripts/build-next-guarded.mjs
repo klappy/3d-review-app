@@ -15,4 +15,9 @@ import { spawnSync } from "node:child_process";
 const branch = process.env.WORKERS_CI_BRANCH ?? "";
 if (branch === "production") console.log("build:next — WORKERS_CI_BRANCH=production: emitting ui/next/ with the fixture harness compiled out");
 const r = spawnSync("npm", ["run", "build:next", ...(process.argv.length > 2 ? ["--", ...process.argv.slice(2)] : [])], { stdio: "inherit", shell: process.platform === "win32" });
-process.exit(r.status ?? 1);
+if (r.status !== 0) process.exit(r.status ?? 1);
+const { buildPlayerDiagnostics } = await import('./build-player-diagnostics.mjs');
+// Test outDir overrides keep diagnostic assets beside that isolated build as well.
+const args = process.argv.slice(2);
+const outIndex = args.indexOf('--outDir');
+await buildPlayerDiagnostics({ branch, ...(outIndex >= 0 ? { assetsDir: args[outIndex + 1] } : {}) });
