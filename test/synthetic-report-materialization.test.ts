@@ -106,7 +106,7 @@ describe('private marker isolation and exact D1 commands',()=>{
   });
   it('pins the effective workspace-aware viewer-read CTE and leaves the original B1 capture unchanged',()=>{
     const normalized=REPORT_CAPTURE_CTE.split('\n').filter(l=>!l.trimStart().startsWith('--')).join('\n').trim();
-    expect(createHash('sha256').update(normalized).digest('hex')).toBe('e8d073f4644391e9f373b75a028521717ebd33403a74c662ec734aba3d276976');
+    expect(createHash('sha256').update(normalized).digest('hex')).toBe('ae65ebac19a38155a6fc8b0d33d096b1b6b870f7ad3598759f857edcaf22c4a4');
     expect(createHash('sha256').update(B1_CAPTURE_SQL).digest('hex')).toBe('8e3f51e2f5cb7350c2a7824e5a78c91c64fb17a1966d79b9fe3f064c711598c6');
   });
   it('keeps reports immutable under actual D1 triggers and surfaces a forced constraint failure',async()=>{
@@ -264,5 +264,50 @@ describe('single-observation disclosure and page suppression',()=>{
     const unsuccessful=intercept(async(sql,args,method,next)=>sql===marker.REPORT_COMMIT_SQL?{success:false}:next());
     expect(await marker.buildMaterialized(context(unsuccessful),aid)).toEqual({ok:false,reason:'UNAVAILABLE'});
   });
+
+});
+
+// Hosted D1 rejects the former nested scalar aggregation although local Miniflare accepts it.
+// Keep the historical producer as the byte-level oracle, not a second production query.
+describe('hosted D1 capture nesting regression',()=>{
+ const oldPacking=B1_CAPTURE_SQL.slice(B1_CAPTURE_SQL.indexOf('), bounds AS ('),B1_CAPTURE_SQL.indexOf('), captured AS ('));
+ const start=REPORT_CAPTURE_CTE.indexOf('), response_pack AS ('),end=REPORT_CAPTURE_CTE.indexOf('), captured AS (');
+ const oldCte=REPORT_CAPTURE_CTE.slice(0,start)+oldPacking+REPORT_CAPTURE_CTE.slice(end);
+ const read=' SELECT assessment_id,capture_json FROM captured;';
+ it('uses one bounded ordered aggregate per fragment set without changing the B1 authority oracle',()=>{
+  expect(start).toBeGreaterThan(0);expect(end).toBeGreaterThan(start);
+  expect(REPORT_CAPTURE_CTE).not.toContain('), bounds AS (');
+  expect(REPORT_CAPTURE_CTE).toContain('FROM target CROSS JOIN integrity CROSS JOIN response_pack rp CROSS JOIN template_pack tp');
+  const normalized=oldCte.split('\n').filter(l=>!l.trimStart().startsWith('--')).join('\n').trim();
+  expect(createHash('sha256').update(normalized).digest('hex')).toBe('e8d073f4644391e9f373b75a028521717ebd33403a74c662ec734aba3d276976');
+ });
+ it('produces exactly the former capture bytes for viewer/member, absent user, support and held input',async()=>{
+  async function compare(){
+   for(const [kind,id,role] of [['user','person_mara','viewer'],['user','person_mara','member'],['user','absent','viewer'],['support','absent','viewer']]){
+    const args=[kind,null,aid,id,role];
+    const old=await db.prepare(oldCte+read).bind(...args).all();
+    const fresh=await db.prepare(REPORT_CAPTURE_CTE+read).bind(...args).all();
+    expect(fresh.results).toEqual(old.results);
+   }
+  }
+  await compare();
+  const row=await db.prepare('SELECT r.id,r.answers_json FROM response r JOIN assessment_survey s ON s.id=r.assessment_survey_id WHERE s.assessment_id=? LIMIT 1').bind(aid).first<any>();
+  await exec('UPDATE response SET answers_json=? WHERE id=?',JSON.stringify('x'.repeat(8193)),row.id);
+  try{await compare();expect((await db.prepare(REPORT_CAPTURE_CTE+read).bind('user',null,aid,'person_mara','viewer').all()).results).toEqual([]);}
+  finally{await exec('UPDATE response SET answers_json=? WHERE id=?',row.answers_json,row.id);}
+ });
+ it('retains the existing response-count boundary and refuses overflow without unbounded JSON aggregation',async()=>{
+  const row=await db.prepare('SELECT r.* FROM response r JOIN assessment_survey s ON s.id=r.assessment_survey_id WHERE s.assessment_id=? LIMIT 1').bind(aid).first<Record<string,unknown>>();
+  const n=await db.prepare('SELECT count(*) n FROM response r JOIN assessment_survey s ON s.id=r.assessment_survey_id WHERE s.assessment_id=?').bind(aid).first<{n:number}>();
+  const insert=(i:number)=>{const v={...row,id:`andy-overflow-${i}`,respondent_id:`andy-overflow-${i}`,idempotency_key:`andy-overflow-${i}`,answers_json:'{}'};return db.prepare('INSERT INTO response ('+Object.keys(v).join(',')+') VALUES ('+Object.keys(v).map(()=>'?').join(',')+')').bind(...Object.values(v));};
+  try{
+   const stmts=Array.from({length:425-n!.n},(_,i)=>insert(i));for(let i=0;i<stmts.length;i+=50)await db.batch(stmts.slice(i,i+50));
+   const args=['user',null,aid,'person_mara','viewer'];
+   expect((await db.prepare(REPORT_CAPTURE_CTE+read).bind(...args).all()).results).toEqual((await db.prepare(oldCte+read).bind(...args).all()).results);
+   await insert(426).run();
+   expect((await db.prepare(REPORT_CAPTURE_CTE+read).bind(...args).all()).results).toEqual([]);
+   expect((await db.prepare(oldCte+read).bind(...args).all()).results).toEqual([]);
+  }finally{await exec("DELETE FROM response WHERE id LIKE 'andy-overflow-%'");}
+ });
 
 });

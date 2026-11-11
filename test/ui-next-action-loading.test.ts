@@ -11,6 +11,7 @@ import { setToken } from '../ui-next/src/app/api.js';
 import { liveChrome, setLiveChrome } from '../ui-next/src/app/chrome.js';
 import { DATA as participantFixture } from '../ui-next/src/screens/participant/data.js';
 import { setTheme } from '../ui-next/src/theme.svelte.js';
+import collect from '../ui-next/fixtures/collect/collect.json';
 import workspace from '../ui-next/fixtures/people/workspace.json';
 const me={principal:{id:'actor-A',display_name:'Actor A',kind:'user',provisioned:true,access_mode:'my'},grants:[]};
 const rows=[{id:'project-A',name:'Verified project',organization:'Fixture organization',role:'owner',assessment_count:1,response_count:2}];
@@ -168,4 +169,34 @@ it.each(['project','review'])('keeps phone %s management menu and Close bound to
 });
 it('menu host follows stored viewer preference and live theme radio changes while staying open',async()=>{
  setup(true);setTheme('dark');vi.spyOn(D,'projects').mockResolvedValue(rows);location.hash='#/projects';const view=render(Live);await view.findByRole('link',{name:'Verified project'});await go('#/menu');await view.findByRole('navigation',{name:'Workspace and account'});const host=view.container.querySelector('.account-overlay-root')!;expect(host.getAttribute('data-theme')).toBe('dark');const dialog=view.getByRole('dialog');await fireEvent.click(within(dialog).getByRole('radio',{name:'Light',exact:true}));await flush();expect(host.getAttribute('data-theme')).toBe('light');await fireEvent.click(within(dialog).getByRole('radio',{name:'Dark',exact:true}));await flush();expect(host.getAttribute('data-theme')).toBe('dark');expect(view.getByRole('dialog')).toBe(dialog);
+});
+
+// Andy regression: a report-list failure must not strand Collect behind inert tabs.
+describe('failed review destination navigation',()=>{
+ it.each([false,true])('offers retry and a working return from Understand/Improve failure (phone=%s)',async phone=>{
+  setup(phone);
+  vi.spyOn(D,'collectModel').mockResolvedValue({...collect,aid:'review-A',projectId:'project-A'});
+  vi.spyOn(D,'attachLinks').mockImplementation(async m=>m);
+  const failure=Object.assign(new Error('The report request could not be completed.'),{code:'STAGE_CONFLICT'});
+  const results=vi.spyOn(D,'resultsModel').mockRejectedValue(failure);
+  const writes=vi.spyOn(D,'buildReport');
+  for(const destination of ['results','next-step']){
+   await go('#/review/review-A/collect');const view=render(Live);
+   await view.findByRole('link',{name:/Understand/});
+   await go(`#/review/review-A/${destination}`);
+   await view.findByRole('heading',{name:'Something went wrong'});
+   expect(view.queryByRole('button',{name:'Retry update'})).toBeNull();
+   const back=view.getByRole('link',{name:'Back to previous view'});
+   expect(back.getAttribute('href')).toBe('#/review/review-A/collect');
+   expect(back.closest('[inert]')).toBeNull();
+   await fireEvent.click(view.getByRole('button',{name:'Retry',exact:true}));
+   await view.findByRole('heading',{name:'Something went wrong'});
+   expect(view.getByRole('link',{name:'Back to previous view'}).getAttribute('href')).toBe('#/review/review-A/collect');
+   await go(back.getAttribute('href')!);
+   await view.findByRole('link',{name:/Understand/});
+   expect(view.getByRole('link',{name:/Understand/}).closest('[inert]')).toBeNull();
+   view.unmount();
+  }
+  expect(results).toHaveBeenCalledTimes(4);expect(writes).not.toHaveBeenCalled();
+ });
 });

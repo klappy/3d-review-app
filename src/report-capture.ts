@@ -102,11 +102,39 @@ const TABLE_FREE_TARGET = '    AND ?2 IS NULL AND a.id = ?3';
 const REPORT_TARGET = `    AND ((?2 IS NULL AND a.id = ?3)
       OR (?3 IS NULL AND EXISTS (
         SELECT 1 FROM synthetic_report m WHERE m.id = ?2 AND m.assessment_id = a.id)))`;
+// Aggregate each ordered fragment set once. Repeated scalar subqueries through
+// bounds/packed expand beyond hosted D1's nesting limit, even when local D1 passes.
+// One statement still authorizes, captures and bounds the same immutable bytes.
+// One overflow row proves the count hold without aggregating unbounded input.
+const REPORT_AGGREGATE_PACKING = `), response_pack AS (
+  SELECT count(*) AS n, sum(fragment IS NULL) AS invalid,
+    COALESCE(sum(length(CAST(fragment AS BLOB)) + 1), 0) AS bytes,
+    json_group_array(json(fragment)) AS packed_json
+  FROM (SELECT fragment FROM response_fragments ORDER BY id COLLATE BINARY LIMIT 426)
+), template_pack AS (
+  SELECT count(*) AS n, sum(fragment IS NULL) AS invalid,
+    COALESCE(sum(length(CAST(fragment AS BLOB)) + 1), 0) AS bytes,
+    json_group_array(json(fragment)) AS packed_json
+  FROM (SELECT fragment FROM template_fragments ORDER BY id COLLATE BINARY, version LIMIT 10)
+), packed AS (
+  SELECT target.id AS assessment_id,
+    CASE WHEN integrity.valid = 1 AND rp.n BETWEEN 1 AND 425
+      AND tp.n BETWEEN 1 AND 9 AND rp.invalid + tp.invalid = 0
+      AND rp.bytes + tp.bytes + 16 <= 524288
+    THEN json_array(json(rp.packed_json), json(tp.packed_json))
+    ELSE NULL END AS capture_json
+  FROM target CROSS JOIN integrity CROSS JOIN response_pack rp CROSS JOIN template_pack tp
+`;
+function flattenReportPacking(sql: string): string {
+  const start = sql.indexOf('), bounds AS ('), end = sql.indexOf('), captured AS (', start);
+  if (start < 0 || end < start) throw new Error('CAPTURE_SQL_SHAPE');
+  return sql.slice(0, start) + REPORT_AGGREGATE_PACKING + sql.slice(end);
+}
 function reportCapturePrefix(): string {
   const grantOpen = '    AND EXISTS (\n      SELECT 1 FROM "grant" g';
   const grantClose = "(?5 = 'viewer' AND g.role = 'viewer')))";
   if (!B1_CAPTURE_SQL.endsWith(CAPTURE_SUFFIX) || [TABLE_FREE_TARGET, grantOpen, grantClose].some(part => B1_CAPTURE_SQL.split(part).length !== 2)) throw new Error('CAPTURE_SQL_SHAPE');
-  return B1_CAPTURE_SQL.slice(0, -CAPTURE_SUFFIX.length).replace(TABLE_FREE_TARGET, REPORT_TARGET)
+  return flattenReportPacking(B1_CAPTURE_SQL.slice(0, -CAPTURE_SUFFIX.length)).replace(TABLE_FREE_TARGET, REPORT_TARGET)
     .replace("g.scope_type = 'assessment' AND g.scope_id = a.id", grantApplies('g', "'assessment'", 'a.id'))
     .replace(grantOpen, "    AND ((?1 = 'support' AND ?5 = 'viewer') OR EXISTS (\n      SELECT 1 FROM \"grant\" g")
     .replace(grantClose, "(?5 = 'viewer' AND g.role = 'viewer'))))")

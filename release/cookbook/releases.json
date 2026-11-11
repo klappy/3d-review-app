@@ -1,7 +1,28 @@
 {
   "schema": "3dr-releases/1",
-  "current": "0.41.7",
+  "current": "0.41.8",
   "versions": [
+    {
+      "version": "0.41.8",
+      "status": "candidate",
+      "notes_path": "releases/0.41.8.md",
+      "sections": {
+        "fixed": [
+          "PATCH 0.41.8 restores saved-report capture reads rejected by hosted D1 with a nested-subquery limit. Bounded ordered aggregate CTEs preserve authorization, deterministic capture bytes, integrity and size limits, and the single-statement snapshot.",
+          "Failed navigation from Collect to Understand or Improve now shows a retryable destination error with a working Back to previous view path. Actual refresh or write uncertainty remains locked; navigation does not build or update a report."
+        ],
+        "changed": [
+          "Frozen product source: app PR633 at 6caa645913dbb2e8d9651a8ee4d68fcb53b53316. The release adds no report auto-update, stage/date rewrite, permission change, schema change or new reporting policy. Empty Edit details/Continue remains a separate investigation. This candidate is not a deployed release.",
+          "Owner-reported exact-source checks: pristine npm ci, typecheck and full npm test passed; 192 files passed and 1 skipped, 2443 tests passed and 3 skipped, including 1164 UI Next tests. Standalone test:ui passed 975 tests; test:mjs passed 119 and skipped 6. The 116 focused backend/access tests overlap the full suite and are not added to its total. Final packaging and attached current-head checks remain required.",
+          "Report-reader hosted SQL scorecard: direct read-only hosted D1 checks of final LIST, GET and OBSERVE statements, denominator 3; attempted 3, passed 3, failed 0, untested 0, all zero writes. This validates hosted query execution, not deployed API/MCP/browser behavior or every saved report.",
+          "Assessment-reviewer UI scorecard: automated/local fixtures at the frozen product source cover phone and desktop layouts for Understand and Improve failures, retry and return to Collect without report creation, denominator 4; attempted 4, passed 4, failed 0, untested 0. Device rendering, live authentication and native phone behavior are not measured by these fixtures.",
+          "Deployed acceptance scorecard for the corrected release: report reader opens a saved report, assessment reviewer opens Understand, and assessment reviewer opens Improve, denominator 3 per environment. DEV: attempted 0, passed 0, failed 0, untested 3. Production: attempted 0, passed 0, failed 0, untested 3. Operator-browser, real-human and broader persona outcomes remain untested. Satisfaction, confusion and frustration are NOT MEASURED, sample 0; no comparable baseline delta is claimed."
+        ],
+        "security": [
+          "No migration, seed replay, production content mutation, dependency, credential, binding, DNS, deployment-trigger, Spanish text or audio change. Existing grant checks, fail-closed capture bounds and immutable saved reports remain in force. Normal independent review, protected merge and Git-connected DEV then production validation remain required."
+        ]
+      }
+    },
     {
       "version": "0.41.7",
       "status": "candidate",
