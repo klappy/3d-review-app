@@ -1,25 +1,25 @@
 {
   "workspace": {
-    "name": "Bridge Connectivity Solutions · India",
-    "short": "BCS · India"
+    "name": "Bridge Connectivity Solutions \u00b7 India",
+    "short": "BCS \u00b7 India"
   },
   "project": {
     "name": "Hindi New Testament",
-    "meta": "Hindi (hin · Deva) · Written · lead organisation BCS · 4 reviews since May 2026",
-    "phoneMeta": "Hindi (hin) · Written · 4 reviews since May 2026",
+    "meta": "Hindi (hin \u00b7 Deva) \u00b7 Written \u00b7 lead organisation BCS \u00b7 4 reviews since May 2026",
+    "phoneMeta": "Hindi (hin) \u00b7 Written \u00b7 4 reviews since May 2026",
     "stage": "collecting"
   },
   "reviews": [
     {
       "when": "Oct 2026",
-      "title": "Mark 1–4 draft",
+      "title": "Mark 1\u20134 draft",
       "stage": "collecting",
       "to": "collect",
       "note": "No results yet"
     },
     {
       "when": "Sep 2026",
-      "title": "Luke 1–2 community review",
+      "title": "Luke 1\u20132 community review",
       "stage": "results",
       "to": "results",
       "levels": [
@@ -67,7 +67,7 @@
     },
     {
       "when": "May 2026",
-      "title": "Workshop 1 · Mark 1",
+      "title": "Workshop 1 \u00b7 Mark 1",
       "stage": "done",
       "to": "nextStep",
       "levels": [
@@ -104,7 +104,7 @@
       "Growing",
       "Support",
       "Urgent",
-      "—"
+      "\u2014"
     ],
     "lines": {
       "team": [
@@ -126,6 +126,9 @@
         "growing"
       ]
     },
-    "read": "Community has stayed at Needs support overall across three reviews while the team climbed — the gap is widening, not closing."
-  }
+    "read": "Community has stayed at Needs support overall across three reviews while the team climbed \u2014 the gap is widening, not closing."
+  },
+  "archivedReviews": [],
+  "limitedAccess": false,
+  "limitedGuidance": null
 }

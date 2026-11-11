@@ -161,7 +161,7 @@
     if (name === "people" && r.query.get("project")) return { screen: name, projectScope: true, data: await D.peopleModel({ type: "project", id: r.query.get("project") }, me) };
     if (name === "people") { if (!reviewQ) return { screen: name, empty: true, emptyText: "Open People from a review's page: this page lists who has access to one review." }; return { screen: name, data: await D.peopleModel({ type: "assessment", id: reviewQ }, me) }; }
     if (name === "invitations") return { screen: name, data: await D.invitationsModel(me), privateInvitation: r.query.get("private") === "1" };
-    if (name === "project") return { screen: "project", data: await D.projectModel(params.pid) };
+    if (name === "project") return { screen: "project", data: await D.projectModel(params.pid, me) };
     if (name === "activity") return { screen: name, entries: activitySnapshot() };
     if (name === "account") return { screen: name, principal: await loadAccountSettings(me.principal.id), view: r.query.get("view") || "name" };
     if (name === "project-tools") return { screen: name, entity: await D.project(params.pid) };
@@ -714,7 +714,7 @@
   {/if}
 {:else if page.data.screen === "invitations"}
   {@const C = REGISTRY.invitations}
-  <C {phone} {theme} data={page.data.data} onaccept={acceptInvite} privateInvitation={page.data.privateInvitation} onsettled={async () => { S.forget(); await load(); }} />
+  <C {phone} {theme} data={page.data.data} onaccept={acceptInvite} privateInvitation={page.data.privateInvitation} onsettled={async () => { S.forget(); go(to("home")); }} />
 {:else if page.data.preview}
   {@const C = REGISTRY[page.data.screen]}
   {@render sampleMark({ href: page.data.editHref ?? (page.data.assessment ? to("review", { aid: page.data.assessment.id }) : to("home")), label: page.data.previewNote ? "Send feedback in the current design" : page.data.editHref ? `Edit ${page.data.assessment?.name ?? "this review"} in the current design` : page.data.assessment ? "Back to the review" : "Home" })}

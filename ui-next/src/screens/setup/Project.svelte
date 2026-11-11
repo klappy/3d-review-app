@@ -22,19 +22,26 @@
   import LensDot from "../../LensDot.svelte";
   import Coverage from "../results/Coverage.svelte";
   import Glyph from "./Glyph.svelte";
+  import Tag from "../../Tag.svelte";
   import { href } from "../href.js";
   import { out } from "./links.js";
   import fixture from "../../../fixtures/setup/project.json";
 
   // The board draws one state; the route's ?state= prop is not read, so any value (unknown included) renders it and never throws.
   // data: the fixture, or the live model in the same shape (app/data.js projectModel); a review row may carry its own href.
+  // Archived reviews live under an explicit view inside the opened project (not on Home / Projects list).
   let { phone = false, theme = "light", data = fixture } = $props();
   const { workspace: ws, project: p, reviews, trend } = data;
+  const archivedReviews = $derived(data.archivedReviews ?? []);
+  const limitedAccess = $derived(!!data.limitedAccess);
+  let reviewView = $state("Active");
+  const VIEWS = ["Active", "Archived", "All"];
+  const shown = $derived(reviewView === "Active" ? reviews : reviewView === "Archived" ? archivedReviews : [...reviews, ...archivedReviews]);
   const W = $derived(phone ? { w: "phone" } : {});
   const to = (screen) => href(screen, W);
   const go = (key) => out(key, W);
   const START = $derived(to("setup1"));
-  const SETTINGS = $derived(data.project.id ? to("project-settings") : undefined);
+  const SETTINGS = $derived(!limitedAccess && data.project.id ? to("project-settings") : undefined);
   // "Over time" chart geometry (viewBox 420x190, rows every 30 from y30; board: a review every 110 from x40, labels from x8). Port: the
   // plot starts at x60 (labels end-anchored at x52), a review every 110 from x70, so the last point (x400, r5) stays inside the viewBox.
   const Y = { strong: 30, growing: 60, support: 90, urgent: 120, more: 150 };
@@ -48,41 +55,47 @@
 {#snippet pen()}<Glyph name="pen" />{/snippet}
 {#snippet dots()}<Glyph name="dots" size={20} />{/snippet}
 {#snippet top()}{#if phone}<PhoneHeader state="root" home={to("home")} />{:else}<TopBar workspace={ws.short} home={to("home")} />{/if}{/snippet}
-{#snippet bar()}{#if phone}<PhoneBar label="Start a 3D Review" lead="plus" href={START} />{/if}{/snippet}
+{#snippet bar()}{#if phone && !limitedAccess}<PhoneBar label="Start a 3D Review" lead="plus" href={START} />{/if}{/snippet}
 
 <AppShell {phone} {theme} screen {top} {bar}>
   {#if phone}
-    <a class="link small" href={go("workspace")}>{ws.short}</a>
-    <Row wrap gap={2}><h1 class="title-phone">{p.name}</h1><Pill stage={p.stage} /></Row>
+    {#if !limitedAccess}<a class="link small" href={go("workspace")}>{ws.short}</a>{:else}<span class="small">{ws.short}</span>{/if}
+    <Row wrap gap={2}><h1 class="title-phone">{p.name}</h1>{#if limitedAccess}<Tag label="Assessment only" />{:else}<Pill stage={p.stage} />{/if}</Row>
     <p class="small">{p.phoneMeta}</p>
-    <Row gap={2}><Button label="People" href={go("people")} lead={people} block /><Button label="Settings" href={SETTINGS} disabled={!SETTINGS} lead={pen} block /></Row>
+    {#if limitedAccess}<p class="small" data-limited-guidance>{data.limitedGuidance}</p>{/if}
+    {#if !limitedAccess}<Row gap={2}><Button label="People" href={go("people")} lead={people} block /><Button label="Settings" href={SETTINGS} disabled={!SETTINGS} lead={pen} block /></Row>{/if}
     <section class="glass l-card" data-pad="list" aria-labelledby="revs-h">
       <Row split gap={3}><span class="micro" id="revs-h">Reviews over time</span><span class="small">newest first</span></Row>
-      {#each reviews as r}
+      <div class="seg" data-size="wide" role="radiogroup" aria-label="Show reviews">{#each VIEWS as v}<label><input type="radio" name="proj-rev-view-phone" checked={reviewView === v} onchange={() => reviewView = v} />{v}</label>{/each}</div>
+      {#each shown as r}
         <a class="card-link su-revline" href={r.href ?? go(r.to)}>
-          <span class="su-revcol" data-grow><span class="small">{r.when}</span><span class="su-clip">{r.title}</span><span class="l-row" data-gap="2"><Pill stage={r.stage} /></span></span>
+          <span class="su-revcol" data-grow><span class="small">{r.when}</span><span class="su-clip">{r.title}</span><span class="l-row" data-gap="2"><Pill stage={r.stage} />{#if r.archived}<Tag label="Archived" />{/if}</span></span>
           {#if r.overall}<Level level={r.overall} />{:else}<span class="small">{r.note}</span>{/if}
         </a>
+      {:else}
+        <p class="small">{reviewView === "Archived" ? "No archived reviews in this project." : "No reviews in this view."}</p>
       {/each}
     </section>
   {:else}
     <Page gap={5}>
       <Row split wrap gap={4}>
-        <Stack gap={1}><a class="link small" href={go("workspace")}>{ws.name}</a><h1 class="title-page">{p.name}</h1><p class="small t-15">{p.meta}</p></Stack>
-        <Row gap={2}><Button icon={dots} ariaLabel="Project settings" href={SETTINGS} disabled={!SETTINGS} /><Button label="People" href={go("people")} lead={people} /><Button label="Start a 3D Review" variant="primary" href={START} lead={plus} /></Row>
+        <Stack gap={1}>{#if !limitedAccess}<a class="link small" href={go("workspace")}>{ws.name}</a>{:else}<span class="small">{ws.name}</span>{/if}<Row wrap gap={2}><h1 class="title-page">{p.name}</h1>{#if limitedAccess}<Tag label="Assessment only" />{/if}</Row><p class="small t-15">{p.meta}</p>{#if limitedAccess}<p class="small" data-limited-guidance>{data.limitedGuidance}</p>{/if}</Stack>
+        {#if !limitedAccess}<Row gap={2}><Button icon={dots} ariaLabel="Project settings" href={SETTINGS} disabled={!SETTINGS} /><Button label="People" href={go("people")} lead={people} /><Button label="Start a 3D Review" variant="primary" href={START} lead={plus} /></Row>{/if}
       </Row>
       <div class="l-grid" data-tpl="su-project" data-gap="5">
         <div class="l-stack" data-gap="3">
-          <h2 class="h2">Reviews, newest first</h2>
-          {#each reviews as r}
+          <Row split wrap gap={3}><h2 class="h2">Reviews, newest first</h2><div class="seg" data-size="wide" role="radiogroup" aria-label="Show reviews">{#each VIEWS as v}<label><input type="radio" name="proj-rev-view" checked={reviewView === v} onchange={() => reviewView = v} />{v}</label>{/each}</div></Row>
+          {#each shown as r}
             <a class="card-link glass l-card su-rev" href={r.href ?? go(r.to)}>
               <span class="small tab-n">{r.when}</span>
               <span class="l-stack" data-gap="2">
-                <span class="l-row" data-gap="2"><span class="h3">{r.title}</span><Pill stage={r.stage} /></span>
+                <span class="l-row" data-gap="2"><span class="h3">{r.title}</span><Pill stage={r.stage} />{#if r.archived}<Tag label="Archived" />{/if}</span>
                 <span class="l-row" data-wrap data-gap="4">{#if r.levels}{#each r.levels as [lens, level, n]}<span class="lvl-pair"><LensDot {lens} /><Level {level} /><Coverage {n} variant="short" /></span>{/each}{:else}<span class="small">{r.note}</span>{/if}</span>
               </span>
               <span class="go" aria-hidden="true"><Glyph name="arrow" /></span>
             </a>
+          {:else}
+            <p class="small">{reviewView === "Archived" ? "No archived reviews in this project." : "No reviews in this view."}</p>
           {/each}
         </div>
         <aside class="glass l-card l-stack" data-gap="3" aria-labelledby="trend-h">
